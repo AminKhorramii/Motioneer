@@ -1,46 +1,61 @@
 /**
- * Briefs. A brief carries the copy and the design tokens of a section or a
- * whole page so the work can be rebuilt somewhere else, by a person or a model.
+ * The brief: everything needed to rebuild this page somewhere else, and nothing else.
+ *
+ * It is written for a model that has to produce UI from it, so the tokens appear once rather
+ * than under every section, arrays collapse onto one line, and the closing instruction is a
+ * sentence rather than a paragraph. The earlier version repeated the same six lines of tokens
+ * nine times, which was most of its length and none of its information.
  */
 
-import { KIND_LABEL, KIND_VARIANTS, type Page, type Section } from '@/sections'
-import type { Taste } from '@/taste'
+import { KIND_LABEL, KIND_VARIANTS, type Page } from '@/sections'
+import { worldById } from '@/worlds'
 
-/** the brief: what a model (or a person) needs to rebuild this section elsewhere */
-export function sectionBrief(sec: Section, t: Taste): string {
-  const lines = [
-    `## ${KIND_LABEL[sec.kind]}, ${KIND_VARIANTS[sec.kind][sec.variant] ?? 'default'} layout`,
-    '',
-    '**Copy**',
-    ...briefLines(sec.content, ''),
-    '',
-    '**Design tokens**',
-    `- background ${t.bg} · text ${t.ink} · muted ${t.dim} · accent ${t.accent} / ${t.accent2}`,
-    `- display ${t.display.split(',')[0]} · body ${t.body.split(',')[0]} · type scale ${t.scale.toFixed(2)} · weight ${t.weight}`,
-    `- radius ${t.radius}px · density ${t.density.toFixed(2)} (0 airy … 1 tight) · motion ${t.motion}`,
-  ]
-  return lines.join('\n')
-}
+/** a value on one line, so a nested list reads as a list rather than as run together text */
+const flat = (v: unknown): string => (Array.isArray(v) ? v.map(flat).join(', ') : String(v))
 
-function briefLines(obj: unknown, prefix: string): string[] {
-  if (Array.isArray(obj)) return obj.flatMap((v, i) => briefLines(v, `${prefix}[${i}]`))
-  if (obj && typeof obj === 'object')
-    return Object.entries(obj as Record<string, unknown>).flatMap(([k, v]) =>
-      briefLines(v, prefix ? `${prefix}.${k}` : k),
-    )
-  return [`- ${prefix}: ${String(obj)}`]
+/** one line per key: scalars inline, string lists comma joined, object lists numbered */
+function lines(obj: unknown, key: string, indent = ''): string[] {
+  if (Array.isArray(obj)) {
+    if (!obj.length) return []
+    if (obj.every((v) => typeof v !== 'object' || v === null)) return [`${indent}${key}: ${obj.join(', ')}`]
+    return [
+      `${indent}${key}:`,
+      ...obj.flatMap((v, i) =>
+        typeof v === 'object' && v !== null
+          ? [`${indent}  ${i + 1}. ${Object.values(v as object).map(flat).join(' | ')}`]
+          : [`${indent}  ${i + 1}. ${String(v)}`],
+      ),
+    ]
+  }
+  if (obj && typeof obj === 'object') {
+    return Object.entries(obj as Record<string, unknown>).flatMap(([k, v]) => lines(v, k, indent))
+  }
+  const value = String(obj ?? '').trim()
+  return value ? [`${indent}${key}: ${value}`] : []
 }
 
 export function pageBrief(page: Page, product: string): string {
+  const t = page.taste
+  const w = worldById(page.world)
+  const on = page.sections.filter((s) => s.on)
+  const s = w.structure
+
   return [
-    `# Landing page brief: ${product}`,
+    `# ${product || 'Landing page'}`,
     '',
-    `A ${page.sections.filter((s) => s.on).length}-section page. Sections in order:`,
-    ...page.sections.filter((s) => s.on).map((s, i) => `${i + 1}. ${KIND_LABEL[s.kind]} (${KIND_VARIANTS[s.kind][s.variant] ?? 'default'})`),
+    '## Tokens',
+    `bg ${t.bg} · ink ${t.ink} · dim ${t.dim} · accent ${t.accent} · accent2 ${t.accent2}`,
+    `display ${t.display.split(',')[0]} · body ${t.body.split(',')[0]} · scale ${t.scale.toFixed(2)} · weight ${t.weight}`,
+    `radius ${t.radius}px · density ${t.density.toFixed(2)} · motion ${t.motion}`,
+    `${w.name}: ${s.rules ? 'ruled' : 'unruled'} · ${s.numbered ? 'numbered' : 'unnumbered'} · ${s.bleed ? 'full bleed' : 'contained'} · measure ${s.measure}ch · figures ${s.figure}`,
     '',
-    ...page.sections.filter((s) => s.on).map((s) => sectionBrief(s, page.taste)),
+    '## Sections',
+    ...on.flatMap((sec, i) => [
+      '',
+      `### ${i + 1}. ${KIND_LABEL[sec.kind]}, layout ${KIND_VARIANTS[sec.kind][sec.variant] ?? 'default'}`,
+      ...lines(sec.content, ''),
+    ]),
     '',
-    '---',
-    'Rebuild this as a single self-contained HTML file. Keep the copy exactly; honour the tokens.',
+    'Build one self-contained HTML file. Keep the copy. Honour the tokens.',
   ].join('\n')
 }

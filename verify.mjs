@@ -164,12 +164,14 @@ await page.waitForSelector('.copybrief', { timeout: 10000 })
 await page.click('.copybrief')
 await page.waitForTimeout(400)
 const pgBrief = await page.evaluate(() => navigator.clipboard.readText().catch(() => ''))
-console.log('briefs:', JSON.stringify({
-  pageBriefStarts: pgBrief.slice(0, 40),
-  coversEverySection: pgBrief.split('\n').filter((l) => l.startsWith('## ')).length,
-  pageBriefHasTokens: pgBrief.includes('Design tokens'),
-  pageBriefLines: pgBrief.split('\n').length,
+console.log('brief:', JSON.stringify({
+  coversEverySection: pgBrief.split('\n').filter((l) => l.startsWith('### ')).length,
+  // tokens belong once: repeating them under every section was most of the old brief
+  tokenBlocks: pgBrief.split('\n').filter((l) => l.startsWith('bg #')).length,
+  lines: pgBrief.split('\n').length,
+  chars: pgBrief.length,
 }))
+
 
 // ——— 5. the prompt bar makes variants (mocked model) ———
 await page.evaluate(() => {
