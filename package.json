@@ -1,0 +1,33 @@
+{
+  "name": "wall",
+  "private": true,
+  "version": "0.1.0",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "build": "tsc -b && vite build",
+    "start": "electron .",
+    "app": "npm run build && electron .",
+    "web": "vite",
+    "verify": "npm run build && node verify.mjs",
+    "verify:web": "npm run build && node verify-web.mjs",
+    "verify:stream": "npm run build && node verify-stream.mjs",
+    "capture": "npm run build && node capture.mjs",
+    "verify:all": "npm run build && node verify.mjs && node verify-web.mjs && node verify-stream.mjs && node verify-stream.mjs fixtures/truncated",
+    "verify:stream:truncated": "node verify-stream.mjs fixtures/truncated"
+  },
+  "dependencies": {
+    "@fontsource-variable/inter": "^5.3.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.3",
+    "electron": "latest",
+    "typescript": "~6.0.2",
+    "vite": "^8.1.1"
+  },
+  "type": "module"
+}

@@ -1,0 +1,126 @@
+{
+  "status": 200,
+  "ms": 23420,
+  "ids": [
+    "kof2ri9",
+    "30oltsy",
+    "mrwxj1a",
+    "947bk61",
+    "ggpvuji",
+    "5vg9nky",
+    "y0jafbw",
+    "2n5iz68",
+    "tfuc7cb"
+  ],
+  "chunks": [
+    {
+      "at": 2488,
+      "text": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"model\":\"claude-sonnet-5\",\"id\":\"msg_01"
+    },
+    {
+      "at": 2488,
+      "text": "1Cdg12YvEbfNgjVN8UszN5\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":1568,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":2,\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}             }\n\n"
+    },
+    {
+      "at": 2907,
+      "text": "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"thinking\",\"thinking\":\"\",\"signature\":\"\"}    }\n\n"
+    },
+    {
+      "at": 17882,
+      "text": "event: ping\ndata: {\"type\": \"ping\"}\n\n"
+    },
+    {
+      "at": 17888,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"signature_delta\",\"signature\":\"EoofCokBCBAYAipAqUcycqyUEele56Wmo4bT3D8p1iNCp6V5ZZBoEvrA3FF3EG5UVGVHJrC9aP1iIO4draNAemLxg5z45HwBIa09SzIPY2xhdWRlLXNvbm5ldC01OABCCHRoaW5raW5nWiQzZTIzMDdiYS1lYzJlLTQzMWItYTI5Yi1lZWU2NzE4N2UwN2USDBI/YV3MV2hc/N6+wBoM8wKBguwiGqwQbEbmIjCk88SU0xvxOLz6HnZc57/DuU7oRPuAHM/xUv5Rh7/VnIzzzhAaKakoVJDh9i1gESoqrR0rwTPQD2q3iPHUS+PQnSyL7Pj7wknEbOoOQsZB67ojDiSrJLrO0lxrVBEJseFBV4wGpQ8E+jGPVnRi+QD/V+WY82Se29BExvWH6y+7MjFn2Z7uFsASN6od2w2EBtjaMD4cfCdGrQNf+fQVzcQmOU+mES1BUPIM0PAvg0w4fD2nSrX/U43zfQ9mwR71tfc9Us1YUUBXieFmtjbd9MoCDk2aqG4bgWFKJGDx5xU3mVTucG3CEEoEFRgUuk/b7jIHA7EqiAJ31Nzh/TU9KoEAVl4xSG9HdaacQM1LVprIKdWnu5ugOabp7/cnWBHaGh5qPyMZbmKiJJMvcbm0U+Iz51K5H/qorr7Kp1Ts01gDrc6RHwmYJJtlnPOApDOkwPNvV4fd5QNIZ07rE6Cu2Uot97tTOxvWVcwcvN/7zugTh9zMtMtFWjv9pm5Hj4x6h6IXL60s2ewtk3BWUKThmS2AB/SiMhwa1eBLkvpslr4ok6OGNp5kxxqwDYKKos8Hz5zm8bgUzHOjiFwtkmQ69XUL4WCgUUGdWAwe/VVK7aI41rihFGRr1j0H9jV7QSj/c6oJU0Vchjh4DTM+3X3vYtDML6Xm4ZDDhaMigpAZs0jYKH7qIRgS+bopeBXEO3AQ2h2hyWw1E/56FbiaasYOEsrPOGTQf7RigpIjmObAJdXsWE+e4xIbw5JVGEGD15RuUN/y4gDL+kpz2Gp8N6PQclA5IfZ0eOWj2Vo01IfEWx6Zo1l5KRX6B3K7M6cyFWwvZu53g4RH7/F+1HWBxD0rJgZp4RwajWuljE7t3Rudif+rQaX8GdXGqi4ehPurm9oefn6epa3pLDGeHSUjO+HL6ZtyfQ47qo1FdCMRWkujpNOY2gKVeJDVQJsO9SmAd30C0iT/rOfgSXRAg6gV53LY1XK4gMsTLuZazI02clMd72S9EREFKfRtdoeUjTLLwvujhaSsS3tAqDKyPSMABkTXKgUClSp+/vROArhfbrhu0IZ0thrGQLj9FuvlVRxeL9VPjXbza/G22K"
+    },
+    {
+      "at": 17888,
+      "text": "mrouOpSL4EYPfxtMeLfp2/DsPB6Gpd9FtToSFkCjlSUYXzuA0weEWHSynVleF2ohxvRsyh/UWZz61L4W2wSs/6pSOdvw9uDURwuvilX5tHIvFIbaRimk563YqwlasKP3fCru6B2en7bvBU+RsVpTQCzluJQeQjNkczy4RDZA7Y/GBuiQv604LY4QuXJYes9nWexFG4NX3ZuD9bV6ErhgQxi5eZ4w+w5okq1l95OkW3gkj8S1+T4t0a7vIHYE0TbtRsKfQYpgmAr1XAlWTdwUokgkZP2JepN8QICFdSZbI6dBjIz7j77iUCQVYyZFuOBgQLZWiAqAYYbB2AtBc2+sDOCjL1Tcnv9VqVgcA1qzTEHYmg5jB6v4yPc9YzlJoJ/4DaOnQ46fC6hQAqYXWotGlrEAc74cgFGQ4h6vY7mx0jx9YeUZ7o+kbBmD333WugO6adg0fjldezWQ5wCg1dvrzp8AKbMgk1ltMdL9QMEVOZ+99w1CFjbCjG6fw/5JT+c8P2wLjSyIyNKsWGb/tHtfIYPMTsF0R266i36iJRxGhDs4hfXO5uq2mDENBfvup5V4LXe25l2S2kFN5bVaPjaLrevX8B+IKH5B8V7MMb8gANOFgt5IAHGLwMeodUhCqQ6+pbbyVFzJdquyXF4gbfdZ6ig7fffO2ZiMXhLodzYVXlDCaumnVTwOj1L45v1I5efYuOol1r98CVf7X1qANqOTSJ+Mf43iqWbmTRtXe3G8ty9Mpcqk3zSRHRL7uvFtE+tlq+Ff2qhqeiiyYCptm9UNcBVRKI3YvWtv9mMrdbRIMXpgoSQJJYqIg0Cni9HOi4JXybc/TMv5Llf1FgNBrW8jLJIUFi/G/fSJltedNqXKsApEdheg3TWxj6ljPsNmPWsXFhYWE2z3mYXAay+2z+g4eCvfscMlwZ+aBW6juX57cU4riFalyi9UiLsCpe+sgCbhGnIC5/kLJKI3mfa0bqykY2lvG1QnhSpMeadkUBsc+pjVkRrrKJClfsDGBLNC91mUHCqM0k6CUSPjr94/jk/BOdlmLwZKMFwIZb2rSXo7KYb9phAOA1MxRp5dYxY0hs4Tj4ImiHujE2laCxWSRfEjbgmwux6h6BBYl1RTh4Vt5tBRhqkxCVp6LTyFba0YSzwMBHjLsiXrH/GIP5DGlWf8Q/B2j964eYWLrAzxTijQU31/ZRURItwE9h3VTf/6BojEc6naQxhzXu0NKeH3kp+/4HABReY8NkDj6NP52XBFCFaZJzaiBNGrN0MXmOveyr6dY7qadg+rnFBj9ymFmHhfNIReIYBFd9kq0xoXncAot8pmpuHu+4rkYvbqLlI0EYmSF/TMNAQUxDkrdoHYXDOWtbrdbL"
+    },
+    {
+      "at": 17888,
+      "text": "qHC2kwOLM3GnGQbQfOfNTKsX6cdxxoLCzFuKILCBMsJJskLhCQ58fvDV5S1aJJcY3NHNGp8n0gi50Nny+H6kXWkQjJtsOFK2nb2RVjAKvfYNZybZaI6/+cq/LUvjVizkanR5lpKVA/uIBTTNUi0yGaWOMAVpR7RCV/ryItnd/uC8Jm9GZ6gJFVZyglvBIStCHR/86O8rBTQvrwIaPV5g0wYSoqKxPZpJRNmBV+aXdOmFNDt8TILuIxI+NgHPopsOCq3aeuVkz7fn1Gv8HFHQaJLQnki6EZk5VzDXaDSHpeCVUyFlMEp4TOmEK4md9AWQAbYpzVh819dfv60SxAFMoDHLwns4CFSwLeDxo9F/n8/4N6RSn067aqsXV3eZjN2aJwVQJ3av53S8oUVf8ntURDBaM4Fw8c5al1x3qE1QCa5iYiRbsdmJgIIMS6Yz+gN95CJf1cRofn3ZMogxQ1P1XTLarBdvdUOb3ZHkPGm8MyrfIXW8rQbBTRmMbzgF0pTOuaJ8DMfyyC5yPkcmNuBZuQlshjzdDa4J+68yu3dYdKc4Xw9KcyBQ9SqXRh0VLeU77ARVRdLJnfy0ZcSyVgkUkFoBAC5IpCK2Zm/LI6IPLLNLtWvikAx6mbQ0yaIorV3D6wjNvICcKPziHeJMuRaUtTILuKnvQmTKgn8/j9EXok5cUjLP6Cqodpk7cA7Oway9qMZyKtcV9qpcEYO/bb80Vqk86vlIyA3gIch7ECZv8uh1FZVOb84y6IjvUpmiCS14gel4Qo+es5TuBjOuWCMNrJCM9epW/nX+SeIm1UAq68f0RF9ZDq8HHPmIQsYuXPL2PeCxeTz95HViwwuqXad/oHcMnesO2F0mtskV+osKMFvAWJ5h8DbIOL9PNVb636ROMQrZoc3o0ISZkqtOBgvoT/cZeDf7JFUtjsR9iPZXYtLcTow80xQlofMwBzykqH9A+OlDcEWOpCORlU4kXrS+R8HD4sk03M/Se4puFtXsWgUzx70yJccv6w+3ln3+JWBtIXGfsjP5Hw3POzp0QpSzrp05PYFVzKRxQPd1CiGX6dt89c5DYW57MpQPA32HyIN/adQH13HLiE+rcoPL8uCk+q9YKLQSEltkuwFIycA9nyJtlHBgFCXHGd9qtq4t5xVv65xpsP7u0rNVXV8QajAOlfOHm2sITEosDx74cAZ/sOgu9BJt5wru7qEesVtizCDgmeXmKLMLhmul0ZPED3AJyWlZhLdvf0BfEgaR2ecRuPu5LlroNmxte+HIbrhe2DanZoVPVg/MnQt8Cb5kEyQPsmxeMtHGq1fcD8OxA+PSRQZrYzl8mipEHifPxOPuy5VkFYLc38uwJ5sNKOpyeeruCYOUXTK"
+    },
+    {
+      "at": 17888,
+      "text": "9kF2SmSvDD6nDQl7Kcrp5osVXBGy+NDltvUqRnocqH4h1k70j9rI+i2W5V79VpxJ/cbGO+vpQAeSU0k4MAvoIRTFvwOfT5LyerJ53yN6S+QGKQ7wwH71TIP3bR1Egeg6MRv36ph7ftdpPyZ/XhrLdlV70j6t5TMdoJ6ax2hHIrAyK7yzyteZeSbQzp04SDopMjM/c8SUG58zXIAIH6rRsnSHFpSSYGFBviWMQ91tOxJI/TCZJF3My8hll1OihFHbmN6wghM5u4yoAmYZgEpC1z8H/+xo0Ne8uYonBG8qVND8pZTgE3lvM2/ZDHNxyM3f9RP5dR6sVLeNQSHfggYDavvp0W5avrRhD/3AbOYfOtN8hNKff+4/a2Phhq9/m+vCQchN7pL6Ms5STmznAIeiOLCxAmJDHev+AxE6m9cieUIndsTlu6BmPHKVsyvfXDJ5f62J0VhpHQruRtAbFHhrSMKjcLHU5SZitEnvaeD5Y12u3ySC2cOOBUyi72fwB3Kr7+X9UR6pFG5yjx9U8y/B/6zkoYcbgyzr58UwqAilpo/xJpy3cvr410+QUoPb5QhHhJVh0565T8YTZplhyD5ldtuTS3ZFKBh7bj+Anjoy9pPcBNFBnQIbIuUsVesagh/zPiq7ES8m9vfj4CScOp0NwtSmE4j4SCI1LprbUUEoKoaQxbx+Pq9XNexDJmb787uzapm0GRdwtmRzDUD+3d6IGcpCDY3pAN5ZMPKyj5GJGhJWBIUWhG2fXJBZ5pw0cdZ0jkFDBbVU454UX9yxm14UvThXjjem+jweqxOVr86FAFr+1H5j1zcj028rqCldunY4Hd392xW3nzddax7gzGWKQzdURLx0vCHPvdA2dMqWzxJydKBNuG0K4G8wIWKYNhUdu4mCjcLuhORf36rEi5THxTOAztHaTdcuFVGm7JwijFadUg9hXvfFec2xz1aKpazANsPy22MfwyfBki0uNj+lSVXNCIdlXNbVHjwDQdOF5dsvUl1IhtzQmcKIwVuk0t7gJWHy9XJK4V2vT0cU9px4il45cw5BQYXXFAaTyZTbtMckIDEBHeF9tjvH+ojKgzFeF2+iSfzpZxHVYR5u/tLEbnzUIdrlbwbQsPoy/vVROD/xVJ18Fds6jIUR5RCCfbSWBUJ3lOrp/FiOh0MizrNulx8sgZgZeFbRDLvW2qN3XVcZejrfvmlSUzNpZHPh+BpK4hWXnrzYDGL0rhutXucvc50Y7GAE=\"}   }\n\n"
+    },
+    {
+      "at": 17890,
+      "text": "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0          }\n\n"
+    },
+    {
+      "at": 17894,
+      "text": "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":1,\"content_block\":{\"type\":\"text\",\"text\":\"\"}       }\n\n"
+    },
+    {
+      "at": 17894,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"{\\n  \\\"sections\\\": [\\n    {\\n      \\\"id\\\": \\\"kof2ri9\\\",\\n      \\\"content\"} }\n\n"
+    },
+    {
+      "at": 18233,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\\": {\\n        \\\"eyebrow\\\": \\\"for people who build with agents\\\",\\n        \\\"headline\\\": \\\"Every session you ever ran, findable in one keystroke.\\\",\\n        \\\"sub\\\": \\\"Type three words from\"}              }\n\n"
+    },
+    {
+      "at": 18608,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" a chat you had weeks ago. The exact prompt, the exact fix, the whole conversation com\"}     }\n\n"
+    },
+    {
+      "at": 18959,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"es back, in order, on your own machine.\\\",\\n        \\\"cta\\\": \\\"Download for macOS\\\",\\n        \\\"cta2\\\": \\\"See how it works\\\"\\n      }\\n    },\\n    {\\n      \\\"id\\\": \\\"mr\"}   }\n\n"
+    },
+    {
+      "at": 19323,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"wxj1a\\\",\\n      \\\"content\\\": {\\n        \\\"title\\\": \\\"How it works\\\",\\n        \\\"items\\\": [\"}          }\n\n"
+    },
+    {
+      "at": 19687,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n          {\\n            \\\"title\\\": \\\"Reads what's already there\\\",\\n            \\\"body\\\": \\\"Spoor watches the transcript files your AI tools write to disk. No setup, no extra step.\\\"\\n          },\\n          {\"}   }\n\n"
+    },
+    {
+      "at": 20051,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n            \\\"title\\\": \\\"Turns logs into one index\\\",\\n            \\\"body\\\": \\\"900MB of scattered files becomes one searchable history in seconds.\\\"\\n          },\\n          {\\n            \\\"title\\\": \\\"St\"}            }\n\n"
+    },
+    {
+      "at": 20417,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"ays on your machine\\\",\\n            \\\"body\\\": \\\"Nothing uploads. No account, no server, just your own history.\\\"\\n          }\\n        ]\\n      }\\n    },\\n    \"}      }\n\n"
+    },
+    {
+      "at": 20780,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"{\\n      \\\"id\\\": \\\"947bk61\\\",\\n      \\\"content\\\": {\\n        \\\"title\\\": \\\"Search your own history\\\",\\n        \\\"caption\\\": \\\"Type a phrase\"}        }\n\n"
+    },
+    {
+      "at": 21165,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" from any past session and get that exact moment back.\\\"\\n      }\\n    },\\n    {\\n      \\\"id\\\": \\\"y0j\"}           }\n\n"
+    },
+    {
+      "at": 21508,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"afbw\\\",\\n      \\\"content\\\": {\\n        \\\"title\\\": \\\"Questions\\\",\\n        \\\"items\\\": [\\n          {\\n            \\\"q\\\": \\\"Where does my data\"}         }\n\n"
+    },
+    {
+      "at": 21878,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" live?\\\",\\n            \\\"a\\\": \\\"On your machine. Nothing is uploaded, ever.\\\"\\n          },\\n          {\\n            \\\"q\\\": \\\"Can I cancel?\\\",\\n            \"}}\n\n"
+    },
+    {
+      "at": 22280,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\\"a\\\": \\\"Any time, in one click.\\\"\\n          },\\n          {\\n            \\\"q\\\": \\\"Does it work offline?\\\",\\n            \\\"a\\\": \\\"Yes. It never need\"}        }\n\n"
+    },
+    {
+      "at": 22603,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"s the internet to search your history.\\\"\\n          }\\n        ]\\n      }\\n    },\\n    {\\n      \\\"id\\\": \\\"2n5iz68\\\",\\n      \\\"content\\\": {\\n        \\\"\"}     }\n\n"
+    },
+    {
+      "at": 22987,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"headline\\\": \\\"Start with Spoor today.\\\",\\n        \\\"sub\\\": \\\"No account needed to try it.\\\",\\n        \\\"cta\\\": \\\"Download for macOS\\\"\\n      }\\n    }\\n  ]\\n}\"}      }\n\n"
+    },
+    {
+      "at": 23388,
+      "text": "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":1      }\n\n"
+    },
+    {
+      "at": 23418,
+      "text": "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null},\"usage\":{\"input_tokens\":1568,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":1934,\"output_tokens_details\":{\"thinking_tokens\":1257}}        }\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"         }\n\n"
+    }
+  ],
+  "raw": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011Cdg12YvEbfNgjVN8UszN5\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":1568,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":2,\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}             }\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"thinking\",\"thinking\":\"\",\"signature\":\"\"}    }\n\nevent: ping\ndata: {\"type\": \"ping\"}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"signature_delta\",\"signature\":\"EoofCokBCBAYAipAqUcycqyUEele56Wmo4bT3D8p1iNCp6V5ZZBoEvrA3FF3EG5UVGVHJrC9aP1iIO4draNAemLxg5z45HwBIa09SzIPY2xhdWRlLXNvbm5ldC01OABCCHRoaW5raW5nWiQzZTIzMDdiYS1lYzJlLTQzMWItYTI5Yi1lZWU2NzE4N2UwN2USDBI/YV3MV2hc/N6+wBoM8wKBguwiGqwQbEbmIjCk88SU0xvxOLz6HnZc57/DuU7oRPuAHM/xUv5Rh7/VnIzzzhAaKakoVJDh9i1gESoqrR0rwTPQD2q3iPHUS+PQnSyL7Pj7wknEbOoOQsZB67ojDiSrJLrO0lxrVBEJseFBV4wGpQ8E+jGPVnRi+QD/V+WY82Se29BExvWH6y+7MjFn2Z7uFsASN6od2w2EBtjaMD4cfCdGrQNf+fQVzcQmOU+mES1BUPIM0PAvg0w4fD2nSrX/U43zfQ9mwR71tfc9Us1YUUBXieFmtjbd9MoCDk2aqG4bgWFKJGDx5xU3mVTucG3CEEoEFRgUuk/b7jIHA7EqiAJ31Nzh/TU9KoEAVl4xSG9HdaacQM1LVprIKdWnu5ugOabp7/cnWBHaGh5qPyMZbmKiJJMvcbm0U+Iz51K5H/qorr7Kp1Ts01gDrc6RHwmYJJtlnPOApDOkwPNvV4fd5QNIZ07rE6Cu2Uot97tTOxvWVcwcvN/7zugTh9zMtMtFWjv9pm5Hj4x6h6IXL60s2ewtk3BWUKThmS2AB/SiMhwa1eBLkvpslr4ok6OGNp5kxxqwDYKKos8Hz5zm8bgUzHOjiFwtkmQ69XUL4WCgUUGdWAwe/VVK7aI41rihFGRr1j0H9jV7QSj/c6oJU0Vchjh4DTM+3X3vYtDML6Xm4ZDDhaMigpAZs0jYKH7qIRgS+bopeBXEO3AQ2h2hyWw1E/56FbiaasYOEsrPOGTQf7RigpIjmObAJdXsWE+e4xIbw5JVGEGD15RuUN/y4gDL+kpz2Gp8N6PQclA5IfZ0eOWj2Vo01IfEWx6Zo1l5KRX6B3K7M6cyFWwvZu53g4RH7/F+1HWBxD0rJgZp4RwajWuljE7t3Rudif+rQaX8GdXGqi4ehPurm9oefn6epa3pLDGeHSUjO+HL6ZtyfQ47qo1FdCMRWkujpNOY2gKVeJDVQJsO9SmAd30C0iT/rOfgSXRAg6gV53LY1XK4gMsTLuZazI02clMd72S9EREFKfRtdoeUjTLLwvujhaSsS3tAqDKyPSMABkTXKgUClSp+/vROArhfbrhu0IZ0thrGQLj9FuvlVRxeL9VPjXbza/G22KmrouOpSL4EYPfxtMeLfp2/DsPB6Gpd9FtToSFkCjlSUYXzuA0weEWHSynVleF2ohxvRsyh/UWZz61L4W2wSs/6pSOdvw9uDURwuvilX5tHIvFIbaRimk563YqwlasKP3fCru6B2en7bvBU+RsVpTQCzluJQeQjNkczy4RDZA7Y/GBuiQv604LY4QuXJYes9nWexFG4NX3ZuD9bV6ErhgQxi5eZ4w+w5okq1l95OkW3gkj8S1+T4t0a7vIHYE0TbtRsKfQYpgmAr1XAlWTdwUokgkZP2JepN8QICFdSZbI6dBjIz7j77iUCQVYyZFuOBgQLZWiAqAYYbB2AtBc2+sDOCjL1Tcnv9VqVgcA1qzTEHYmg5jB6v4yPc9YzlJoJ/4DaOnQ46fC6hQAqYXWotGlrEAc74cgFGQ4h6vY7mx0jx9YeUZ7o+kbBmD333WugO6adg0fjldezWQ5wCg1dvrzp8AKbMgk1ltMdL9QMEVOZ+99w1CFjbCjG6fw/5JT+c8P2wLjSyIyNKsWGb/tHtfIYPMTsF0R266i36iJRxGhDs4hfXO5uq2mDENBfvup5V4LXe25l2S2kFN5bVaPjaLrevX8B+IKH5B8V7MMb8gANOFgt5IAHGLwMeodUhCqQ6+pbbyVFzJdquyXF4gbfdZ6ig7fffO2ZiMXhLodzYVXlDCaumnVTwOj1L45v1I5efYuOol1r98CVf7X1qANqOTSJ+Mf43iqWbmTRtXe3G8ty9Mpcqk3zSRHRL7uvFtE+tlq+Ff2qhqeiiyYCptm9UNcBVRKI3YvWtv9mMrdbRIMXpgoSQJJYqIg0Cni9HOi4JXybc/TMv5Llf1FgNBrW8jLJIUFi/G/fSJltedNqXKsApEdheg3TWxj6ljPsNmPWsXFhYWE2z3mYXAay+2z+g4eCvfscMlwZ+aBW6juX57cU4riFalyi9UiLsCpe+sgCbhGnIC5/kLJKI3mfa0bqykY2lvG1QnhSpMeadkUBsc+pjVkRrrKJClfsDGBLNC91mUHCqM0k6CUSPjr94/jk/BOdlmLwZKMFwIZb2rSXo7KYb9phAOA1MxRp5dYxY0hs4Tj4ImiHujE2laCxWSRfEjbgmwux6h6BBYl1RTh4Vt5tBRhqkxCVp6LTyFba0YSzwMBHjLsiXrH/GIP5DGlWf8Q/B2j964eYWLrAzxTijQU31/ZRURItwE9h3VTf/6BojEc6naQxhzXu0NKeH3kp+/4HABReY8NkDj6NP52XBFCFaZJzaiBNGrN0MXmOveyr6dY7qadg+rnFBj9ymFmHhfNIReIYBFd9kq0xoXncAot8pmpuHu+4rkYvbqLlI0EYmSF/TMNAQUxDkrdoHYXDOWtbrdbLqHC2kwOLM3GnGQbQfOfNTKsX6cdxxoLCzFuKILCBMsJJskLhCQ58fvDV5S1aJJcY3NHNGp8n0gi50Nny+H6kXWkQjJtsOFK2nb2RVjAKvfYNZybZaI6/+cq/LUvjVizkanR5lpKVA/uIBTTNUi0yGaWOMAVpR7RCV/ryItnd/uC8Jm9GZ6gJFVZyglvBIStCHR/86O8rBTQvrwIaPV5g0wYSoqKxPZpJRNmBV+aXdOmFNDt8TILuIxI+NgHPopsOCq3aeuVkz7fn1Gv8HFHQaJLQnki6EZk5VzDXaDSHpeCVUyFlMEp4TOmEK4md9AWQAbYpzVh819dfv60SxAFMoDHLwns4CFSwLeDxo9F/n8/4N6RSn067aqsXV3eZjN2aJwVQJ3av53S8oUVf8ntURDBaM4Fw8c5al1x3qE1QCa5iYiRbsdmJgIIMS6Yz+gN95CJf1cRofn3ZMogxQ1P1XTLarBdvdUOb3ZHkPGm8MyrfIXW8rQbBTRmMbzgF0pTOuaJ8DMfyyC5yPkcmNuBZuQlshjzdDa4J+68yu3dYdKc4Xw9KcyBQ9SqXRh0VLeU77ARVRdLJnfy0ZcSyVgkUkFoBAC5IpCK2Zm/LI6IPLLNLtWvikAx6mbQ0yaIorV3D6wjNvICcKPziHeJMuRaUtTILuKnvQmTKgn8/j9EXok5cUjLP6Cqodpk7cA7Oway9qMZyKtcV9qpcEYO/bb80Vqk86vlIyA3gIch7ECZv8uh1FZVOb84y6IjvUpmiCS14gel4Qo+es5TuBjOuWCMNrJCM9epW/nX+SeIm1UAq68f0RF9ZDq8HHPmIQsYuXPL2PeCxeTz95HViwwuqXad/oHcMnesO2F0mtskV+osKMFvAWJ5h8DbIOL9PNVb636ROMQrZoc3o0ISZkqtOBgvoT/cZeDf7JFUtjsR9iPZXYtLcTow80xQlofMwBzykqH9A+OlDcEWOpCORlU4kXrS+R8HD4sk03M/Se4puFtXsWgUzx70yJccv6w+3ln3+JWBtIXGfsjP5Hw3POzp0QpSzrp05PYFVzKRxQPd1CiGX6dt89c5DYW57MpQPA32HyIN/adQH13HLiE+rcoPL8uCk+q9YKLQSEltkuwFIycA9nyJtlHBgFCXHGd9qtq4t5xVv65xpsP7u0rNVXV8QajAOlfOHm2sITEosDx74cAZ/sOgu9BJt5wru7qEesVtizCDgmeXmKLMLhmul0ZPED3AJyWlZhLdvf0BfEgaR2ecRuPu5LlroNmxte+HIbrhe2DanZoVPVg/MnQt8Cb5kEyQPsmxeMtHGq1fcD8OxA+PSRQZrYzl8mipEHifPxOPuy5VkFYLc38uwJ5sNKOpyeeruCYOUXTK9kF2SmSvDD6nDQl7Kcrp5osVXBGy+NDltvUqRnocqH4h1k70j9rI+i2W5V79VpxJ/cbGO+vpQAeSU0k4MAvoIRTFvwOfT5LyerJ53yN6S+QGKQ7wwH71TIP3bR1Egeg6MRv36ph7ftdpPyZ/XhrLdlV70j6t5TMdoJ6ax2hHIrAyK7yzyteZeSbQzp04SDopMjM/c8SUG58zXIAIH6rRsnSHFpSSYGFBviWMQ91tOxJI/TCZJF3My8hll1OihFHbmN6wghM5u4yoAmYZgEpC1z8H/+xo0Ne8uYonBG8qVND8pZTgE3lvM2/ZDHNxyM3f9RP5dR6sVLeNQSHfggYDavvp0W5avrRhD/3AbOYfOtN8hNKff+4/a2Phhq9/m+vCQchN7pL6Ms5STmznAIeiOLCxAmJDHev+AxE6m9cieUIndsTlu6BmPHKVsyvfXDJ5f62J0VhpHQruRtAbFHhrSMKjcLHU5SZitEnvaeD5Y12u3ySC2cOOBUyi72fwB3Kr7+X9UR6pFG5yjx9U8y/B/6zkoYcbgyzr58UwqAilpo/xJpy3cvr410+QUoPb5QhHhJVh0565T8YTZplhyD5ldtuTS3ZFKBh7bj+Anjoy9pPcBNFBnQIbIuUsVesagh/zPiq7ES8m9vfj4CScOp0NwtSmE4j4SCI1LprbUUEoKoaQxbx+Pq9XNexDJmb787uzapm0GRdwtmRzDUD+3d6IGcpCDY3pAN5ZMPKyj5GJGhJWBIUWhG2fXJBZ5pw0cdZ0jkFDBbVU454UX9yxm14UvThXjjem+jweqxOVr86FAFr+1H5j1zcj028rqCldunY4Hd392xW3nzddax7gzGWKQzdURLx0vCHPvdA2dMqWzxJydKBNuG0K4G8wIWKYNhUdu4mCjcLuhORf36rEi5THxTOAztHaTdcuFVGm7JwijFadUg9hXvfFec2xz1aKpazANsPy22MfwyfBki0uNj+lSVXNCIdlXNbVHjwDQdOF5dsvUl1IhtzQmcKIwVuk0t7gJWHy9XJK4V2vT0cU9px4il45cw5BQYXXFAaTyZTbtMckIDEBHeF9tjvH+ojKgzFeF2+iSfzpZxHVYR5u/tLEbnzUIdrlbwbQsPoy/vVROD/xVJ18Fds6jIUR5RCCfbSWBUJ3lOrp/FiOh0MizrNulx8sgZgZeFbRDLvW2qN3XVcZejrfvmlSUzNpZHPh+BpK4hWXnrzYDGL0rhutXucvc50Y7GAE=\"}   }\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0          }\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":1,\"content_block\":{\"type\":\"text\",\"text\":\"\"}       }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"{\\n  \\\"sections\\\": [\\n    {\\n      \\\"id\\\": \\\"kof2ri9\\\",\\n      \\\"content\"} }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\\": {\\n        \\\"eyebrow\\\": \\\"for people who build with agents\\\",\\n        \\\"headline\\\": \\\"Every session you ever ran, findable in one keystroke.\\\",\\n        \\\"sub\\\": \\\"Type three words from\"}              }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" a chat you had weeks ago. The exact prompt, the exact fix, the whole conversation com\"}     }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"es back, in order, on your own machine.\\\",\\n        \\\"cta\\\": \\\"Download for macOS\\\",\\n        \\\"cta2\\\": \\\"See how it works\\\"\\n      }\\n    },\\n    {\\n      \\\"id\\\": \\\"mr\"}   }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"wxj1a\\\",\\n      \\\"content\\\": {\\n        \\\"title\\\": \\\"How it works\\\",\\n        \\\"items\\\": [\"}          }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n          {\\n            \\\"title\\\": \\\"Reads what's already there\\\",\\n            \\\"body\\\": \\\"Spoor watches the transcript files your AI tools write to disk. No setup, no extra step.\\\"\\n          },\\n          {\"}   }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n            \\\"title\\\": \\\"Turns logs into one index\\\",\\n            \\\"body\\\": \\\"900MB of scattered files becomes one searchable history in seconds.\\\"\\n          },\\n          {\\n            \\\"title\\\": \\\"St\"}            }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"ays on your machine\\\",\\n            \\\"body\\\": \\\"Nothing uploads. No account, no server, just your own history.\\\"\\n          }\\n        ]\\n      }\\n    },\\n    \"}      }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"{\\n      \\\"id\\\": \\\"947bk61\\\",\\n      \\\"content\\\": {\\n        \\\"title\\\": \\\"Search your own history\\\",\\n        \\\"caption\\\": \\\"Type a phrase\"}        }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" from any past session and get that exact moment back.\\\"\\n      }\\n    },\\n    {\\n      \\\"id\\\": \\\"y0j\"}           }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"afbw\\\",\\n      \\\"content\\\": {\\n        \\\"title\\\": \\\"Questions\\\",\\n        \\\"items\\\": [\\n          {\\n            \\\"q\\\": \\\"Where does my data\"}         }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" live?\\\",\\n            \\\"a\\\": \\\"On your machine. Nothing is uploaded, ever.\\\"\\n          },\\n          {\\n            \\\"q\\\": \\\"Can I cancel?\\\",\\n            \"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\\"a\\\": \\\"Any time, in one click.\\\"\\n          },\\n          {\\n            \\\"q\\\": \\\"Does it work offline?\\\",\\n            \\\"a\\\": \\\"Yes. It never need\"}        }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"s the internet to search your history.\\\"\\n          }\\n        ]\\n      }\\n    },\\n    {\\n      \\\"id\\\": \\\"2n5iz68\\\",\\n      \\\"content\\\": {\\n        \\\"\"}     }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"headline\\\": \\\"Start with Spoor today.\\\",\\n        \\\"sub\\\": \\\"No account needed to try it.\\\",\\n        \\\"cta\\\": \\\"Download for macOS\\\"\\n      }\\n    }\\n  ]\\n}\"}      }\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":1      }\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null},\"usage\":{\"input_tokens\":1568,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":1934,\"output_tokens_details\":{\"thinking_tokens\":1257}}        }\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"         }\n\n"
+}

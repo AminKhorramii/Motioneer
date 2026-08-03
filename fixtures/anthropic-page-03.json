@@ -1,0 +1,166 @@
+{
+  "status": 200,
+  "ms": 20604,
+  "ids": [
+    "vih4b3n",
+    "em8euyq",
+    "5guha54",
+    "zodlwar",
+    "2d8syyr",
+    "j2er4id",
+    "tb5o9cq",
+    "4jtil7n",
+    "s4q2q30"
+  ],
+  "chunks": [
+    {
+      "at": 1693,
+      "text": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"model\":\"claude-sonnet-5\",\"id\":\"msg_01"
+    },
+    {
+      "at": 1693,
+      "text": "1Cdg6w1ZtuGU4oq836jcVb\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":1757,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":2,\"service_tier\":\"standard\",\"inference_geo\":\"global\"}} }\n\n"
+    },
+    {
+      "at": 2483,
+      "text": "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"thinking\",\"thinking\":\"\",\"signature\":\"\"}       }\n\n"
+    },
+    {
+      "at": 11640,
+      "text": "event: ping\ndata: {\"type\": \"ping\"}\n\n"
+    },
+    {
+      "at": 11642,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"signature_delta\",\"signature\":\"EtIRCokBCBAYAipA7OSUUX5q6OKqhW7OQTEyH93sxpRNcDyrqplmsYlTCmVmyLKfLbW7Lpbf+aN07FTGLDu4E6PSbQOnikYiyQ7XKzIPY2xhdWRlLXNvbm5ldC01OABCCHRoaW5raW5nWiQzZTIzMDdiYS1lYzJlLTQzMWItYTI5Yi1lZWU2NzE4N2UwN2USDNAMhEtYakXn0MXstxoMt+p2uqJy6fUvzfGWIjATwiyU0Brf8o3N/WsQfNCmnXlUHgYqJyhIv3gUaCh5YZk8x+or/IMHi90EgvlBeCYq9Q9J3OloGnZooMm8+SY3k1dA4vBxYuzU8D6zdvUjtPLv26DWWD56tYGgnPr98UoMd1kZpNkonfZPfSsQXZ7DlKOCd7gy6nsb7DsKreXBtXqzJ+78mWME/pK43Mo0SeeuL8auF28K+pezNjSdyIcOE5CMPyAjuqWAeHb7mBtmQ9NbrwTanp5ve1+AjTqwkJuU5btXxcDXaBCF6GIGihVGZxPpBo/021z0hI3z3ENFFqTHx+976OvnXMzNCPCIRFyOfLVe+v5eeCdyUTlP1C0LOrhCHQv2fh0iPX/dO0iwJ1XU+XefZ3r2qIVE6XEJiKWvz9ZOpJA0zfb33q0/QVaROdjpPwRJeodG4ZTxskXD0nTvvnxy2S6UipF6HxZO0+B+1ssi5tZ8P7xbTYPl86YSUNff2t8ptoPCYY/D8SC6jhc9+glN9wnt8h3gHZbPO7qRRssJWAP02WBxL/OcfZ/jVV7t0CFW+qIA9VQ/FVQEg5Y+iWIzIkOmc/1QTgrgAma7qghW0x61/BtxRT5j67maNo+b2BVjBJ5ONT1v7/KJ+mtaXIf8X/JUanfiQYmsvHC8S6H1ZbvlOqjyZTZnfvvdePUjpsg2VJQDDW73iyhyIdb348cGe1BlPT/IhVsRpYmXZ/LywcZxOzgDlIOEhMfiynr6Kzzp5X1apc5NTzr1fDfDjhBamcUNfOdKgM8fmfG31h+EjSnULjQFQ9367q1V9jAwSdqea6Sr5pTX+3RHlVmkdz7ld6cgl/E/1yzzn34wGTkQIM4mtmh7Fn7Kkn28r3VezhdGxjEntFNjLvORGCYEtWu0prchuBkESbhAIDWKP+5uPeTQO9xgBL7e6dctSGfaKXH/H5LplpWHlu57SR2DSp1zYQq6xJ0nD9XVNcsP76ylYBiqr3BHkEf49nGoHatB66rWXDMXbDZccevIs8EGUoCQCKyiNrIjFsRjP8MrvYB98sKsdQLTmS8NZuc3ifhkIXV3xxOiVyVQy1NvpKx+fgLC6iAYKIyXCOmOe3miZyYmwWC"
+    },
+    {
+      "at": 11642,
+      "text": "CJYAPysFMJuxq0V2Ar24ZdYLLKFYddIhSosJdnaB2FL4NXOM+RvjtUkVcT92RMIhRm2Nc1i2x/iTumqAj4kIXaL1X7G3JjoLosrL6V+yhjcry625LSdjCdNze8//5SG4oJ6esKfK0Pr+wl2VgpSjrY3SD8WCS2cztNNBuMVwbmVLCKYZGx2F0McqPUSKKowHN7v37mQtWmnX+ORj3aEeO9UyGdb/Br0YrW5in5YV+cDgrI/lJMfmtR5eoQfhwGXUotOkxZ+UkUemrmzRN9aiBfb07TKgWSQ6lAJEh6aC4U+kP/QB16pXCVAsHFSVjihUM1vrKHdEtVjPVpBZhvWq2lSQjEN4v8p0gTr3tV45uzdhoReiOW04H8p3aNde734FB08DdSfo13rUOE/te4LXl49RbIkQmXOEXGZi+yD54jjb6o9+658kQGCytqGBVx0FY7hX+/AbgWAykPqvlnByePjyyj6Rr4i1o47pr4+wA13YLrSrsXn2qqJbDRO+LApeW4/HSNAHXeZOAfX7KcjT6WcBJF7FCg5kiPbkYTQxgk39zUsB1TFOoARO0njz3dJjT8dXDYAews4Xjk/RivnQgoHi2Y3qSNWvR9xytrdZKgKVYmbobeWpr28LTgwSYkr8ByaTAQWp1MyJRn1Odhr65q+BK/BBQbi0CKYe910qgeSjq6juCHbi799R2hQ+Bd1Zt3pO7dpld+5jRpzWBBDYYMpIU47mhgVwgY6Q5YtyFeB1ZetN4nwMlZxc8mCLunRf9ZhPoMgFvG6IR26qPATkdw2SvhKHJwoqxBEVhqiFMCECZ5AFez3WWCbI3bfeWVzyrgBfOZRYdLUGkIKPuC4eInrICfkKEe3nGNNlA8wFKciwnLyRU7IbXeFyMoxJD97TEklYgdeRBxLYH/fSwi6GhwkkM774NdQgWUl3MZZ6T13+KXBynDiNqH2j9ccRUOjbuUJnOMmsqsAHMp+yB0lf4Oytxtbu3MQKg4e6IgA9YoM80HRLuhbmrTqyd8RVLUOW8AXDV0dzqhWKyb15uhMdhDrHe5lyd/A2oD+d8YKDJIJRtx9MHe7d/EpQVEPCghiGvpcDiXztY/rvTByQ9StH9X3MtzObjAavKYWVJX7//MHajeL+xOIOLTUU7Gr3CnqzS4YY8WdqvkLsuRHbFy0d+nwQWon9Ga76SYj3cpPlCNJtFiLuaGiebM3vzeAnULSwJHop8slMtzgnPyFAyQwgz9wGyhin07p1QpuM6ZPTuatUzH9UWGaPKByEN1rqMRTz1D4NPGbKS7/7/aWG5fa/UgzFLASjhoq90Hc7jDGl8JGyKeGZ35a0jPHWM0LQNykeP5RtAtYxoHy386Nk0tWZVd2Mq"
+    },
+    {
+      "at": 11642,
+      "text": "VyF+NIsfXM6IimH0vs24kveAfq5/lzSZ1iiU35itH9+T9+SYjvllP1VsrVM8RxIXnOYWOhb/o3RvmUzOqrnBqCWMN0wguYv5QJL0EVNvbZkv6gB253+mRB6NweEE7WvTG9jalpS2/SjP/TR3mBzZV1xcQsRwmBb/1VHyXhw5laxqObTV4izo7qE8WTxy6vlO7TawZKZ68zuqh7+ta7q4xl8OQ6pGZn+87q5tXMl6RgCKUxdZBNfYLlpr9JpycU7dFavgxJrOfeOhaLlCMyBf5eO8B9zmc97tFAgKTk7v7DL+A8QEvSPb+yXEbi3AnsIYAQ==\"}           }\n\n"
+    },
+    {
+      "at": 11642,
+      "text": "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0 }\n\n"
+    },
+    {
+      "at": 11645,
+      "text": "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":1,\"content_block\":{\"type\":\"text\",\"text\":\"\"} }\n\n"
+    },
+    {
+      "at": 11646,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"{\\n  \\\"sections\\\": [\\n    {\\n      \\\"id\\\": \\\"vih4b3\"}  }\n\n"
+    },
+    {
+      "at": 11983,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"n\\\",\\n      \\\"content\\\": {\\n        \\\"eyebrow\\\": \\\"\\\",\\n        \\\"headline\\\": \\\"Spoor turns your AI chat logs into a file you can search.\\\",\\n        \\\"\"}     }\n\n"
+    },
+    {
+      "at": 12348,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"sub\\\": \\\"It reads the transcripts Claude, Cursor, and other tools already save to disk, ind\"}            }\n\n"
+    },
+    {
+      "at": 12710,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"exes them on your machine, and lets you search all of it by keyword. No upload, no server.\\\",\\n        \\\"cta\\\": \\\"Download for\"}         }\n\n"
+    },
+    {
+      "at": 13078,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" macOS\\\",\\n        \\\"cta2\\\": \\\"Read how it works\\\"\\n      }\\n    },\\n    {\\n      \\\"id\\\": \\\"em8euyq\"}             }\n\n"
+    },
+    {
+      "at": 13451,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\\",\\n      \\\"content\\\": {\\n        \\\"label\\\": \\\"engineers at these companies run it\\\",\\n        \\\"names\\\": [\\n          \\\"Northwind\\\",\\n          \\\"Ac\"}     }\n\n"
+    },
+    {
+      "at": 13816,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"me\\\",\\n          \\\"Vector\\\",\\n          \\\"Halden\\\",\\n          \\\"Fold\\\"\\n        ]\\n      }\\n    },\\n    {\\n      \\\"id\\\": \\\"5guha54\"}     }\n\n"
+    },
+    {
+      "at": 14166,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\\",\\n      \\\"content\\\": {\\n        \\\"title\\\": \\\"What it does\\\",\\n        \\\"items\\\": [\\n          {\\n            \\\"title\\\": \\\"Finds your transcripts\\\",\\n            \\\"body\"}               }\n\n"
+    },
+    {
+      "at": 14539,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\\": \\\"It scans the folders where Claude, Cursor, and similar tools write session logs.\\\"\\n          },\\n          {\\n            \\\"title\\\": \\\"Builds a local index\\\",\\n            \\\"body\\\":\"}       }\n\n"
+    },
+    {
+      "at": 14974,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" \\\"It turns up to 900MB of text into a search index stored on your disk.\\\"\\n          },\\n          {\\n            \\\"title\\\": \\\"Searches by keyword\\\",\\n            \\\"body\\\": \\\"Type a term\"}          }\n\n"
+    },
+    {
+      "at": 15275,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\". Get every session that used it, with dates and tool names.\\\"\\n          }\\n        ]\\n      }\\n    },\\n    {\\n      \\\"id\\\": \\\"zod\"}   }\n\n"
+    },
+    {
+      "at": 15764,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"lwar\\\",\\n      \\\"content\\\": {\\n        \\\"title\\\": \\\"A search that takes under a second\\\",\\n        \\\"caption\\\": \\\"Typing 'refactor auth' returns 14 sessions\"}           }\n\n"
+    },
+    {
+      "at": 16115,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" from three different tools.\\\"\\n      }\\n    },\\n    {\\n      \\\"id\\\": \\\"2d8syyr\"}      }\n\n"
+    },
+    {
+      "at": 16389,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\\",\\n      \\\"content\\\": {\\n        \\\"quote\\\": \\\"I found a decision I made in March in about two seconds.\\\",\\n        \\\"name\\\": \\\"A real person\\\",\\n        \\\"role\\\": \\\"engine\"} }\n\n"
+    },
+    {
+      "at": 17155,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"er, somewhere\\\"\\n      }\\n    },\\n    {\\n      \\\"id\\\": \\\"j2er4id\"}      }\n\n"
+    },
+    {
+      "at": 17212,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\\",\\n      \\\"content\\\": {\\n        \\\"title\\\": \\\"Pricing\\\",\\n        \\\"plans\\\": [\\n          {\\n            \\\"name\\\": \\\"Free\\\",\\n            \\\"price\\\": \\\"$0\\\",\\n            \\\"line\\\": \\\"one\"}     }\n\n"
+    },
+    {
+      "at": 17476,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" project, local only\\\",\\n            \\\"features\\\": [\\n              \\\"One project\\\",\\n              \\\"Local only\\\"\\n            ]\\n          },\\n          {\\n            \\\"name\\\": \\\"Pro\\\",\\n            \\\"price\\\": \\\"$19\\\",\\n            \\\"line\\\":\"}         }\n\n"
+    },
+    {
+      "at": 17807,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" \\\"per month\\\",\\n            \\\"features\\\": [\\n              \\\"Unlimited projects\\\",\\n              \\\"Everything stays local\\\",\\n              \\\"Priority replies\\\"\\n            ]\\n          },\\n          {\\n            \\\"name\\\": \\\"Team\\\",\\n            \\\"price\\\":\"}        }\n\n"
+    },
+    {
+      "at": 18180,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" \\\"$49\\\",\\n            \\\"line\\\": \\\"per month\\\",\\n            \\\"features\\\": [\\n              \\\"Shared workspace\\\",\\n              \\\"Roles\\\",\\n              \\\"Invoicing\\\"\\n            ]\\n          }\\n        ]\\n      }\"}            }\n\n"
+    },
+    {
+      "at": 18532,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n    },\\n    {\\n      \\\"id\\\": \\\"tb5o9cq\\\",\\n      \\\"content\\\": {\"}           }\n\n"
+    },
+    {
+      "at": 18906,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n        \\\"title\\\": \\\"Questions\\\",\\n        \\\"items\\\": [\\n          {\\n            \\\"q\\\": \\\"Where does my data live?\\\",\\n            \\\"a\\\": \\\"On your machine, in a local index\"}             }\n\n"
+    },
+    {
+      "at": 19265,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\". Nothing leaves it.\\\"\\n          },\\n          {\\n            \\\"q\\\": \\\"Can I cancel?\\\",\\n            \\\"a\\\": \\\"Yes, in one click, any\"}  }\n\n"
+    },
+    {
+      "at": 19626,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" time.\\\"\\n          },\\n          {\\n            \\\"q\\\": \\\"Does it work offline?\\\",\\n            \\\"a\\\": \\\"Yes. It reads files already on your disk.\\\"\\n          }\\n        \"}   }\n\n"
+    },
+    {
+      "at": 19989,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"]\\n      }\\n    },\\n    {\\n      \\\"id\\\": \\\"4jtil7n\\\",\\n      \\\"content\\\": {\\n        \\\"headline\\\": \\\"Download it and search your first transcript today.\\\",\\n        \\\"sub\\\": \\\"No\"}   }\n\n"
+    },
+    {
+      "at": 20353,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" account needed. It runs on your machine.\\\",\\n        \\\"cta\\\": \\\"Download for macOS\\\"\\n      }\\n    },\\n    {\\n      \\\"id\\\": \\\"s4q2q30\\\",\"}          }\n\n"
+    },
+    {
+      "at": 20588,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n      \\\"content\\\": {\\n        \\\"product\\\": \\\"Spoor\\\",\\n        \\\"note\\\": \\\"\\\"\\n      }\\n    }\\n  ]\\n}\"} }\n\n"
+    },
+    {
+      "at": 20590,
+      "text": "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":1}\n\n"
+    },
+    {
+      "at": 20603,
+      "text": "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null},\"usage\":{\"input_tokens\":1757,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":1878,\"output_tokens_details\":{\"thinking_tokens\":718}}    }\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"     }\n\n"
+    }
+  ],
+  "raw": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011Cdg6w1ZtuGU4oq836jcVb\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":1757,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":2,\"service_tier\":\"standard\",\"inference_geo\":\"global\"}} }\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"thinking\",\"thinking\":\"\",\"signature\":\"\"}       }\n\nevent: ping\ndata: {\"type\": \"ping\"}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"signature_delta\",\"signature\":\"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\"}           }\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0 }\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":1,\"content_block\":{\"type\":\"text\",\"text\":\"\"} }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"{\\n  \\\"sections\\\": [\\n    {\\n      \\\"id\\\": \\\"vih4b3\"}  }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"n\\\",\\n      \\\"content\\\": {\\n        \\\"eyebrow\\\": \\\"\\\",\\n        \\\"headline\\\": \\\"Spoor turns your AI chat logs into a file you can search.\\\",\\n        \\\"\"}     }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"sub\\\": \\\"It reads the transcripts Claude, Cursor, and other tools already save to disk, ind\"}            }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"exes them on your machine, and lets you search all of it by keyword. No upload, no server.\\\",\\n        \\\"cta\\\": \\\"Download for\"}         }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" macOS\\\",\\n        \\\"cta2\\\": \\\"Read how it works\\\"\\n      }\\n    },\\n    {\\n      \\\"id\\\": \\\"em8euyq\"}             }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\\",\\n      \\\"content\\\": {\\n        \\\"label\\\": \\\"engineers at these companies run it\\\",\\n        \\\"names\\\": [\\n          \\\"Northwind\\\",\\n          \\\"Ac\"}     }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"me\\\",\\n          \\\"Vector\\\",\\n          \\\"Halden\\\",\\n          \\\"Fold\\\"\\n        ]\\n      }\\n    },\\n    {\\n      \\\"id\\\": \\\"5guha54\"}     }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\\",\\n      \\\"content\\\": {\\n        \\\"title\\\": \\\"What it does\\\",\\n        \\\"items\\\": [\\n          {\\n            \\\"title\\\": \\\"Finds your transcripts\\\",\\n            \\\"body\"}               }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\\": \\\"It scans the folders where Claude, Cursor, and similar tools write session logs.\\\"\\n          },\\n          {\\n            \\\"title\\\": \\\"Builds a local index\\\",\\n            \\\"body\\\":\"}       }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" \\\"It turns up to 900MB of text into a search index stored on your disk.\\\"\\n          },\\n          {\\n            \\\"title\\\": \\\"Searches by keyword\\\",\\n            \\\"body\\\": \\\"Type a term\"}          }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\". Get every session that used it, with dates and tool names.\\\"\\n          }\\n        ]\\n      }\\n    },\\n    {\\n      \\\"id\\\": \\\"zod\"}   }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"lwar\\\",\\n      \\\"content\\\": {\\n        \\\"title\\\": \\\"A search that takes under a second\\\",\\n        \\\"caption\\\": \\\"Typing 'refactor auth' returns 14 sessions\"}           }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" from three different tools.\\\"\\n      }\\n    },\\n    {\\n      \\\"id\\\": \\\"2d8syyr\"}      }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\\",\\n      \\\"content\\\": {\\n        \\\"quote\\\": \\\"I found a decision I made in March in about two seconds.\\\",\\n        \\\"name\\\": \\\"A real person\\\",\\n        \\\"role\\\": \\\"engine\"} }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"er, somewhere\\\"\\n      }\\n    },\\n    {\\n      \\\"id\\\": \\\"j2er4id\"}      }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\\",\\n      \\\"content\\\": {\\n        \\\"title\\\": \\\"Pricing\\\",\\n        \\\"plans\\\": [\\n          {\\n            \\\"name\\\": \\\"Free\\\",\\n            \\\"price\\\": \\\"$0\\\",\\n            \\\"line\\\": \\\"one\"}     }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" project, local only\\\",\\n            \\\"features\\\": [\\n              \\\"One project\\\",\\n              \\\"Local only\\\"\\n            ]\\n          },\\n          {\\n            \\\"name\\\": \\\"Pro\\\",\\n            \\\"price\\\": \\\"$19\\\",\\n            \\\"line\\\":\"}         }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" \\\"per month\\\",\\n            \\\"features\\\": [\\n              \\\"Unlimited projects\\\",\\n              \\\"Everything stays local\\\",\\n              \\\"Priority replies\\\"\\n            ]\\n          },\\n          {\\n            \\\"name\\\": \\\"Team\\\",\\n            \\\"price\\\":\"}        }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" \\\"$49\\\",\\n            \\\"line\\\": \\\"per month\\\",\\n            \\\"features\\\": [\\n              \\\"Shared workspace\\\",\\n              \\\"Roles\\\",\\n              \\\"Invoicing\\\"\\n            ]\\n          }\\n        ]\\n      }\"}            }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n    },\\n    {\\n      \\\"id\\\": \\\"tb5o9cq\\\",\\n      \\\"content\\\": {\"}           }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n        \\\"title\\\": \\\"Questions\\\",\\n        \\\"items\\\": [\\n          {\\n            \\\"q\\\": \\\"Where does my data live?\\\",\\n            \\\"a\\\": \\\"On your machine, in a local index\"}             }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\". Nothing leaves it.\\\"\\n          },\\n          {\\n            \\\"q\\\": \\\"Can I cancel?\\\",\\n            \\\"a\\\": \\\"Yes, in one click, any\"}  }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" time.\\\"\\n          },\\n          {\\n            \\\"q\\\": \\\"Does it work offline?\\\",\\n            \\\"a\\\": \\\"Yes. It reads files already on your disk.\\\"\\n          }\\n        \"}   }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"]\\n      }\\n    },\\n    {\\n      \\\"id\\\": \\\"4jtil7n\\\",\\n      \\\"content\\\": {\\n        \\\"headline\\\": \\\"Download it and search your first transcript today.\\\",\\n        \\\"sub\\\": \\\"No\"}   }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" account needed. It runs on your machine.\\\",\\n        \\\"cta\\\": \\\"Download for macOS\\\"\\n      }\\n    },\\n    {\\n      \\\"id\\\": \\\"s4q2q30\\\",\"}          }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n      \\\"content\\\": {\\n        \\\"product\\\": \\\"Spoor\\\",\\n        \\\"note\\\": \\\"\\\"\\n      }\\n    }\\n  ]\\n}\"} }\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":1}\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null},\"usage\":{\"input_tokens\":1757,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":1878,\"output_tokens_details\":{\"thinking_tokens\":718}}    }\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"     }\n\n"
+}

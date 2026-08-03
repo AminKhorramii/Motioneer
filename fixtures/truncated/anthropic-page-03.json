@@ -1,0 +1,166 @@
+{
+  "status": 200,
+  "ms": 18650,
+  "ids": [
+    "kof2ri9",
+    "30oltsy",
+    "mrwxj1a",
+    "947bk61",
+    "ggpvuji",
+    "5vg9nky",
+    "y0jafbw",
+    "2n5iz68",
+    "tfuc7cb"
+  ],
+  "chunks": [
+    {
+      "at": 2708,
+      "text": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"model\":\"claude-sonnet-5\",\"id\":\"msg_01"
+    },
+    {
+      "at": 2708,
+      "text": "1Cdg12YEZMZMfCRx8coWxn\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":1563,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":2,\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}              }\n\n"
+    },
+    {
+      "at": 3128,
+      "text": "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"thinking\",\"thinking\":\"\",\"signature\":\"\"}          }\n\n"
+    },
+    {
+      "at": 8222,
+      "text": "event: ping\ndata: {\"type\": \"ping\"}\n\n"
+    },
+    {
+      "at": 8224,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"signature_delta\",\"signature\":\"EpQLCokBCBAYAipAF9vB450m2mJhapeVldGHdrDznrRePjbRQkjwd0EA8QsJus5dBbUwFFf2DylqVneL/rGtfC5Fq4EWQGr8jeo7uTIPY2xhdWRlLXNvbm5ldC01OABCCHRoaW5raW5nWiQzZTIzMDdiYS1lYzJlLTQzMWItYTI5Yi1lZWU2NzE4N2UwN2USDJChCiWiVPy919DxhhoMmnqwt++UiqubMVWMIjAjo8IljDDF0rq0Vm0TDLtE+1e3iCW2w0VVIcwvJuinw8T5gqCZ0nYAqL/rGxwW298qtwnbWgqCUEZ053uBUhOMCWesHSyNNm9RZfA18Z3ymfWbR5sfAS9th8rF+MQvJXfHRO5DGVMeGCTYzU32TYZWN+5ElJHFTwoeGs7usmivofK/wYVPRMpZT7LDk3ENdLi47fIsGgcmdjGWjXyZjLQfz0x0eBWdJwpyApnE8otlIUMjvmtRY9PdF9MU+6hLjOYYKedPfIXl64GtsT4n5M+mPySLG/t0b0eJt4o7ZN1zKs84NLarWLArjmCBoBf3lBfcuqfHTsI9oonRqKRaEvThDnnzI4ctw6boMoqcs8J07EATuSyL1eVfU3SIp8f4FyUN1CkqdmxzDuhPLwGj7nLe5LusD7v5FRFbINGBZGKYVhKMRiQpUKYhEK5aTT3IfFJhoPFUh+6MEyluSEJUG1Ci+1dZjAvOJspPWWWd4eso1y1Q9PJ8/IPSnwZms14l88fINEFUqGXC/I6gE4/2HmuDp4J8fkOwwQY0+i9MLE+q/D1ZxAYhYuhHK58eJMmgUX0CZgCS9qAOh5bdVoz/UsppVFN1tbPl1Z1PZxcbGHq633DgjzeISQnsenPk34GaBDOgvuxnq6Prg377SeZrgVWkB2zRWj6urhxrQScEieBAQ93kt9zAmfaBT8fq0yJpNjoBux86HqwxQXn8bE9Bxlj0l8L9m1sk+MOc403VECxgaB75wL2WbTQG5qc7AVp145I4LomBacrgIhpPnoiKIyfAq0bx8KInHxlsQNzt3Dxk/+WjIzjUSSCJJUg49sqRpMVhVB1Lj12zZzNl7QCkm7KsVdScqAbYUM6SRoR0luRlrtIDtmzMikHKeFpUOTso3ZkCxvkmnMKtXBKlSCFmUKNtwHdM1KvUUu/pMrLn5JzGNY3WmhqCwwOihBV5iYH3mSexKJ+zpkzw/f75nJIsFRId6rQX1pwKQ7zFRYx/+vZR33dcS9kJiIEIBl4QW8i3gVKlYos26W8HvE49S1AL7WtvwsKhOOu+YjxDe3XKV+Ldk7mJkxixSNzaumG1vfMrtD9N2xNZkCwJr"
+    },
+    {
+      "at": 8224,
+      "text": "NPZhltWmSKio5k0T5eFPNK8u5g4Tkyn2wxiTKxJbkmMLYz0L55/NIQp96XELRKvGJJdFoL3GUjxuVAD84BbJoKhq6Ec4I4WBugPhdu13y4hdzlx1Kilq5ZMmwcFBcGNJ3/LdS6OsRwCwV6pzUVMDil35pphqZYzXkuHFwK1PAOndFFJjoAydyHT0FJXXNY4UzNfRWDGhP3XgkXPlnmtaR7qGgMxY4E8Hiu71oWyw6pjfjjmPMVUJLErDpikFN05f8BP7Q18kZR+SllC/6bTDBSt/VG7RDnSUE/zcvoWOSkBnBbjTn2kXkDWgZ/HqxNgM01H41JmXkLVYKlui06T8PwFhDs/L2UZTEO5mbhkmrg6oJ7ZUwQtmrRcb/8Qm1QutWNN1cZ+7fSmNvYnutvp9vlb25GoBdETRfaAn1I/m39CxuAA6bvO8tzmUDsW1jsDv2FVHx96Un+KHc1XJG0b4Pf6oPjcn7qmwhfyDinKpw+WAZam5jEGXI2VyqOik45HNU3eieQzfrCpeUtBqS51gf8MS0Rz+jzFC606ZmGJvj26JxqL+08KUw/k106Gf1lFBNuVGAE=\"}          }\n\n"
+    },
+    {
+      "at": 8224,
+      "text": "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0           }\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":1,\"content_block\":{\"type\":\"text\",\"text\":\"\"}   }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"```json\\n{\\n  \\\"sections\\\": [\\n    {\\n      \\\"id\\\": \\\"kof2\"}               }\n\n"
+    },
+    {
+      "at": 8632,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"ri9\\\",\\n      \\\"content\\\": {\\n        \\\"eyebrow\\\": \\\"for people who build with agents\\\",\\n        \\\"headline\\\": \\\"Every session you ever ran, findable in one keystroke.\\\",\"}            }\n\n"
+    },
+    {
+      "at": 9035,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n        \\\"sub\\\": \\\"Spoor reads what your AI tools already write to disk and turns 900MB of transcripts into memory you can search.\"}             }\n\n"
+    },
+    {
+      "at": 9364,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" Local, instant, yours.\\\",\\n        \\\"cta\\\": \\\"Download for macOS\\\",\\n        \\\"cta2\\\": \\\"See how it works\\\"\\n      }\\n    },\\n    {\\n      \\\"id\\\": \\\"30\"}      }\n\n"
+    },
+    {
+      "at": 9722,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"oltsy\\\",\\n      \\\"content\\\": {\\n        \\\"label\\\": \\\"agent teams who never\"}          }\n\n"
+    },
+    {
+      "at": 10087,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" lose a session\\\",\\n        \\\"names\\\": [\\n          \\\"Northwind\\\",\\n          \\\"Acme\\\",\\n          \\\"Vector\\\",\\n          \\\"Halden\\\",\\n          \\\"Fold\"}    }\n\n"
+    },
+    {
+      "at": 10451,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\\"\\n        ]\\n      }\\n    },\\n    {\\n      \\\"id\\\": \\\"mrwxj1a\"}             }\n\n"
+    },
+    {
+      "at": 10818,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\\",\\n      \\\"content\\\": {\\n        \\\"title\\\": \\\"How it finds every session\\\",\\n        \\\"items\\\": [\\n          {\\n            \\\"title\\\": \\\"Reads what's already there\\\",\\n            \\\"body\\\": \\\"Spoor\"}    }\n\n"
+    },
+    {
+      "at": 11202,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" watches the transcript files your AI tools save. No setup, no new habit.\\\"\\n          },\\n          {\"}            }\n\n"
+    },
+    {
+      "at": 11543,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n            \\\"title\\\": \\\"Turns files into memory\\\",\\n            \\\"body\\\": \\\"900MB of scattered logs become one sear\"}   }\n\n"
+    },
+    {
+      "at": 11906,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"chable history.\\\"\\n          },\\n          {\\n            \\\"title\\\": \\\"One keystroke, any session\\\",\\n            \\\"body\\\": \\\"Type a few words from\"}    }\n\n"
+    },
+    {
+      "at": 12271,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" a conversation. Find it in under a second.\\\"\\n          }\\n        ]\\n      }\\n    },\\n    {\\n      \\\"id\\\": \\\"947bk61\\\",\\n      \\\"content\\\": {\"}}\n\n"
+    },
+    {
+      "at": 12633,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n        \\\"title\\\": \\\"Search your whole history\\\",\\n        \\\"caption\\\": \\\"Type what you remember.\"}             }\n\n"
+    },
+    {
+      "at": 12998,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" The exact session comes back.\\\"\\n      }\\n    },\\n    {\\n      \\\"id\\\": \\\"ggpv\"}    }\n\n"
+    },
+    {
+      "at": 13361,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"uji\\\",\\n      \\\"content\\\": {\\n        \\\"quote\\\": \\\"I stopped scrolling through old terminal\"}              }\n\n"
+    },
+    {
+      "at": 13726,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" logs. I just search now.\\\",\\n        \\\"name\\\": \\\"A real person\\\",\\n        \\\"role\\\": \\\"builds with agents da\"}             }\n\n"
+    },
+    {
+      "at": 14089,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"ily\\\"\\n      }\\n    },\\n    {\\n      \\\"id\\\": \\\"5vg9nky\\\",\\n      \\\"content\\\": {\\n        \\\"title\\\": \\\"Sim\"}}\n\n"
+    },
+    {
+      "at": 14452,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"ple pricing\\\",\\n        \\\"plans\\\": [\\n          {\\n            \\\"name\\\": \\\"Free\\\",\\n            \\\"price\\\": \\\"$0\\\",\\n            \\\"line\\\": \\\"search your last week\\\",\\n            \\\"features\\\": [\"}      }\n\n"
+    },
+    {
+      "at": 14973,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n              \\\"One project\\\",\\n              \\\"Local only\\\"\\n            ]\\n          },\\n          {\\n            \\\"name\\\": \\\"Pro\\\",\\n            \\\"price\\\": \\\"$19\\\",\\n            \\\"line\\\": \\\"search everything,\"}      }\n\n"
+    },
+    {
+      "at": 15179,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" always\\\",\\n            \\\"features\\\": [\\n              \\\"Unlimited projects\\\",\\n              \\\"Everything local\\\",\\n              \\\"Priority replies\\\"\\n            ]\\n          },\\n          {\\n            \\\"name\"}           }\n\n"
+    },
+    {
+      "at": 15548,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\\": \\\"Team\\\",\\n            \\\"price\\\": \\\"$49\\\",\\n            \\\"line\\\": \\\"one keystroke for the whole team\\\",\\n            \\\"features\\\": [\\n              \\\"Shared workspace\\\",\\n              \\\"\"}        }\n\n"
+    },
+    {
+      "at": 15957,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"Roles\\\",\\n              \\\"Invoicing\\\"\\n            ]\\n          }\\n        ]\\n      }\\n    },\\n    {\\n      \\\"id\\\": \\\"y0jafb\"}          }\n\n"
+    },
+    {
+      "at": 16271,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"w\\\",\\n      \\\"content\\\": {\\n        \\\"title\\\": \\\"Questions\\\",\\n        \\\"items\\\": [\\n          {\\n            \\\"q\\\": \\\"Where does my data live?\\\",\\n            \\\"a\\\": \\\"On your machine. N\"}         }\n\n"
+    },
+    {
+      "at": 16635,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"othing is uploaded, so every session stays yours to find.\\\"\\n          },\\n          {\\n            \\\"q\\\": \\\"Can I cancel?\\\",\\n            \\\"a\\\": \\\"\"}     }\n\n"
+    },
+    {
+      "at": 16999,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"Any time, in one click.\\\"\\n          },\\n          {\\n            \\\"q\\\": \\\"Does it work offline?\\\",\\n            \\\"a\\\": \\\"Yes. Your sessions are findable even\"}       }\n\n"
+    },
+    {
+      "at": 17437,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" with no connection.\\\"\\n          }\\n        ]\\n      }\\n    },\\n    {\\n      \\\"id\\\": \\\"2n5iz68\\\",\\n      \\\"content\\\": {\\n        \\\"headline\\\": \\\"Every session you ever ran, find\"}  }\n\n"
+    },
+    {
+      "at": 17730,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"able in one keystroke.\\\",\\n        \\\"sub\\\": \\\"No account needed to try it.\\\",\\n        \\\"cta\\\": \\\"Download for macOS\\\"\\n      }\\n    },\\n    {\\n      \\\"id\\\": \\\"tfuc7cb\\\",\\n      \"}         }\n\n"
+    },
+    {
+      "at": 18499,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\\"content\\\": {\\n        \\\"product\\\": \\\"Spoor\\\",\\n        \\\"note\\\": \\\"Every session you ever ran, findable in one keystroke.\\\"\\n      }\\n    }\\n  ]\\n}\\n```\"}     }\n\n"
+    },
+    {
+      "at": 18503,
+      "text": "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":1   }\n\n"
+    },
+    {
+      "at": 18643,
+      "text": "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null},\"usage\":{\"input_tokens\":1563,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":1577,\"output_tokens_details\":{\"thinking_tokens\":392}}     }\n\n"
+    },
+    {
+      "at": 18647,
+      "text": "event: message_stop\ndata: {\"type\":\"message_stop\"  }\n\n"
+    }
+  ],
+  "raw": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011Cdg12YEZMZMfCRx8coWxn\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":1563,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":2,\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}              }\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"thinking\",\"thinking\":\"\",\"signature\":\"\"}          }\n\nevent: ping\ndata: {\"type\": \"ping\"}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"signature_delta\",\"signature\":\"EpQLCokBCBAYAipAF9vB450m2mJhapeVldGHdrDznrRePjbRQkjwd0EA8QsJus5dBbUwFFf2DylqVneL/rGtfC5Fq4EWQGr8jeo7uTIPY2xhdWRlLXNvbm5ldC01OABCCHRoaW5raW5nWiQzZTIzMDdiYS1lYzJlLTQzMWItYTI5Yi1lZWU2NzE4N2UwN2USDJChCiWiVPy919DxhhoMmnqwt++UiqubMVWMIjAjo8IljDDF0rq0Vm0TDLtE+1e3iCW2w0VVIcwvJuinw8T5gqCZ0nYAqL/rGxwW298qtwnbWgqCUEZ053uBUhOMCWesHSyNNm9RZfA18Z3ymfWbR5sfAS9th8rF+MQvJXfHRO5DGVMeGCTYzU32TYZWN+5ElJHFTwoeGs7usmivofK/wYVPRMpZT7LDk3ENdLi47fIsGgcmdjGWjXyZjLQfz0x0eBWdJwpyApnE8otlIUMjvmtRY9PdF9MU+6hLjOYYKedPfIXl64GtsT4n5M+mPySLG/t0b0eJt4o7ZN1zKs84NLarWLArjmCBoBf3lBfcuqfHTsI9oonRqKRaEvThDnnzI4ctw6boMoqcs8J07EATuSyL1eVfU3SIp8f4FyUN1CkqdmxzDuhPLwGj7nLe5LusD7v5FRFbINGBZGKYVhKMRiQpUKYhEK5aTT3IfFJhoPFUh+6MEyluSEJUG1Ci+1dZjAvOJspPWWWd4eso1y1Q9PJ8/IPSnwZms14l88fINEFUqGXC/I6gE4/2HmuDp4J8fkOwwQY0+i9MLE+q/D1ZxAYhYuhHK58eJMmgUX0CZgCS9qAOh5bdVoz/UsppVFN1tbPl1Z1PZxcbGHq633DgjzeISQnsenPk34GaBDOgvuxnq6Prg377SeZrgVWkB2zRWj6urhxrQScEieBAQ93kt9zAmfaBT8fq0yJpNjoBux86HqwxQXn8bE9Bxlj0l8L9m1sk+MOc403VECxgaB75wL2WbTQG5qc7AVp145I4LomBacrgIhpPnoiKIyfAq0bx8KInHxlsQNzt3Dxk/+WjIzjUSSCJJUg49sqRpMVhVB1Lj12zZzNl7QCkm7KsVdScqAbYUM6SRoR0luRlrtIDtmzMikHKeFpUOTso3ZkCxvkmnMKtXBKlSCFmUKNtwHdM1KvUUu/pMrLn5JzGNY3WmhqCwwOihBV5iYH3mSexKJ+zpkzw/f75nJIsFRId6rQX1pwKQ7zFRYx/+vZR33dcS9kJiIEIBl4QW8i3gVKlYos26W8HvE49S1AL7WtvwsKhOOu+YjxDe3XKV+Ldk7mJkxixSNzaumG1vfMrtD9N2xNZkCwJrNPZhltWmSKio5k0T5eFPNK8u5g4Tkyn2wxiTKxJbkmMLYz0L55/NIQp96XELRKvGJJdFoL3GUjxuVAD84BbJoKhq6Ec4I4WBugPhdu13y4hdzlx1Kilq5ZMmwcFBcGNJ3/LdS6OsRwCwV6pzUVMDil35pphqZYzXkuHFwK1PAOndFFJjoAydyHT0FJXXNY4UzNfRWDGhP3XgkXPlnmtaR7qGgMxY4E8Hiu71oWyw6pjfjjmPMVUJLErDpikFN05f8BP7Q18kZR+SllC/6bTDBSt/VG7RDnSUE/zcvoWOSkBnBbjTn2kXkDWgZ/HqxNgM01H41JmXkLVYKlui06T8PwFhDs/L2UZTEO5mbhkmrg6oJ7ZUwQtmrRcb/8Qm1QutWNN1cZ+7fSmNvYnutvp9vlb25GoBdETRfaAn1I/m39CxuAA6bvO8tzmUDsW1jsDv2FVHx96Un+KHc1XJG0b4Pf6oPjcn7qmwhfyDinKpw+WAZam5jEGXI2VyqOik45HNU3eieQzfrCpeUtBqS51gf8MS0Rz+jzFC606ZmGJvj26JxqL+08KUw/k106Gf1lFBNuVGAE=\"}          }\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0           }\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":1,\"content_block\":{\"type\":\"text\",\"text\":\"\"}   }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"```json\\n{\\n  \\\"sections\\\": [\\n    {\\n      \\\"id\\\": \\\"kof2\"}               }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"ri9\\\",\\n      \\\"content\\\": {\\n        \\\"eyebrow\\\": \\\"for people who build with agents\\\",\\n        \\\"headline\\\": \\\"Every session you ever ran, findable in one keystroke.\\\",\"}            }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n        \\\"sub\\\": \\\"Spoor reads what your AI tools already write to disk and turns 900MB of transcripts into memory you can search.\"}             }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" Local, instant, yours.\\\",\\n        \\\"cta\\\": \\\"Download for macOS\\\",\\n        \\\"cta2\\\": \\\"See how it works\\\"\\n      }\\n    },\\n    {\\n      \\\"id\\\": \\\"30\"}      }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"oltsy\\\",\\n      \\\"content\\\": {\\n        \\\"label\\\": \\\"agent teams who never\"}          }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" lose a session\\\",\\n        \\\"names\\\": [\\n          \\\"Northwind\\\",\\n          \\\"Acme\\\",\\n          \\\"Vector\\\",\\n          \\\"Halden\\\",\\n          \\\"Fold\"}    }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\\"\\n        ]\\n      }\\n    },\\n    {\\n      \\\"id\\\": \\\"mrwxj1a\"}             }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\\",\\n      \\\"content\\\": {\\n        \\\"title\\\": \\\"How it finds every session\\\",\\n        \\\"items\\\": [\\n          {\\n            \\\"title\\\": \\\"Reads what's already there\\\",\\n            \\\"body\\\": \\\"Spoor\"}    }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" watches the transcript files your AI tools save. No setup, no new habit.\\\"\\n          },\\n          {\"}            }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n            \\\"title\\\": \\\"Turns files into memory\\\",\\n            \\\"body\\\": \\\"900MB of scattered logs become one sear\"}   }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"chable history.\\\"\\n          },\\n          {\\n            \\\"title\\\": \\\"One keystroke, any session\\\",\\n            \\\"body\\\": \\\"Type a few words from\"}    }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" a conversation. Find it in under a second.\\\"\\n          }\\n        ]\\n      }\\n    },\\n    {\\n      \\\"id\\\": \\\"947bk61\\\",\\n      \\\"content\\\": {\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n        \\\"title\\\": \\\"Search your whole history\\\",\\n        \\\"caption\\\": \\\"Type what you remember.\"}             }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" The exact session comes back.\\\"\\n      }\\n    },\\n    {\\n      \\\"id\\\": \\\"ggpv\"}    }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"uji\\\",\\n      \\\"content\\\": {\\n        \\\"quote\\\": \\\"I stopped scrolling through old terminal\"}              }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" logs. I just search now.\\\",\\n        \\\"name\\\": \\\"A real person\\\",\\n        \\\"role\\\": \\\"builds with agents da\"}             }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"ily\\\"\\n      }\\n    },\\n    {\\n      \\\"id\\\": \\\"5vg9nky\\\",\\n      \\\"content\\\": {\\n        \\\"title\\\": \\\"Sim\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"ple pricing\\\",\\n        \\\"plans\\\": [\\n          {\\n            \\\"name\\\": \\\"Free\\\",\\n            \\\"price\\\": \\\"$0\\\",\\n            \\\"line\\\": \\\"search your last week\\\",\\n            \\\"features\\\": [\"}      }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n              \\\"One project\\\",\\n              \\\"Local only\\\"\\n            ]\\n          },\\n          {\\n            \\\"name\\\": \\\"Pro\\\",\\n            \\\"price\\\": \\\"$19\\\",\\n            \\\"line\\\": \\\"search everything,\"}      }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" always\\\",\\n            \\\"features\\\": [\\n              \\\"Unlimited projects\\\",\\n              \\\"Everything local\\\",\\n              \\\"Priority replies\\\"\\n            ]\\n          },\\n          {\\n            \\\"name\"}           }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\\": \\\"Team\\\",\\n            \\\"price\\\": \\\"$49\\\",\\n            \\\"line\\\": \\\"one keystroke for the whole team\\\",\\n            \\\"features\\\": [\\n              \\\"Shared workspace\\\",\\n              \\\"\"}        }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"Roles\\\",\\n              \\\"Invoicing\\\"\\n            ]\\n          }\\n        ]\\n      }\\n    },\\n    {\\n      \\\"id\\\": \\\"y0jafb\"}          }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"w\\\",\\n      \\\"content\\\": {\\n        \\\"title\\\": \\\"Questions\\\",\\n        \\\"items\\\": [\\n          {\\n            \\\"q\\\": \\\"Where does my data live?\\\",\\n            \\\"a\\\": \\\"On your machine. N\"}         }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"othing is uploaded, so every session stays yours to find.\\\"\\n          },\\n          {\\n            \\\"q\\\": \\\"Can I cancel?\\\",\\n            \\\"a\\\": \\\"\"}     }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"Any time, in one click.\\\"\\n          },\\n          {\\n            \\\"q\\\": \\\"Does it work offline?\\\",\\n            \\\"a\\\": \\\"Yes. Your sessions are findable even\"}       }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" with no connection.\\\"\\n          }\\n        ]\\n      }\\n    },\\n    {\\n      \\\"id\\\": \\\"2n5iz68\\\",\\n      \\\"content\\\": {\\n        \\\"headline\\\": \\\"Every session you ever ran, find\"}  }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"able in one keystroke.\\\",\\n        \\\"sub\\\": \\\"No account needed to try it.\\\",\\n        \\\"cta\\\": \\\"Download for macOS\\\"\\n      }\\n    },\\n    {\\n      \\\"id\\\": \\\"tfuc7cb\\\",\\n      \"}         }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\\"content\\\": {\\n        \\\"product\\\": \\\"Spoor\\\",\\n        \\\"note\\\": \\\"Every session you ever ran, findable in one keystroke.\\\"\\n      }\\n    }\\n  ]\\n}\\n```\"}     }\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":1   }\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null},\"usage\":{\"input_tokens\":1563,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":1577,\"output_tokens_details\":{\"thinking_tokens\":392}}     }\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"  }\n\n"
+}

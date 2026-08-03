@@ -1,0 +1,162 @@
+{
+  "status": 200,
+  "ms": 22023,
+  "ids": [
+    "vih4b3n",
+    "em8euyq",
+    "5guha54",
+    "zodlwar",
+    "2d8syyr",
+    "j2er4id",
+    "tb5o9cq",
+    "4jtil7n",
+    "s4q2q30"
+  ],
+  "chunks": [
+    {
+      "at": 902,
+      "text": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"model\":\"claude-sonnet-5\",\"id\":\"msg_01"
+    },
+    {
+      "at": 902,
+      "text": "1Cdg6vzVf16Fqj5b4yLJ1D\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":1754,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":5,\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}     }\n\n"
+    },
+    {
+      "at": 1286,
+      "text": "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"thinking\",\"thinking\":\"\",\"signature\":\"\"}  }\n\n"
+    },
+    {
+      "at": 13975,
+      "text": "event: ping\ndata: {\"type\": \"ping\"}\n\n"
+    },
+    {
+      "at": 13978,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"signature_delta\",\"signature\":\"EpAZCokBCBAYAipAGl0+s3PXTclQDi2HpBvaTqGQ1nLj5wumwz9ROYaVcUgKg5+vBN9xUVt8HPYdw02RbJLszWbSUhvHlVhSPN8iPDIPY2xhdWRlLXNvbm5ldC01OABCCHRoaW5raW5nWiQzZTIzMDdiYS1lYzJlLTQzMWItYTI5Yi1lZWU2NzE4N2UwN2USDGGYHsIVkf3316G+phoM1N85zFnAgCqefPV0IjBRtm6My2aK+o6hC3HrqQ0EHUWm+y3DMf4iRFt3XizNubdTcWWl7HrXA/3FplAIEJMqsxcYzX19pIPbHEMjrxlAh+AU4VoEV2MD/eW3Yt/sVLcdtp4u+DHLAY6MfkeUJO67+o4tq2a1rY6hCQgy8rKL64ZCqtzqG6eZuHwqIo4Qyns1G2A0aAmngz6KfCWOUw3YGnlqYF+yfSo9sNDB+ijT5ORnXnSw79KNIwIP/1h5qse02fnd2/KY4GnuJbO+PbUBjvXj1fKWmq6zAFZj8aYRhVgKninDuQv9qD8Vmu0nIGOhbihgmU1yiLZxdr2EVhtJW6RIQZuH22UikHpiAHTXQpxwjWcRbNatOVu8wq2yfBmi8+mzHXgT0P7dSfrCx5BdoipOPOZdCb3xQ1UJiQf3ynx3h7fTVPs/JY+Sb4M2GlNvATZNwjyLs2jdjHc2urAH5Nj44UW3cz8sefLv/4UreBWAf5TrCRmb1zk71avT1feoiLPatbJIL3DcpNju8wa11/iC5/GHXga8fzQxH0zKUgnRnFz21zTZBueiV9UG4AOP8n8kEp+cOs8KyLEzifNFDK5lOM3XtRl0VBD8Y2PSYqniw4EEFnr/gS4fkl8Pl1OHkGJ3KB1JfAC7yERGNqzyY8N1wuSzA0s+s49Iv8V9vFDWTfLKVPR4noC+wbjZMQ8OIh8zUZmocBlUDwxGVsUFBYbHdRNGZfmSr2Vn2zo9Mosj8sqOxAV3vSDlG2nTCompMnHax+nRX2z35kBiww1mZwm1aOmpLbGAyn/CSOSj7fuclEMJNwDhsI0wBKVPQv1M7Y68f/cBO7fIyavpEzNI4WqwJPhE3i2UpP4FNkPSkA310KLlLFYKXE0al08elT4p5z+o97qx9+IsvsKodi9djCOSyL9W/WDyyTgkssE/jWl110Cg5S/wQwWFrQrUsHg2payzk14fwbmwj1EBuaGKTyKfp2hjhs84Ow13U1QyW1OUfixyI0936DZgmJM8oWJ0k2v9n8NIWYh2sJtRyl4jlgJRo/Nmezg61UjNTDk7qLmh87IX/gMgq/0BW2qM+viT3s8bbHLIpJZAFM1h0AJnJIqFIq"
+    },
+    {
+      "at": 13978,
+      "text": "mBU06xxQ4h1X+Ce/ceyXkg8RyfoBGgt5VDoNYdRAA3eXrIReCI2aMO2gMMpLKfNvcpokxnKYBvDstiB+W6b/a+4UYX4lnT164WWxyDn/YG09jt6e+6YjN7lZVkqFy/AqaXJ9nAPnhVmmHTOfBVZglJWT+ChWU93dExOSw3YzGnwdvLzlYyIt+9G05el1vg+1hQDFklzlV+V8GHT3l1ZGf3izX5xaNIlQl4JK2s0gEMm2AOxuPnAR8mhU6O0Ws36eq90syWmDz7QxvDkonVfIgqvipP16DElB4KfVAvI1I1sKNMrQJbyiQTqbn8WHtNY7xJyA6qJObcl2SrRJ2LHv9orGoU6tlb7uP0K6bGzLmBEe6Hq43ouomHnxlkbhzPGBsFXpn7E7WSmqfoSLT9qHjPSabsCE6Ywet8VAmL6yshJpzNhbIB+yUVv/qpyPCKa9sWAGMlhYWSF85T2axfRVsizigrWAdlEhiab4Q8ye60EmnOiJHIa/OHjbVkbgk4eRVsXWZuIBioqlklB9Tk01xk3WoPMJhUqxIzBJI9RwzDONvL4l1a4eSSraZv8EofphLC9m9IqV6YAv5acOyX75dvnlLJUyBVwQt5BeFTbEann5c4V2zyZUzuPge4uli40BhLqo/lpHX0ATXx3mtZOmtM7y9Ko3OLw/azlLDkWWxqrh0CzOog4UvzEL8y9gx7M3XqjLDLldLnvlTZBjTMsVRjOA6vMjlWk/XnB+z//YsNLKwbsva0fabdbNlokfW/bCEUjoVyDz+Mjkrp347M/AI4G6bsMixDIgZ2Hep2JaONaGXc09wrzBpcSGxvoEfsl3XUba7XwEYE1KtKoFMJfyXgvUqtCZXlNIVotn8kd4eemEFlr2tqM0HyMa+j7ZviT+D8qxQTXFRTAC16df9H8eg7MHKe5kYuSc3ytErz+XcUvJiD5aL6Hcc3Y9Fcd+L3MMD+DzqArEykcE10bhiJyt5pT6FIxWMemGlQXBJUMvlSyWc/0T0khdEVxGluFWyS59nj8gFFtitdODu8wJT62jGSLiLjWWrr39A2lwlSAb112I9ycyANQKhe9Gg4vnHePRiFIpYRM8Pm4vj2zo0UHPPZFkRptzwOvrxaLRvvPUnnjmzYnXd08kYbwtJ6Ld0qXoq6EBl90op7fue1t0//swY+DpTLOJTbPsHkfdk49vD35uyRD3R7iPJMBhRFISbAazcfGRZt2TZPJrW4OrRvJb7ws5f72qzFUqaI3pZCG6fN85rzdFyhcOiCETmyt6MSr2AAwsJVjc8E4bG5Ib8I1wsjRwb3AKkCBRp8VKOy4Hu+8JANXh+vamo0rsBi84wO8ZcOl6o3Whm8wloo7uOVMdX8rXw"
+    },
+    {
+      "at": 13978,
+      "text": "jHhDePKliizr/ZYJFjFEP2Dpb1VhucIRW6DVgZwuAILktoEVD4wtKzEwVwtuLTU5NDKBU1jIR7TkuPNWnyMVZJAv4GPUxQBODJlR41Fik6+650uPGi+Vd4/okcTBbYPOneqoMT6vX7C/ynUl+NjbpiOfTtO3xF6It9Kf+XkGNKVkMx2kw6r/J9hN+s6q9OwsRJFllkNjheX3sJMTp6fXNpW4oxQQJbsR5tCl1DDI8kxxXTMbzGU8AIBErnkBKNVfGogRAP3MXO8hanrUJDxncg+zWTlluVc8GZzABzSAC21V6+hmEjFLtx82qYVG0rmtXD/rhFuAyEBhC14U32NMVn6h/PCB8zXCnt53IGZxpPA8c0Sz756wh93C4a+3pYVYXNbNfN5vrvTcBAABQb13BXWm1juwa92Pj8lxUztZUHge8IlmmRzVj9++mO/3sBnMBUfDIVFBCINJyD4Hwfv8eVLescKetjNoozulvzdrXoD/Chz1x2cXYWKfNVk53S/OHnRgVNOuxChMRRoeWO4OsVjqpbslyZkN4lIhpBEUxT79I6E1ksSmKBVPKXUbOrIU7YHTGsH65Ygx4NmlDdoVy4u9Am4zggzgz/qwULysOV1/+NAG+ANqbocBsV1XANS8QmXaJ3TFfn1tCQWC3k7XwmOHJs5UeZklvIAPPdK7RODy82npJnoitWuRBkCd+q44z64sE49z4DNs1peTz+ZVDcQ+kS85cb+RFklrjyLNdCOH1BTonMXAMZ7zTqsvCwDXSrpASzjqGt5EeVL9+Kn2z1Z2KxWQgB1LHtGIyPEUbWIw01c3o4N+NyIbqOqUITRvoYmqvWW3NvYBSyWUjeLWmo9ijlbT58g3IfdGdu7GJF6Ux8VEm+sudQFqNhFu9gdxXtz6AR+WMxHiSrg7V32wdZUCGqC5wrmkuppENoeKdiM5j4Zpn5A/s8XG+jmfP2KiBS4LC19ZKbPrXFx+vR2USjE+cIWwJLs9M4YMlx8Udf8QW2RQybSvhws6j3Ot0eNTaVdU06HznDnlaiQmTrUgrMVfGVPqqH85DZzoxAXubkkamUuSpJl9LjHBGYr5WcAIzZEn5oaL5Q+oeFov0aX1QrZo+NA4DoL0HMk3RR7fEhhi/6cs+pZJ5jKt/OvYIs2F29Jo2IIkCHQ8/F00iMJJ59kHpNz/I0vxKAdWSX5KwTN19Y+w/mxjjHqqptj6odCub833v7QIBV2gLsL16RiEf55gT8AQ9hAVqCERq1ugyzvqAEpxVUqN0pOv3kVJ8JVz3Wsv4nUVmtkm6Kq1G24tNSSpB+tOvEWMq5Qw8SPqEM4E0CuKgLCUQew7NKptUytPloIbnBsq7StXs09lCESGJoBKO"
+    },
+    {
+      "at": 13978,
+      "text": "2Idx0Ib5kvbXGb03IVRTmoLgvvWnxsEnYgutvJZf0ZxMLZhJjA/VbRRIxV4Mg8xbZdnli/bhCulxsu5ci/5pSH1pwzIOQzmtUoXa22DLh6zFExtM7QSAcS2Br3lwqqJ1UWQdILTHtwHpOK7SWcBVfTP3xm0rty2WckJlxSfyRHDV8LGhQItfQCl89G1FFK8UGlek23jWJ10f/72EJiSjvcijHPaCOoGxgg86GAE=\"}            }\n\n"
+    },
+    {
+      "at": 13978,
+      "text": "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0         }\n\n"
+    },
+    {
+      "at": 13980,
+      "text": "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":1,\"content_block\":{\"type\":\"text\",\"text\":\"\"}      }\n\n"
+    },
+    {
+      "at": 13984,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"{\\\"sections\\\":[\\n  {\\\"id\\\":\\\"v\"}          }\n\n"
+    },
+    {
+      "at": 14334,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"ih4b3n\\\",\\\"content\\\":{\\n    \\\"eyebrow\\\":\\\"\\\",\\n    \\\"headline\\\":\\\"Built to read files your t\"}       }\n\n"
+    },
+    {
+      "at": 14716,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"ools already write. Nothing more.\\\",\\n    \\\"sub\\\":\\\"Spoor parses the transcripts your AI tools save to disk and\"}    }\n\n"
+    },
+    {
+      "at": 15065,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" turns 900MB of them into an index you can search. No new format, no server, no account.\"}       }\n\n"
+    },
+    {
+      "at": 15428,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" Local, instant, yours.\\\",\\n    \\\"cta\\\":\\\"Download for macOS\\\",\\n    \\\"cta2\\\":\\\"Read the build notes\\\"\\n  }},\"}         }\n\n"
+    },
+    {
+      "at": 15822,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n  {\\\"id\\\":\\\"em8euyq\\\",\\\"content\\\":{\\n    \\\"label\\\":\\\"used by teams at\\\",\"}          }\n\n"
+    },
+    {
+      "at": 16155,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n    \\\"names\\\":[\\\"Northwind\\\",\\\"Acme\\\",\\\"Vector\\\",\\\"Halden\\\",\\\"Fold\\\"]\\n  }},\\n  {\\\"id\\\":\\\"5guha54\\\",\\\"content\\\":{\\n    \\\"title\\\":\\\"The decisions\"}   }\n\n"
+    },
+    {
+      "at": 16520,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\\",\\n    \\\"items\\\":[\\n      {\\\"title\\\":\\\"Reads, never writes\\\",\\\"body\\\":\\\"Spoor only parses the transcript files your tools already save. It never edits or mo\"}}\n\n"
+    },
+    {
+      "at": 16892,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"ves them.\\\"},\\n      {\\\"title\\\":\\\"No server, no database\\\",\\\"body\\\":\\\"Search runs against a local index file.\"}}\n\n"
+    },
+    {
+      "at": 17249,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" There's nothing to host, back up, or lose access to.\\\"},\\n      {\\\"title\\\":\\\"What we left out\\\",\\\"body\\\":\\\"No\"}     }\n\n"
+    },
+    {
+      "at": 17613,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" cloud sync, no login, no telemetry. Every one of those is a thing you'd otherwise have to trust.\\\"}\\n    ]\\n  }\"}      }\n\n"
+    },
+    {
+      "at": 17981,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"},\\n  {\\\"id\\\":\\\"zodlwar\\\",\\\"content\\\":{\\n    \\\"title\\\":\\\"Watch it index a real session folder\\\",\\n    \\\"caption\\\":\\\"900MB of transcripts, sear\"}           }\n\n"
+    },
+    {
+      "at": 18352,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"chable in under a second, no upload step.\\\"\\n  }},\\n  {\\\"id\\\":\\\"2d8syyr\\\",\\\"content\\\":{\\n    \\\"quote\\\":\\\"It\"}    }\n\n"
+    },
+    {
+      "at": 18704,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"'s the only one of these tools that tells you what it doesn't do.\\\",\\n    \\\"name\\\":\\\"A real person\\\",\\n    \\\"\"}           }\n\n"
+    },
+    {
+      "at": 19069,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"role\\\":\\\"founder, somewhere\\\"\\n  }},\\n  {\\\"id\\\":\\\"j2er4id\\\",\\\"content\\\":{\\n    \\\"title\\\":\\\"Simple pricing\\\",\\n    \\\"plans\\\":[\\n      {\\\"name\\\":\"}   }\n\n"
+    },
+    {
+      "at": 19434,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\\"Free\\\",\\\"price\\\":\\\"$0\\\",\\\"line\\\":\\\"to try it\\\",\\\"features\\\":[\\\"One project\\\",\\\"Local only\\\"]},\\n      {\\\"name\\\":\\\"Pro\\\",\\\"price\\\":\\\"$19\\\",\\\"line\\\":\\\"per month\\\",\\\"features\\\":[\\\"Unlimited projects\\\",\\\"\"}        }\n\n"
+    },
+    {
+      "at": 19798,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"Everything local\\\",\\\"Priority replies\\\"]},\\n      {\\\"name\\\":\\\"Team\\\",\\\"price\\\":\\\"$49\\\",\\\"line\\\":\\\"per month\\\",\\\"features\\\":[\\\"Shared workspace\\\",\\\"Roles\\\",\\\"Invoicing\\\"]}\\n    ]\\n  }},\"}           }\n\n"
+    },
+    {
+      "at": 20352,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n  {\\\"id\\\":\\\"tb5o9cq\\\",\\\"content\\\":{\\n    \\\"title\\\":\\\"Questions\\\",\\n    \\\"items\\\":[\\n      {\\\"q\\\":\\\"Where does my data live?\\\",\\\"a\\\":\\\"In the same folder your tools already\"}   }\n\n"
+    },
+    {
+      "at": 20528,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" wrote it to. We index it in place; we don't copy it anywhere.\\\"},\\n      {\\\"q\\\":\\\"Can I cancel?\\\",\\\"a\"}   }\n\n"
+    },
+    {
+      "at": 20911,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\\":\\\"One click. There was never a lock-in to build around.\\\"},\\n      {\\\"q\\\":\\\"Does it work offline?\\\",\\\"a\\\":\\\"Yes,\"}}\n\n"
+    },
+    {
+      "at": 21280,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" by construction. There's no server for it to depend on.\\\"}\\n    ]\\n  }},\\n  {\\\"id\\\":\\\"4jtil7n\\\",\\\"content\\\":{\\n    \\\"headline\\\":\\\"Try the version\"}         }\n\n"
+    },
+    {
+      "at": 21624,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" built to stay small.\\\",\\n    \\\"sub\\\":\\\"No account, no setup wizard. Just an index of what you already have.\\\",\\n    \\\"\"}       }\n\n"
+    },
+    {
+      "at": 21991,
+      "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"cta\\\":\\\"Download for macOS\\\"\\n  }},\\n  {\\\"id\\\":\\\"s4q2q30\\\",\\\"content\\\":{\\n    \\\"product\\\":\\\"Spoor\\\",\\n    \\\"note\\\":\\\"\\\"\\n  }}\\n]}\"}              }\n\n"
+    },
+    {
+      "at": 21994,
+      "text": "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":1     }\n\n"
+    },
+    {
+      "at": 22016,
+      "text": "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null},\"usage\":{\"input_tokens\":1754,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":2008,\"output_tokens_details\":{\"thinking_tokens\":1011}}    }\n\n"
+    },
+    {
+      "at": 22018,
+      "text": "event: message_stop\ndata: {\"type\":\"message_stop\"      }\n\n"
+    }
+  ],
+  "raw": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011Cdg6vzVf16Fqj5b4yLJ1D\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":1754,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":5,\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}     }\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"thinking\",\"thinking\":\"\",\"signature\":\"\"}  }\n\nevent: ping\ndata: {\"type\": \"ping\"}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"signature_delta\",\"signature\":\"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\"}            }\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0         }\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":1,\"content_block\":{\"type\":\"text\",\"text\":\"\"}      }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"{\\\"sections\\\":[\\n  {\\\"id\\\":\\\"v\"}          }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"ih4b3n\\\",\\\"content\\\":{\\n    \\\"eyebrow\\\":\\\"\\\",\\n    \\\"headline\\\":\\\"Built to read files your t\"}       }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"ools already write. Nothing more.\\\",\\n    \\\"sub\\\":\\\"Spoor parses the transcripts your AI tools save to disk and\"}    }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" turns 900MB of them into an index you can search. No new format, no server, no account.\"}       }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" Local, instant, yours.\\\",\\n    \\\"cta\\\":\\\"Download for macOS\\\",\\n    \\\"cta2\\\":\\\"Read the build notes\\\"\\n  }},\"}         }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n  {\\\"id\\\":\\\"em8euyq\\\",\\\"content\\\":{\\n    \\\"label\\\":\\\"used by teams at\\\",\"}          }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n    \\\"names\\\":[\\\"Northwind\\\",\\\"Acme\\\",\\\"Vector\\\",\\\"Halden\\\",\\\"Fold\\\"]\\n  }},\\n  {\\\"id\\\":\\\"5guha54\\\",\\\"content\\\":{\\n    \\\"title\\\":\\\"The decisions\"}   }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\\",\\n    \\\"items\\\":[\\n      {\\\"title\\\":\\\"Reads, never writes\\\",\\\"body\\\":\\\"Spoor only parses the transcript files your tools already save. It never edits or mo\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"ves them.\\\"},\\n      {\\\"title\\\":\\\"No server, no database\\\",\\\"body\\\":\\\"Search runs against a local index file.\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" There's nothing to host, back up, or lose access to.\\\"},\\n      {\\\"title\\\":\\\"What we left out\\\",\\\"body\\\":\\\"No\"}     }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" cloud sync, no login, no telemetry. Every one of those is a thing you'd otherwise have to trust.\\\"}\\n    ]\\n  }\"}      }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"},\\n  {\\\"id\\\":\\\"zodlwar\\\",\\\"content\\\":{\\n    \\\"title\\\":\\\"Watch it index a real session folder\\\",\\n    \\\"caption\\\":\\\"900MB of transcripts, sear\"}           }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"chable in under a second, no upload step.\\\"\\n  }},\\n  {\\\"id\\\":\\\"2d8syyr\\\",\\\"content\\\":{\\n    \\\"quote\\\":\\\"It\"}    }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"'s the only one of these tools that tells you what it doesn't do.\\\",\\n    \\\"name\\\":\\\"A real person\\\",\\n    \\\"\"}           }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"role\\\":\\\"founder, somewhere\\\"\\n  }},\\n  {\\\"id\\\":\\\"j2er4id\\\",\\\"content\\\":{\\n    \\\"title\\\":\\\"Simple pricing\\\",\\n    \\\"plans\\\":[\\n      {\\\"name\\\":\"}   }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\\"Free\\\",\\\"price\\\":\\\"$0\\\",\\\"line\\\":\\\"to try it\\\",\\\"features\\\":[\\\"One project\\\",\\\"Local only\\\"]},\\n      {\\\"name\\\":\\\"Pro\\\",\\\"price\\\":\\\"$19\\\",\\\"line\\\":\\\"per month\\\",\\\"features\\\":[\\\"Unlimited projects\\\",\\\"\"}        }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"Everything local\\\",\\\"Priority replies\\\"]},\\n      {\\\"name\\\":\\\"Team\\\",\\\"price\\\":\\\"$49\\\",\\\"line\\\":\\\"per month\\\",\\\"features\\\":[\\\"Shared workspace\\\",\\\"Roles\\\",\\\"Invoicing\\\"]}\\n    ]\\n  }},\"}           }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n  {\\\"id\\\":\\\"tb5o9cq\\\",\\\"content\\\":{\\n    \\\"title\\\":\\\"Questions\\\",\\n    \\\"items\\\":[\\n      {\\\"q\\\":\\\"Where does my data live?\\\",\\\"a\\\":\\\"In the same folder your tools already\"}   }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" wrote it to. We index it in place; we don't copy it anywhere.\\\"},\\n      {\\\"q\\\":\\\"Can I cancel?\\\",\\\"a\"}   }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\\":\\\"One click. There was never a lock-in to build around.\\\"},\\n      {\\\"q\\\":\\\"Does it work offline?\\\",\\\"a\\\":\\\"Yes,\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" by construction. There's no server for it to depend on.\\\"}\\n    ]\\n  }},\\n  {\\\"id\\\":\\\"4jtil7n\\\",\\\"content\\\":{\\n    \\\"headline\\\":\\\"Try the version\"}         }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\" built to stay small.\\\",\\n    \\\"sub\\\":\\\"No account, no setup wizard. Just an index of what you already have.\\\",\\n    \\\"\"}       }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"cta\\\":\\\"Download for macOS\\\"\\n  }},\\n  {\\\"id\\\":\\\"s4q2q30\\\",\\\"content\\\":{\\n    \\\"product\\\":\\\"Spoor\\\",\\n    \\\"note\\\":\\\"\\\"\\n  }}\\n]}\"}              }\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":1     }\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null},\"usage\":{\"input_tokens\":1754,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":2008,\"output_tokens_details\":{\"thinking_tokens\":1011}}    }\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"      }\n\n"
+}
