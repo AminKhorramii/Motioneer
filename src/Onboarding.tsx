@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { PRESETS, type Taste } from '@/taste'
-import { PROVIDERS } from '@/compose'
+import { IMAGE_KEY_NAME, PROVIDERS } from '@/compose'
 import type { Product } from '@/compose'
 import { Icon } from '@/icons'
 import { isDesktop } from '@/host'
@@ -31,8 +31,11 @@ interface Props {
 
 export function Onboarding({ product, taste, explainOnly, onProduct, onTaste, onBuild, onClose }: Props) {
   const [step, setStep] = useState(0)
-  const [keys, setKeys] = useState(() =>
-    Object.fromEntries(PROVIDERS.map((p) => [p.id, localStorage.getItem(p.keyName) ?? ''])),
+  const [keys, setKeys] = useState<Record<string, string>>(() =>
+    Object.fromEntries([
+      ...PROVIDERS.map((p) => [p.id, localStorage.getItem(p.keyName) ?? '']),
+      ['gemini', localStorage.getItem(IMAGE_KEY_NAME) ?? ''],
+    ]),
   )
   const ready = product.name.trim().length > 0 && product.oneLiner.trim().length > 0
 
@@ -175,6 +178,16 @@ export function Onboarding({ product, taste, explainOnly, onProduct, onTaste, on
                   onChange={(e) => saveKey(p.id, p.keyName, e.currentTarget.value)} />
               </label>
             ))}
+
+            <label className="keyline">
+              <span>Gemini</span>
+              <input type="password" value={keys.gemini ?? ''} placeholder="for drawing images, optional"
+                onChange={(e) => saveKey('gemini', IMAGE_KEY_NAME, e.currentTarget.value)} />
+            </label>
+            <p className="lede small" style={{ marginTop: '0.5rem' }}>
+              The Gemini key is only for drawing images, and pages are complete without one, because
+              Wall draws its own backdrops from your palette.
+            </p>
 
             <div className="row">
               <button className="primary" disabled={!ready} onClick={() => finish(product)}>build my page</button>

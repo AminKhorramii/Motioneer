@@ -84,3 +84,35 @@ export async function streamText(provider, system, user, key, onDelta) {
     return { error: String(err).slice(0, 200) }
   }
 }
+
+/**
+ * Image generation. Separate from streamText because an image is one response rather than a
+ * stream, and because it is a different provider axis: the model writing the copy and the
+ * model drawing the picture are chosen independently.
+ *
+ * Returns a data URL, since the whole product promise is one self-contained file.
+ */
+export const IMAGE_REQUESTS = {
+  gemini: (prompt, key) => ({
+    url: `${base() || 'https://generativelanguage.googleapis.com'}/v1beta/models/gemini-2.5-flash-image:generateContent?key=${encodeURIComponent(key)}`,
+    headers: { 'content-type': 'application/json' },
+    body: { contents: [{ parts: [{ text: prompt }] }] },
+    pick: (j) => {
+      const part = (j?.candidates?.[0]?.content?.parts ?? []).find((p) => p.inlineData?.data)
+      return part ? `data:${part.inlineData.mimeType ?? 'image/png'};base64,${part.inlineData.data}` : ''
+    },
+  }),
+}
+
+export async function generateImage(provider, prompt, key) {
+  const make = IMAGE_REQUESTS[provider] ?? IMAGE_REQUESTS.gemini
+  const req = make(prompt, key)
+  try {
+    const res = await fetch(req.url, { method: 'POST', headers: req.headers, body: JSON.stringify(req.body) })
+    if (!res.ok) return { error: `${provider} ${res.status}: ${(await res.text()).slice(0, 160)}` }
+    const dataUrl = req.pick(await res.json())
+    return dataUrl ? { dataUrl } : { error: 'the reply carried no image' }
+  } catch (err) {
+    return { error: String(err).slice(0, 200) }
+  }
+}

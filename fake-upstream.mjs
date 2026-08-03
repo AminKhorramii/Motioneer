@@ -1,5 +1,6 @@
 /**
- * A local server that answers in Anthropic's wire format, so the streaming path can be run
+ * A local test upstream. It answers in Anthropic's wire format for text, and in Gemini's for
+ * images, so the streaming path can be run
  * repeatedly without a key and without spending tokens.
  *
  * It prefers to replay a real captured stream from fixtures/, because a fake I invented would
@@ -13,6 +14,7 @@
  */
 import { createServer } from 'node:http'
 import { readFile, readdir } from 'node:fs/promises'
+import { deflateSync } from 'node:zlib'
 import path from 'node:path'
 
 const FIXTURES = path.join(process.cwd(), 'fixtures')
@@ -115,6 +117,50 @@ function chunkUp(raw) {
   return out
 }
 
+/** A real, decodable PNG built from scratch, so image assertions can check actual bytes. */
+function png(w = 64, h = 40) {
+  const table = Array.from({ length: 256 }, (_, n) => {
+    let c = n
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1
+    return c >>> 0
+  })
+  const crc = (buf) => {
+    let c = 0xffffffff
+    for (const b of buf) c = table[(c ^ b) & 0xff] ^ (c >>> 8)
+    return (c ^ 0xffffffff) >>> 0
+  }
+  const chunk = (type, data) => {
+    const len = Buffer.alloc(4)
+    len.writeUInt32BE(data.length)
+    const body = Buffer.concat([Buffer.from(type, 'ascii'), data])
+    const sum = Buffer.alloc(4)
+    sum.writeUInt32BE(crc(body))
+    return Buffer.concat([len, body, sum])
+  }
+  const ihdr = Buffer.alloc(13)
+  ihdr.writeUInt32BE(w, 0)
+  ihdr.writeUInt32BE(h, 4)
+  ihdr[8] = 8
+  ihdr[9] = 2
+  // a gradient rather than a flat fill, so a "this is not one solid colour" check means something
+  const rows = []
+  for (let y = 0; y < h; y++) {
+    const row = Buffer.alloc(1 + w * 3)
+    for (let x = 0; x < w; x++) {
+      row[1 + x * 3] = (x * 255) / w
+      row[2 + x * 3] = (y * 255) / h
+      row[3 + x * 3] = ((x ^ y) * 7) % 256
+    }
+    rows.push(row)
+  }
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', ihdr),
+    chunk('IDAT', deflateSync(Buffer.concat(rows))),
+    chunk('IEND', Buffer.alloc(0)),
+  ])
+}
+
 export async function fakeAnthropic(dir = FIXTURES) {
   const fixtures = await loadFixtures(dir)
   let seq = 0
@@ -127,6 +173,15 @@ export async function fakeAnthropic(dir = FIXTURES) {
       req.on('data', (c) => (b += c))
       req.on('end', () => r(b))
     })
+
+    // images are one response rather than a stream, so they take the short path
+    if (req.url.includes('generateContent')) {
+      res.writeHead(200, { ...CORS, 'content-type': 'application/json' })
+      res.end(JSON.stringify({
+        candidates: [{ content: { parts: [{ inlineData: { mimeType: 'image/png', data: png().toString('base64') } }] } }],
+      }))
+      return
+    }
     // the page shape is embedded in a JSON body, so its quotes arrive escaped
     const ids = [...body.matchAll(/\\?"id\\?":\s*\\?"([a-z0-9]{5,})\\?"/g)].map((m) => m[1])
     const n = seq++

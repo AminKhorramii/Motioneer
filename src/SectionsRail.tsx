@@ -17,12 +17,13 @@ interface Props {
   onPromptRun: (id: string) => void
   onFanOut: (id: string) => void
   onCopyBrief: (id: string) => void
+  onDraw: (id: string) => void
   onAdd: (kind: Kind) => void
 }
 
 export function SectionsRail({
   page, selected, prompts, provider,
-  onSelect, onCycle, onMove, onToggle, onPromptChange, onPromptRun, onFanOut, onCopyBrief, onAdd,
+  onSelect, onCycle, onMove, onToggle, onPromptChange, onPromptRun, onFanOut, onCopyBrief, onDraw, onAdd,
 }: Props) {
   const stop = (e: React.MouseEvent) => e.stopPropagation()
   return (
@@ -56,6 +57,9 @@ export function SectionsRail({
               <div className="srow">
                 <button onClick={() => onFanOut(s.id)}>every layout as an alternative</button>
                 <button onClick={() => onCopyBrief(s.id)}><Icon.copy /> brief</button>
+                {(s.kind === 'hero' || s.kind === 'showcase') && (
+                  <button onClick={() => onDraw(s.id)}>draw the image</button>
+                )}
               </div>
             </div>
           )}

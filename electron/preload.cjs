@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('wall', {
   exportPage: (html, name) => ipcRenderer.invoke('page:export', html, name),
   preview: (html) => ipcRenderer.invoke('page:preview', html),
   stream: (id, provider, system, user, key) => ipcRenderer.invoke('model:stream', id, provider, system, user, key),
+  image: (provider, prompt, key) => ipcRenderer.invoke('model:image', provider, prompt, key),
   onDelta: (fn) => {
     const handler = (_e, id, delta) => fn(id, delta)
     ipcRenderer.on('model:delta', handler)

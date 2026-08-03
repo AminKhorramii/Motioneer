@@ -1,6 +1,6 @@
 /** Making pages: alternatives, section prompts, and the model path (with a mock for tests). */
 
-import { drift } from '@/taste'
+import { drift, type Taste } from '@/taste'
 import { host } from '@/host'
 import { slop, slopBrief } from '@/slop'
 import { BACKDROPS, type Backdrop } from '@/backdrop'
@@ -116,6 +116,11 @@ export const PROVIDERS: { id: Provider; label: string; keyName: string }[] = [
   { id: 'claude', label: 'Claude', keyName: 'wall-key-anthropic' },
   { id: 'gpt', label: 'GPT', keyName: 'wall-key-openai' },
 ]
+
+/** Images are a separate provider axis: the model writing the copy and the model drawing the
+ *  picture are chosen independently, so the key is stored separately too. */
+export const IMAGE_KEY_NAME = 'wall-key-gemini'
+export const imageKey = () => localStorage.getItem(IMAGE_KEY_NAME) ?? ''
 
 export const keyFor = (p: Provider) =>
   localStorage.getItem(PROVIDERS.find((x) => x.id === p)!.keyName) ?? ''
@@ -338,6 +343,27 @@ export async function fanOut(
     written: done.reduce((a, b) => a + b.ok, 0),
     error: done.find((d) => d.error)?.error,
   }
+}
+
+/**
+ * Draw the image for one section. The prompt rules out the things that make a generated image
+ * announce itself, and rules out text hardest of all: words baked into a picture cannot be
+ * edited on the paper, cannot be translated, and are usually misspelled.
+ */
+export async function illustrate(sec: Section, product: Product, taste: Taste): Promise<string | null> {
+  const key = imageKey()
+  if (!key) return null
+  const prompt = [
+    `Draw one abstract image for the ${sec.kind} section of a landing page.`,
+    `The product: ${product.name}. ${product.oneLiner}`,
+    `Use this palette and nothing else: background ${taste.bg}, foreground ${taste.ink}, accent ${taste.accent}.`,
+    'Compose it wide and calm, around a single idea, with generous empty space, because it sits behind and beside text that has to stay readable.',
+    'Include no text, letters or numbers, because words baked into an image cannot be edited on the page and are usually wrong.',
+    'Avoid stock photography, people, glossy three dimensional renders, neon gradients, lens flare and floating glass cards, because those are the defaults that make a page look like every other page.',
+  ].join('\n')
+  const res = await host.image('gemini', prompt, key)
+  if (res.error) throw new Error(res.error)
+  return res.dataUrl ?? null
 }
 
 function mergeSections(

@@ -10,7 +10,7 @@ import electronPath from 'electron'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { fakeAnthropic } from './fake-anthropic.mjs'
+import { fakeAnthropic } from './fake-upstream.mjs'
 
 // an argument points at a different corpus, so the truncated captures can be replayed as a
 // recovery test: those replies were cut off mid-object by a token limit that is now raised
@@ -76,6 +76,34 @@ const wall = await page.evaluate(async () => {
   }
 })
 console.log('written wall:', JSON.stringify(wall))
+// images: one response rather than a stream, and the promise is that it ships inside the file
+await page.evaluate(() => localStorage.setItem('wall-key-gemini', 'test-key'))
+await page.evaluate(() => document.querySelectorAll('.sec')[0].click())
+await page.waitForTimeout(300)
+await page.evaluate(() => [...document.querySelectorAll('.srow button')].find((b) => b.textContent.includes('draw'))?.click())
+await page.waitForFunction(
+  () => document.querySelector('.paper.here iframe')?.contentDocument?.querySelector('img[src^="data:image"]'),
+  null,
+  { timeout: 30000 },
+)
+const image = await page.evaluate(() => {
+  const img = document.querySelector('.paper.here iframe').contentDocument.querySelector('img[src^="data:image"]')
+  return { mime: img.src.slice(5, img.src.indexOf(';')), base64Chars: img.src.length }
+})
+console.log('image drawn:', JSON.stringify(image))
+
+const shipped = await page.evaluate(() => {
+  const html = document.querySelector('.paper.here iframe').contentDocument.documentElement.outerHTML
+  const m = html.match(/data:image\/png;base64,([A-Za-z0-9+/=]+)/)
+  return { bytes: html.length, external: /src="http|href="http/.test(html), b64: m?.[1]?.slice(0, 64) ?? null }
+})
+const raw = shipped.b64 ? Buffer.from(shipped.b64, 'base64') : Buffer.alloc(0)
+console.log('image in page:', JSON.stringify({
+  pageBytes: shipped.bytes,
+  noExternalRefs: !shipped.external,
+  decodesAsPng: raw.slice(1, 4).toString() === 'PNG',
+}))
+
 console.log('written wall toast:', JSON.stringify(await page.evaluate(() => document.querySelector('.toast')?.textContent ?? null)))
 console.log('errors:', errors.length ? errors.slice(0, 5) : 'none')
 

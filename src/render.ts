@@ -74,7 +74,11 @@ document.addEventListener('click',function(e){
 },true);
 </script>`
 
-function figure(t: Taste, seed: number, ratio = '16/10') {
+function figure(t: Taste, seed: number, ratio = '16/10', img?: string) {
+  if (img) {
+    return `<div style="border-radius:var(--r);overflow:hidden;border:1px solid var(--line);aspect-ratio:${ratio}">
+<img src="${img}" alt="" style="width:100%;height:100%;object-fit:cover;display:block"></div>`
+  }
   const r = (n: number) => Math.abs(Math.sin(seed * 3301 + n * 7919)) % 1
   const blobs = Array.from({ length: 4 }, (_, i) => {
     const c = i % 2 ? t.accent2 : t.accent
@@ -91,6 +95,8 @@ aspect-ratio:${ratio};background:${blobs},${mix(t.bg, dark ? '#fff' : '#000', 0.
 
 export function renderSection(sec: Section, t: Taste, seed: number): string {
   const c = sec.content as Record<string, string>
+  // a generated image replaces the drawn placeholder wherever a section shows a figure
+  const img = typeof c.image === 'string' && c.image.startsWith('data:') ? c.image : undefined
   const v = sec.variant
   const open = `<section data-section="${sec.id}" id="${sec.kind}">`
   const ctas = `<div class="ctas"><a class="btn btn-primary" ${ed(sec.id, 'cta')}>${esc(c.cta)}</a>
@@ -105,12 +111,12 @@ export function renderSection(sec: Section, t: Taste, seed: number): string {
 <p style="font-size:1.16rem;max-width:56ch;margin:0 auto" ${ed(sec.id, 'sub')}>${esc(c.sub)}</p>
 <div class="ctas" style="justify-content:center"><a class="btn btn-primary" ${ed(sec.id, 'cta')}>${esc(c.cta)}</a>
 <a class="btn btn-ghost" ${ed(sec.id, 'cta2')}>${esc(c.cta2)}</a></div>
-<div style="margin-top:calc(var(--gap)*1.6)">${figure(t, seed)}</div></div>`,
+<div style="margin-top:calc(var(--gap)*1.6)">${figure(t, seed, '16/10', img)}</div></div>`,
         1: `<div class="wrap" style="display:grid;grid-template-columns:1.05fr .95fr;gap:calc(var(--gap)*1.4);align-items:center">
 <div><span class="eyebrow" ${ed(sec.id, 'eyebrow')}>${esc(c.eyebrow)}</span>
 <h1 style="margin:.9rem 0 1rem" ${ed(sec.id, 'headline')}>${esc(c.headline)}</h1>
 <p style="font-size:1.1rem;max-width:46ch" ${ed(sec.id, 'sub')}>${esc(c.sub)}</p>${ctas}</div>
-<div>${figure(t, seed, '4/5')}</div></div>`,
+<div>${figure(t, seed, '4/5', img)}</div></div>`,
         2: `<div class="wrap" style="max-width:900px">
 <h1 style="font-size:clamp(2.6rem,7.4vw,5.2rem);max-width:16ch" ${ed(sec.id, 'headline')}>${esc(c.headline)}</h1>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:calc(var(--gap)*1.2);margin-top:calc(var(--gap)*1.2);
@@ -122,7 +128,7 @@ border-top:1px solid var(--line);padding-top:calc(var(--gap)*.9)">
 <p style="color:var(--accent);font-size:.92rem" ${ed(sec.id, 'eyebrow')}>${esc(c.eyebrow)}</p>
 <h1 style="font-size:clamp(1.9rem,4.4vw,2.9rem);margin:1rem 0" ${ed(sec.id, 'headline')}>${esc(c.headline)}</h1>
 <p style="max-width:58ch" ${ed(sec.id, 'sub')}>${esc(c.sub)}</p>${ctas}</div>
-<div style="margin-top:calc(var(--gap)*1.2)">${figure(t, seed)}</div></div>`,
+<div style="margin-top:calc(var(--gap)*1.2)">${figure(t, seed, '16/10', img)}</div></div>`,
       }[v % 4]
       return `${open}${body}</section>`
     }

@@ -78,6 +78,11 @@ ipcMain.handle('model:stream', async (e, id, provider, system, user, key) => {
   })
 })
 
+ipcMain.handle('model:image', async (_e, provider, prompt, key) => {
+  const { generateImage } = await import(pathToFileURL(path.join(__dirname, '..', 'shared', 'providers.mjs')).href)
+  return generateImage(provider, prompt, key)
+})
+
 app.whenReady().then(() => {
   createWindow()
   app.on('activate', () => {

@@ -4,7 +4,7 @@ import { KIND_LABEL, applyEdit, starterPage, type Kind, type Page } from '@/sect
 import { renderPage } from '@/render'
 import { pageBrief, sectionBrief } from '@/brief'
 import {
-  EMPTY_PRODUCT, addSection, alternatives, arrange, cycleBackdrop, cycleVariant, fanOut, keyFor, moveSection,
+  EMPTY_PRODUCT, addSection, alternatives, arrange, cycleBackdrop, cycleVariant, fanOut, illustrate, imageKey, keyFor, moveSection,
   promptPage, promptSection, sectionAlternatives, seeded, setMock, type Product, type Provider,
 } from '@/compose'
 import { Onboarding } from '@/Onboarding'
@@ -173,6 +173,27 @@ export default function App() {
     flash(`${good.length} variants ready. Use the arrow keys to compare them.`)
   }
 
+  /** Draw the image for one section. It lands in the page content, so it ships with the file. */
+  async function drawImage(id: string) {
+    const sec = page?.sections.find((s) => s.id === id)
+    if (!sec) return
+    if (!imageKey()) return flash('Add a Gemini key in the brief panel to draw images.')
+    setBusy(`Drawing the ${KIND_LABEL[sec.kind]} image.`)
+    try {
+      const dataUrl = await illustrate(sec, product, page!.taste)
+      if (!dataUrl) return flash('No image came back.')
+      setPage((p) => ({
+        ...p,
+        sections: p.sections.map((s) => (s.id === id ? { ...s, content: { ...s.content, image: dataUrl } } : s)),
+      }))
+      flash(`Image drawn, ${Math.round((dataUrl.length * 3) / 4 / 1024)}KB inside the page.`)
+    } catch (e) {
+      flash(`The image call failed: ${String(e instanceof Error ? e.message : e).slice(0, 140)}`)
+    } finally {
+      setBusy('')
+    }
+  }
+
   async function runSectionPrompt(id: string) {
     const sec = page?.sections.find((s) => s.id === id)
     const instruction = prompts[id]?.trim()
@@ -299,6 +320,7 @@ export default function App() {
                 setPages((all) => [...all.slice(0, at + 1), ...alts.slice(1), ...all.slice(at + 1)])
                 flash(`${alts.length - 1} more layouts are waiting to the right.`)
               }}
+              onDraw={(id) => void drawImage(id)}
               onCopyBrief={(id) => {
                 const s = page.sections.find((x) => x.id === id)
                 if (s) void copy(sectionBrief(s, page.taste), `The ${KIND_LABEL[s.kind]} brief`)

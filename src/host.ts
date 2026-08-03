@@ -5,7 +5,7 @@
  * desktop version rather than a reduced copy of it.
  */
 
-import { streamText } from '../shared/providers.mjs'
+import { generateImage, streamText } from '../shared/providers.mjs'
 
 export interface Host {
   readState: () => Promise<unknown>
@@ -16,6 +16,8 @@ export interface Host {
   stream: (id: string, provider: string, system: string, user: string, key: string)
     => Promise<{ text?: string; error?: string }>
   onDelta: (fn: (id: string, delta: string) => void) => () => void
+  /** one response rather than a stream, returned as a data URL so the page stays one file */
+  image: (provider: string, prompt: string, key: string) => Promise<{ dataUrl?: string; error?: string }>
 }
 
 const STATE_KEY = 'wall-state'
@@ -54,6 +56,7 @@ const web: Host = {
   // the browser talks to the model itself, so deltas never leave this tab
   stream: (id, provider, system, user, key) =>
     streamText(provider, system, user, key, (delta) => deltaFns.forEach((fn) => fn(id, delta))),
+  image: (provider, prompt, key) => generateImage(provider, prompt, key),
   onDelta: (fn) => {
     deltaFns.add(fn)
     return () => deltaFns.delete(fn)

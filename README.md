@@ -164,3 +164,21 @@ It runs locally on the page model and the rendered HTML, so it is free and insta
 what lets it run *before* the model call, where its findings are passed into the prompt as
 things to avoid, rather than only after, where they would just be a report. The film bar
 shows `clean` or `N generic` for the paper in the middle, with the reasons on hover.
+
+## Backdrops and images
+
+A landing page needs something behind the words. Wall draws it rather than generating a
+photograph, for two reasons: a generated hero image is the fastest way to look like every
+other page, and one image embedded as a data URI outweighs the entire document.
+
+`src/backdrop.ts` has three, all seeded from the taste sheet so the art changes when the
+palette does: `contours` and `ridge` are WebGL2 fields of topographic lines, `grain` is a
+still texture drawn once. They honour `prefers-reduced-motion`, pause when the tab is hidden,
+fall back to a gradient without WebGL2, and cost about 2KB inside the page. A wall walks
+through them, so the eight papers differ before you read a word.
+
+Generated images are available where a section shows a figure, through Gemini, behind the
+same host boundary as everything else. The prompt rules out text hardest of all, because
+words baked into an image cannot be edited on the paper and are usually wrong. The result is
+stored as a data URL in the page content, so it still ships as one file. Expect the page to
+grow by roughly a megabyte per image, which is why the drawn backdrops are the default.
