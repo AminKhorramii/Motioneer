@@ -60,7 +60,71 @@ ${editable ? `[data-edit]{outline:0;transition:box-shadow .15s ease;border-radiu
 </style></head><body>`
 }
 
-const EDIT_SCRIPT = `<script>
+/**
+ * The editable build. Text is edited in place, and whole sections are dragged in place, so
+ * the page itself is the control surface rather than a list beside it. Both report back to
+ * the app, which owns the page: nothing here mutates state on its own, or the paper and the
+ * model would drift apart.
+ */
+const EDIT_SCRIPT = `<style>
+[data-section]{position:relative}
+[data-section].wall-over{box-shadow:inset 0 3px 0 -1px currentColor}
+[data-section].wall-over-end{box-shadow:inset 0 -3px 0 -1px currentColor}
+[data-section].wall-lift{opacity:.35}
+.wall-grip{position:absolute;left:10px;top:10px;z-index:9;display:flex;gap:3px;align-items:center;
+padding:5px 8px;border-radius:7px;font:500 11px/1 ui-sans-serif,system-ui;letter-spacing:.02em;
+background:rgba(128,128,128,.16);color:inherit;opacity:0;transition:opacity .12s ease;cursor:grab;
+-webkit-user-select:none;user-select:none;backdrop-filter:blur(6px)}
+[data-section]:hover>.wall-grip{opacity:.75}
+.wall-grip:active{cursor:grabbing}
+.wall-grip i{width:9px;height:1.5px;background:currentColor;display:block;border-radius:1px}
+.wall-grip span{margin-left:3px}
+</style><script>
+document.querySelectorAll('[data-section]').forEach(function(sec){
+  var g=document.createElement('div');
+  g.className='wall-grip';g.draggable=true;
+  g.innerHTML='<i></i><i></i><span>drag to move</span>';
+  sec.insertBefore(g,sec.firstChild);
+  g.addEventListener('dragstart',function(e){
+    e.dataTransfer.effectAllowed='move';
+    e.dataTransfer.setData('text/plain',sec.getAttribute('data-section'));
+    e.dataTransfer.setDragImage(sec,40,20);
+    sec.classList.add('wall-lift');
+  });
+  g.addEventListener('dragend',function(){
+    sec.classList.remove('wall-lift');
+    document.querySelectorAll('[data-section]').forEach(function(s){
+      s.classList.remove('wall-over');s.classList.remove('wall-over-end');
+    });
+  });
+});
+function mark(el,after){
+  document.querySelectorAll('[data-section]').forEach(function(s){
+    s.classList.remove('wall-over');s.classList.remove('wall-over-end');
+  });
+  el.classList.add(after?'wall-over-end':'wall-over');
+}
+document.addEventListener('dragover',function(e){
+  var s=e.target.closest&&e.target.closest('[data-section]');
+  if(!s)return;
+  e.preventDefault();e.dataTransfer.dropEffect='move';
+  var r=s.getBoundingClientRect();
+  mark(s,e.clientY>r.top+r.height/2);
+});
+document.addEventListener('drop',function(e){
+  var s=e.target.closest&&e.target.closest('[data-section]');
+  if(!s)return;
+  e.preventDefault();
+  var id=e.dataTransfer.getData('text/plain');
+  var r=s.getBoundingClientRect();
+  document.querySelectorAll('[data-section]').forEach(function(x){
+    x.classList.remove('wall-over');x.classList.remove('wall-over-end');
+  });
+  if(id&&id!==s.getAttribute('data-section')){
+    parent.postMessage({wall:'move',id:id,onto:s.getAttribute('data-section'),
+      after:e.clientY>r.top+r.height/2},'*');
+  }
+});
 document.querySelectorAll('[data-edit]').forEach(function(el){
   el.setAttribute('contenteditable','plaintext-only');
   el.addEventListener('blur',function(){

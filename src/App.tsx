@@ -4,8 +4,7 @@ import { KIND_LABEL, applyEdit, starterPage, type Kind, type Page } from '@/sect
 import { renderPage } from '@/render'
 import { pageBrief, sectionBrief } from '@/brief'
 import {
-  EMPTY_PRODUCT, addSection, alternatives, arrange, cycleBackdrop, cycleVariant, fanOut, illustrate, imageKey, keyFor, moveSection,
-  promptPage, promptSection, sectionAlternatives, seeded, setMock, type Product, type Provider,
+  EMPTY_PRODUCT, addSection, alternatives, arrange, cycleBackdrop, cycleVariant, dropSection, fanOut, illustrate, imageKey, keyFor, promptPage, promptSection, sectionAlternatives, seeded, setMock, type Product, type Provider,
 } from '@/compose'
 import { Onboarding } from '@/Onboarding'
 import { BriefRail } from '@/BriefRail'
@@ -35,6 +34,10 @@ export default function App() {
     () => (localStorage.getItem('wall-onboarded') ? null : 'first'),
   )
   const wheelLock = useRef(0)
+  // Each fan-out gets a token. Pages from an earlier run keep streaming in after a new one
+  // starts, and without this they land on the new wall, which mixes pages built from two
+  // different bases.
+  const run = useRef(0)
 
   const page = pages[at] ?? null
 
@@ -64,6 +67,7 @@ export default function App() {
    * copy is arranged eight ways, which still gives something to choose between.
    */
   const fill = useCallback(async (base: Page, p: Product, prov: Provider) => {
+    const mine = ++run.current
     setPages([arrange(base, 0)])
     setAt(0)
     if (!keyFor(prov)) {
@@ -75,12 +79,14 @@ export default function App() {
     // then fills in, instead of arriving all at once when the model finishes
     const started = new Set<string>()
     const { written, error } = await fanOut(base, p, prov, 8, (page) => {
+      if (run.current !== mine) return
       if (!started.has(page.id)) {
         started.add(page.id)
         setBusy(`${started.size} of 8 pages writing.`)
       }
       upsertPage(page)
     })
+    if (run.current !== mine) return
     setBusy('')
     if (!written) {
       setPages(alternatives(base, 8))
@@ -115,9 +121,12 @@ export default function App() {
   // text edited directly on the paper
   useEffect(() => {
     const onMsg = (e: MessageEvent) => {
-      const d = e.data as { wall?: string; path?: string; value?: string; id?: string }
+      const d = e.data as
+        { wall?: string; path?: string; value?: string; id?: string; onto?: string; after?: boolean }
       if (d?.wall === 'edit' && d.path) {
         setPages((all) => all.map((p, i) => (i === at ? applyEdit(p, d.path!, d.value ?? '') : p)))
+      } else if (d?.wall === 'move' && d.id && d.onto) {
+        setPages((all) => all.map((p, i) => (i === at ? dropSection(p, d.id!, d.onto!, !!d.after) : p)))
       } else if (d?.wall === 'select' && d.id) setSelected(d.id)
     }
     window.addEventListener('message', onMsg)
@@ -308,7 +317,7 @@ export default function App() {
               provider={provider}
               onSelect={setSelected}
               onCycle={(id) => setPage((p) => cycleVariant(p, id))}
-              onMove={(id, dir) => setPage((p) => moveSection(p, id, dir))}
+              onDrop={(id, onto, after) => setPage((p) => dropSection(p, id, onto, after))}
               onToggle={(id) => setPage((p) => ({
                 ...p,
                 sections: p.sections.map((s) => (s.id === id ? { ...s, on: !s.on } : s)),

@@ -99,12 +99,14 @@ export function cycleVariant(page: Page, id: string): Page {
   }
 }
 
-export function moveSection(page: Page, id: string, dir: -1 | 1): Page {
-  const list = [...page.sections]
-  const i = list.findIndex((s) => s.id === id)
-  const j = i + dir
-  if (i < 0 || j < 0 || j >= list.length) return page
-  ;[list[i], list[j]] = [list[j], list[i]]
+/** Drop one section next to another. The paper reports the intent, the model does the move. */
+export function dropSection(page: Page, id: string, onto: string, after: boolean): Page {
+  if (id === onto) return page
+  const list = page.sections.filter((s) => s.id !== id)
+  const moved = page.sections.find((s) => s.id === id)
+  const target = list.findIndex((s) => s.id === onto)
+  if (!moved || target < 0) return page
+  list.splice(target + (after ? 1 : 0), 0, moved)
   return { ...page, sections: list }
 }
 

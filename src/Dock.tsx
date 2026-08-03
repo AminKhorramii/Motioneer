@@ -3,6 +3,14 @@ import { Icon } from '@/icons'
 import type { Flag } from '@/slop'
 import { BACKDROP_NOTE, type Backdrop } from '@/backdrop'
 
+/**
+ * The dock: what you ask for on top, where you are underneath.
+ *
+ * Everything here acts on the paper in the middle, which is why it is one panel rather than a
+ * toolbar per concern. Secondary actions carry their explanation in a title rather than a
+ * label, because a row of sentences competes with the page you are trying to read.
+ */
+
 interface Props {
   at: number
   count: number
@@ -22,9 +30,12 @@ interface Props {
   onShip: () => void
 }
 
-export function Dock({ at, count, angle, flags, backdrop, bar, provider, busy, onBar, onRun, onProvider, onGo, onFlags, onBackdrop, onOpen, onShip }: Props) {
+export function Dock({
+  at, count, angle, flags, backdrop, bar, provider, busy,
+  onBar, onRun, onProvider, onGo, onFlags, onBackdrop, onOpen, onShip,
+}: Props) {
   return (
-    <>
+    <div className="dock">
       <div className="barwrap">
         <div className="models">
           {PROVIDERS.map((p) => (
@@ -45,11 +56,15 @@ export function Dock({ at, count, angle, flags, backdrop, bar, provider, busy, o
       </div>
 
       <div className="filmbar">
-        <button title="previous alternative" onClick={() => onGo(at - 1)} disabled={at === 0}><Icon.left /></button>
-        <span>{at + 1} of {count}</span>
+        <div className="nav">
+          <button title="previous alternative, or press the left arrow key"
+            onClick={() => onGo(at - 1)} disabled={at === 0}><Icon.left /></button>
+          <span className="count"><b>{at + 1}</b> of {count}</span>
+          <button title="next alternative, or press the right arrow key"
+            onClick={() => onGo(at + 1)} disabled={at >= count - 1}><Icon.right /></button>
+        </div>
         {angle && <span className="angle">{angle}</span>}
-        <button title="next alternative" onClick={() => onGo(at + 1)} disabled={at >= count - 1}><Icon.right /></button>
-        <span className="tip">scroll sideways to compare. click any text on the paper to edit it.</span>
+        <span className="spacer" />
         <button title={`backdrop: ${BACKDROP_NOTE[backdrop]}. click for the next one.`} onClick={onBackdrop}>
           {backdrop === 'none' ? 'no backdrop' : backdrop}
         </button>
@@ -60,9 +75,11 @@ export function Dock({ at, count, angle, flags, backdrop, bar, provider, busy, o
         >
           {flags.length ? `${flags.length} generic` : 'clean'}
         </button>
-        <button onClick={onOpen}>open in browser</button>
-        <button className="go" onClick={onShip}><Icon.ship /> ship this</button>
+        <button title="open this page in your browser" onClick={onOpen}>open</button>
+        <button className="go" title="write this page out as one HTML file" onClick={onShip}>
+          <Icon.ship /> ship
+        </button>
       </div>
-    </>
+    </div>
   )
 }

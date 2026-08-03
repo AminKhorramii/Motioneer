@@ -149,44 +149,79 @@ button:disabled { opacity: 0.32; pointer-events: none; }
 
 /* ——— the dock ——— */
 
-.barwrap, .filmbar {
-  position: absolute; left: 50%; transform: translateX(-50%);
-  display: flex; align-items: center; gap: 0.4rem; z-index: 20;
+/* ——— the dock ———
+   One panel, two rows: what you ask for on top, where you are underneath. It floats over the
+   canvas rather than docking to an edge, so the paper stays the largest thing on screen. */
+
+.dock {
+  position: absolute; left: 50%; bottom: 1.1rem; transform: translateX(-50%);
+  width: min(780px, 80%); z-index: 20;
+  background: rgba(18, 19, 22, 0.86); backdrop-filter: blur(22px) saturate(1.5);
+  border: 1px solid var(--hair2); border-radius: 14px;
+  box-shadow: 0 22px 52px rgba(0, 0, 0, 0.6), 0 1px 0 rgba(255, 255, 255, 0.05) inset;
 }
-.barwrap {
-  bottom: 3.2rem; width: min(760px, 78%);
-  background: rgba(19, 20, 23, 0.82); backdrop-filter: blur(22px) saturate(1.4);
-  border: 1px solid var(--hair2); border-radius: 13px;
-  padding: 0.4rem 0.4rem 0.4rem 0.5rem;
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
+
+.barwrap, .filmbar { display: flex; align-items: center; gap: 0.4rem; }
+.barwrap { padding: 0.45rem 0.45rem 0.45rem 0.5rem; }
+.filmbar {
+  padding: 0.3rem 0.5rem 0.34rem;
+  border-top: 1px solid var(--hair);
 }
-.models { display: flex; gap: 1px; }
+
+.models { display: flex; gap: 1px; padding-right: 0.15rem; }
 .models button {
   display: flex; align-items: center; gap: 5px;
   background: none; border: none; border-radius: 8px; color: var(--dim);
-  font-size: 11.5px; padding: 0.34rem 0.55rem; transition: background var(--t), color var(--t);
+  font-size: 11.5px; padding: 0.36rem 0.55rem; transition: background var(--t), color var(--t);
 }
 .models button:hover { background: rgba(255, 255, 255, 0.05); color: var(--ink2); }
 .models button.on { background: rgba(255, 255, 255, 0.09); color: var(--ink); }
-.bar { flex: 1; background: none; border: none; color: var(--ink); font-size: 13px; padding: 0.4rem 0.3rem; outline: none; }
-.barwrap .go {
-  background: var(--accent); border: none; border-radius: 8px; color: var(--on-accent);
-  font-size: 11.5px; font-weight: 500; padding: 0.42rem 0.75rem;
-  transition: filter var(--t), transform var(--t);
-}
-.barwrap .go:hover { filter: brightness(1.12); }
-.barwrap .go:active { transform: scale(0.97); }
 
-.filmbar { bottom: 0.95rem; width: min(760px, 78%); }
-.filmbar button {
-  background: none; border: none; border-radius: 6px; color: var(--dim);
-  font-size: 11.5px; padding: 0.3rem 0.55rem; transition: background var(--t), color var(--t);
+.bar {
+  flex: 1; min-width: 0; background: none; border: none; color: var(--ink);
+  font-size: 13px; padding: 0.4rem 0.35rem; outline: none;
 }
-.filmbar button:hover { background: rgba(255, 255, 255, 0.06); color: var(--ink); }
-.filmbar > span { font-size: 11px; color: var(--dim2); font-variant-numeric: tabular-nums; }
-.filmbar .tip { flex: 1; text-align: center; letter-spacing: 0; }
-.filmbar .go { color: var(--ok); }
-.filmbar .go:hover { background: rgba(100, 201, 154, 0.12); }
+.bar::placeholder { color: var(--dim2); }
+
+/* navigation reads as one control, so the arrows and the count share a shell */
+.filmbar .nav {
+  display: flex; align-items: center; gap: 1px;
+  background: rgba(255, 255, 255, 0.045); border-radius: 8px; padding: 1px;
+}
+.filmbar .nav button {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 22px; padding: 0; border-radius: 7px;
+}
+.filmbar .count {
+  font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums;
+  padding: 0 0.4rem; min-width: 3.6rem; text-align: center;
+}
+.filmbar .count b { color: var(--ink2); font-weight: 500; }
+
+.filmbar button {
+  background: none; border: none; border-radius: 7px; color: var(--dim);
+  font-size: 11.5px; padding: 0.3rem 0.5rem;
+  transition: background var(--t), color var(--t);
+}
+.filmbar button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.06); color: var(--ink); }
+.filmbar button:disabled { color: var(--dim2); opacity: 0.5; }
+.filmbar .angle {
+  font-size: 11px; color: var(--ink2);
+  padding-left: 0.55rem; border-left: 1px solid var(--hair2);
+}
+.filmbar .spacer { flex: 1; }
+
+/* the slop count sits beside ship, because it is the last thing worth checking before you
+   send a page out */
+.filmbar .flags::before {
+  content: ''; display: inline-block; width: 5px; height: 5px; border-radius: 50%;
+  background: #c98b4b; margin-right: 6px; vertical-align: 1px;
+}
+.filmbar .flags.ok::before { background: var(--ok); }
+
+:where(.dock) button:focus-visible, .side input:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 1px;
+}
 
 /* ——— sections rail ——— */
 
@@ -430,3 +465,14 @@ button:disabled { opacity: 0.32; pointer-events: none; }
 }
 .filmbar .flags.ok { color: var(--dim); }
 .filmbar .flags.ok::before { background: var(--ok); }
+
+/* sections are dragged rather than nudged with arrows, so the whole row is the handle and
+   the drop edge is drawn where the section will land */
+.sec { cursor: grab; }
+.sec:active { cursor: grabbing; }
+.sec[data-edge='before'] { box-shadow: inset 0 2px 0 -0.5px var(--accent); }
+.sec[data-edge='after'] { box-shadow: inset 0 -2px 0 -0.5px var(--accent); }
+
+/* section actions stay on one line each: a button that wraps reads as two controls */
+.srow { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.srow button { white-space: nowrap; flex: 0 0 auto; }

@@ -173,6 +173,26 @@ await page.waitForTimeout(1400)
 const file = join(exportDir, 'pers-impressions')
 const shipped = existsSync(join(exportDir, 'spoor', 'index.html'))
 const html = shipped ? readFileSync(join(exportDir, 'spoor', 'index.html'), 'utf8') : ''
+// direct manipulation: the paper reports a drop, the app owns the reorder
+const drag = await page.evaluate(async () => {
+  const names = () => [...document.querySelectorAll('.sec b')].map((b) => b.textContent)
+  const before = names()
+  const ids = [...document.querySelectorAll('.paper.here iframe')][0].contentDocument
+    .querySelectorAll('[data-section]')
+  const first = ids[0].getAttribute('data-section')
+  const last = ids[ids.length - 1].getAttribute('data-section')
+  window.postMessage({ wall: 'move', id: first, onto: last, after: true }, '*')
+  await new Promise((r) => setTimeout(r, 400))
+  const doc = document.querySelector('.paper.here iframe').contentDocument
+  return {
+    before: before.slice(0, 3),
+    after: names().slice(0, 3),
+    movedToEnd: names()[names().length - 1] === before[0],
+    gripsOnPaper: doc.querySelectorAll('.wall-grip').length,
+  }
+})
+console.log('drag reorder:', JSON.stringify(drag))
+
 const back = await page.evaluate(async () => {
   const seen = []
   for (let i = 0; i < 4; i++) {
@@ -193,6 +213,7 @@ console.log('shipped:', JSON.stringify({
   ok: shipped,
   bytes: html.length,
   selfContained: shipped && !/(src|href)=["']https?:/.test(html),
+  noGrips: !html.includes('wall-grip'),
   noEditScript: shipped && !html.includes('contenteditable'),
   sections: (html.match(/<section/g) ?? []).length,
 }))

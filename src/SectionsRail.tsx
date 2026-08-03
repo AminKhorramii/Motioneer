@@ -11,7 +11,7 @@ interface Props {
   provider: Provider
   onSelect: (id: string) => void
   onCycle: (id: string) => void
-  onMove: (id: string, dir: -1 | 1) => void
+  onDrop: (id: string, onto: string, after: boolean) => void
   onToggle: (id: string) => void
   onPromptChange: (id: string, value: string) => void
   onPromptRun: (id: string) => void
@@ -23,20 +23,37 @@ interface Props {
 
 export function SectionsRail({
   page, selected, prompts, provider,
-  onSelect, onCycle, onMove, onToggle, onPromptChange, onPromptRun, onFanOut, onCopyBrief, onDraw, onAdd,
+  onSelect, onCycle, onDrop, onToggle, onPromptChange, onPromptRun, onFanOut, onCopyBrief, onDraw, onAdd,
 }: Props) {
   const stop = (e: React.MouseEvent) => e.stopPropagation()
   return (
     <aside className="sections">
       <h3>sections</h3>
-      {page.sections.map((s, i) => (
-        <div key={s.id} className={`sec ${selected === s.id ? 'sel' : ''} ${s.on ? '' : 'off'}`} onClick={() => onSelect(s.id)}>
+      {page.sections.map((s) => (
+        <div
+          key={s.id}
+          className={`sec ${selected === s.id ? 'sel' : ''} ${s.on ? '' : 'off'}`}
+          draggable
+          onClick={() => onSelect(s.id)}
+          onDragStart={(e) => e.dataTransfer.setData('text/plain', s.id)}
+          onDragOver={(e) => {
+            e.preventDefault()
+            const box = e.currentTarget.getBoundingClientRect()
+            e.currentTarget.dataset.edge = e.clientY > box.top + box.height / 2 ? 'after' : 'before'
+          }}
+          onDragLeave={(e) => delete e.currentTarget.dataset.edge}
+          onDrop={(e) => {
+            e.preventDefault()
+            const from = e.dataTransfer.getData('text/plain')
+            const after = e.currentTarget.dataset.edge === 'after'
+            delete e.currentTarget.dataset.edge
+            if (from && from !== s.id) onDrop(from, s.id, after)
+          }}
+        >
           <div className="secline">
             <b>{KIND_LABEL[s.kind]}</b>
             <span className="vname">{KIND_VARIANTS[s.kind][s.variant]}</span>
             <button title="try the next layout" onClick={(e) => { stop(e); onCycle(s.id) }}><Icon.cycle /></button>
-            <button title="move up" disabled={i === 0} onClick={(e) => { stop(e); onMove(s.id, -1) }}><Icon.up /></button>
-            <button title="move down" disabled={i === page.sections.length - 1} onClick={(e) => { stop(e); onMove(s.id, 1) }}><Icon.down /></button>
             <button title={s.on ? 'hide this section' : 'show this section'} onClick={(e) => { stop(e); onToggle(s.id) }}>
               {s.on ? <Icon.shown /> : <Icon.hidden />}
             </button>
@@ -55,10 +72,10 @@ export function SectionsRail({
                 </button>
               </div>
               <div className="srow">
-                <button onClick={() => onFanOut(s.id)}>every layout as an alternative</button>
+                <button onClick={() => onFanOut(s.id)}>all layouts</button>
                 <button onClick={() => onCopyBrief(s.id)}><Icon.copy /> brief</button>
                 {(s.kind === 'hero' || s.kind === 'showcase') && (
-                  <button onClick={() => onDraw(s.id)}>draw the image</button>
+                  <button onClick={() => onDraw(s.id)}>draw image</button>
                 )}
               </div>
             </div>

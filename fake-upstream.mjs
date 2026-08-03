@@ -35,12 +35,33 @@ async function loadFixtures(dir) {
 
 const frame = (event, data) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
 
+/**
+ * Copy designed to break the parser rather than to read well. Every string here targets a
+ * specific fragility: braces and quotes inside strings must not end a JSON object early,
+ * markup must be escaped rather than rendered, and multi-byte characters must survive being
+ * split across network chunks.
+ */
+const HARD = (tag, i) => ({
+  eyebrow: `${tag} · for teams shipping 24/7 — ünïcödé, 日本語, العربية`,
+  headline: `Ship {fast}: 99.9% uptime, "guaranteed" & <b>proven</b> [${i}]`,
+  sub: `Line one with a closing brace } mid sentence.\nLine two: <script>window.__pwned=1</script> & an ampersand.\nA backslash \\ and a quote " and an emoji 🚀🛰️ that must survive chunking.`,
+  cta: `Start {now}`,
+  cta2: 'See the "docs"',
+  label: `${tag} <em>label</em>`,
+  title: `A title with {braces} & "quotes"`,
+  quote: `They said: "it just works }" and meant it.`,
+  name: 'Ada <Lovelace>',
+  role: 'CTO & co-founder',
+  product: 'Wall & Co. {test}',
+  note: 'note } with brace',
+})
+
 /** A stand-in stream, used only when nothing has been captured yet. */
-function synthetic(ids, tag) {
+function synthetic(ids, tag, hard) {
   const payload = '```json\n' + JSON.stringify({
     sections: ids.map((id, i) => ({
       id,
-      content: { headline: `${tag} headline ${i}`, sub: `${tag} sub ${i}` },
+      content: hard ? HARD(tag, i) : { headline: `${tag} headline ${i}`, sub: `${tag} sub ${i}` },
     })),
   }) + '\n```'
   return (
@@ -106,9 +127,24 @@ function replay(fx, ids) {
   }).concat([{ at: chunks[chunks.length - 1]?.at ?? 0, text: raw.slice(cut) }])
 }
 
-/** Cut text into network sized chunks on a plausible clock, for the no-fixture case. */
-function chunkUp(raw) {
+/**
+ * Cut text into network sized chunks on a plausible clock, for the no-fixture case.
+ *
+ * In hard mode the split happens on the byte buffer at deliberately awkward offsets, so a
+ * multi-byte character lands half in one chunk and half in the next. That is the case a
+ * streaming decoder gets wrong, and slicing a JavaScript string would never produce it.
+ */
+function chunkUp(raw, hard) {
   const out = []
+  if (hard) {
+    const buf = Buffer.from(raw, 'utf8')
+    for (let i = 0, at = 0; i < buf.length; at += 14) {
+      const size = 7 + (i % 5)
+      out.push({ at, text: buf.subarray(i, i + size) })
+      i += size
+    }
+    return out
+  }
   for (let i = 0, at = 0; i < raw.length; at += 16) {
     const size = 37 + (i % 23)
     out.push({ at, text: raw.slice(i, i + size) })
@@ -162,7 +198,9 @@ function png(w = 64, h = 40) {
 }
 
 export async function fakeAnthropic(dir = FIXTURES) {
-  const fixtures = await loadFixtures(dir)
+  // 'hard' skips the captured corpus and serves copy built to break the parser
+  const hard = dir === 'hard'
+  const fixtures = hard ? [] : await loadFixtures(dir)
   let seq = 0
 
   const server = createServer(async (req, res) => {
@@ -195,7 +233,7 @@ export async function fakeAnthropic(dir = FIXTURES) {
     // recorded chunk boundaries still apply exactly.
     const plan = fixtures.length
       ? replay(fixtures[n % fixtures.length], ids)
-      : chunkUp(synthetic(ids, `angle${n}`))
+      : chunkUp(synthetic(ids, `angle${n}`, hard), hard)
 
     res.writeHead(200, { ...CORS, 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
     let clock = 0
