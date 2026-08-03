@@ -1,12 +1,14 @@
 import { PROVIDERS, type Provider } from '@/compose'
 import { Icon } from '@/icons'
 import type { Flag } from '@/slop'
+import { BACKDROP_NOTE, type Backdrop } from '@/backdrop'
 
 interface Props {
   at: number
   count: number
   angle?: string
   flags: Flag[]
+  backdrop: Backdrop
   bar: string
   provider: Provider
   busy: boolean
@@ -15,11 +17,12 @@ interface Props {
   onProvider: (p: Provider) => void
   onGo: (i: number) => void
   onFlags: () => void
+  onBackdrop: () => void
   onOpen: () => void
   onShip: () => void
 }
 
-export function Dock({ at, count, angle, flags, bar, provider, busy, onBar, onRun, onProvider, onGo, onFlags, onOpen, onShip }: Props) {
+export function Dock({ at, count, angle, flags, backdrop, bar, provider, busy, onBar, onRun, onProvider, onGo, onFlags, onBackdrop, onOpen, onShip }: Props) {
   return (
     <>
       <div className="barwrap">
@@ -47,6 +50,9 @@ export function Dock({ at, count, angle, flags, bar, provider, busy, onBar, onRu
         {angle && <span className="angle">{angle}</span>}
         <button title="next alternative" onClick={() => onGo(at + 1)} disabled={at >= count - 1}><Icon.right /></button>
         <span className="tip">scroll sideways to compare. click any text on the paper to edit it.</span>
+        <button title={`backdrop: ${BACKDROP_NOTE[backdrop]}. click for the next one.`} onClick={onBackdrop}>
+          {backdrop === 'none' ? 'no backdrop' : backdrop}
+        </button>
         <button
           className={flags.length ? 'flags' : 'flags ok'}
           title={flags.length ? flags.map((f) => `${f.label}. ${f.why}`).join('\n') : 'nothing generic found'}

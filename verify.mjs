@@ -173,6 +173,18 @@ await page.waitForTimeout(1400)
 const file = join(exportDir, 'pers-impressions')
 const shipped = existsSync(join(exportDir, 'spoor', 'index.html'))
 const html = shipped ? readFileSync(join(exportDir, 'spoor', 'index.html'), 'utf8') : ''
+const back = await page.evaluate(async () => {
+  const seen = []
+  for (let i = 0; i < 4; i++) {
+    const b = [...document.querySelectorAll('.filmbar button')].find((x) => /backdrop|contours|grain|ridge/.test(x.textContent))
+    seen.push(b?.textContent)
+    b?.click()
+    await new Promise((r) => setTimeout(r, 350))
+  }
+  const doc = document.querySelector('.paper.here iframe')?.contentDocument
+  return { cycled: seen, canvasInPage: !!doc?.querySelector('#bd'), webgl: !!doc?.querySelector('#bd')?.getContext?.('webgl2') }
+})
+console.log('backdrop:', JSON.stringify(back))
 console.log('slop:', JSON.stringify(await page.evaluate(() => ({
   badge: document.querySelector('.filmbar .flags')?.textContent,
   detail: document.querySelector('.filmbar .flags')?.getAttribute('title')?.split('\n').map((s) => s.split('.')[0]),

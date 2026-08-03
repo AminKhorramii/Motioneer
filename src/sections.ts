@@ -5,6 +5,7 @@
  */
 
 import type { Taste } from '@/taste'
+import type { Backdrop } from '@/backdrop'
 
 export type Kind = 'hero' | 'logos' | 'features' | 'showcase' | 'quote' | 'pricing' | 'faq' | 'cta' | 'footer'
 
@@ -23,6 +24,8 @@ export interface Page {
   pinned?: boolean
   /** the editorial position this page argues, when a model wrote it */
   angle?: string
+  /** the generated art behind the page, drawn from the taste sheet */
+  backdrop?: Backdrop
 }
 
 export const KIND_VARIANTS: Record<Kind, string[]> = {

@@ -6,6 +6,7 @@
 
 import { alpha, luminance, mix, shift, type Taste } from '@/taste'
 import { type Page, type Section } from '@/sections'
+import { backdropHtml } from '@/backdrop'
 
 const esc = (s: unknown) =>
   String(s ?? '').replace(/[<>&]/g, (m) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' })[m]!)
@@ -252,6 +253,8 @@ export function renderPage(page: Page, opts: { editable?: boolean; title?: strin
     .filter((s) => s.on)
     .map((s, i) => renderSection(s, page.taste, seed + i * 11))
     .join('\n')
-  return `${head(page.taste, opts.title ?? 'Landing', !!opts.editable)}${body}${opts.editable ? EDIT_SCRIPT : ''}</body></html>`
+  // the backdrop goes first so it sits behind the content without needing a stacking hack
+  const art = backdropHtml(page.taste, page.backdrop ?? 'none')
+  return `${head(page.taste, opts.title ?? 'Landing', !!opts.editable)}${art}${body}${opts.editable ? EDIT_SCRIPT : ''}</body></html>`
 }
 

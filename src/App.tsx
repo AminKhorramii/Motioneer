@@ -4,7 +4,7 @@ import { KIND_LABEL, applyEdit, starterPage, type Kind, type Page } from '@/sect
 import { renderPage } from '@/render'
 import { pageBrief, sectionBrief } from '@/brief'
 import {
-  EMPTY_PRODUCT, addSection, alternatives, arrange, cycleVariant, fanOut, keyFor, moveSection,
+  EMPTY_PRODUCT, addSection, alternatives, arrange, cycleBackdrop, cycleVariant, fanOut, keyFor, moveSection,
   promptPage, promptSection, sectionAlternatives, seeded, setMock, type Product, type Provider,
 } from '@/compose'
 import { Onboarding } from '@/Onboarding'
@@ -264,7 +264,7 @@ export default function App() {
                 })}
               </div>
               <Dock
-                at={at} count={pages.length} angle={page.angle} flags={flags} bar={bar} provider={provider} busy={!!busy}
+                at={at} count={pages.length} angle={page.angle} flags={flags} backdrop={page.backdrop ?? 'none'} bar={bar} provider={provider} busy={!!busy}
                 onBar={setBar} onRun={runBar} onProvider={setProvider}
                 onGo={(i) => setAt(Math.max(0, Math.min(i, pages.length - 1)))}
                 onFlags={() => flash(
@@ -272,6 +272,7 @@ export default function App() {
                     ? `${flags.length} generic patterns: ${flags.slice(0, 3).map((f) => f.label).join(', ')}.`
                     : 'No generic patterns found on this page.',
                 )}
+                onBackdrop={() => setPage(cycleBackdrop)}
                 onOpen={() => void host.preview(renderPage(page, { title: product.name })).then(() => flash('Opened in your browser.'))}
                 onShip={() => void host.exportPage(renderPage(page, { title: product.name }), shipName).then(
                   (r) => r && flash(isDesktop ? `Shipped to ${r.file}` : `${r.file} downloaded, ${r.bytes.toLocaleString()} bytes.`),

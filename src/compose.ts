@@ -3,6 +3,7 @@
 import { drift } from '@/taste'
 import { host } from '@/host'
 import { slop, slopBrief } from '@/slop'
+import { BACKDROPS, type Backdrop } from '@/backdrop'
 import { KIND_VARIANTS, defaultContent, uid, type Kind, type Page, type Section } from '@/sections'
 
 export interface Product {
@@ -48,6 +49,8 @@ export function arrange(base: Page, i: number): Page {
   return {
     ...base,
     id: uid(),
+    // walk the backdrops rather than picking at random, so a wall shows each of them
+    backdrop: i === 0 ? (base.backdrop ?? 'none') : BACKDROPS[i % BACKDROPS.length],
     taste: i === 0 ? base.taste : drift(base.taste, seed),
     sections: base.sections.map((s) => ({
       ...s,
@@ -81,6 +84,12 @@ export function addSection(page: Page, kind: Kind, product: string, at?: number)
 }
 
 /** Cycle a section to its next layout. The wrap lives here because KIND_VARIANTS defines the range. */
+/** Cycle the page's backdrop. The wrap lives here because BACKDROPS defines the range. */
+export function cycleBackdrop(page: Page): Page {
+  const at = BACKDROPS.indexOf(page.backdrop ?? 'none')
+  return { ...page, backdrop: BACKDROPS[(at + 1) % BACKDROPS.length] as Backdrop }
+}
+
 export function cycleVariant(page: Page, id: string): Page {
   return {
     ...page,

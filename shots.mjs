@@ -25,5 +25,11 @@ await page.screenshot({ path: 'shots/studio.png' })
 await page.evaluate(() => document.querySelectorAll('.sec')[0].click())
 await page.waitForTimeout(600)
 await page.screenshot({ path: 'shots/section.png' })
+for (const name of ['contours', 'grain', 'ridge']) {
+  await page.evaluate(() => [...document.querySelectorAll('.filmbar button')]
+    .find((x) => /backdrop|contours|grain|ridge/.test(x.textContent))?.click())
+  await page.waitForTimeout(1400)
+  await page.screenshot({ path: `shots/backdrop-${name}.png` })
+}
 await app.close()
 console.log('shots done')
