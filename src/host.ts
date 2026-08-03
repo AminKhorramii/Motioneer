@@ -65,7 +65,66 @@ const web: Host = {
 
 const deltaFns = new Set<(id: string, delta: string) => void>()
 
-/** Electron injects its bridge on window.wall, so its presence is what picks the host. */
-export const host: Host = (window as unknown as { wall?: Host }).wall ?? web
+/**
+ * The served host: the same app, with the keys behind the server instead of in the page.
+ * State and export stay in the browser, because those are the user's and there is no reason
+ * for them to travel. Only the model calls move.
+ */
+const served: Host = {
+  ...web,
+  stream: async (id, provider, system, user) => {
+    const res = await fetch('/api/stream', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ provider, system, user }),
+    })
+    if (!res.ok || !res.body) return { error: `server ${res.status}: ${(await res.text()).slice(0, 160)}` }
+    const reader = res.body.getReader()
+    const dec = new TextDecoder()
+    let text = ''
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      const delta = dec.decode(value, { stream: true })
+      if (!delta) continue
+      text += delta
+      deltaFns.forEach((fn) => fn(id, delta))
+    }
+    return { text }
+  },
+  image: async (_provider, prompt) => {
+    const res = await fetch('/api/image', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ prompt }),
+    })
+    if (!res.ok) return { error: `server ${res.status}` }
+    return res.json()
+  },
+}
 
-export const isDesktop = Boolean((window as unknown as { wall?: Host }).wall)
+const win = window as unknown as { wall?: Host; __wallServed?: number; __wallProviders?: string[] }
+
+/**
+ * Which host answers is decided by what is present. Electron injects a bridge on window.wall.
+ * A server injects a flag into the page it serves. Neither means the browser is on its own and
+ * the visitor brings a key.
+ */
+export const host: Host = win.wall ?? (win.__wallServed ? served : web)
+
+export const isDesktop = Boolean(win.wall)
+export const isServed = Boolean(!win.wall && win.__wallServed)
+
+/** Providers the server already holds a key for, so the app can stop asking for one. */
+export const servedProviders = async (): Promise<string[]> => {
+  if (!isServed) return []
+  if (win.__wallProviders) return win.__wallProviders
+  try {
+    const r = await fetch('/api/config')
+    const list = ((await r.json()) as { providers?: string[] }).providers ?? []
+    win.__wallProviders = list
+    return list
+  } catch {
+    return []
+  }
+}

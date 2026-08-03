@@ -6,6 +6,11 @@
 
 /** Tests point this at a local server that speaks the same wire format, so the streaming
  *  path can be exercised without a key. Unset in normal use. */
+/** The model is configurable because this task is short JSON copy, not code, so a small model
+ *  may do it as well as a large one at a fraction of the cost. */
+const model = (fallback) =>
+  (globalThis.WALL_MODEL ?? (typeof process !== 'undefined' ? process.env?.WALL_MODEL : '') ?? '') || fallback
+
 const base = () =>
   globalThis.WALL_API_BASE ??
   (typeof process !== 'undefined' ? process.env?.WALL_API_BASE : '') ??
@@ -16,7 +21,7 @@ export const REQUESTS = {
     url: `${base() || 'https://api.openai.com'}/v1/chat/completions`,
     headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
     body: {
-      model: 'gpt-5.2',
+      model: model('gpt-5.2'),
       messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
       max_completion_tokens: 8000,
       stream: true,
@@ -33,7 +38,7 @@ export const REQUESTS = {
       'anthropic-dangerous-direct-browser-access': 'true',
     },
     body: {
-      model: 'claude-sonnet-5',
+      model: model('claude-sonnet-5'),
       // nine sections of copy runs past 2000, and a truncated reply is a lost page
       max_tokens: 8000,
       system,

@@ -55,7 +55,7 @@ const onboard = await page.evaluate(() => ({
   heading: document.querySelector('.onboard h2')?.textContent,
   activeStep: [...document.querySelectorAll('.onboard .steps button')].findIndex((b) => b.classList.contains('on')),
   h2count: document.querySelectorAll('.onboard h2').length,
-  points: document.querySelectorAll('.onboard .how li').length,
+  words: document.querySelector('.onboard .pane')?.innerText?.split(/\s+/).length,
   caps: document.querySelector('.onboard .card').innerText.replace(/\b(AI|HTML|CSS|URL|API)\b/g, '').match(/\b[A-Z]{2,}\b/g) ?? 'none',
   dashes: document.querySelector('.onboard .card').innerText.includes('\u2014'),
 }))

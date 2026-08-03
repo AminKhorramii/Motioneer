@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { PRESETS, type Taste } from '@/taste'
 import { starterPage } from '@/sections'
 import { renderPage } from '@/render'
-import { IMAGE_KEY_NAME, PROVIDERS, readBrief, seeded, type Intake } from '@/compose'
+import { IMAGE_KEY_NAME, PROVIDERS, canWrite, readBrief, seeded, type Intake } from '@/compose'
 import type { Product } from '@/compose'
 import { Icon } from '@/icons'
 import { isDesktop } from '@/host'
@@ -44,6 +44,7 @@ export function Onboarding({ product, taste, explainOnly, onProduct, onTaste, on
   const [reading, setReading] = useState(false)
   const [asked, setAsked] = useState<Intake['questions']>([])
   const [read, setRead] = useState(false)
+  const [failed, setFailed] = useState(false)
   const [keys, setKeys] = useState<Record<string, string>>(() =>
     Object.fromEntries([
       ...PROVIDERS.map((p) => [p.id, localStorage.getItem(p.keyName) ?? '']),
@@ -63,7 +64,12 @@ export function Onboarding({ product, taste, explainOnly, onProduct, onTaste, on
     setReading(true)
     const got = await readBrief(told).catch(() => null)
     setReading(false)
-    if (!got) return
+    if (!got) {
+      // silence here would look like nothing happened, which is worse than saying so
+      setFailed(true)
+      return
+    }
+    setFailed(false)
     onProduct(got.product)
     // ask only about what the description genuinely left empty, because everything else either
     // came out of the reading or has a sensible default
@@ -100,13 +106,10 @@ export function Onboarding({ product, taste, explainOnly, onProduct, onTaste, on
               Wall writes your landing page eight ways at once, so you choose between real pages
               instead of imagining them.
             </p>
-            <ol className="how">
-              <li><b>Every paper argues differently.</b> The angle is named under each page.</li>
-              <li><b>The paper sits in the middle.</b> Arrow keys bring another to the centre.</li>
-              <li><b>Click any text to edit it.</b> Edits live in the page, so they survive a layout change.</li>
-              <li><b>Prompting adds three pages to the right.</b> Nothing is overwritten.</li>
-              <li><b>Ship writes one HTML file you own.</b> No framework, no runtime, host it anywhere.</li>
-            </ol>
+            <p className="lede">
+              Describe what you are launching. Edit any page by clicking its text. Ship writes one
+              HTML file you own.
+            </p>
             {explainOnly ? (
               <div className="row"><button className="primary" onClick={onClose}>back to work</button></div>
             ) : (
@@ -123,7 +126,7 @@ export function Onboarding({ product, taste, explainOnly, onProduct, onTaste, on
         {step === 1 && (
           <div className="pane">
             <h2>What are you launching?</h2>
-            {keys.claude || keys.gpt ? (
+            {keys.claude || keys.gpt || canWrite('claude') ? (
               <>
                 <p className="lede">
                   Say it however you already say it. A README, a note, two sentences.
@@ -137,6 +140,12 @@ export function Onboarding({ product, taste, explainOnly, onProduct, onTaste, on
                     onChange={(e) => setTold(e.currentTarget.value)}
                   />
                 </div>
+
+                {failed && (
+                  <p className="lede small">
+                    That could not be read. Try again, or fill the two fields below the key instead.
+                  </p>
+                )}
 
                 {asked.length > 0 && (
                   <div className="fields">

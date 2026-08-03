@@ -200,3 +200,35 @@ A variant is now an angle crossed with a world: what the page argues, and how it
 The world name sits under the paper and clicking it rebuilds the page in the next one.
 `verify:stream` asserts a wall spans distinct worlds and distinct looks, so eight pages
 quietly converging is a test failure rather than something you notice months later.
+
+## Running it as a server
+
+`server/index.mjs` is one file with no dependencies. It serves the built app and holds the
+model keys, so they never reach a browser. The same `dist/` works either way: the server
+announces itself by injecting a flag into the page it serves, and the app picks its host from
+what is present. Electron uses its bridge, a served page uses the server, and a plain static
+build falls back to the visitor's own key.
+
+```
+ANTHROPIC_API_KEY=... npm run serve          # self hosted, your key, your machine
+PORT=8080 GEMINI_API_KEY=... npm run serve   # images too
+```
+
+For a public deployment there are two ceilings, both off unless set, because an instance
+paying with its own key does not need protecting from itself:
+
+```
+WALL_WALLS_PER_HOUR=5            # per address
+WALL_DAILY_OUTPUT_TOKENS=500000  # whole deployment
+```
+
+The unit is the wall rather than the request, because one click is eight calls. Measured from
+real captures, one wall costs about 14,000 input and 16,000 output tokens and takes around 28
+seconds.
+
+`WALL_MODEL` picks the model. The task here is short JSON copy rather than code, since the
+renderer produces the HTML, so a small model may do it as well as a large one at a fraction of
+the cost.
+
+`npm run verify:server` runs the real server against a recorded upstream in a real browser,
+and asserts the visitor never holds a key.

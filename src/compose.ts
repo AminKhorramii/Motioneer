@@ -1,7 +1,7 @@
 /** Making pages: alternatives, section prompts, and the model path (with a mock for tests). */
 
 import { type Taste } from '@/taste'
-import { host } from '@/host'
+import { host, isServed, servedProviders } from '@/host'
 import { slop, slopBrief } from '@/slop'
 import { BACKDROPS, type Backdrop } from '@/backdrop'
 import { WORLDS, type World } from '@/worlds'
@@ -142,6 +142,17 @@ export const imageKey = () => localStorage.getItem(IMAGE_KEY_NAME) ?? ''
 export const keyFor = (p: Provider) =>
   localStorage.getItem(PROVIDERS.find((x) => x.id === p)!.keyName) ?? ''
 
+/**
+ * A deployment can hold the keys instead of the visitor, so "can this write" is not the same
+ * question as "is there a key in this browser". Everything that gates on writing asks this.
+ */
+let held: string[] = []
+export async function loadHeldKeys() {
+  held = await servedProviders()
+}
+export const canWrite = (p: Provider) => Boolean(keyFor(p)) || held.includes(p === 'gpt' ? 'openai' : 'anthropic')
+export const canDraw = () => Boolean(imageKey()) || held.includes('gemini')
+
 // One delta listener for the whole app, fanned out by request id, because several pages
 // stream at once and each needs only its own text.
 const streams = new Map<string, (delta: string) => void>()
@@ -159,7 +170,8 @@ async function ask(
   onDelta?: (delta: string) => void,
 ): Promise<string | null> {
   const key = keyFor(provider)
-  if (!key) return null
+  // a served deployment holds the key, so an empty one here is not a reason to stop
+  if (!key && !isServed) return null
   if (!listening) {
     listening = true
     host.onDelta((id, delta) => streams.get(id)?.(delta))
@@ -418,7 +430,7 @@ export async function readBrief(text: string, provider: Provider = 'claude'): Pr
  */
 export async function illustrate(sec: Section, product: Product, taste: Taste): Promise<string | null> {
   const key = imageKey()
-  if (!key) return null
+  if (!key && !isServed) return null
   const prompt = [
     `Draw one abstract image for the ${sec.kind} section of a landing page.`,
     `The product: ${product.name}. ${product.oneLiner}`,

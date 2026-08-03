@@ -4,7 +4,7 @@ import { KIND_LABEL, applyEdit, starterPage, type Kind, type Page } from '@/sect
 import { renderPage } from '@/render'
 import { pageBrief } from '@/brief'
 import {
-  EMPTY_PRODUCT, addSection, alternatives, arrange, cycleBackdrop, cycleVariant, cycleWorld, dropSection, fanOut, illustrate, imageKey, keyFor, promptPage, promptSection, sectionAlternatives, seeded, setMock, type Product, type Provider,
+  EMPTY_PRODUCT, addSection, alternatives, arrange, canDraw, canWrite, cycleBackdrop, cycleVariant, cycleWorld, dropSection, fanOut, illustrate, loadHeldKeys, promptPage, promptSection, sectionAlternatives, seeded, setMock, type Product, type Provider,
 } from '@/compose'
 import { Onboarding } from '@/Onboarding'
 import { BriefRail } from '@/BriefRail'
@@ -90,7 +90,7 @@ export default function App() {
     const mine = ++run.current
     setPages([arrange(base, 0)])
     setAt(0)
-    if (!keyFor(prov)) {
+    if (!canWrite(prov)) {
       setPages(alternatives(base, 8))
       return
     }
@@ -123,6 +123,11 @@ export default function App() {
   const build = useCallback((p: Product, t: Taste) => {
     void fill(seeded(starterPage(t, p.name || 'Product'), p), p, provider)
   }, [fill, provider])
+
+  // ask the deployment which keys it holds before anything gates on having one
+  useEffect(() => {
+    void loadHeldKeys()
+  }, [])
 
   useEffect(() => {
     void host.readState().then((raw) => {
@@ -176,7 +181,7 @@ export default function App() {
   async function runBar() {
     const instruction = bar.trim()
     if (!instruction || !page) return
-    if (!keyFor(provider)) {
+    if (!canWrite(provider)) {
       flash(`Add a ${provider === 'claude' ? 'Claude' : 'GPT'} key in the brief panel to write copy with a model.`)
       return
     }
@@ -206,7 +211,7 @@ export default function App() {
   async function drawImage(id: string) {
     const sec = page?.sections.find((s) => s.id === id)
     if (!sec) return
-    if (!imageKey()) return flash('Add a Gemini key in the brief panel to draw images.')
+    if (!canDraw()) return flash('Add a Gemini key in the brief panel to draw images.')
     setBusy(`Drawing the ${KIND_LABEL[sec.kind]} image.`)
     try {
       const dataUrl = await illustrate(sec, product, page!.taste)
@@ -227,7 +232,7 @@ export default function App() {
     const sec = page?.sections.find((s) => s.id === id)
     const instruction = prompts[id]?.trim()
     if (!sec || !instruction) return
-    if (!keyFor(provider)) return flash('Add a model key in the brief panel to rewrite a section.')
+    if (!canWrite(provider)) return flash('Add a model key in the brief panel to rewrite a section.')
     setBusy(`Rewriting the ${KIND_LABEL[sec.kind]}.`)
     const next = await promptSection(sec, instruction, product, provider)
     setBusy('')
@@ -286,7 +291,7 @@ export default function App() {
           {/* writing a wall takes half a minute, so starting another must not be blocked. Runs
               carry a token, so the previous one is abandoned rather than mixed in. */}
           <button className="go" disabled={!page} onClick={() => page && void fill(page, product, provider)}>
-            {keyFor(provider) ? 'write a new wall' : 'new alternatives'}
+            {canWrite(provider) ? 'write a new wall' : 'new alternatives'}
           </button>
           <button className={armed ? 'arm' : ''} title="describe a different product and start a new wall"
             onClick={startOver}>

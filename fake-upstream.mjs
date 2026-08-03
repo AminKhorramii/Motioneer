@@ -56,6 +56,15 @@ const HARD = (tag, i) => ({
   note: 'note } with brace',
 })
 
+/** wrap a reply in the same frames a real stream uses, without the recorded pacing */
+const intakeStream = (payload) =>
+  frame('message_start', { type: 'message_start', message: { id: 'msg_fake', role: 'assistant' } }) +
+  frame('content_block_start', { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } }) +
+  [...payload.matchAll(/[\s\S]{1,40}/g)]
+    .map(([text]) => frame('content_block_delta', { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text } }))
+    .join('') +
+  frame('message_stop', { type: 'message_stop' })
+
 /** A stand-in stream, used only when nothing has been captured yet. */
 function synthetic(ids, tag, hard) {
   const payload = '```json\n' + JSON.stringify({
@@ -222,6 +231,24 @@ export async function fakeAnthropic(dir = FIXTURES) {
     }
     // the page shape is embedded in a JSON body, so its quotes arrive escaped
     const ids = [...body.matchAll(/\\?"id\\?":\s*\\?"([a-z0-9]{5,})\\?"/g)].map((m) => m[1])
+    // an intake asks for a product and questions rather than sections, so it needs its own reply
+    // match without quotes: the prompt travels inside a JSON body, so its quotes are escaped
+    if (body.includes('questions')) {
+      const reply = '```json\n' + JSON.stringify({
+        product: {
+          name: 'Spoor',
+          oneLiner: 'Every session you ever ran, findable in one keystroke.',
+          what: 'It reads what your tools already write to disk and makes it searchable.',
+          audience: '',
+          cta: 'Download for macOS',
+        },
+        questions: [{ key: 'audience', question: 'Who specifically is this for?', why: 'the page needs a reader' }],
+      }) + '\n```'
+      res.writeHead(200, { ...CORS, 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
+      for (const { text } of chunkUp(intakeStream(reply))) res.write(text)
+      return res.end()
+    }
+
     const n = seq++
     // real calls do not return in lockstep, and a wall that appears all at once would not
     // exercise the code that puts one paper up while others are still writing
