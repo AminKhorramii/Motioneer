@@ -535,23 +535,22 @@ header .hactions button.on { color: var(--ink); }
 
 /* the model picker: the mark carries the recognition, so it leads and the words follow */
 .onboard .picks { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin: 1.1rem 0 1rem; }
-/* Just the mark and its name. A tile behind a tile behind a logo is three surfaces where one
-   will do, and boxes inside boxes is a pattern this app flags on generated pages. */
-/* nine options, so three across leaves no orphan row */
-.onboard .picks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.2rem; margin: 1.1rem 0 1rem; }
-.onboard .pick {
-  display: flex; flex-direction: column; align-items: center; gap: 0.6rem;
-  background: none; border: none; border-radius: 10px;
-  padding: 0.9rem 0.5rem 0.75rem; color: var(--dim2);
-  transition: color var(--t), background var(--t);
+/* One row of marks. The name of whichever is hovered or chosen appears on the line below, so
+   ten options cost one row instead of four. */
+.onboard .picks {
+  display: flex; flex-wrap: wrap; gap: 0.15rem; margin: 1rem 0 0.5rem;
 }
-.onboard .pick .mark { display: flex; opacity: 0.55; transition: opacity var(--t), transform var(--t); }
-.onboard .pick b { font-size: 11.5px; font-weight: 400; color: inherit; text-align: center; }
-.onboard .pick:hover { color: var(--ink2); }
-.onboard .pick:hover .mark { opacity: 0.85; transform: translateY(-1px); }
-.onboard .pick.on { color: var(--ink); background: rgba(255, 255, 255, 0.05); }
-.onboard .pick.on .mark { opacity: 1; }
-.onboard .pick.on b { font-weight: 500; }
+.onboard .pick {
+  display: flex; align-items: center; justify-content: center;
+  width: 46px; height: 42px; border-radius: 9px;
+  background: none; border: none; opacity: 0.45;
+  transition: opacity var(--t), background var(--t), transform var(--t);
+}
+.onboard .pick:hover { opacity: 0.9; background: rgba(255, 255, 255, 0.045); }
+.onboard .pick.on { opacity: 1; background: rgba(255, 255, 255, 0.08); }
+.onboard .pick:active { transform: scale(0.95); }
+/* one line, and it holds its height so choosing does not shift the card */
+.onboard .named { height: 1.15rem; margin-bottom: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .onboard .row .lede.small { margin: 0; }
 

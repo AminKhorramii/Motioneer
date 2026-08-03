@@ -56,7 +56,7 @@ const onboard = await page.evaluate(() => ({
   activeStep: [...document.querySelectorAll('.onboard .steps button')].findIndex((b) => b.classList.contains('on')),
   h2count: document.querySelectorAll('.onboard h2').length,
   words: document.querySelector('.onboard .pane')?.innerText?.split(/\s+/).length,
-  models: [...document.querySelectorAll('.onboard .pick b')].map((b) => b.textContent),
+  models: [...document.querySelectorAll('.onboard .pick')].map((b) => b.getAttribute('aria-label')),
   fieldsBeforePicking: document.querySelectorAll('.onboard .fields').length,
   caps: document.querySelector('.onboard .card').innerText.replace(/\b(AI|HTML|CSS|URL|API|GPT|GLM)\b/g, '').match(/\b[A-Z]{2,}\b/g) ?? 'none',
   dashes: document.querySelector('.onboard .card').innerText.includes('\u2014'),

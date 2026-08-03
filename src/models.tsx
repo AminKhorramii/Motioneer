@@ -27,53 +27,53 @@ export const MODELS: ModelChoice[] = [
   {
     id: 'claude', label: 'Claude', wire: 'anthropic', base: '', model: 'claude-sonnet-5',
     keyName: 'wall-key-anthropic', keys: 'console.anthropic.com',
-    note: 'the strongest writing, and the most expensive',
+    note: 'The best writing, at the highest price.',
   },
   {
     id: 'haiku', label: 'Claude Haiku', wire: 'anthropic', base: '', model: 'claude-haiku-4-5-20251001',
     keyName: 'wall-key-anthropic', keys: 'console.anthropic.com',
-    note: 'the same writing at roughly a third of the cost',
+    note: 'Nearly the same writing, a third of the cost.',
   },
   {
     id: 'gpt', label: 'GPT', wire: 'openai', base: '', model: 'gpt-5.2',
     keyName: 'wall-key-openai', keys: 'platform.openai.com',
-    note: 'close on quality, familiar keys',
+    note: 'Close on quality, familiar keys.',
   },
   {
     id: 'gemini', label: 'Gemini Flash', wire: 'openai',
     base: 'https://generativelanguage.googleapis.com/v1beta/openai',
     model: 'gemini-flash-latest', keyName: 'wall-key-gemini', keys: 'aistudio.google.com',
-    note: 'a free tier that covers real use, and the same key draws the images',
+    note: 'Free tier, and it draws the images too.',
   },
   {
     id: 'glm', label: 'GLM', wire: 'openai', base: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-5.2',
     keyName: 'wall-key-glm', keys: 'bigmodel.cn',
-    note: 'open weights, near the top on coding, a fraction of the price',
+    note: 'Open weights, near the top, a fraction of the price.',
   },
   {
     id: 'deepseek', label: 'DeepSeek', wire: 'openai', base: 'https://api.deepseek.com', model: 'deepseek-v4-flash',
     keyName: 'wall-key-deepseek', keys: 'platform.deepseek.com',
-    note: 'the cheapest of the serious models',
+    note: 'The cheapest of the serious models.',
   },
   {
     id: 'qwen', label: 'Qwen', wire: 'openai', base: 'https://dashscope-intl.aliyuncs.com/compatible-mode', model: 'qwen3.6-plus',
     keyName: 'wall-key-qwen', keys: 'modelstudio.console.alibabacloud.com',
-    note: 'strong and mid priced',
+    note: 'Strong, and mid priced.',
   },
   {
     id: 'kimi', label: 'Kimi', wire: 'openai', base: 'https://api.moonshot.ai', model: 'kimi-k2.6',
     keyName: 'wall-key-kimi', keys: 'platform.moonshot.ai',
-    note: 'long context, good at holding a brief',
+    note: 'Long context, holds a brief well.',
   },
   {
     id: 'minimax', label: 'MiniMax', wire: 'openai', base: 'https://api.minimax.io/v1', model: 'minimax-m3',
     keyName: 'wall-key-minimax', keys: 'minimax.io',
-    note: 'cheap, strong on long structured replies',
+    note: 'Cheap, strong on long replies.',
   },
   {
     id: 'custom', label: 'Anything else', wire: 'openai', base: '', model: '',
     keyName: 'wall-key-custom', keys: 'your provider',
-    note: 'any OpenAI compatible endpoint, including a local one',
+    note: 'Any OpenAI compatible endpoint, including a local one.',
   },
 ]
 

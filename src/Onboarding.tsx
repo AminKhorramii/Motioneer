@@ -36,6 +36,7 @@ export function Onboarding({ product, taste, explainOnly, onProduct, onBuild, on
   const [failed, setFailed] = useState(false)
   const [asked, setAsked] = useState<Intake['questions']>([])
   // nothing is chosen on a first run, so the grid is the only thing on screen until it is
+  const [hover, setHover] = useState('')
   const [pick, setPick] = useState(() => localStorage.getItem('wall-model') ?? '')
   const [keys, setKeys] = useState<Record<string, string>>(() =>
     Object.fromEntries([
@@ -45,6 +46,7 @@ export function Onboarding({ product, taste, explainOnly, onProduct, onBuild, on
   )
   const model = modelById(pick)
   const picked = Boolean(pick)
+  const shown = hover || pick ? modelById(hover || pick) : null
   const ready = product.name.trim().length > 0 && product.oneLiner.trim().length > 0
 
   const saveKey = (keyName: string, value: string) => {
@@ -93,16 +95,19 @@ export function Onboarding({ product, taste, explainOnly, onProduct, onBuild, on
         {step === 0 && (
           <div className="pane">
             <h2>Which model writes?</h2>
-            <p className="lede">Wall asks for short copy, not code, so a small model does it well.</p>
-            <div className="picks">
+            {/* one row of marks, and one line that names whichever is under the cursor. Ten
+                labelled tiles was four rows of reading to make one choice. */}
+            <div className="picks" onMouseLeave={() => setHover('')}>
               {MODELS.map((m) => (
-                <button key={m.id} className={m.id === pick ? 'pick on' : 'pick'} onClick={() => take(m.id)}
-                  title={m.note}>
-                  <span className="mark">{MARKS[m.id]?.()}</span>
-                  <b>{m.label}</b>
+                <button key={m.id} className={m.id === pick ? 'pick on' : 'pick'} aria-label={m.label}
+                  onMouseEnter={() => setHover(m.id)} onFocus={() => setHover(m.id)} onClick={() => take(m.id)}>
+                  {MARKS[m.id]?.()}
                 </button>
               ))}
             </div>
+            <p className="lede small named">
+              {shown ? `${shown.label}: ${shown.note}` : 'Pick one. Wall asks for short copy, not code, so a small model does it well.'}
+            </p>
 
             {picked && (
             <div className="fields">
