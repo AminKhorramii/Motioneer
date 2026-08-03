@@ -1,5 +1,6 @@
-import { PROVIDERS, type Provider } from '@/compose'
+import { chosen } from '@/compose'
 import { Icon } from '@/icons'
+import { MARKS } from '@/models'
 import type { Flag } from '@/slop'
 import { BACKDROP_NOTE, type Backdrop } from '@/backdrop'
 import { worldById, type WorldId } from '@/worlds'
@@ -20,13 +21,12 @@ interface Props {
   backdrop: Backdrop
   world?: WorldId
   bar: string
-  provider: Provider
   busy: boolean
   onBar: (v: string) => void
   onRun: () => void
-  onProvider: (p: Provider) => void
   onGo: (i: number) => void
   onFlags: () => void
+  onModel: () => void
   onBackdrop: () => void
   onWorld: () => void
   onOpen: () => void
@@ -34,20 +34,16 @@ interface Props {
 }
 
 export function Dock({
-  at, count, angle, flags, backdrop, world, bar, provider, busy,
-  onBar, onRun, onProvider, onGo, onFlags, onBackdrop, onWorld, onOpen, onShip,
+  at, count, angle, flags, backdrop, world, bar, busy,
+  onBar, onRun, onGo, onFlags, onModel, onBackdrop, onWorld, onOpen, onShip,
 }: Props) {
   return (
     <div className="dock">
       <div className="barwrap">
-        <div className="models">
-          {PROVIDERS.map((p) => (
-            <button key={p.id} className={provider === p.id ? 'on' : ''} onClick={() => onProvider(p.id)}
-              title={`write with ${p.label}`}>
-              {p.id === 'claude' ? <Icon.claude /> : <Icon.gpt />} {p.label}
-            </button>
-          ))}
-        </div>
+        {/* the model is a whole configuration now, so it is shown and changed in one place */}
+        <button className="model" onClick={onModel} title={`writing with ${chosen().label}. click to change.`}>
+          {MARKS[chosen().id]?.() ?? <Icon.claude />} {chosen().label}
+        </button>
         <input
           className="bar"
           value={bar}

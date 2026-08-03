@@ -47,19 +47,23 @@ await page.evaluate((key) => {
     sections: shape.map((s) => ({
       id: s.id,
       content: Object.fromEntries(
-        Object.entries(s.content).map(([k, v]) => [k, typeof v === 'string' ? `${instruction.slice(0, 18)} | ${v}` : v]),
+        Object.entries(s.content).map(([k, v]) => [k, typeof v === 'string' ? `${instruction.match(/"([^"]+)"/)?.[1] ?? instruction.slice(0, 14)} | ${v}` : v]),
       ),
     })),
   }))
 }, REAL)
 
+// setup is two steps now: the model, then the brief where the sample lives
+await page.evaluate(() => document.querySelector('.onboard .pick')?.click())
+await page.click('.onboard .primary')
+await page.waitForSelector('.sample', { timeout: 10000 })
 await page.click('.sample')
 await page.waitForSelector('.paper.here', { timeout: 20000 })
 await page.waitForFunction(() => /of 9$/.test(document.querySelector('.filmbar span')?.textContent ?? ''), null, { timeout: REAL ? 180000 : 20000 })
 console.log('written wall:', JSON.stringify(await page.evaluate(async () => {
   const seen = new Set()
   for (let i = 0; i < 9; i++) {
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }))
+    document.querySelectorAll('.filmbar .nav button')[1]?.click()
     await new Promise((r) => setTimeout(r, 300))
     seen.add(document.querySelector('.paper.here iframe')?.contentDocument?.querySelector('h1')?.innerText ?? '')
   }

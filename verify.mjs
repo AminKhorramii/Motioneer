@@ -44,7 +44,7 @@ await page.evaluate((key) => {
       id: s.id,
       content: Object.fromEntries(
         Object.entries(s.content).map(([k, v]) => [
-          k, typeof v === 'string' ? `${instruction.slice(0, 18)} | ${v}` : v,
+          k, typeof v === 'string' ? `${instruction.match(/"([^"]+)"/)?.[1] ?? instruction.slice(0, 14)} | ${v}` : v,
         ]),
       ),
     })),
@@ -56,14 +56,17 @@ const onboard = await page.evaluate(() => ({
   activeStep: [...document.querySelectorAll('.onboard .steps button')].findIndex((b) => b.classList.contains('on')),
   h2count: document.querySelectorAll('.onboard h2').length,
   words: document.querySelector('.onboard .pane')?.innerText?.split(/\s+/).length,
-  caps: document.querySelector('.onboard .card').innerText.replace(/\b(AI|HTML|CSS|URL|API)\b/g, '').match(/\b[A-Z]{2,}\b/g) ?? 'none',
+  models: [...document.querySelectorAll('.onboard .pick b')].map((b) => b.textContent),
+  fieldsBeforePicking: document.querySelectorAll('.onboard .fields').length,
+  caps: document.querySelector('.onboard .card').innerText.replace(/\b(AI|HTML|CSS|URL|API|GPT|GLM)\b/g, '').match(/\b[A-Z]{2,}\b/g) ?? 'none',
   dashes: document.querySelector('.onboard .card').innerText.includes('\u2014'),
 }))
 console.log('onboarding:', JSON.stringify(onboard))
 
-// a key turns the five field form into a description box, which is the path being tested
+// two steps: pick a model, which is what reveals the key fields, then describe the product
+await page.evaluate(() => document.querySelector('.onboard .pick')?.click())
+await page.waitForTimeout(200)
 await page.click('.onboard .primary')
-await page.fill('.onboard .keyline input', 'test-key')
 await page.waitForSelector('.onboard .tell', { timeout: 10000 })
 await page.fill('.onboard .tell', 'Spoor makes every AI session you ever ran searchable, locally.')
 await page.click('.onboard .primary')
@@ -75,9 +78,7 @@ const intake = await page.evaluate(() => ({
   boxes: document.querySelectorAll('.onboard .tell').length,
 }))
 console.log('intake:', JSON.stringify(intake))
-await page.fill('.onboard .fields input', 'people who build with agents')
-await page.click('.onboard .primary')
-await page.waitForTimeout(300)
+await page.fill('.onboard .fields input:not([type=password])', 'people who build with agents')
 await page.click('.onboard .primary')
 await page.waitForSelector('.paper.here', { timeout: 20000 })
 console.log('onboarding closed:', JSON.stringify({ gone: (await page.locator('.onboard').count()) === 0 }))
@@ -115,7 +116,7 @@ const studio = await page.evaluate(() => ({
   papers: document.querySelectorAll('.paper').length,
   sections: [...document.querySelectorAll('.sec .secline b')].map((b) => b.textContent),
   counter: document.querySelector('.filmbar span')?.textContent,
-  models: [...document.querySelectorAll('.models button')].map((b) => b.textContent.trim()),
+  writingWith: document.querySelector('.barwrap .model')?.textContent?.trim(),
 }))
 console.log('studio:', JSON.stringify(studio))
 await page.screenshot({ path: `${OUT}/wall-studio.png` })

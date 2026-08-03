@@ -1,6 +1,7 @@
 import { PRESETS, type Taste } from '@/taste'
-import { PROVIDERS, type Product } from '@/compose'
-import { Icon } from '@/icons'
+import { starterPage } from '@/sections'
+import { renderPage } from '@/render'
+import { seeded, type Product } from '@/compose'
 
 interface Props {
   product: Product
@@ -8,6 +9,12 @@ interface Props {
   onProduct: (p: Product) => void
   onTaste: (t: Taste) => void
   onCopy: () => void
+}
+
+/** A look shown as the page it makes, at rail size. */
+const lookHtml = (t: Taste, p: Product) => {
+  const page = seeded(starterPage(t, p.name || 'Product'), p)
+  return renderPage({ ...page, sections: page.sections.slice(0, 1) }, { title: t.name })
 }
 
 /** The brief rail. Editing here changes what future sections are written from. */
@@ -40,27 +47,18 @@ export function BriefRail({ product, taste, onProduct, onTaste, onCopy }: Props)
           onChange={(e) => onProduct({ ...product, cta: e.currentTarget.value })} />
       </label>
 
-      <h3 className="mt">taste</h3>
-      <p className="hint">Drop a screenshot of a page you admire and its colours become your taste sheet.</p>
-      <div className="swatches">
-        {[taste.bg, taste.ink, taste.accent, taste.accent2].map((c, i) => <i key={i} style={{ background: c }} />)}
-      </div>
-      <div className="presets">
+      <h3 className="mt">look</h3>
+      <div className="looks small">
         {PRESETS.map((p) => (
-          <button key={p.name} className={p.name === taste.name ? 'on' : ''} onClick={() => onTaste(p)}>{p.name}</button>
+          <button key={p.name} className={p.name === taste.name ? 'look on' : 'look'} onClick={() => onTaste(p)}>
+            <span className="shot">
+              <iframe title={p.name} scrolling="no" tabIndex={-1} srcDoc={lookHtml(p, product)} />
+            </span>
+            <span className="looklabel">{p.name}</span>
+          </button>
         ))}
       </div>
-
-      <h3 className="mt">models</h3>
-      {PROVIDERS.map((p) => (
-        <label key={p.id} className="keyrow">
-          <span>{p.id === 'claude' ? <Icon.claude /> : <Icon.gpt />} {p.label} key</span>
-          <input type="password" defaultValue={localStorage.getItem(p.keyName) ?? ''}
-            placeholder={p.id === 'claude' ? 'sk-ant-...' : 'sk-...'}
-            onChange={(e) => localStorage.setItem(p.keyName, e.currentTarget.value.trim())} />
-        </label>
-      ))}
-      <p className="hint">Keys are used only for writing copy, and they stay on this machine.</p>
+      <p className="hint">Drop a screenshot of a page you admire and its colours become a look.</p>
     </aside>
   )
 }

@@ -71,11 +71,11 @@ ipcMain.handle('page:preview', async (_e, html) => {
 })
 
 /** the model path, from the main process so there is no CORS wall */
-ipcMain.handle('model:stream', async (e, id, provider, system, user, key) => {
+ipcMain.handle('model:stream', async (e, id, provider, system, user, key, opts) => {
   const { streamText } = await import(pathToFileURL(path.join(__dirname, '..', 'shared', 'providers.mjs')).href)
   return streamText(provider, system, user, key, (delta) => {
     if (!e.sender.isDestroyed()) e.sender.send('model:delta', id, delta)
-  })
+  }, opts)
 })
 
 ipcMain.handle('model:image', async (_e, provider, prompt, key) => {

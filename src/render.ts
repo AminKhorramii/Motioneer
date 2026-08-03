@@ -201,7 +201,8 @@ export function renderSection(sec: Section, t: Taste, seed: number, w: World): s
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:calc(var(--gap)*1.2);margin-top:calc(var(--gap)*1.2);
 border-top:1px solid var(--line);padding-top:calc(var(--gap)*.9)">
 <p style="font-size:1.12rem" ${ed(sec.id, 'sub')}>${esc(c.sub)}</p>
-<div><p style="color:var(--ink)" ${ed(sec.id, 'eyebrow')}>${esc(c.eyebrow)}</p>${ctas}</div></div></div>`,
+<div><p style="color:var(--ink)" ${ed(sec.id, 'eyebrow')}>${esc(c.eyebrow)}</p>${ctas}</div></div>
+${img ? `<div style="margin-top:calc(var(--gap)*1.2)">${figure(t, seed, '16/10', img, w.structure.figure)}</div>` : ''}</div>`,
         3: `<div class="wrap" style="max-width:900px"><div class="card" style="font-family:ui-monospace,Menlo,monospace">
 <div style="display:flex;gap:6px;margin-bottom:1.1rem">${['#ff5f57', '#febc2e', '#28c840'].map((x) => `<i style="width:11px;height:11px;border-radius:50%;background:${x};display:block"></i>`).join('')}</div>
 <p style="color:var(--accent);font-size:.92rem" ${ed(sec.id, 'eyebrow')}>${esc(c.eyebrow)}</p>

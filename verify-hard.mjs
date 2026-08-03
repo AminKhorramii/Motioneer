@@ -29,6 +29,10 @@ page.on('console', (m) => m.type() === 'error' && errors.push(m.text().slice(0, 
 
 await page.waitForSelector('.onboard .card', { timeout: 20000 })
 await page.evaluate(() => localStorage.setItem('wall-key-anthropic', 'test-key'))
+// setup is two steps now: the model, then the brief where the sample lives
+await page.evaluate(() => document.querySelector('.onboard .pick')?.click())
+await page.click('.onboard .primary')
+await page.waitForSelector('.sample', { timeout: 10000 })
 await page.click('.sample')
 await page.waitForSelector('.paper.here', { timeout: 20000 })
 
@@ -91,11 +95,11 @@ console.log('sections per paper:', JSON.stringify(await page.evaluate(async () =
   const out = []
   for (let i = 0; i < 9; i++) {
     out.push(document.querySelectorAll('.sec').length)
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }))
+    document.querySelectorAll('.filmbar .nav button')[1]?.click()
     await new Promise((r) => setTimeout(r, 250))
   }
   for (let i = 0; i < 8; i++) {
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft' }))
+    document.querySelectorAll('.filmbar .nav button')[0]?.click()
     await new Promise((r) => setTimeout(r, 120))
   }
   return out

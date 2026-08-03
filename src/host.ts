@@ -7,13 +7,19 @@
 
 import { generateImage, streamText } from '../shared/providers.mjs'
 
+export interface ModelOpts {
+  base?: string
+  model?: string
+}
+
 export interface Host {
   readState: () => Promise<unknown>
   writeState: (v: unknown) => Promise<boolean>
   /** returns where the page went, so the app can say it plainly */
   exportPage: (html: string, name: string) => Promise<{ file: string; bytes: number } | null>
   preview: (html: string) => Promise<string>
-  stream: (id: string, provider: string, system: string, user: string, key: string)
+  /** opts carry the endpoint and model, because a browser with its own key picks the vendor */
+  stream: (id: string, provider: string, system: string, user: string, key: string, opts?: ModelOpts)
     => Promise<{ text?: string; error?: string }>
   onDelta: (fn: (id: string, delta: string) => void) => () => void
   /** one response rather than a stream, returned as a data URL so the page stays one file */
@@ -54,8 +60,8 @@ const web: Host = {
     return url
   },
   // the browser talks to the model itself, so deltas never leave this tab
-  stream: (id, provider, system, user, key) =>
-    streamText(provider, system, user, key, (delta) => deltaFns.forEach((fn) => fn(id, delta))),
+  stream: (id, provider, system, user, key, opts) =>
+    streamText(provider, system, user, key, (delta) => deltaFns.forEach((fn) => fn(id, delta)), opts),
   image: (provider, prompt, key) => generateImage(provider, prompt, key),
   onDelta: (fn) => {
     deltaFns.add(fn)

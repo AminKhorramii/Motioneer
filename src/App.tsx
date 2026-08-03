@@ -4,7 +4,7 @@ import { KIND_LABEL, applyEdit, starterPage, type Kind, type Page } from '@/sect
 import { renderPage } from '@/render'
 import { pageBrief } from '@/brief'
 import {
-  EMPTY_PRODUCT, addSection, alternatives, arrange, canDraw, canWrite, cycleBackdrop, cycleVariant, cycleWorld, dropSection, fanOut, illustrate, loadHeldKeys, promptPage, promptSection, sectionAlternatives, seeded, setMock, type Product, type Provider,
+  EMPTY_PRODUCT, addSection, alternatives, arrange, canDraw, canWrite, chosen, cycleBackdrop, cycleVariant, cycleWorld, dropSection, fanOut, illustrate, loadHeldKeys, promptPage, promptSection, sectionAlternatives, seeded, setMock, type Product,
 } from '@/compose'
 import { Onboarding } from '@/Onboarding'
 import { BriefRail } from '@/BriefRail'
@@ -25,7 +25,6 @@ export default function App() {
   const [selected, setSelected] = useState<string | null>(null)
   const [prompts, setPrompts] = useState<Record<string, string>>({})
   const [bar, setBar] = useState('')
-  const [provider, setProvider] = useState<Provider>('claude')
   const [busy, setBusy] = useState('')
   const [toast, setToast] = useState('')
   const [view, setView] = useState<'studio' | 'wall'>('studio')
@@ -86,19 +85,19 @@ export default function App() {
    * soon as its own call returns, so the wall fills in front of you. With no key the same
    * copy is arranged eight ways, which still gives something to choose between.
    */
-  const fill = useCallback(async (base: Page, p: Product, prov: Provider) => {
+  const fill = useCallback(async (base: Page, p: Product) => {
     const mine = ++run.current
     setPages([arrange(base, 0)])
     setAt(0)
-    if (!canWrite(prov)) {
+    if (!canWrite()) {
       setPages(alternatives(base, 8))
       return
     }
-    setBusy(`Writing eight pages with ${prov === 'claude' ? 'Claude' : 'GPT'}, one per angle.`)
+    setBusy(`Writing eight pages with ${chosen().label}, one per angle.`)
     // a page keeps one id for its whole stream, so a paper appears on its first section and
     // then fills in, instead of arriving all at once when the model finishes
     const started = new Set<string>()
-    const { written, error } = await fanOut(base, p, prov, 8, (page) => {
+    const { written, error } = await fanOut(base, p, 'model', 8, (page) => {
       if (run.current !== mine) return
       if (!started.has(page.id)) {
         started.add(page.id)
@@ -121,8 +120,8 @@ export default function App() {
   }, [upsertPage])
 
   const build = useCallback((p: Product, t: Taste) => {
-    void fill(seeded(starterPage(t, p.name || 'Product'), p), p, provider)
-  }, [fill, provider])
+    void fill(seeded(starterPage(t, p.name || 'Product'), p), p)
+  }, [fill])
 
   // ask the deployment which keys it holds before anything gates on having one
   useEffect(() => {
@@ -181,16 +180,16 @@ export default function App() {
   async function runBar() {
     const instruction = bar.trim()
     if (!instruction || !page) return
-    if (!canWrite(provider)) {
-      flash(`Add a ${provider === 'claude' ? 'Claude' : 'GPT'} key in the brief panel to write copy with a model.`)
+    if (!canWrite()) {
+      flash(`Add a ${chosen().label} key to write copy with a model.`)
       return
     }
-    setBusy(`Writing three variants with ${provider === 'claude' ? 'Claude' : 'GPT'}.`)
+    setBusy(`Writing three variants with ${chosen().label}.`)
     // streamed pages land at the end of the wall, so remember where the new run starts
     const firstNew = pages.length
     const made = await Promise.all(
       [0, 1, 2].map(() =>
-        promptPage(page, instruction, product, provider, upsertPage)
+        promptPage(page, instruction, product, 'model', upsertPage)
           .catch((e: unknown) => String(e instanceof Error ? e.message : e).slice(0, 160)),
       ),
     )
@@ -232,9 +231,9 @@ export default function App() {
     const sec = page?.sections.find((s) => s.id === id)
     const instruction = prompts[id]?.trim()
     if (!sec || !instruction) return
-    if (!canWrite(provider)) return flash('Add a model key in the brief panel to rewrite a section.')
+    if (!canWrite()) return flash('Add a model key in the brief panel to rewrite a section.')
     setBusy(`Rewriting the ${KIND_LABEL[sec.kind]}.`)
-    const next = await promptSection(sec, instruction, product, provider)
+    const next = await promptSection(sec, instruction, product, 'model')
     setBusy('')
     if (!next) return flash('No usable copy came back.')
     setPage((p) => ({ ...p, sections: p.sections.map((s) => (s.id === id ? { ...s, content: next } : s)) }))
@@ -290,8 +289,8 @@ export default function App() {
             title="what every page is written from">brief</button>
           {/* writing a wall takes half a minute, so starting another must not be blocked. Runs
               carry a token, so the previous one is abandoned rather than mixed in. */}
-          <button className="go" disabled={!page} onClick={() => page && void fill(page, product, provider)}>
-            {canWrite(provider) ? 'write a new wall' : 'new alternatives'}
+          <button className="go" disabled={!page} onClick={() => page && void fill(page, product)}>
+            {canWrite() ? 'write a new wall' : 'new alternatives'}
           </button>
           <button className={armed ? 'arm' : ''} title="describe a different product and start a new wall"
             onClick={startOver}>
@@ -335,8 +334,9 @@ export default function App() {
                 })}
               </div>
               <Dock
-                at={at} count={pages.length} angle={page.angle} flags={flags} backdrop={page.backdrop ?? 'none'} world={page.world} bar={bar} provider={provider} busy={!!busy}
-                onBar={setBar} onRun={runBar} onProvider={setProvider}
+                at={at} count={pages.length} angle={page.angle} flags={flags} backdrop={page.backdrop ?? 'none'} world={page.world} bar={bar} busy={!!busy}
+                onBar={setBar} onRun={runBar}
+                onModel={() => setOnboarding('first')}
                 onGo={(i) => setAt(Math.max(0, Math.min(i, pages.length - 1)))}
                 onFlags={() => flash(
                   flags.length
@@ -356,8 +356,7 @@ export default function App() {
               page={page}
               selected={selected}
               prompts={prompts}
-              provider={provider}
-              onSelect={setSelected}
+                            onSelect={setSelected}
               onCycle={(id) => setPage((p) => cycleVariant(p, id))}
               onDrop={(id, onto, after) => setPage((p) => dropSection(p, id, onto, after))}
               onToggle={(id) => setPage((p) => ({

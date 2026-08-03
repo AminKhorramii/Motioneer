@@ -23,19 +23,19 @@ const base = () => env('WALL_API_BASE')
 const openaiBase = () => base() || env('WALL_OPENAI_BASE') || 'https://api.openai.com'
 
 export const REQUESTS = {
-  openai: (system, user, key) => ({
-    url: `${openaiBase()}/v1/chat/completions`,
+  openai: (system, user, key, opts = {}) => ({
+    url: `${opts.base || openaiBase()}/v1/chat/completions`,
     headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
     body: {
-      model: model('gpt-5.2'),
+      model: opts.model || model('gpt-5.2'),
       messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
       max_completion_tokens: 8000,
       stream: true,
     },
     delta: (j) => j?.choices?.[0]?.delta?.content ?? '',
   }),
-  anthropic: (system, user, key) => ({
-    url: `${base() || 'https://api.anthropic.com'}/v1/messages`,
+  anthropic: (system, user, key, opts = {}) => ({
+    url: `${base() || opts.base || 'https://api.anthropic.com'}/v1/messages`,
     headers: {
       'content-type': 'application/json',
       'x-api-key': key,
@@ -44,7 +44,7 @@ export const REQUESTS = {
       'anthropic-dangerous-direct-browser-access': 'true',
     },
     body: {
-      model: model('claude-sonnet-5'),
+      model: opts.model || model('claude-sonnet-5'),
       // nine sections of copy runs past 2000, and a truncated reply is a lost page
       max_tokens: 8000,
       system,
@@ -72,8 +72,8 @@ async function* sse(body) {
 }
 
 /** Stream one completion, handing every delta to onDelta and returning the whole text. */
-export async function streamText(provider, system, user, key, onDelta) {
-  const req = (REQUESTS[provider] ?? REQUESTS.anthropic)(system, user, key)
+export async function streamText(provider, system, user, key, onDelta, opts = {}) {
+  const req = (REQUESTS[provider] ?? REQUESTS.anthropic)(system, user, key, opts)
   try {
     const res = await fetch(req.url, { method: 'POST', headers: req.headers, body: JSON.stringify(req.body) })
     if (!res.ok) return { error: `${provider} ${res.status}: ${(await res.text()).slice(0, 160)}` }

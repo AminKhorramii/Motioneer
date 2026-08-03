@@ -46,14 +46,14 @@ await page.goto(`http://127.0.0.1:${PORT}/`)
 await page.waitForSelector('.onboard .card', { timeout: 20000 })
 
 // the visitor holds no key, and the app must still offer the described path
-const offered = await page.evaluate(() => {
-  document.querySelector('.onboard .primary').click()
-  return new Promise((r) => setTimeout(() => r({
-    served: !!window.__wallServed,
-    keysInBrowser: Object.keys(localStorage).filter((k) => k.startsWith('wall-key')).length,
-    describeBox: !!document.querySelector('.onboard .tell'),
-  }), 300))
-})
+await page.evaluate(() => document.querySelector('.onboard .pick')?.click())
+await page.click('.onboard .primary')
+await page.waitForSelector('.onboard .tell', { timeout: 10000 })
+const offered = await page.evaluate(() => ({
+  served: !!window.__wallServed,
+  keysInBrowser: Object.keys(localStorage).filter((k) => k.startsWith('wall-key')).length,
+  describeBox: !!document.querySelector('.onboard .tell'),
+}))
 console.log('served app:', JSON.stringify(offered))
 
 await page.fill('.onboard .tell', 'Spoor makes every AI session searchable, locally.')

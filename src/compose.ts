@@ -3,6 +3,7 @@
 import { type Taste } from '@/taste'
 import { host, isServed, servedProviders } from '@/host'
 import { slop, slopBrief } from '@/slop'
+import { modelById } from '@/models'
 import { BACKDROPS, type Backdrop } from '@/backdrop'
 import { WORLDS, type World } from '@/worlds'
 import { KIND_VARIANTS, defaultContent, uid, type Kind, type Page, type Section } from '@/sections'
@@ -127,20 +128,30 @@ export function dropSection(page: Page, id: string, onto: string, after: boolean
 
 // ——— the model path: pick a provider, prompt, get variants ———
 
-export type Provider = 'claude' | 'gpt'
+export type Provider = string
 
-export const PROVIDERS: { id: Provider; label: string; keyName: string }[] = [
-  { id: 'claude', label: 'Claude', keyName: 'wall-key-anthropic' },
-  { id: 'gpt', label: 'GPT', keyName: 'wall-key-openai' },
-]
+/** The chosen model, which is a whole configuration rather than a provider name: a wire shape,
+ *  an endpoint, a model id and where its key lives. */
+const CHOICE = 'wall-model'
+export const chosen = () => modelById(localStorage.getItem(CHOICE) ?? 'claude')
+export const choose = (id: string) => localStorage.setItem(CHOICE, id)
+
+/** custom endpoints are configured rather than guessed, so they are stored beside the key */
+export const CUSTOM = { base: 'wall-custom-base', model: 'wall-custom-model' }
+export function optsFor(m = chosen()) {
+  if (m.id !== 'custom') return { base: m.base, model: m.model }
+  return {
+    base: localStorage.getItem(CUSTOM.base) ?? '',
+    model: localStorage.getItem(CUSTOM.model) ?? '',
+  }
+}
 
 /** Images are a separate provider axis: the model writing the copy and the model drawing the
  *  picture are chosen independently, so the key is stored separately too. */
 export const IMAGE_KEY_NAME = 'wall-key-gemini'
 export const imageKey = () => localStorage.getItem(IMAGE_KEY_NAME) ?? ''
 
-export const keyFor = (p: Provider) =>
-  localStorage.getItem(PROVIDERS.find((x) => x.id === p)!.keyName) ?? ''
+export const keyFor = (_p?: Provider) => localStorage.getItem(chosen().keyName) ?? ''
 
 /**
  * A deployment can hold the keys instead of the visitor, so "can this write" is not the same
@@ -150,7 +161,7 @@ let held: string[] = []
 export async function loadHeldKeys() {
   held = await servedProviders()
 }
-export const canWrite = (p: Provider) => Boolean(keyFor(p)) || held.includes(p === 'gpt' ? 'openai' : 'anthropic')
+export const canWrite = (_p?: Provider) => Boolean(keyFor()) || held.includes(chosen().wire)
 export const canDraw = () => Boolean(imageKey()) || held.includes('gemini')
 
 // One delta listener for the whole app, fanned out by request id, because several pages
@@ -179,7 +190,8 @@ async function ask(
   const id = uid()
   if (onDelta) streams.set(id, onDelta)
   try {
-    const res = await host.stream(id, provider === 'gpt' ? 'openai' : 'anthropic', system, user, key)
+    const m = chosen()
+    const res = await host.stream(id, m.wire, system, user, key, optsFor(m))
     if (res?.error) throw new Error(res.error)
     return res?.text ?? null
   } finally {

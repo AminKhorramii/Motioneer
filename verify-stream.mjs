@@ -48,6 +48,10 @@ page.on('console', (m) => m.type() === 'error' && errors.push(m.text().slice(0, 
 
 await page.waitForSelector('.onboard .card', { timeout: 20000 })
 await page.evaluate(() => localStorage.setItem('wall-key-anthropic', 'test-key-not-used-upstream'))
+// setup is two steps now: the model, then the brief where the sample lives
+await page.evaluate(() => document.querySelector('.onboard .pick')?.click())
+await page.click('.onboard .primary')
+await page.waitForSelector('.sample', { timeout: 10000 })
 await page.click('.sample')
 await page.waitForSelector('.paper.here', { timeout: 20000 })
 
@@ -62,6 +66,8 @@ const watch = setInterval(async () => {
 // corpus legitimately produces fewer pages and should still be asserted, not time out
 await page.waitForFunction(() => !document.querySelector('.busy'), null, { timeout: 120000 })
 clearInterval(watch)
+// let the last papers commit before walking them, or the walk reads one paper nine times
+await page.waitForTimeout(600)
 
 const counts = [...new Set(seen)].sort((a, b) => a - b)
 console.log('wall filled progressively:', JSON.stringify({
@@ -102,6 +108,13 @@ const wall = await page.evaluate(async () => {
 console.log('written wall:', JSON.stringify(wall))
 // images: one response rather than a stream, and the promise is that it ships inside the file
 await page.evaluate(() => localStorage.setItem('wall-key-gemini', 'test-key'))
+// go back to the first paper, so the assertion is not at the mercy of which world is centred
+await page.evaluate(async () => {
+  for (let i = 0; i < 9; i++) {
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft' }))
+    await new Promise((r) => setTimeout(r, 90))
+  }
+})
 await page.evaluate(() => document.querySelectorAll('.sec')[0].click())
 await page.waitForTimeout(300)
 await page.evaluate(() => [...document.querySelectorAll('.srow button')].find((b) => b.textContent.includes('draw'))?.click())

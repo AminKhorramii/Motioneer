@@ -1,6 +1,7 @@
 import { KIND_LABEL, KIND_VARIANTS, type Kind, type Page } from '@/sections'
 import { Icon } from '@/icons'
-import type { Provider } from '@/compose'
+import { chosen } from '@/compose'
+import { MARKS } from '@/models'
 
 const ALL_KINDS: Kind[] = ['hero', 'logos', 'features', 'showcase', 'quote', 'pricing', 'faq', 'cta', 'footer']
 
@@ -8,7 +9,6 @@ interface Props {
   page: Page
   selected: string | null
   prompts: Record<string, string>
-  provider: Provider
   onSelect: (id: string) => void
   onCycle: (id: string) => void
   onDrop: (id: string, onto: string, after: boolean) => void
@@ -21,7 +21,7 @@ interface Props {
 }
 
 export function SectionsRail({
-  page, selected, prompts, provider,
+  page, selected, prompts,
   onSelect, onCycle, onDrop, onToggle, onPromptChange, onPromptRun, onFanOut, onDraw, onAdd,
 }: Props) {
   const stop = (e: React.MouseEvent) => e.stopPropagation()
@@ -67,7 +67,7 @@ export function SectionsRail({
                   onKeyDown={(e) => { if (e.key === 'Enter') onPromptRun(s.id) }}
                 />
                 <button title="rewrite this section" onClick={() => onPromptRun(s.id)}>
-                  {provider === 'claude' ? <Icon.claude /> : <Icon.gpt />}
+                  {MARKS[chosen().id]?.() ?? <Icon.cycle />}
                 </button>
               </div>
               <div className="srow">

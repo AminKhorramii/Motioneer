@@ -1,24 +1,15 @@
 import { useState } from 'react'
-import { PRESETS, type Taste } from '@/taste'
-import { starterPage } from '@/sections'
-import { renderPage } from '@/render'
-import { IMAGE_KEY_NAME, PROVIDERS, canWrite, readBrief, seeded, type Intake } from '@/compose'
+import type { Taste } from '@/taste'
+import { CUSTOM, IMAGE_KEY_NAME, canWrite, choose, readBrief, type Intake } from '@/compose'
 import type { Product } from '@/compose'
-import { Icon } from '@/icons'
-import { isDesktop } from '@/host'
+import { MARKS, MODELS, modelById } from '@/models'
 
 /**
- * First run. Three steps that end in a finished page, so the setup produces
- * something instead of only explaining. Shown once, and reopenable from the
- * header when someone wants the explanation again.
+ * First run, in two steps: which model writes, and what it writes about.
+ *
+ * Everything else was moved out. The look belongs beside the page it changes, and explaining
+ * the app before it has done anything is a worse introduction than the app doing it.
  */
-
-/** A look is shown as the real page it produces, because a row of colour chips describes a
- *  palette rather than a design, and the palette is the smallest part of the difference. */
-const lookHtml = (t: Taste) => {
-  const page = seeded(starterPage(t, 'Spoor'), SAMPLE)
-  return renderPage({ ...page, sections: page.sections.slice(0, 1) }, { title: t.name })
-}
 
 const SAMPLE: Product = {
   name: 'Spoor',
@@ -38,24 +29,31 @@ interface Props {
   onClose: () => void
 }
 
-export function Onboarding({ product, taste, explainOnly, onProduct, onTaste, onBuild, onClose }: Props) {
+export function Onboarding({ product, taste, explainOnly, onProduct, onBuild, onClose }: Props) {
   const [step, setStep] = useState(0)
   const [told, setTold] = useState('')
   const [reading, setReading] = useState(false)
-  const [asked, setAsked] = useState<Intake['questions']>([])
-  const [read, setRead] = useState(false)
   const [failed, setFailed] = useState(false)
+  const [asked, setAsked] = useState<Intake['questions']>([])
+  // nothing is chosen on a first run, so the grid is the only thing on screen until it is
+  const [pick, setPick] = useState(() => localStorage.getItem('wall-model') ?? '')
   const [keys, setKeys] = useState<Record<string, string>>(() =>
     Object.fromEntries([
-      ...PROVIDERS.map((p) => [p.id, localStorage.getItem(p.keyName) ?? '']),
-      ['gemini', localStorage.getItem(IMAGE_KEY_NAME) ?? ''],
+      ...MODELS.map((m) => [m.keyName, localStorage.getItem(m.keyName) ?? '']),
+      [IMAGE_KEY_NAME, localStorage.getItem(IMAGE_KEY_NAME) ?? ''],
     ]),
   )
+  const model = modelById(pick)
+  const picked = Boolean(pick)
   const ready = product.name.trim().length > 0 && product.oneLiner.trim().length > 0
 
-  const saveKey = (id: string, keyName: string, value: string) => {
-    setKeys((k) => ({ ...k, [id]: value }))
+  const saveKey = (keyName: string, value: string) => {
+    setKeys((k) => ({ ...k, [keyName]: value }))
     localStorage.setItem(keyName, value.trim())
+  }
+  const take = (id: string) => {
+    setPick(id)
+    choose(id)
   }
 
   /** Read the description into a brief, then ask only for what it did not carry. */
@@ -65,18 +63,14 @@ export function Onboarding({ product, taste, explainOnly, onProduct, onTaste, on
     const got = await readBrief(told).catch(() => null)
     setReading(false)
     if (!got) {
-      // silence here would look like nothing happened, which is worse than saying so
       setFailed(true)
       return
     }
     setFailed(false)
     onProduct(got.product)
-    // ask only about what the description genuinely left empty, because everything else either
-    // came out of the reading or has a sensible default
     const gaps = got.questions.filter((q) => !String(got.product[q.key] ?? '').trim()).slice(0, 2)
     setAsked(gaps)
-    setRead(true)
-    if (!gaps.length && got.product.name && got.product.oneLiner) setStep(2)
+    if (!gaps.length && got.product.name && got.product.oneLiner) finish(got.product)
   }
 
   const finish = (p: Product) => {
@@ -89,11 +83,8 @@ export function Onboarding({ product, taste, explainOnly, onProduct, onTaste, on
     <div className="onboard">
       <div className="card">
         <div className="steps">
-          {['what this is', 'your product', 'your taste'].map((label, i) => (
-            <button key={label} className={i === step ? 'on' : ''} onClick={() => setStep(i)}
-              disabled={explainOnly && i > 0}>
-              {label}
-            </button>
+          {['model', 'brief'].map((label, i) => (
+            <button key={label} className={i === step ? 'on' : ''} onClick={() => setStep(i)}>{label}</button>
           ))}
           <span className="grow" />
           {explainOnly && <button onClick={onClose}>close</button>}
@@ -101,52 +92,70 @@ export function Onboarding({ product, taste, explainOnly, onProduct, onTaste, on
 
         {step === 0 && (
           <div className="pane">
-            <h2>Eight pages, then one.</h2>
-            <p className="lede">
-              Wall writes your landing page eight ways at once, so you choose between real pages
-              instead of imagining them.
-            </p>
-            <p className="lede">
-              Describe what you are launching. Edit any page by clicking its text. Ship writes one
-              HTML file you own.
-            </p>
-            {explainOnly ? (
-              <div className="row"><button className="primary" onClick={onClose}>back to work</button></div>
-            ) : (
-              <div className="row">
-                <button className="primary" onClick={() => setStep(1)}>set up in a minute</button>
-                <button className="sample" onClick={() => { onProduct(SAMPLE); finish(SAMPLE) }}>
-                  skip and use a sample product
+            <h2>Which model writes?</h2>
+            <p className="lede">Wall asks for short copy, not code, so a small model does it well.</p>
+            <div className="picks">
+              {MODELS.map((m) => (
+                <button key={m.id} className={m.id === pick ? 'pick on' : 'pick'} onClick={() => take(m.id)}
+                  title={m.note}>
+                  <span className="mark">{MARKS[m.id]?.()}</span>
+                  <b>{m.label}</b>
                 </button>
-              </div>
+              ))}
+            </div>
+
+            {picked && (
+            <div className="fields">
+              <label className="keyline">
+                <span>{model.label} key</span>
+                <input type="password" autoFocus value={keys[model.keyName] ?? ''}
+                  placeholder={`from ${model.keys}`}
+                  onChange={(e) => saveKey(model.keyName, e.currentTarget.value)} />
+              </label>
+              {model.id === 'custom' && (
+                <div className="pair">
+                  <label><span>endpoint</span>
+                    <input defaultValue={localStorage.getItem(CUSTOM.base) ?? ''} placeholder="https://host/v1"
+                      onChange={(e) => localStorage.setItem(CUSTOM.base, e.currentTarget.value.trim())} />
+                  </label>
+                  <label><span>model</span>
+                    <input defaultValue={localStorage.getItem(CUSTOM.model) ?? ''} placeholder="model-name"
+                      onChange={(e) => localStorage.setItem(CUSTOM.model, e.currentTarget.value.trim())} />
+                  </label>
+                </div>
+              )}
+              {model.keyName !== IMAGE_KEY_NAME && (
+                <label className="keyline">
+                  <span>Gemini, for images</span>
+                  <input type="password" value={keys[IMAGE_KEY_NAME] ?? ''} placeholder="optional"
+                    onChange={(e) => saveKey(IMAGE_KEY_NAME, e.currentTarget.value)} />
+                </label>
+              )}
+            </div>
             )}
+
+            <div className="row">
+              <button className="primary" disabled={!picked}
+                onClick={() => (explainOnly ? onClose() : setStep(1))}>
+                {explainOnly ? 'done' : 'next'}
+              </button>
+              {picked && <span className="lede small">Keys stay on this machine and are used only for writing.</span>}
+            </div>
           </div>
         )}
 
         {step === 1 && (
           <div className="pane">
             <h2>What are you launching?</h2>
-            {keys.claude || keys.gpt || canWrite('claude') ? (
+            {canWrite() ? (
               <>
-                <p className="lede">
-                  Say it however you already say it. A README, a note, two sentences.
-                </p>
+                <p className="lede">Say it however you already say it. A README, a note, two sentences.</p>
                 <div className="fields">
-                  <textarea
-                    className="tell"
-                    autoFocus
-                    value={told}
-                    placeholder="Spoor reads the transcripts my AI tools already write to disk and makes 900MB of history searchable in under a second. It is for people who build with agents. Everything stays local."
-                    onChange={(e) => setTold(e.currentTarget.value)}
-                  />
+                  <textarea className="tell" autoFocus value={told}
+                    placeholder="Spoor reads the transcripts my AI tools already write to disk and makes 900MB of history searchable in under a second. It is for people who build with agents."
+                    onChange={(e) => setTold(e.currentTarget.value)} />
                 </div>
-
-                {failed && (
-                  <p className="lede small">
-                    That could not be read. Try again, or fill the two fields below the key instead.
-                  </p>
-                )}
-
+                {failed && <p className="lede small">That could not be read. Try again, or use the sample.</p>}
                 {asked.length > 0 && (
                   <div className="fields">
                     {asked.map((q) => (
@@ -158,26 +167,20 @@ export function Onboarding({ product, taste, explainOnly, onProduct, onTaste, on
                     ))}
                   </div>
                 )}
-
                 <div className="row">
-                  {read ? (
-                    <button className="primary" disabled={!ready} onClick={() => setStep(2)}>next, pick a look</button>
+                  {asked.length > 0 ? (
+                    <button className="primary" disabled={!ready} onClick={() => finish(product)}>write my pages</button>
                   ) : (
                     <button className="primary" disabled={!told.trim() || reading} onClick={() => void readIt()}>
                       {reading ? 'reading' : 'write my pages'}
                     </button>
                   )}
-                  <button className="sample" onClick={() => { onProduct(SAMPLE); setRead(true); setAsked([]) }}>
-                    use a sample instead
-                  </button>
+                  <button className="sample" onClick={() => { onProduct(SAMPLE); finish(SAMPLE) }}>use a sample</button>
                 </div>
               </>
             ) : (
               <>
-                <p className="lede">
-                  Paste a key and Wall writes the pages from a description. Without one it needs
-                  these two and fills in the rest.
-                </p>
+                <p className="lede">Without a key Wall still builds and arranges pages. It needs these two.</p>
                 <div className="fields">
                   <label><span>product name</span>
                     <input autoFocus value={product.name} placeholder="Spoor"
@@ -187,62 +190,13 @@ export function Onboarding({ product, taste, explainOnly, onProduct, onTaste, on
                     <input value={product.oneLiner} placeholder="Every session you ever ran, findable in one keystroke."
                       onChange={(e) => onProduct({ ...product, oneLiner: e.currentTarget.value })} />
                   </label>
-                  {/* the good path needs a key, so it is offered here rather than a step later,
-                      where someone would already have filled the form it replaces */}
-                  <label className="keyline">
-                    <span><Icon.claude /> Claude</span>
-                    <input type="password" value={keys.claude ?? ''} placeholder="paste a key and describe it instead"
-                      onChange={(e) => saveKey('claude', PROVIDERS[0].keyName, e.currentTarget.value)} />
-                  </label>
                 </div>
                 <div className="row">
-                  <button className="primary" disabled={!ready} onClick={() => setStep(2)}>next, pick a look</button>
-                  <button className="sample" onClick={() => onProduct(SAMPLE)}>fill with a sample</button>
+                  <button className="primary" disabled={!ready} onClick={() => finish(product)}>build my pages</button>
+                  <button className="sample" onClick={() => { onProduct(SAMPLE); finish(SAMPLE) }}>use a sample</button>
                 </div>
               </>
             )}
-          </div>
-        )}
-
-        {step === 2 && (
-          <div className="pane">
-            <h2>How should it feel?</h2>
-            <div className="looks">
-              {PRESETS.map((p) => (
-                <button key={p.name} className={p.name === taste.name ? 'look on' : 'look'} onClick={() => onTaste(p)}>
-                  <span className="shot">
-                    <iframe title={p.name} scrolling="no" tabIndex={-1} srcDoc={lookHtml(p)} />
-                  </span>
-                  <span className="looklabel">{p.name}</span>
-                </button>
-              ))}
-            </div>
-            <p className="lede small">Drop a screenshot of any page you admire and Wall reads its colours into a look of your own.</p>
-
-            <h3 className="keyhead">Keys, if you have them</h3>
-            <p className="lede small">
-              {isDesktop
-                ? 'Used only for writing copy, and kept on this machine.'
-                : 'Used only for writing copy, kept in this browser, sent straight to the provider.'}
-            </p>
-            {PROVIDERS.map((p) => (
-              <label key={p.id} className="keyline">
-                <span>{p.id === 'claude' ? <Icon.claude /> : <Icon.gpt />} {p.label}</span>
-                <input type="password" value={keys[p.id]} placeholder={p.id === 'claude' ? 'sk-ant-...' : 'sk-...'}
-                  onChange={(e) => saveKey(p.id, p.keyName, e.currentTarget.value)} />
-              </label>
-            ))}
-
-            <label className="keyline">
-              <span>Gemini</span>
-              <input type="password" value={keys.gemini ?? ''} placeholder="for drawing images, optional"
-                onChange={(e) => saveKey('gemini', IMAGE_KEY_NAME, e.currentTarget.value)} />
-            </label>
-
-            <div className="row">
-              <button className="primary" disabled={!ready} onClick={() => finish(product)}>build my page</button>
-              <button className="sample" onClick={() => setStep(1)}>back</button>
-            </div>
           </div>
         )}
       </div>

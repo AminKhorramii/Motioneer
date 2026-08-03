@@ -532,3 +532,44 @@ header .hactions button.on { color: var(--ink); }
 
 /* starting over throws the wall away, so the button asks once before it does */
 .hactions .arm { color: var(--ink); background: rgba(255, 255, 255, 0.09); }
+
+/* the model picker: the mark carries the recognition, so it leads and the words follow */
+.onboard .picks { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin: 1.1rem 0 1rem; }
+/* Just the mark and its name. A tile behind a tile behind a logo is three surfaces where one
+   will do, and boxes inside boxes is a pattern this app flags on generated pages. */
+/* nine options, so three across leaves no orphan row */
+.onboard .picks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.2rem; margin: 1.1rem 0 1rem; }
+.onboard .pick {
+  display: flex; flex-direction: column; align-items: center; gap: 0.6rem;
+  background: none; border: none; border-radius: 10px;
+  padding: 0.9rem 0.5rem 0.75rem; color: var(--dim2);
+  transition: color var(--t), background var(--t);
+}
+.onboard .pick .mark { display: flex; opacity: 0.55; transition: opacity var(--t), transform var(--t); }
+.onboard .pick b { font-size: 11.5px; font-weight: 400; color: inherit; text-align: center; }
+.onboard .pick:hover { color: var(--ink2); }
+.onboard .pick:hover .mark { opacity: 0.85; transform: translateY(-1px); }
+.onboard .pick.on { color: var(--ink); background: rgba(255, 255, 255, 0.05); }
+.onboard .pick.on .mark { opacity: 1; }
+.onboard .pick.on b { font-weight: 500; }
+
+.onboard .row .lede.small { margin: 0; }
+
+/* looks appear in the rail now, at rail size */
+.side .looks { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.4rem; margin: 0.5rem 0 0.6rem; }
+.side .look { background: none; border: 1px solid var(--hair); border-radius: 8px; padding: 0; overflow: hidden; }
+.side .look.on { border-color: var(--accent); }
+.side .look .shot { display: block; height: 62px; overflow: hidden; position: relative; }
+.side .look .shot iframe {
+  width: 1280px; height: 1280px; border: 0; position: absolute; top: 0; left: 0;
+  transform: scale(0.078); transform-origin: 0 0; pointer-events: none;
+}
+.side .looklabel { display: block; padding: 0.3rem 0.4rem; font-size: 10.5px; color: var(--dim); }
+
+/* the model in the dock is one control showing what writes */
+.barwrap .model {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: none; border: none; border-radius: 8px; color: var(--dim);
+  font-size: 11.5px; padding: 0.36rem 0.55rem; transition: background var(--t), color var(--t);
+}
+.barwrap .model:hover { background: rgba(255, 255, 255, 0.05); color: var(--ink); }
