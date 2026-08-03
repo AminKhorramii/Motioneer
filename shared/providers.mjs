@@ -71,12 +71,36 @@ async function* sse(body) {
   }
 }
 
+/**
+ * When a Google endpoint answers 404 the cause is almost always a model id that has been
+ * retired or closed to new keys, and the reply does not say which ones would work. This asks,
+ * so the error names the way out instead of the dead end.
+ */
+async function suggest(url, key) {
+  if (!url.includes('generativelanguage')) return ''
+  try {
+    const root = url.split('/v1beta')[0]
+    const res = await fetch(`${root}/v1beta/models?key=${encodeURIComponent(key)}`)
+    if (!res.ok) return ''
+    const names = ((await res.json()).models ?? [])
+      .map((m) => String(m.name ?? '').replace('models/', ''))
+      .filter((n) => n.includes('flash'))
+      .slice(0, 6)
+    return names.length ? `. Your key can use: ${names.join(', ')}` : ''
+  } catch {
+    return ''
+  }
+}
+
 /** Stream one completion, handing every delta to onDelta and returning the whole text. */
 export async function streamText(provider, system, user, key, onDelta, opts = {}) {
   const req = (REQUESTS[provider] ?? REQUESTS.anthropic)(system, user, key, opts)
   try {
     const res = await fetch(req.url, { method: 'POST', headers: req.headers, body: JSON.stringify(req.body) })
-    if (!res.ok) return { error: `${provider} ${res.status}: ${(await res.text()).slice(0, 160)}` }
+    if (!res.ok) {
+      const why = (await res.text()).slice(0, 160)
+      return { error: `${provider} ${res.status}: ${why}${res.status === 404 ? await suggest(req.url, key) : ''}` }
+    }
     let text = ''
     for await (const payload of sse(res.body)) {
       if (payload === '[DONE]') break
@@ -105,7 +129,7 @@ export async function streamText(provider, system, user, key, onDelta, opts = {}
  */
 export const IMAGE_REQUESTS = {
   gemini: (prompt, key) => ({
-    url: `${base() || 'https://generativelanguage.googleapis.com'}/v1beta/models/gemini-2.5-flash-image:generateContent?key=${encodeURIComponent(key)}`,
+    url: `${base() || 'https://generativelanguage.googleapis.com'}/v1beta/models/${env('WALL_IMAGE_MODEL') || 'gemini-2.5-flash-image'}:generateContent?key=${encodeURIComponent(key)}`,
     headers: { 'content-type': 'application/json' },
     body: { contents: [{ parts: [{ text: prompt }] }] },
     pick: (j) => {
@@ -120,7 +144,10 @@ export async function generateImage(provider, prompt, key) {
   const req = make(prompt, key)
   try {
     const res = await fetch(req.url, { method: 'POST', headers: req.headers, body: JSON.stringify(req.body) })
-    if (!res.ok) return { error: `${provider} ${res.status}: ${(await res.text()).slice(0, 160)}` }
+    if (!res.ok) {
+      const why = (await res.text()).slice(0, 160)
+      return { error: `${provider} ${res.status}: ${why}${res.status === 404 ? await suggest(req.url, key) : ''}` }
+    }
     const dataUrl = req.pick(await res.json())
     return dataUrl ? { dataUrl } : { error: 'the reply carried no image' }
   } catch (err) {

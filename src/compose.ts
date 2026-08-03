@@ -1,6 +1,6 @@
 /** Making pages: alternatives, section prompts, and the model path (with a mock for tests). */
 
-import { type Taste } from '@/taste'
+import { PRESETS, type Taste } from '@/taste'
 import { host, isServed, servedProviders } from '@/host'
 import { slop, slopBrief } from '@/slop'
 import { modelById } from '@/models'
@@ -52,7 +52,14 @@ export function arrange(base: Page, i: number): Page {
   if (i === 0) {
     return { ...base, id: uid(), sections: base.sections.map((s) => ({ ...s, content: structuredClone(s.content) })) }
   }
-  return { ...inWorld(base, WORLDS[(i - 1) % WORLDS.length]), id: uid() }
+  // Two axes, not one. A world decides how a page is built and a look decides how it feels, and
+  // holding the look fixed made six worlds read as six versions of the same page. The look
+  // advances by a stride so the pairs do not move in lockstep, which is what makes a wall of
+  // eight look like eight rather than like three repeated.
+  const looks = [base.taste, ...PRESETS.filter((p) => p.name !== base.taste.name)]
+  const world = WORLDS[(i - 1) % WORLDS.length]
+  const look = looks[((i - 1) * 3) % looks.length]
+  return { ...inWorld({ ...base, taste: look }, world), id: uid() }
 }
 
 /** Rebuild a page inside a world: its palette, its type, its layouts, its backdrop. */

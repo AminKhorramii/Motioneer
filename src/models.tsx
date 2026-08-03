@@ -42,7 +42,7 @@ export const MODELS: ModelChoice[] = [
   {
     id: 'gemini', label: 'Gemini Flash', wire: 'openai',
     base: 'https://generativelanguage.googleapis.com/v1beta/openai',
-    model: 'gemini-2.5-flash', keyName: 'wall-key-gemini', keys: 'aistudio.google.com',
+    model: 'gemini-flash-latest', keyName: 'wall-key-gemini', keys: 'aistudio.google.com',
     note: 'a free tier that covers real use, and the same key draws the images',
   },
   {
