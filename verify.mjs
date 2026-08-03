@@ -30,7 +30,16 @@ console.log('model:', REAL ? 'live Claude' : 'mock')
 await page.evaluate((key) => {
   localStorage.setItem('wall-key-anthropic', key || 'test-key')
   if (key) return
-  window.__wall.setMock((instruction, shape) => ({
+  window.__wall.setMock((instruction, shape) => instruction === 'intake' ? {
+    product: {
+      name: 'Spoor',
+      oneLiner: 'Every session you ever ran, findable in one keystroke.',
+      what: String(shape).slice(0, 80),
+      audience: '',
+      cta: 'Download for macOS',
+    },
+    questions: [{ key: 'audience', question: 'Who specifically is this for?', why: 'the page needs a reader' }],
+  } : ({
     sections: shape.map((s) => ({
       id: s.id,
       content: Object.fromEntries(
@@ -52,7 +61,24 @@ const onboard = await page.evaluate(() => ({
 }))
 console.log('onboarding:', JSON.stringify(onboard))
 
-await page.click('.sample')
+// a key turns the five field form into a description box, which is the path being tested
+await page.click('.onboard .primary')
+await page.fill('.onboard .keyline input', 'test-key')
+await page.waitForSelector('.onboard .tell', { timeout: 10000 })
+await page.fill('.onboard .tell', 'Spoor makes every AI session you ever ran searchable, locally.')
+await page.click('.onboard .primary')
+await page.waitForSelector('.onboard .fields label span', { timeout: 15000 })
+// a prompt, plus only what the description did not carry, and no form echoing it back
+const intake = await page.evaluate(() => ({
+  asked: [...document.querySelectorAll('.onboard .fields label span')].map((s) => s.textContent),
+  textInputs: document.querySelectorAll('.onboard .pane input:not([type=password])').length,
+  boxes: document.querySelectorAll('.onboard .tell').length,
+}))
+console.log('intake:', JSON.stringify(intake))
+await page.fill('.onboard .fields input', 'people who build with agents')
+await page.click('.onboard .primary')
+await page.waitForTimeout(300)
+await page.click('.onboard .primary')
 await page.waitForSelector('.paper.here', { timeout: 20000 })
 console.log('onboarding closed:', JSON.stringify({ gone: (await page.locator('.onboard').count()) === 0 }))
 // papers must appear while the models are still writing, so sample the wall mid-flight
@@ -144,7 +170,16 @@ console.log('briefs:', JSON.stringify({
 // ——— 5. the prompt bar makes variants (mocked model) ———
 await page.evaluate(() => {
   localStorage.setItem('wall-key-anthropic', 'test-key')
-  window.__wall.setMock((instruction, shape) => ({
+  window.__wall.setMock((instruction, shape) => instruction === 'intake' ? {
+    product: {
+      name: 'Spoor',
+      oneLiner: 'Every session you ever ran, findable in one keystroke.',
+      what: String(shape).slice(0, 80),
+      audience: '',
+      cta: 'Download for macOS',
+    },
+    questions: [{ key: 'audience', question: 'Who specifically is this for?', why: 'the page needs a reader' }],
+  } : ({
     sections: shape.map((s) => ({
       id: s.id,
       content: Object.fromEntries(

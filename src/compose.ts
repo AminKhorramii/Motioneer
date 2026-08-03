@@ -375,6 +375,42 @@ export async function fanOut(
   }
 }
 
+const INTAKE_SYSTEM = `You are reading someone's description of the thing they are launching, so that a landing page can be written from it. The description may be a README, a note, a paste from a pitch, or a couple of sentences typed quickly.
+
+Return JSON shaped as {"product":{"name":"","oneLiner":"","what":"","audience":"","cta":""},"questions":[{"key":"","question":"","why":""}]}.
+
+Fill the product fields from what you were actually told. Leave a field empty rather than inventing it, because a made up audience produces a page aimed at nobody. Write oneLiner as a single sentence a stranger would understand, and what as two sentences at most. Write cta as the words that would sit on the button, naming the action rather than the effort, so "Download for macOS" rather than "Get started".
+
+Then ask for what is missing. Each question names one field in key, which must be one of name, oneLiner, what, audience or cta. Ask at most three, and ask none if the description already covers everything, because every question you ask is one the person has to answer before they see anything.
+
+Ask the question a designer would ask: who specifically this is for, what they use today, what the one action is, what a sceptical reader would need to believe. Put the reason in why, in one short sentence, so the person can tell whether the answer matters.
+
+Respond with the JSON object alone, because the reply is parsed directly.`
+
+export interface Intake {
+  product: Product
+  questions: { key: keyof Product; question: string; why: string }[]
+}
+
+/**
+ * Read a free description into a brief, and ask for what is missing.
+ *
+ * A form asks everyone the same five questions in the same order, including the ones they
+ * already answered in the first sentence. This asks only for what the description does not
+ * carry, which is both shorter and better, because the questions are chosen after reading.
+ */
+export async function readBrief(text: string, provider: Provider = 'claude'): Promise<Intake | null> {
+  const raw = mockReply
+    ? mockReply('intake', text)
+    : grabJson((await ask(provider, INTAKE_SYSTEM, text)) ?? '')
+  const j = raw as { product?: Partial<Product>; questions?: Intake['questions'] } | null
+  if (!j?.product) return null
+  return {
+    product: { ...EMPTY_PRODUCT, ...j.product },
+    questions: (j.questions ?? []).filter((q) => q.key in EMPTY_PRODUCT).slice(0, 3),
+  }
+}
+
 /**
  * Draw the image for one section. The prompt rules out the things that make a generated image
  * announce itself, and rules out text hardest of all: words baked into a picture cannot be

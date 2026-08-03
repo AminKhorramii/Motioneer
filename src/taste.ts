@@ -22,7 +22,32 @@ const GROTESK = "'Helvetica Neue', Arial, sans-serif"
 const SERIF = "'Charter', 'Iowan Old Style', Georgia, serif"
 const MONO = "ui-monospace, 'SF Mono', Menlo, monospace"
 
+/**
+ * The looks offered at setup. They are named for the feeling rather than the technique,
+ * because someone choosing a look is picking a mood, not a type stack, and each one is shown
+ * as a real rendered page rather than described.
+ */
 export const PRESETS: Taste[] = [
+  {
+    name: 'anime',
+    bg: '#fdf2f8', ink: '#1a1024', dim: '#7c6a8c', accent: '#ff4d8d', accent2: '#38d0ff',
+    display: GROTESK, body: SANS, scale: 1.38, radius: 20, density: 0.45, weight: 800, caps: false, motion: 'lively',
+  },
+  {
+    name: 'spaceship',
+    bg: '#05070f', ink: '#dbe7ff', dim: '#6a7a9c', accent: '#4dd8ff', accent2: '#8b7bff',
+    display: MONO, body: SANS, scale: 1.3, radius: 2, density: 0.7, weight: 600, caps: true, motion: 'soft',
+  },
+  {
+    name: 'neon',
+    bg: '#0a0510', ink: '#f4e9ff', dim: '#8a76a0', accent: '#ff2fd0', accent2: '#7cf7ff',
+    display: GROTESK, body: SANS, scale: 1.44, radius: 0, density: 0.6, weight: 800, caps: false, motion: 'lively',
+  },
+  {
+    name: 'gallery',
+    bg: '#fbfaf8', ink: '#0d0d0c', dim: '#77746e', accent: '#0d0d0c', accent2: '#9a8f7a',
+    display: SERIF, body: SERIF, scale: 1.5, radius: 0, density: 0.32, weight: 400, caps: true, motion: 'still',
+  },
   {
     name: 'quiet dark',
     bg: '#0c0d10', ink: '#e9ecf1', dim: '#8a93a0', accent: '#6ea8fe', accent2: '#b48cff',
@@ -32,11 +57,6 @@ export const PRESETS: Taste[] = [
     name: 'paper editorial',
     bg: '#f6f2ea', ink: '#1b1a17', dim: '#6d675d', accent: '#b4472a', accent2: '#2f5d50',
     display: SERIF, body: SERIF, scale: 1.42, radius: 2, density: 0.4, weight: 500, caps: true, motion: 'still',
-  },
-  {
-    name: 'clinical light',
-    bg: '#ffffff', ink: '#0b0d12', dim: '#69717d', accent: '#1a54ff', accent2: '#00b389',
-    display: GROTESK, body: SANS, scale: 1.33, radius: 6, density: 0.65, weight: 700, caps: false, motion: 'soft',
   },
   {
     name: 'terminal',

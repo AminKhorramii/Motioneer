@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { PRESETS, type Taste } from '@/taste'
-import { IMAGE_KEY_NAME, PROVIDERS } from '@/compose'
+import { starterPage } from '@/sections'
+import { renderPage } from '@/render'
+import { IMAGE_KEY_NAME, PROVIDERS, readBrief, seeded, type Intake } from '@/compose'
 import type { Product } from '@/compose'
 import { Icon } from '@/icons'
 import { isDesktop } from '@/host'
@@ -10,6 +12,13 @@ import { isDesktop } from '@/host'
  * something instead of only explaining. Shown once, and reopenable from the
  * header when someone wants the explanation again.
  */
+
+/** A look is shown as the real page it produces, because a row of colour chips describes a
+ *  palette rather than a design, and the palette is the smallest part of the difference. */
+const lookHtml = (t: Taste) => {
+  const page = seeded(starterPage(t, 'Spoor'), SAMPLE)
+  return renderPage({ ...page, sections: page.sections.slice(0, 1) }, { title: t.name })
+}
 
 const SAMPLE: Product = {
   name: 'Spoor',
@@ -31,6 +40,10 @@ interface Props {
 
 export function Onboarding({ product, taste, explainOnly, onProduct, onTaste, onBuild, onClose }: Props) {
   const [step, setStep] = useState(0)
+  const [told, setTold] = useState('')
+  const [reading, setReading] = useState(false)
+  const [asked, setAsked] = useState<Intake['questions']>([])
+  const [read, setRead] = useState(false)
   const [keys, setKeys] = useState<Record<string, string>>(() =>
     Object.fromEntries([
       ...PROVIDERS.map((p) => [p.id, localStorage.getItem(p.keyName) ?? '']),
@@ -42,6 +55,22 @@ export function Onboarding({ product, taste, explainOnly, onProduct, onTaste, on
   const saveKey = (id: string, keyName: string, value: string) => {
     setKeys((k) => ({ ...k, [id]: value }))
     localStorage.setItem(keyName, value.trim())
+  }
+
+  /** Read the description into a brief, then ask only for what it did not carry. */
+  async function readIt() {
+    if (!told.trim()) return
+    setReading(true)
+    const got = await readBrief(told).catch(() => null)
+    setReading(false)
+    if (!got) return
+    onProduct(got.product)
+    // ask only about what the description genuinely left empty, because everything else either
+    // came out of the reading or has a sensible default
+    const gaps = got.questions.filter((q) => !String(got.product[q.key] ?? '').trim()).slice(0, 2)
+    setAsked(gaps)
+    setRead(true)
+    if (!gaps.length && got.product.name && got.product.oneLiner) setStep(2)
   }
 
   const finish = (p: Product) => {
@@ -68,31 +97,15 @@ export function Onboarding({ product, taste, explainOnly, onProduct, onTaste, on
           <div className="pane">
             <h2>Eight pages, then one.</h2>
             <p className="lede">
-              Wall writes your landing page eight different ways at once and lines them up, so you
-              choose between real pages instead of imagining them.
+              Wall writes your landing page eight ways at once, so you choose between real pages
+              instead of imagining them.
             </p>
             <ol className="how">
-              <li>
-                <b>Every paper argues differently.</b> One names the pain, one leads with the
-                outcome, one opens with proof. The angle is named under each page, so you are
-                choosing between positions rather than between page three and page five.
-              </li>
-              <li>
-                <b>The paper sits in the middle.</b> The others wait either side. Scroll sideways or
-                use the arrow keys to bring one to the centre.
-              </li>
-              <li>
-                <b>Click any text on the paper to edit it.</b> The change goes into the page itself,
-                so it survives when you switch layouts.
-              </li>
-              <li>
-                <b>Prompting makes variants.</b> An instruction produces three new pages placed to
-                the right, so your current page is never overwritten.
-              </li>
-              <li>
-                <b>Ship writes one HTML file you own.</b> No framework and no runtime from us, so
-                you can host it anywhere.
-              </li>
+              <li><b>Every paper argues differently.</b> The angle is named under each page.</li>
+              <li><b>The paper sits in the middle.</b> Arrow keys bring another to the centre.</li>
+              <li><b>Click any text to edit it.</b> Edits live in the page, so they survive a layout change.</li>
+              <li><b>Prompting adds three pages to the right.</b> Nothing is overwritten.</li>
+              <li><b>Ship writes one HTML file you own.</b> No framework, no runtime, host it anywhere.</li>
             </ol>
             {explainOnly ? (
               <div className="row"><button className="primary" onClick={onClose}>back to work</button></div>
@@ -110,66 +123,98 @@ export function Onboarding({ product, taste, explainOnly, onProduct, onTaste, on
         {step === 1 && (
           <div className="pane">
             <h2>What are you launching?</h2>
-            <p className="lede">
-              Every section is written from this, so a plain answer beats a polished one. You can
-              change all of it later, on the page itself.
-            </p>
-            <div className="fields">
-              <label><span>product name</span>
-                <input autoFocus value={product.name} placeholder="Spoor"
-                  onChange={(e) => onProduct({ ...product, name: e.currentTarget.value })} />
-              </label>
-              <label><span>one line that makes it obvious</span>
-                <input value={product.oneLiner} placeholder="Every session you ever ran, findable in one keystroke."
-                  onChange={(e) => onProduct({ ...product, oneLiner: e.currentTarget.value })} />
-              </label>
-              <label><span>what it is, in two sentences</span>
-                <textarea value={product.what} placeholder="Written for someone who has never heard of it."
-                  onChange={(e) => onProduct({ ...product, what: e.currentTarget.value })} />
-              </label>
-              <div className="pair">
-                <label><span>who it is for</span>
-                  <input value={product.audience} placeholder="for people who build with agents"
-                    onChange={(e) => onProduct({ ...product, audience: e.currentTarget.value })} />
-                </label>
-                <label><span>the one action you want</span>
-                  <input value={product.cta} placeholder="Start free"
-                    onChange={(e) => onProduct({ ...product, cta: e.currentTarget.value })} />
-                </label>
-              </div>
-            </div>
-            <div className="row">
-              <button className="primary" disabled={!ready} onClick={() => setStep(2)}>next, pick a look</button>
-              <button className="sample" onClick={() => onProduct(SAMPLE)}>fill with a sample</button>
-            </div>
+            {keys.claude || keys.gpt ? (
+              <>
+                <p className="lede">
+                  Say it however you already say it. A README, a note, two sentences.
+                </p>
+                <div className="fields">
+                  <textarea
+                    className="tell"
+                    autoFocus
+                    value={told}
+                    placeholder="Spoor reads the transcripts my AI tools already write to disk and makes 900MB of history searchable in under a second. It is for people who build with agents. Everything stays local."
+                    onChange={(e) => setTold(e.currentTarget.value)}
+                  />
+                </div>
+
+                {asked.length > 0 && (
+                  <div className="fields">
+                    {asked.map((q) => (
+                      <label key={q.key}>
+                        <span>{q.question}</span>
+                        <input autoFocus value={product[q.key]} placeholder={q.why}
+                          onChange={(e) => onProduct({ ...product, [q.key]: e.currentTarget.value })} />
+                      </label>
+                    ))}
+                  </div>
+                )}
+
+                <div className="row">
+                  {read ? (
+                    <button className="primary" disabled={!ready} onClick={() => setStep(2)}>next, pick a look</button>
+                  ) : (
+                    <button className="primary" disabled={!told.trim() || reading} onClick={() => void readIt()}>
+                      {reading ? 'reading' : 'write my pages'}
+                    </button>
+                  )}
+                  <button className="sample" onClick={() => { onProduct(SAMPLE); setRead(true); setAsked([]) }}>
+                    use a sample instead
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="lede">
+                  Paste a key and Wall writes the pages from a description. Without one it needs
+                  these two and fills in the rest.
+                </p>
+                <div className="fields">
+                  <label><span>product name</span>
+                    <input autoFocus value={product.name} placeholder="Spoor"
+                      onChange={(e) => onProduct({ ...product, name: e.currentTarget.value })} />
+                  </label>
+                  <label><span>one line that makes it obvious</span>
+                    <input value={product.oneLiner} placeholder="Every session you ever ran, findable in one keystroke."
+                      onChange={(e) => onProduct({ ...product, oneLiner: e.currentTarget.value })} />
+                  </label>
+                  {/* the good path needs a key, so it is offered here rather than a step later,
+                      where someone would already have filled the form it replaces */}
+                  <label className="keyline">
+                    <span><Icon.claude /> Claude</span>
+                    <input type="password" value={keys.claude ?? ''} placeholder="paste a key and describe it instead"
+                      onChange={(e) => saveKey('claude', PROVIDERS[0].keyName, e.currentTarget.value)} />
+                  </label>
+                </div>
+                <div className="row">
+                  <button className="primary" disabled={!ready} onClick={() => setStep(2)}>next, pick a look</button>
+                  <button className="sample" onClick={() => onProduct(SAMPLE)}>fill with a sample</button>
+                </div>
+              </>
+            )}
           </div>
         )}
 
         {step === 2 && (
           <div className="pane">
             <h2>How should it feel?</h2>
-            <p className="lede">
-              Pick a starting point. Later you can drop a screenshot of any page you admire and Wall
-              reads its colours and contrast into your taste sheet.
-            </p>
-            <div className="tastes">
+            <div className="looks">
               {PRESETS.map((p) => (
-                <button key={p.name} className={p.name === taste.name ? 'tas on' : 'tas'} onClick={() => onTaste(p)}>
-                  <span className="chips">
-                    {[p.bg, p.ink, p.accent, p.accent2].map((c, i) => <i key={i} style={{ background: c }} />)}
+                <button key={p.name} className={p.name === taste.name ? 'look on' : 'look'} onClick={() => onTaste(p)}>
+                  <span className="shot">
+                    <iframe title={p.name} scrolling="no" tabIndex={-1} srcDoc={lookHtml(p)} />
                   </span>
-                  {p.name}
+                  <span className="looklabel">{p.name}</span>
                 </button>
               ))}
             </div>
+            <p className="lede small">Drop a screenshot of any page you admire and Wall reads its colours into a look of your own.</p>
 
-            <h3 className="keyhead">Model keys, if you have them</h3>
+            <h3 className="keyhead">Keys, if you have them</h3>
             <p className="lede small">
-              With a key, each of the eight pages is written from its own angle. Without one, Wall
-              arranges your copy eight ways instead, so the app still works.{' '}
               {isDesktop
-                ? "Either way the key stays in this app's storage on this machine, and is used only for writing copy."
-                : 'Either way the key stays in this browser and goes straight to the provider, because there is no Wall server in between. On a shared computer, use a key you can revoke.'}
+                ? 'Used only for writing copy, and kept on this machine.'
+                : 'Used only for writing copy, kept in this browser, sent straight to the provider.'}
             </p>
             {PROVIDERS.map((p) => (
               <label key={p.id} className="keyline">
@@ -184,10 +229,6 @@ export function Onboarding({ product, taste, explainOnly, onProduct, onTaste, on
               <input type="password" value={keys.gemini ?? ''} placeholder="for drawing images, optional"
                 onChange={(e) => saveKey('gemini', IMAGE_KEY_NAME, e.currentTarget.value)} />
             </label>
-            <p className="lede small" style={{ marginTop: '0.5rem' }}>
-              The Gemini key is only for drawing images, and pages are complete without one, because
-              Wall draws its own backdrops from your palette.
-            </p>
 
             <div className="row">
               <button className="primary" disabled={!ready} onClick={() => finish(product)}>build my page</button>
