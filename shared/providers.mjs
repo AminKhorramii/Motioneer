@@ -8,17 +8,23 @@
  *  path can be exercised without a key. Unset in normal use. */
 /** The model is configurable because this task is short JSON copy, not code, so a small model
  *  may do it as well as a large one at a fraction of the cost. */
-const model = (fallback) =>
-  (globalThis.WALL_MODEL ?? (typeof process !== 'undefined' ? process.env?.WALL_MODEL : '') ?? '') || fallback
+const model = (fallback) => env('WALL_MODEL') || fallback
 
-const base = () =>
-  globalThis.WALL_API_BASE ??
-  (typeof process !== 'undefined' ? process.env?.WALL_API_BASE : '') ??
-  ''
+const env = (name) =>
+  globalThis[name] ?? (typeof process !== 'undefined' ? process.env?.[name] : '') ?? ''
+
+const base = () => env('WALL_API_BASE')
+
+/**
+ * Every serious open weight model speaks the OpenAI shape: same request, same SSE frames, same
+ * delta field. So there is no vendor table here, only a base URL and a model name. Pointing
+ * WALL_OPENAI_BASE at GLM, DeepSeek, Qwen, Kimi, MiniMax or a gateway is the whole integration.
+ */
+const openaiBase = () => base() || env('WALL_OPENAI_BASE') || 'https://api.openai.com'
 
 export const REQUESTS = {
   openai: (system, user, key) => ({
-    url: `${base() || 'https://api.openai.com'}/v1/chat/completions`,
+    url: `${openaiBase()}/v1/chat/completions`,
     headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
     body: {
       model: model('gpt-5.2'),

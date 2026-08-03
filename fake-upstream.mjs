@@ -221,6 +221,21 @@ export async function fakeAnthropic(dir = FIXTURES) {
       req.on('end', () => r(b))
     })
 
+    // the openai shape: different frames, same job, and until now never tested
+    if (req.url.includes('chat/completions')) {
+      const ids = [...body.matchAll(/\\?"id\\?":\s*\\?"([a-z0-9]{5,})\\?"/g)].map((m) => m[1])
+      const payload = body.includes('questions')
+        ? JSON.stringify({ product: { name: 'Spoor', oneLiner: 'Findable in one keystroke.', what: '', audience: '', cta: 'Download' }, questions: [] })
+        : JSON.stringify({ sections: ids.map((id, i) => ({ id, content: { headline: `openai headline ${i}` } })) })
+      res.writeHead(200, { ...CORS, 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
+      for (const [text] of payload.matchAll(/[\s\S]{1,17}/g)) {
+        res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\n`)
+        await new Promise((r) => setTimeout(r, 3))
+      }
+      res.write('data: [DONE]\n\n')
+      return res.end()
+    }
+
     // images are one response rather than a stream, so they take the short path
     if (req.url.includes('generateContent')) {
       res.writeHead(200, { ...CORS, 'content-type': 'application/json' })

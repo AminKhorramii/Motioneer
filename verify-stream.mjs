@@ -16,6 +16,19 @@ import { fakeAnthropic } from './fake-upstream.mjs'
 // recovery test: those replies were cut off mid-object by a token limit that is now raised
 const corpus = process.argv[2]
 const { server, url, fixtures } = await fakeAnthropic(corpus)
+
+// both wire formats, before anything else: the anthropic frames and the openai frames differ
+// in shape and in how they end, and every open weight vendor speaks the second one
+globalThis.WALL_API_BASE = url
+const { streamText } = await import('./shared/providers.mjs')
+const shapes = {}
+for (const provider of ['anthropic', 'openai']) {
+  let deltas = 0
+  const r = await streamText(provider, 'sys', JSON.stringify({ id: 'abc1234' }), 'k', () => deltas++)
+  shapes[provider] = { deltas, ok: !r.error && (r.text ?? '').includes('sections') }
+}
+console.log('wire formats:', JSON.stringify(shapes))
+delete globalThis.WALL_API_BASE
 console.log('upstream:', corpus ?? 'fixtures', fixtures ? `${fixtures} captured fixtures` : 'synthetic (no capture yet)', 'at', url)
 
 // a fresh directory per run, because this is the app's localStorage and a kept one would
