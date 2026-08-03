@@ -261,7 +261,9 @@ export default function App() {
           <button disabled={!page} onClick={() => page && void copy(pageBrief(page, product.name), 'Page brief')}>
             copy page brief
           </button>
-          <button className="go" disabled={!page || !!busy} onClick={() => page && void fill(page, product, provider)}>
+          {/* writing a wall takes half a minute, so starting another must not be blocked. Runs
+              carry a token, so the previous one is abandoned rather than mixed in. */}
+          <button className="go" disabled={!page} onClick={() => page && void fill(page, product, provider)}>
             {keyFor(provider) ? 'write a new wall' : 'new alternatives'}
           </button>
           <button title="how this works" onClick={() => setOnboarding('explain')}><Icon.help /></button>

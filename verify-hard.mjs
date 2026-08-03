@@ -44,9 +44,24 @@ await page.evaluate(async () => {
 const grown = await page.evaluate(() => document.querySelectorAll('.sec').length)
 console.log('page grown to:', JSON.stringify({ sections: grown }))
 
-await page.evaluate(() => [...document.querySelectorAll('header button')]
-  .find((b) => /new alternatives|write a new wall/.test(b.textContent))?.click())
-await page.waitForFunction(() => !document.querySelector('.busy'), null, { timeout: 180000 })
+const rewrite = await page.evaluate(() => {
+  const b = [...document.querySelectorAll('header button')]
+    .find((x) => /new alternatives|write a new wall/.test(x.textContent))
+  b?.click()
+  return { found: !!b, disabled: !!b?.disabled }
+})
+console.log('rewrite click:', JSON.stringify(rewrite))
+if (rewrite.disabled) throw new Error('the rewrite button was disabled, so nothing was tested')
+for (let i = 0; i < 24; i++) {
+  const s = await page.evaluate(() => ({
+    busy: document.querySelector('.busy')?.textContent ?? null,
+    papers: document.querySelector('.filmbar .count')?.textContent,
+  }))
+  if (!s.busy) break
+  if (i % 4 === 0) console.log('  waiting:', JSON.stringify(s))
+  await new Promise((r) => setTimeout(r, 5000))
+}
+if (errors.length) console.log('errors while writing:', errors.slice(0, 3))
 if (errors.length) console.log('errors during write:', errors.slice(0, 3))
 
 // the iframe re-renders after the model state settles, so wait for the paper to catch up

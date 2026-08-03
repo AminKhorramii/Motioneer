@@ -161,20 +161,29 @@ async function ask(
 }
 
 /**
- * Pull the section objects that have finished arriving out of a partial JSON reply. The
- * walk tracks strings and brace depth, so a closing brace inside a headline does not end an
- * object early. Every call re-reads the whole buffer and yields all complete objects, which
- * keeps this stateless: merging the same section twice costs nothing.
+ * Pull the section objects that have finished arriving out of a partial JSON reply. The walk
+ * tracks strings and brace depth, so a closing brace inside a headline does not end an object
+ * early.
+ *
+ * It resumes from a cursor rather than re-reading the buffer, because copy full of braces
+ * makes almost every delta trigger a scan, and re-reading turns one page into quadratic work.
+ * With several pages streaming at once that is enough to stall the app.
  */
-function* streamedSections(buf: string): Generator<{ id: string; content: Record<string, unknown> }> {
-  const key = buf.indexOf('"sections"')
-  const open = key < 0 ? -1 : buf.indexOf('[', key)
-  if (open < 0) return
+function scanSections(buf: string, from: number) {
+  const out: { id: string; content: Record<string, unknown> }[] = []
+  let cursor = from
+  if (from === 0) {
+    const key = buf.indexOf('"sections"')
+    const open = key < 0 ? -1 : buf.indexOf('[', key)
+    if (open < 0) return { out, cursor }
+    cursor = open + 1
+  }
   let depth = 0
   let start = -1
   let inString = false
   let escaped = false
-  for (let i = open + 1; i < buf.length; i++) {
+  let done = cursor
+  for (let i = cursor; i < buf.length; i++) {
     const ch = buf[i]
     if (inString) {
       if (escaped) escaped = false
@@ -191,14 +200,16 @@ function* streamedSections(buf: string): Generator<{ id: string; content: Record
       if (depth === 0 && start >= 0) {
         try {
           const obj = JSON.parse(buf.slice(start, i + 1)) as { id?: string; content?: Record<string, unknown> }
-          if (obj.id && obj.content) yield { id: obj.id, content: obj.content }
+          if (obj.id && obj.content) out.push({ id: obj.id, content: obj.content })
         } catch {
           // an object that fails to parse is simply not finished yet
         }
         start = -1
+        done = i + 1
       }
     }
   }
+  return { out, cursor: done }
 }
 
 const grabJson = (text: string) => {
@@ -258,17 +269,19 @@ export async function promptPage(
     .map((s) => ({ id: s.id, kind: s.kind, content: s.content }))
   const outId = uid()
   let buf = ''
-  let shown = 0
+  let cursor = 0
+  const found: { id: string; content: Record<string, unknown> }[] = []
   const feed = (delta: string) => {
     buf += delta
-    if (!onPartial || !delta.includes('}')) return
-    const done = [...streamedSections(buf)]
+    if (!delta.includes('}')) return
+    const scan = scanSections(buf, cursor)
+    cursor = scan.cursor
+    if (!scan.out.length) return
+    found.push(...scan.out)
     // repaint only when another section has finished, because a real stream delivers a few
     // characters at a time and repainting per delta would re-render every paper hundreds of
     // times for the same content
-    if (done.length <= shown) return
-    shown = done.length
-    onPartial(mergeSections(page, done, outId))
+    onPartial?.(mergeSections(page, found, outId))
   }
 
   if (mockReply) {
@@ -293,7 +306,7 @@ export async function promptPage(
   // A reply cut off mid-object cannot be parsed whole, but the sections that did arrive are
   // already complete and worth keeping. The streaming parser doubles as the recovery path, so
   // a truncated reply costs the tail of a page instead of the entire page.
-  const sections = json?.sections ?? [...streamedSections(buf)]
+  const sections = json?.sections ?? found
   return sections.length ? mergeSections(page, sections, outId) : null
 }
 
