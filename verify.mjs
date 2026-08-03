@@ -198,8 +198,20 @@ const back = await page.evaluate(async () => {
     b?.click()
     await new Promise((r) => setTimeout(r, 350))
   }
+  // land on a backdrop that draws, so the canvas assertion means something
+  while (!/contours|ridge/.test(document.querySelector('.filmbar button')?.textContent ?? '')) {
+    const b = [...document.querySelectorAll('.filmbar button')].find((x) => /backdrop|contours|grain|ridge/.test(x.textContent))
+    b?.click()
+    await new Promise((r) => setTimeout(r, 300))
+    if (seen.length > 12) break
+    seen.push('.')
+  }
   const doc = document.querySelector('.paper.here iframe')?.contentDocument
-  return { cycled: seen, canvasInPage: !!doc?.querySelector('#bd'), webgl: !!doc?.querySelector('#bd')?.getContext?.('webgl2') }
+  return {
+    cycled: seen.filter((s) => s !== '.'),
+    canvasInPage: !!doc?.querySelector('#bd'),
+    webgl: !!doc?.querySelector('#bd')?.getContext?.('webgl2'),
+  }
 })
 console.log('backdrop:', JSON.stringify(back))
 console.log('slop:', JSON.stringify(await page.evaluate(() => ({

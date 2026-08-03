@@ -6,6 +6,7 @@
 
 import type { Taste } from '@/taste'
 import type { Backdrop } from '@/backdrop'
+import type { WorldId } from '@/worlds'
 
 export type Kind = 'hero' | 'logos' | 'features' | 'showcase' | 'quote' | 'pricing' | 'faq' | 'cta' | 'footer'
 
@@ -26,6 +27,8 @@ export interface Page {
   angle?: string
   /** the generated art behind the page, drawn from the taste sheet */
   backdrop?: Backdrop
+  /** the design world this page is built in: one set of decisions, not a shuffle */
+  world?: WorldId
 }
 
 export const KIND_VARIANTS: Record<Kind, string[]> = {

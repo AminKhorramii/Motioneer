@@ -182,3 +182,21 @@ same host boundary as everything else. The prompt rules out text hardest of all,
 words baked into an image cannot be edited on the paper and are usually wrong. The result is
 stored as a data URL in the page content, so it still ships as one file. Expect the page to
 grow by roughly a megabyte per image, which is why the drawn backdrops are the default.
+
+## Design worlds
+
+A variant used to be a shuffle: every section picked a layout at random and the palette was
+jittered. That buys variety without identity, so eight papers came out as eight shuffles
+rather than eight designs.
+
+`src/worlds.ts` defines six worlds, each one set of decisions that propagate together: type
+pairing and scale, tracking and weight, radius, density, whether sections carry hairline rules
+or numbers, whether they sit in a column or run edge to edge, the measure in characters, how
+figures are treated, which backdrop belongs to it, and which layout each section kind wears.
+Palette moves are relationships rather than random shifts: monochrome, tinted paper, pushed
+contrast.
+
+A variant is now an angle crossed with a world: what the page argues, and how it is built.
+The world name sits under the paper and clicking it rebuilds the page in the next one.
+`verify:stream` asserts a wall spans distinct worlds and distinct looks, so eight pages
+quietly converging is a test failure rather than something you notice months later.

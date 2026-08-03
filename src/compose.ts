@@ -1,9 +1,10 @@
 /** Making pages: alternatives, section prompts, and the model path (with a mock for tests). */
 
-import { drift, type Taste } from '@/taste'
+import { type Taste } from '@/taste'
 import { host } from '@/host'
 import { slop, slopBrief } from '@/slop'
 import { BACKDROPS, type Backdrop } from '@/backdrop'
+import { WORLDS, type World } from '@/worlds'
 import { KIND_VARIANTS, defaultContent, uid, type Kind, type Page, type Section } from '@/sections'
 
 export interface Product {
@@ -39,25 +40,39 @@ export function seeded(page: Page, p: Product): Page {
 }
 
 /**
- * The i-th arrangement of a page: layout choices and a taste drift, copy untouched.
+ * The i-th arrangement of a page: one design world applied whole, copy untouched.
  * Index 0 is the page as given, so a fan-out always keeps the original to compare against.
- * Both the local path and the model path build on this, so a variant differs visibly
- * before you read a word of it.
+ *
+ * The layouts come from the world rather than from chance. Picking each section at random
+ * produced variety without identity: a terminal hero above an editorial features block reads
+ * as a shuffle rather than as a design.
  */
 export function arrange(base: Page, i: number): Page {
-  const seed = Math.floor(Math.random() * 1e6)
+  if (i === 0) {
+    return { ...base, id: uid(), sections: base.sections.map((s) => ({ ...s, content: structuredClone(s.content) })) }
+  }
+  return { ...inWorld(base, WORLDS[(i - 1) % WORLDS.length]), id: uid() }
+}
+
+/** Rebuild a page inside a world: its palette, its type, its layouts, its backdrop. */
+function inWorld(page: Page, world: World): Page {
   return {
-    ...base,
-    id: uid(),
-    // walk the backdrops rather than picking at random, so a wall shows each of them
-    backdrop: i === 0 ? (base.backdrop ?? 'none') : BACKDROPS[i % BACKDROPS.length],
-    taste: i === 0 ? base.taste : drift(base.taste, seed),
-    sections: base.sections.map((s) => ({
+    ...page,
+    world: world.id,
+    backdrop: world.backdrop,
+    taste: world.taste(page.taste),
+    sections: page.sections.map((s) => ({
       ...s,
-      variant: i === 0 ? s.variant : Math.floor(Math.random() * KIND_VARIANTS[s.kind].length),
+      variant: Math.min(world.prefer[s.kind] ?? s.variant, KIND_VARIANTS[s.kind].length - 1),
       content: structuredClone(s.content),
     })),
   }
+}
+
+/** Move a page to the next world, keeping its copy. */
+export function cycleWorld(page: Page): Page {
+  const at = WORLDS.findIndex((w) => w.id === page.world)
+  return inWorld(page, WORLDS[(at + 1) % WORLDS.length])
 }
 
 /** alternatives of a whole page: same copy, different arrangement. The path with no key. */
@@ -83,13 +98,13 @@ export function addSection(page: Page, kind: Kind, product: string, at?: number)
   return { ...page, sections: list }
 }
 
-/** Cycle a section to its next layout. The wrap lives here because KIND_VARIANTS defines the range. */
 /** Cycle the page's backdrop. The wrap lives here because BACKDROPS defines the range. */
 export function cycleBackdrop(page: Page): Page {
   const at = BACKDROPS.indexOf(page.backdrop ?? 'none')
   return { ...page, backdrop: BACKDROPS[(at + 1) % BACKDROPS.length] as Backdrop }
 }
 
+/** Cycle a section to its next layout. The wrap lives here because KIND_VARIANTS defines the range. */
 export function cycleVariant(page: Page, id: string): Page {
   return {
     ...page,

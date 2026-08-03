@@ -476,3 +476,12 @@ button:disabled { opacity: 0.32; pointer-events: none; }
 /* section actions stay on one line each: a button that wraps reads as two controls */
 .srow { display: flex; flex-wrap: wrap; gap: 0.3rem; }
 .srow button { white-space: nowrap; flex: 0 0 auto; }
+
+/* the world is identity and control at once: it names how the paper is built, and clicking
+   it rebuilds the paper in the next one */
+.filmbar .world {
+  color: var(--ink2); font-size: 11px;
+  padding-left: 0.5rem; margin-left: 0.1rem;
+  border-left: 1px solid var(--hair2); border-radius: 0;
+}
+.filmbar .world:hover:not(:disabled) { background: none; color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }

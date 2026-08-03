@@ -7,6 +7,7 @@
 import { alpha, luminance, mix, shift, type Taste } from '@/taste'
 import { type Page, type Section } from '@/sections'
 import { backdropHtml } from '@/backdrop'
+import { worldById, type World } from '@/worlds'
 
 const esc = (s: unknown) =>
   String(s ?? '').replace(/[<>&]/g, (m) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' })[m]!)
@@ -29,7 +30,7 @@ function tokens(t: Taste) {
   }
 }
 
-function head(t: Taste, title: string, editable: boolean) {
+function head(t: Taste, title: string, editable: boolean, w: World) {
   const { gap, surface, line, s, ease } = tokens(t)
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><style>
@@ -54,6 +55,15 @@ section{padding:calc(var(--gap)*2.2) 0}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:calc(var(--gap)*.95)}
 .grid{display:grid;gap:calc(var(--gap)*.8)}
 .ctas{display:flex;gap:.7rem;flex-wrap:wrap;margin-top:calc(var(--gap)*.9)}
+${w.structure.rules ? 'section+section{border-top:1px solid var(--line)}' : ''}
+${w.structure.numbered ? `body{counter-reset:sec}
+section{counter-increment:sec}
+section>.wrap{position:relative}
+section>.wrap::before{content:counter(sec,decimal-leading-zero);position:absolute;left:-2.6rem;top:.2rem;
+font-size:.72rem;letter-spacing:.14em;color:var(--dim);font-variant-numeric:tabular-nums}
+@media(max-width:1100px){section>.wrap::before{display:none}}` : ''}
+${w.structure.bleed ? '.wrap{max-width:none;padding-left:6vw;padding-right:6vw}' : ''}
+p{max-width:${w.structure.measure}ch}
 ${editable ? `[data-edit]{outline:0;transition:box-shadow .15s ease;border-radius:3px}
 [data-edit]:hover{box-shadow:0 0 0 1px ${alpha(t.accent, 0.45)}}
 [data-edit]:focus{box-shadow:0 0 0 2px ${t.accent};background:${alpha(t.accent, 0.06)}}` : ''}
@@ -74,7 +84,7 @@ const EDIT_SCRIPT = `<style>
 .wall-grip{position:absolute;left:10px;top:10px;z-index:9;display:flex;gap:3px;align-items:center;
 padding:5px 8px;border-radius:7px;font:500 11px/1 ui-sans-serif,system-ui;letter-spacing:.02em;
 background:rgba(128,128,128,.16);color:inherit;opacity:0;transition:opacity .12s ease;cursor:grab;
--webkit-user-select:none;user-select:none;backdrop-filter:blur(6px)}
+-webkit-user-select:none;user-select:none}
 [data-section]:hover>.wall-grip{opacity:.75}
 .wall-grip:active{cursor:grabbing}
 .wall-grip i{width:9px;height:1.5px;background:currentColor;display:block;border-radius:1px}
@@ -138,9 +148,14 @@ document.addEventListener('click',function(e){
 },true);
 </script>`
 
-function figure(t: Taste, seed: number, ratio = '16/10', img?: string) {
+function figure(t: Taste, seed: number, ratio = '16/10', img?: string, treatment: World['structure']['figure'] = 'framed') {
+  const frame = treatment === 'plain'
+    ? 'border:1px solid var(--line)'
+    : treatment === 'bleed'
+      ? 'border:0;border-radius:0'
+      : 'border:1px solid var(--line);border-radius:var(--r)'
   if (img) {
-    return `<div style="border-radius:var(--r);overflow:hidden;border:1px solid var(--line);aspect-ratio:${ratio}">
+    return `<div style="overflow:hidden;${frame};aspect-ratio:${ratio}">
 <img src="${img}" alt="" style="width:100%;height:100%;object-fit:cover;display:block"></div>`
   }
   const r = (n: number) => Math.abs(Math.sin(seed * 3301 + n * 7919)) % 1
@@ -149,7 +164,7 @@ function figure(t: Taste, seed: number, ratio = '16/10', img?: string) {
     return `radial-gradient(${(30 + r(i) * 40).toFixed(0)}% ${(28 + r(i + 9) * 36).toFixed(0)}% at ${(12 + r(i + 3) * 76).toFixed(0)}% ${(14 + r(i + 5) * 72).toFixed(0)}%,${alpha(c, 0.5 - i * 0.08)} 0%,transparent 70%)`
   }).join(',')
   const dark = luminance(t.bg) < 0.5
-  return `<div style="position:relative;border-radius:var(--r);overflow:hidden;border:1px solid var(--line);
+  return `<div style="position:relative;overflow:hidden;${frame};
 aspect-ratio:${ratio};background:${blobs},${mix(t.bg, dark ? '#fff' : '#000', 0.05)}">
 <div style="position:absolute;inset:0;background:repeating-linear-gradient(115deg,${alpha(t.ink, 0.05)} 0 1px,transparent 1px 7px)"></div>
 <div style="position:absolute;left:8%;top:13%;right:8%;height:9px;border-radius:99px;background:${alpha(t.ink, 0.14)}"></div>
@@ -157,7 +172,7 @@ aspect-ratio:${ratio};background:${blobs},${mix(t.bg, dark ? '#fff' : '#000', 0.
 <div style="position:absolute;left:8%;bottom:14%;width:32%;height:34px;border-radius:var(--r);background:${alpha(t.accent, 0.45)}"></div></div>`
 }
 
-export function renderSection(sec: Section, t: Taste, seed: number): string {
+export function renderSection(sec: Section, t: Taste, seed: number, w: World): string {
   const c = sec.content as Record<string, string>
   // a generated image replaces the drawn placeholder wherever a section shows a figure
   const img = typeof c.image === 'string' && c.image.startsWith('data:') ? c.image : undefined
@@ -175,12 +190,12 @@ export function renderSection(sec: Section, t: Taste, seed: number): string {
 <p style="font-size:1.16rem;max-width:56ch;margin:0 auto" ${ed(sec.id, 'sub')}>${esc(c.sub)}</p>
 <div class="ctas" style="justify-content:center"><a class="btn btn-primary" ${ed(sec.id, 'cta')}>${esc(c.cta)}</a>
 <a class="btn btn-ghost" ${ed(sec.id, 'cta2')}>${esc(c.cta2)}</a></div>
-<div style="margin-top:calc(var(--gap)*1.6)">${figure(t, seed, '16/10', img)}</div></div>`,
+<div style="margin-top:calc(var(--gap)*1.6)">${figure(t, seed, '16/10', img, w.structure.figure)}</div></div>`,
         1: `<div class="wrap" style="display:grid;grid-template-columns:1.05fr .95fr;gap:calc(var(--gap)*1.4);align-items:center">
 <div><span class="eyebrow" ${ed(sec.id, 'eyebrow')}>${esc(c.eyebrow)}</span>
 <h1 style="margin:.9rem 0 1rem" ${ed(sec.id, 'headline')}>${esc(c.headline)}</h1>
 <p style="font-size:1.1rem;max-width:46ch" ${ed(sec.id, 'sub')}>${esc(c.sub)}</p>${ctas}</div>
-<div>${figure(t, seed, '4/5', img)}</div></div>`,
+<div>${figure(t, seed, '4/5', img, w.structure.figure)}</div></div>`,
         2: `<div class="wrap" style="max-width:900px">
 <h1 style="font-size:clamp(2.6rem,7.4vw,5.2rem);max-width:16ch" ${ed(sec.id, 'headline')}>${esc(c.headline)}</h1>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:calc(var(--gap)*1.2);margin-top:calc(var(--gap)*1.2);
@@ -192,7 +207,7 @@ border-top:1px solid var(--line);padding-top:calc(var(--gap)*.9)">
 <p style="color:var(--accent);font-size:.92rem" ${ed(sec.id, 'eyebrow')}>${esc(c.eyebrow)}</p>
 <h1 style="font-size:clamp(1.9rem,4.4vw,2.9rem);margin:1rem 0" ${ed(sec.id, 'headline')}>${esc(c.headline)}</h1>
 <p style="max-width:58ch" ${ed(sec.id, 'sub')}>${esc(c.sub)}</p>${ctas}</div>
-<div style="margin-top:calc(var(--gap)*1.2)">${figure(t, seed, '16/10', img)}</div></div>`,
+<div style="margin-top:calc(var(--gap)*1.2)">${figure(t, seed, '16/10', img, w.structure.figure)}</div></div>`,
       }[v % 4]
       return `${open}${body}</section>`
     }
@@ -318,13 +333,14 @@ justify-content:space-between;gap:1rem;flex-wrap:wrap;color:var(--dim);font-size
 }
 
 export function renderPage(page: Page, opts: { editable?: boolean; title?: string } = {}): string {
+  const world = worldById(page.world)
   const seed = page.sections.length * 17 + page.taste.radius
   const body = page.sections
     .filter((s) => s.on)
-    .map((s, i) => renderSection(s, page.taste, seed + i * 11))
+    .map((s, i) => renderSection(s, page.taste, seed + i * 11, world))
     .join('\n')
   // the backdrop goes first so it sits behind the content without needing a stacking hack
   const art = backdropHtml(page.taste, page.backdrop ?? 'none')
-  return `${head(page.taste, opts.title ?? 'Landing', !!opts.editable)}${art}${body}${opts.editable ? EDIT_SCRIPT : ''}</body></html>`
+  return `${head(page.taste, opts.title ?? 'Landing', !!opts.editable, world)}${art}${body}${opts.editable ? EDIT_SCRIPT : ''}</body></html>`
 }
 

@@ -60,6 +60,8 @@ console.log('wall filled progressively:', JSON.stringify({
 const wall = await page.evaluate(async () => {
   const heads = new Set()
   const angles = []
+  const worlds = new Set()
+  const looks = new Set()
   for (let i = 0; i < 9; i++) {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }))
     await new Promise((r) => setTimeout(r, 450))
@@ -67,11 +69,20 @@ const wall = await page.evaluate(async () => {
     heads.add(doc?.querySelector('h1')?.innerText ?? `missing-${i}`)
     const a = document.querySelector('.filmbar .angle')?.textContent
     if (a) angles.push(a)
+    worlds.add(document.querySelector('.filmbar .world')?.textContent ?? '')
+    // a page's look is its type, its scale and its ground: if two papers share all three
+    // they are the same design wearing different words
+    const d = document.querySelector('.paper.here iframe')?.contentDocument
+    const b = d && getComputedStyle(d.body)
+    const h = d && d.querySelector('h1') && getComputedStyle(d.querySelector('h1'))
+    looks.add([b?.fontFamily?.slice(0, 18), h?.fontSize, b?.backgroundColor].join('|'))
   }
   return {
     counter: document.querySelector('.filmbar span')?.textContent,
     distinctHeadlines: heads.size,
     angles: [...new Set(angles)].length,
+    worlds: [...worlds].filter(Boolean),
+    distinctLooks: looks.size,
     headlines: [...heads].map((h) => h.slice(0, 46)),
   }
 })

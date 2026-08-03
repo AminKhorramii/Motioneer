@@ -2,6 +2,7 @@ import { PROVIDERS, type Provider } from '@/compose'
 import { Icon } from '@/icons'
 import type { Flag } from '@/slop'
 import { BACKDROP_NOTE, type Backdrop } from '@/backdrop'
+import { worldById, type WorldId } from '@/worlds'
 
 /**
  * The dock: what you ask for on top, where you are underneath.
@@ -17,6 +18,7 @@ interface Props {
   angle?: string
   flags: Flag[]
   backdrop: Backdrop
+  world?: WorldId
   bar: string
   provider: Provider
   busy: boolean
@@ -26,13 +28,14 @@ interface Props {
   onGo: (i: number) => void
   onFlags: () => void
   onBackdrop: () => void
+  onWorld: () => void
   onOpen: () => void
   onShip: () => void
 }
 
 export function Dock({
-  at, count, angle, flags, backdrop, bar, provider, busy,
-  onBar, onRun, onProvider, onGo, onFlags, onBackdrop, onOpen, onShip,
+  at, count, angle, flags, backdrop, world, bar, provider, busy,
+  onBar, onRun, onProvider, onGo, onFlags, onBackdrop, onWorld, onOpen, onShip,
 }: Props) {
   return (
     <div className="dock">
@@ -63,7 +66,11 @@ export function Dock({
           <button title="next alternative, or press the right arrow key"
             onClick={() => onGo(at + 1)} disabled={at >= count - 1}><Icon.right /></button>
         </div>
+        {/* the left side says what this paper is, and the world doubles as the control for it */}
         {angle && <span className="angle">{angle}</span>}
+        <button className="world" title={`${worldById(world).note} click for the next world.`} onClick={onWorld}>
+          {worldById(world).name}
+        </button>
         <span className="spacer" />
         <button title={`backdrop: ${BACKDROP_NOTE[backdrop]}. click for the next one.`} onClick={onBackdrop}>
           {backdrop === 'none' ? 'no backdrop' : backdrop}
