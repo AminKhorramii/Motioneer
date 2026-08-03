@@ -130,16 +130,13 @@ console.log('section panel:', JSON.stringify(secUi))
 await page.evaluate(() => document.querySelector('.sec.sel .secline button').click()) // next layout
 await page.waitForTimeout(500)
 
-// copy a section brief, then the page brief
-await page.evaluate(() => document.querySelectorAll('.sec.sel .srow button')[1].click())
-await page.waitForTimeout(400)
-const secBrief = await page.evaluate(() => navigator.clipboard.readText().catch(() => ''))
+// the page brief is the only brief now, so it has to carry every section
 await page.click('.hactions button:nth-child(3)')
 await page.waitForTimeout(400)
 const pgBrief = await page.evaluate(() => navigator.clipboard.readText().catch(() => ''))
 console.log('briefs:', JSON.stringify({
-  sectionBriefStarts: secBrief.slice(0, 46),
   pageBriefStarts: pgBrief.slice(0, 40),
+  coversEverySection: pgBrief.split('\n').filter((l) => l.startsWith('## ')).length,
   pageBriefHasTokens: pgBrief.includes('Design tokens'),
   pageBriefLines: pgBrief.split('\n').length,
 }))

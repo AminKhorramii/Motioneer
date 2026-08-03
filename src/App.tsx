@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PRESETS, tasteFromImage, type Taste } from '@/taste'
 import { KIND_LABEL, applyEdit, starterPage, type Kind, type Page } from '@/sections'
 import { renderPage } from '@/render'
-import { pageBrief, sectionBrief } from '@/brief'
+import { pageBrief } from '@/brief'
 import {
   EMPTY_PRODUCT, addSection, alternatives, arrange, cycleBackdrop, cycleVariant, dropSection, fanOut, illustrate, imageKey, keyFor, promptPage, promptSection, sectionAlternatives, seeded, setMock, type Product, type Provider,
 } from '@/compose'
@@ -330,10 +330,6 @@ export default function App() {
                 flash(`${alts.length - 1} more layouts are waiting to the right.`)
               }}
               onDraw={(id) => void drawImage(id)}
-              onCopyBrief={(id) => {
-                const s = page.sections.find((x) => x.id === id)
-                if (s) void copy(sectionBrief(s, page.taste), `The ${KIND_LABEL[s.kind]} brief`)
-              }}
               onAdd={(kind: Kind) => setPage((p) => addSection(p, kind, product.name))}
             />
           </>
