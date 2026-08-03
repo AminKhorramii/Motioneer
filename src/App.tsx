@@ -34,12 +34,32 @@ export default function App() {
     () => (localStorage.getItem('wall-onboarded') ? null : 'first'),
   )
   const wheelLock = useRef(0)
+  const [armed, setArmed] = useState(false)
   // Each fan-out gets a token. Pages from an earlier run keep streaming in after a new one
   // starts, and without this they land on the new wall, which mixes pages built from two
   // different bases.
   const run = useRef(0)
 
   const page = pages[at] ?? null
+
+  /**
+   * Start again with a different product. This throws the current wall away, so the button
+   * asks once rather than opening a dialog: a second click within a few seconds confirms.
+   */
+  function startOver() {
+    if (!armed) {
+      setArmed(true)
+      setTimeout(() => setArmed(false), 4000)
+      return
+    }
+    setArmed(false)
+    setPages([])
+    setAt(0)
+    setProduct(EMPTY_PRODUCT)
+    setSelected(null)
+    void host.writeState(null)
+    setOnboarding('first')
+  }
 
   const flash = (m: string) => {
     setToast(m)
@@ -250,21 +270,27 @@ export default function App() {
 
   return (
     <div className="wall" onDragOver={(e) => e.preventDefault()} onDrop={onDropRef}>
+      {/* The header carries what you switch between and the one thing that rebuilds the wall.
+          Anything about the brief lives with the brief, and the view is a two state control
+          rather than a button whose label is the state you are not in. */}
       <header>
-        <h1>Wall</h1>
-        <span className="sub">{view === 'studio' ? 'one paper, alternatives either side' : 'all of them at once'}</span>
+        <div className="views">
+          <button className={view === 'studio' ? 'on' : ''} onClick={() => setView('studio')}
+            title="one paper, with the alternatives either side">one</button>
+          <button className={view === 'wall' ? 'on' : ''} onClick={() => setView('wall')}
+            title="every paper at once">all</button>
+        </div>
         <div className="hactions">
-          <button onClick={() => setBriefOpen((v) => !v)}>{briefOpen ? 'hide brief' : 'brief'}</button>
-          <button className={view === 'wall' ? 'on' : ''} onClick={() => setView(view === 'wall' ? 'studio' : 'wall')}>
-            {view === 'wall' ? 'studio' : 'see all'}
-          </button>
-          <button disabled={!page} onClick={() => page && void copy(pageBrief(page, product.name), 'Page brief')}>
-            copy page brief
-          </button>
+          <button className={briefOpen ? 'on' : ''} onClick={() => setBriefOpen((v) => !v)}
+            title="what every page is written from">brief</button>
           {/* writing a wall takes half a minute, so starting another must not be blocked. Runs
               carry a token, so the previous one is abandoned rather than mixed in. */}
           <button className="go" disabled={!page} onClick={() => page && void fill(page, product, provider)}>
             {keyFor(provider) ? 'write a new wall' : 'new alternatives'}
+          </button>
+          <button className={armed ? 'arm' : ''} title="describe a different product and start a new wall"
+            onClick={startOver}>
+            {armed ? 'discard this wall?' : 'start over'}
           </button>
           <button title="how this works" onClick={() => setOnboarding('explain')}><Icon.help /></button>
         </div>
@@ -273,10 +299,18 @@ export default function App() {
       {busy && <p className="busy">{busy}</p>}
 
       <div className="body">
-        {briefOpen && <BriefRail product={product} taste={taste} onProduct={setProduct} onTaste={(t) => {
-          setTaste(t)
-          setPages((all) => all.map((p) => ({ ...p, taste: t })))
-        }} />}
+        {briefOpen && (
+          <BriefRail
+            product={product}
+            taste={taste}
+            onProduct={setProduct}
+            onCopy={() => page && void copy(pageBrief(page, product.name), 'Page brief')}
+            onTaste={(t) => {
+              setTaste(t)
+              setPages((all) => all.map((p) => ({ ...p, taste: t })))
+            }}
+          />
+        )}
 
         {view === 'studio' && page && (
           <>

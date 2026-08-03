@@ -157,7 +157,11 @@ await page.evaluate(() => document.querySelector('.sec.sel .secline button').cli
 await page.waitForTimeout(500)
 
 // the page brief is the only brief now, so it has to carry every section
-await page.click('.hactions button:nth-child(3)')
+// copying the brief now lives with the brief, so the rail has to be open to reach it
+await page.evaluate(() => [...document.querySelectorAll('.hactions button')]
+  .find((b) => b.textContent.trim() === 'brief')?.click())
+await page.waitForSelector('.copybrief', { timeout: 10000 })
+await page.click('.copybrief')
 await page.waitForTimeout(400)
 const pgBrief = await page.evaluate(() => navigator.clipboard.readText().catch(() => ''))
 console.log('briefs:', JSON.stringify({
@@ -249,6 +253,10 @@ const back = await page.evaluate(async () => {
   }
 })
 console.log('backdrop:', JSON.stringify(back))
+console.log('header:', JSON.stringify(await page.evaluate(() => ({
+  views: [...document.querySelectorAll('header .views button')].map((b) => b.textContent),
+  actions: [...document.querySelectorAll('.hactions button')].map((b) => b.textContent.trim() || 'help'),
+}))))
 console.log('slop:', JSON.stringify(await page.evaluate(() => ({
   badge: document.querySelector('.filmbar .flags')?.textContent,
   detail: document.querySelector('.filmbar .flags')?.getAttribute('title')?.split('\n').map((s) => s.split('.')[0]),
@@ -262,6 +270,18 @@ console.log('shipped:', JSON.stringify({
   sections: (html.match(/<section/g) ?? []).length,
 }))
 void file
+
+// start over throws the wall away, so it must ask once and only then reset
+const over = await page.evaluate(async () => {
+  const btn = () => [...document.querySelectorAll('.hactions button')].find((b) => /start over|discard/.test(b.textContent))
+  btn().click()
+  await new Promise((r) => setTimeout(r, 150))
+  const asked = btn().textContent.includes('discard')
+  btn().click()
+  await new Promise((r) => setTimeout(r, 400))
+  return { asked, onboardingBack: !!document.querySelector('.onboard .card'), papers: document.querySelectorAll('.paper').length }
+})
+console.log('start over:', JSON.stringify(over))
 
 console.log('errors:', errors.length ? errors.slice(0, 5) : 'none')
 await app.close()

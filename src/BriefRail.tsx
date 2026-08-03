@@ -7,13 +7,18 @@ interface Props {
   taste: Taste
   onProduct: (p: Product) => void
   onTaste: (t: Taste) => void
+  onCopy: () => void
 }
 
 /** The brief rail. Editing here changes what future sections are written from. */
-export function BriefRail({ product, taste, onProduct, onTaste }: Props) {
+export function BriefRail({ product, taste, onProduct, onTaste, onCopy }: Props) {
   return (
     <aside className="side">
-      <h3>the brief</h3>
+      {/* copying the brief belongs with the brief, not in the header beside the view switch */}
+      <div className="briefhead">
+        <h3>the brief</h3>
+        <button className="copybrief" onClick={onCopy} title="the whole page as markdown, for another model">copy</button>
+      </div>
       <label><span>product</span>
         <input value={product.name} placeholder="Spoor"
           onChange={(e) => onProduct({ ...product, name: e.currentTarget.value })} />
