@@ -101,6 +101,12 @@ console.log('design returned:', JSON.stringify({
   namesTheDirectory: text.includes(at),
 }))
 console.log('files in the project:', JSON.stringify(['chosen.md', 'chosen.html', 'chosen.json'].filter((f) => existsSync(join(at, f)))))
+// both sides of the handoff say which shape they speak, because npx keeps the writer current
+// while whatever reads the directory can be any age
+console.log('format stamped:', JSON.stringify({
+  request: JSON.parse(readFileSync(join(at, 'request.json'), 'utf8')).format,
+  chosen: JSON.parse(readFileSync(join(at, 'chosen.json'), 'utf8')).format,
+}))
 console.log('errors:', errors.length ? errors.slice(0, 3) : 'none')
 
 await browser.close()

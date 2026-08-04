@@ -248,11 +248,13 @@ claude mcp add --scope user wall -- npx -y wall-mcp
 Ask for a landing page. Wall opens, you pick one, and the choice arrives in your project as a
 spec your agent implements.
 
-Where it opens depends on what is there. A desktop app if one is installed, and otherwise a
-local server and whichever browser you already have. The browser route is the one a first run
-takes: no download, no toolchain, and nothing for the operating system to refuse to open, which
-matters because the install is the part of a first run that leaks most. It also means Windows
-and Linux work without a build.
+Where it opens depends on what is there. A desktop build if `WALL_APP` points at one or a
+clone has built it, and otherwise a local server and whichever browser you already have. The
+browser route is the one a first run takes: no download, no toolchain, and nothing for the
+operating system to refuse to open, which matters because the install is the part of a first
+run that leaks most. It also means Windows and Linux work without a build, and it is why a run
+is never stale: `npx` resolves the latest published version each time, where an installed app
+stays whatever it was the day it was downloaded.
 
 Keys are held by the local server in `~/.wall/config.json`, not by the page. A browser tab keeps
 them per origin, so a server on a different port every run would lose them and ask again.
@@ -281,3 +283,11 @@ Three tools:
 
 `npm run verify:mcp` speaks the protocol to the real server, launches the real desktop with a
 request file, drives it the way a person would, and reads the handoff back through `collect`.
+
+`npm run verify:update` holds the update channel itself. Wall updates by publish, since `npx`
+resolves the latest version on every run, so the suite asserts what that rests on: the package
+answers to the name in the one line, it is publishable, the tarball npm would build carries
+everything the entry points import, the version clients are told is the one in package.json,
+and a redeploy cannot strand a cached page. The handoff files carry a format number, checked
+live by `verify:oneline`, because the writer is always current while whatever reads the
+directory can be any age.

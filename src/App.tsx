@@ -312,7 +312,7 @@ export default function App() {
     const res = await host.handoff(askedFrom, {
       'chosen.md': pageBrief(page, product.name),
       'chosen.html': renderPage(page, { title: product.name }),
-      'chosen.json': JSON.stringify({ product, page }, null, 2),
+      'chosen.json': JSON.stringify({ format: 1, product, page }, null, 2),
     })
     flash(res.error ? `Could not write the handoff: ${res.error}` : 'Sent back. Your agent can pick it up now.')
   }

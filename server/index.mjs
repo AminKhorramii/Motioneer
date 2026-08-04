@@ -123,7 +123,14 @@ async function serveFile(res, file, injectFlag) {
         body.toString('utf8').replace('</head>', '<script>window.__wallServed=1</script></head>'),
       )
     }
-    res.writeHead(200, { 'content-type': TYPES[path.extname(file)] ?? 'application/octet-stream' })
+    res.writeHead(200, {
+      'content-type': TYPES[path.extname(file)] ?? 'application/octet-stream',
+      // hashed assets never change under the same name; everything else must revalidate, or a
+      // redeploy leaves a cached index.html pointing at assets that no longer exist
+      'cache-control': file.includes(`${path.sep}assets${path.sep}`)
+        ? 'public, max-age=31536000, immutable'
+        : 'no-cache',
+    })
     res.end(body)
   } catch {
     res.writeHead(404).end('not found')

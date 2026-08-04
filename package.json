@@ -1,6 +1,7 @@
 {
-  "name": "wall",
-  "private": true,
+  "name": "wall-mcp",
+  "description": "Twelve landing pages, then one. A wall of complete pages to compare, choose from, and hand back to your agent as a spec.",
+  "repository": "github:AminKhorramii/Wall",
   "version": "0.1.0",
   "scripts": {
     "build": "tsc -b && vite build && vite build --ssr src/core.ts --outDir dist-core",
@@ -10,7 +11,7 @@
     "verify": "npm run build && node verify.mjs",
     "verify:stream": "npm run build && node verify-stream.mjs",
     "capture": "npm run build && node capture.mjs",
-    "verify:all": "npm run build && node verify.mjs && node verify-server.mjs && node verify-stream.mjs && node verify-stream.mjs fixtures/truncated && node verify-mcp.mjs && node verify-image.mjs && node verify-tauri.mjs && node verify-oneline.mjs",
+    "verify:all": "npm run build && node verify.mjs && node verify-server.mjs && node verify-stream.mjs && node verify-stream.mjs fixtures/truncated && node verify-mcp.mjs && node verify-image.mjs && node verify-tauri.mjs && node verify-oneline.mjs && node verify-update.mjs",
     "verify:stream:truncated": "node verify-stream.mjs fixtures/truncated",
     "serve": "npm run build && node server/index.mjs",
     "verify:server": "npm run build && node verify-server.mjs",
@@ -20,24 +21,23 @@
     "verify:image": "node verify-image.mjs",
     "verify:tauri": "node verify-tauri.mjs",
     "verify:oneline": "npm run build && node verify-oneline.mjs",
+    "verify:update": "node verify-update.mjs",
     "prepublishOnly": "npm run build"
   },
-  "dependencies": {
+  "devDependencies": {
     "@fontsource-variable/inter": "^5.3.0",
     "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/cli": "^2.11.4",
     "@tauri-apps/plugin-dialog": "^2.7.2",
     "@tauri-apps/plugin-http": "^2.5.9",
     "@tauri-apps/plugin-opener": "^2.5.4",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7"
-  },
-  "devDependencies": {
-    "@tauri-apps/cli": "^2.11.4",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
     "playwright": "^1.62.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "typescript": "~6.0.2",
     "vite": "^8.1.1"
   },
@@ -52,5 +52,8 @@
     "dist/",
     "dist-core/",
     "README.md"
-  ]
+  ],
+  "engines": {
+    "node": ">=20"
+  }
 }

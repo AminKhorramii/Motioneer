@@ -21,6 +21,10 @@ import path from 'node:path'
 
 const ROOT = path.join(path.dirname(new URL(import.meta.url).pathname), '..')
 const WAIT_MS = Number(process.env.WALL_WAIT_MS ?? 900_000)
+// the one version this package has, told to clients instead of a number nobody bumps
+const VERSION = await readFile(path.join(ROOT, 'package.json'), 'utf8')
+  .then((raw) => JSON.parse(raw).version)
+  .catch(() => '0.0.0')
 
 const send = (msg) => process.stdout.write(JSON.stringify(msg) + '\n')
 const ok = (id, text) => send({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text }] } })
@@ -127,8 +131,14 @@ function openInBrowser(request, at) {
     const give = async (url) => {
       // written down as well as opened, so a browser that did not launch is still reachable
       await writeFile(path.join(at, 'open.txt'), url, 'utf8').catch(() => {})
-      const open = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open'
-      spawn(open, [url], { stdio: 'ignore', detached: true }).unref()
+      // start is a shell builtin rather than a program, so on Windows it has to be run by one
+      const [cmd, args] =
+        process.platform === 'darwin'
+          ? ['open', [url]]
+          : process.platform === 'win32'
+            ? ['cmd', ['/c', 'start', '', url]]
+            : ['xdg-open', [url]]
+      spawn(cmd, args, { stdio: 'ignore', detached: true }).unref()
       resolve({ child, url })
     }
     child.stdout.on('data', (d) => {
@@ -148,7 +158,9 @@ async function design({ brief, name, dir }) {
   // a stale answer from a previous run would resolve instantly and look like this one
   await rm(path.join(at, 'chosen.md'), { force: true })
   const request = path.join(at, 'request.json')
-  await writeFile(request, JSON.stringify({ brief, name }, null, 2), 'utf8')
+  // this file crosses versions: npx keeps this writer current while an installed reader can be
+  // any age, so the shape carries its own number for a reader to refuse rather than misread
+  await writeFile(request, JSON.stringify({ format: 1, brief, name }, null, 2), 'utf8')
 
   const found = findShell()
   let server = null
@@ -242,7 +254,7 @@ process.stdin.on('data', async (chunk) => {
         result: {
           protocolVersion: msg.params?.protocolVersion ?? '2024-11-05',
           capabilities: { tools: {} },
-          serverInfo: { name: 'wall', version: '1.0.0' },
+          serverInfo: { name: 'wall', version: VERSION },
         },
       })
     } else if (msg.method === 'tools/list') {
