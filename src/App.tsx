@@ -4,7 +4,7 @@ import { KIND_LABEL, applyEdit, starterPage, type Kind, type Page } from '@/sect
 import { renderPage } from '@/render'
 import { pageBrief } from '@/brief'
 import {
-  EMPTY_PRODUCT, addSection, alternatives, arrange, canDraw, canWrite, chosen, promptWorlds, setDesigned, cycleVariant, cycleWorld, dropSection, fanOut, illustrate, loadHeldKeys, promptPage, sectionAlternatives, seeded, setMock, type Product,
+  EMPTY_PRODUCT, addSection, alternatives, arrange, readBrief, canDraw, canWrite, chosen, promptWorlds, setDesigned, cycleVariant, cycleWorld, dropSection, fanOut, illustrate, loadHeldKeys, promptPage, sectionAlternatives, seeded, setMock, type Product,
 } from '@/compose'
 import { Onboarding } from '@/Onboarding'
 import { BriefRail } from '@/BriefRail'
@@ -35,6 +35,8 @@ export default function App() {
     () => (localStorage.getItem('wall-onboarded') ? null : 'first'),
   )
   const wheelLock = useRef(0)
+  /** where to write the chosen design, when something launched this window to ask for one */
+  const [askedFrom, setAskedFrom] = useState<string | null>(null)
   const [armed, setArmed] = useState(false)
   // Each fan-out gets a token. Pages from an earlier run keep streaming in after a new one
   // starts, and without this they land on the new wall, which mixes pages built from two
@@ -145,6 +147,25 @@ export default function App() {
   // ask the deployment which keys it holds before anything gates on having one
   useEffect(() => {
     void loadHeldKeys()
+  }, [])
+
+  /**
+   * A brief handed in from outside skips setup entirely. Someone who asked their agent for a
+   * landing page has already said what it is, and asking them again in a different window
+   * would be the worst possible greeting.
+   */
+  useEffect(() => {
+    void host.request().then(async (req) => {
+      if (!req?.brief || !req.dir) return
+      setAskedFrom(req.dir)
+      setOnboarding(null)
+      await loadHeldKeys()
+      const read = canWrite() ? await readBrief(req.brief).catch(() => null) : null
+      const p: Product = read?.product ?? { ...EMPTY_PRODUCT, name: req.name ?? 'Product', oneLiner: req.brief }
+      setProduct(p)
+      build(p, taste)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -275,6 +296,17 @@ export default function App() {
 
   const shipName = (product.name || 'landing').toLowerCase().replace(/\W+/g, '-')
 
+  /** Hand the chosen page back as a spec, a render and the page itself. */
+  async function sendBack() {
+    if (!page || !askedFrom) return
+    const res = await host.handoff(askedFrom, {
+      'chosen.md': pageBrief(page, product.name),
+      'chosen.html': renderPage(page, { title: product.name }),
+      'chosen.json': JSON.stringify({ product, page }, null, 2),
+    })
+    flash(res.error ? `Could not write the handoff: ${res.error}` : 'Sent back. Your agent can pick it up now.')
+  }
+
   return (
     // a durable signal that work is in flight, independent of how it is presented, because
     // hiding the status text once left every harness thinking the wall was finished
@@ -351,6 +383,7 @@ export default function App() {
                 onModel={() => setOnboarding('first')}
                 onGo={(i) => setAt(Math.max(0, Math.min(i, pages.length - 1)))}
                 onWorld={() => setPage(cycleWorld)}
+                onSend={askedFrom ? sendBack : undefined}
                 onOpen={() => void host.preview(renderPage(page, { title: product.name })).then(() => flash('Opened in your browser.'))}
                 onShip={() => void host.exportPage(renderPage(page, { title: product.name }), shipName).then(
                   (r) => r && flash(`${r.file} saved, ${r.bytes.toLocaleString()} bytes.`),

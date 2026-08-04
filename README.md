@@ -236,3 +236,30 @@ the cost.
 
 `npm run verify:server` runs the real server against a recorded upstream in a real browser,
 and asserts the visitor never holds a key.
+
+## Wall as a tool your agent can call
+
+`mcp/index.mjs` is an MCP server with no dependencies. Add it once:
+
+```
+claude mcp add wall -- node /path/to/wall/mcp/index.mjs
+```
+
+Then ask for a landing page. Your agent calls `design` with whatever brief exists, the desktop
+opens with it already filled in and skips setup entirely, you browse a wall of real pages and
+press send back, and the choice returns as a spec.
+
+The spec is what travels, not the file. It carries the tokens once, the world's structural
+decisions, and every section with its copy, so your agent implements the page in your own
+stack rather than handing you a static file to port. The reference render and the page model
+go into `.wall/` beside it.
+
+Three tools:
+
+- `design` opens Wall and waits. A person browsing takes longer than any sensible timeout, so
+  if it gives up the answer is still written to disk.
+- `collect` reads a design chosen after `design` stopped waiting.
+- `check` reports the patterns that make a page look generated, with the reason each matters.
+
+`npm run verify:mcp` speaks the protocol to the real server, launches the real desktop with a
+request file, drives it the way a person would, and reads the handoff back through `collect`.

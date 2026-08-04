@@ -26,6 +26,10 @@ export interface Host {
   onDelta: (fn: (id: string, delta: string) => void) => () => void
   /** one response rather than a stream, returned as a data URL so the page stays one file */
   image: (provider: string, prompt: string, key: string) => Promise<{ dataUrl?: string; error?: string }>
+  /** a brief handed in from outside, when something launched this window to ask for a design */
+  request: () => Promise<{ brief?: string; name?: string; dir?: string } | null>
+  /** write the chosen design back where whoever asked can find it */
+  handoff: (dir: string, files: Record<string, string>) => Promise<{ dir?: string; error?: string }>
 }
 
 const STATE_KEY = 'wall-state'
@@ -65,6 +69,9 @@ const web: Host = {
   stream: (id, provider, system, user, key, opts) =>
     streamText(provider, system, user, key, (delta) => deltaFns.forEach((fn) => fn(id, delta)), opts),
   image: (provider, prompt, key) => generateImage(provider, prompt, key),
+  // a browser cannot be launched by an agent holding a directory, so there is nothing to hand
+  request: async () => null,
+  handoff: async () => ({ error: 'handing off needs the desktop app' }),
   onDelta: (fn) => {
     deltaFns.add(fn)
     return () => deltaFns.delete(fn)

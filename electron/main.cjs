@@ -78,6 +78,35 @@ ipcMain.handle('model:stream', async (e, id, provider, system, user, key, opts) 
   }, opts)
 })
 
+/**
+ * A request from outside, written by the MCP server before it launched this window.
+ *
+ * The handoff is files in a directory rather than a return value, because the agent that
+ * asked may have timed out, moved on, or been restarted by the time someone finishes
+ * choosing, and a file is still there when it comes back.
+ */
+ipcMain.handle('wall:request', async () => {
+  const file = process.env.WALL_REQUEST
+  if (!file) return null
+  try {
+    return { ...JSON.parse(await fs.readFile(file, 'utf8')), dir: path.dirname(file) }
+  } catch {
+    return null
+  }
+})
+
+ipcMain.handle('wall:handoff', async (_e, dir, files) => {
+  try {
+    await fs.mkdir(dir, { recursive: true })
+    for (const [name, body] of Object.entries(files)) {
+      await fs.writeFile(path.join(dir, name), String(body), 'utf8')
+    }
+    return { dir, wrote: Object.keys(files) }
+  } catch (e) {
+    return { error: String(e).slice(0, 200) }
+  }
+})
+
 ipcMain.handle('model:image', async (_e, provider, prompt, key) => {
   const { generateImage } = await import(pathToFileURL(path.join(__dirname, '..', 'shared', 'providers.mjs')).href)
   return generateImage(provider, prompt, key)

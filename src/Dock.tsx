@@ -23,13 +23,15 @@ interface Props {
   onGo: (i: number) => void
   onModel: () => void
   onWorld: () => void
+  /** present only when something asked for this design, which is what makes it the main act */
+  onSend?: () => void
   onOpen: () => void
   onShip: () => void
 }
 
 export function Dock({
   at, count, angle, world, bar, busy,
-  onBar, onRun, onGo, onModel, onWorld, onOpen, onShip,
+  onBar, onRun, onGo, onModel, onWorld, onSend, onOpen, onShip,
 }: Props) {
   return (
     <div className="dock">
@@ -63,6 +65,11 @@ export function Dock({
         </button>
         <span className="spacer" />
         <button title="open this page in your browser" onClick={onOpen}>full view</button>
+        {onSend && (
+          <button className="go" title="write this design back for the agent that asked" onClick={onSend}>
+            send back
+          </button>
+        )}
         <button className="go" title="write this page out as one HTML file" onClick={onShip}>
           <Icon.ship /> download
         </button>
