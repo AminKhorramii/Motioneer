@@ -13,6 +13,7 @@ import { useEffect, useState } from 'react'
  */
 
 const DESIGNING = [
+  'Reading your brief.',
   'Looking for eight different ways to build this.',
   'Borrowing from receipts, timetables and wall labels.',
   'Deciding what each page should leave out.',

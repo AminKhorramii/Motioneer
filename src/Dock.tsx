@@ -57,8 +57,8 @@ export function Dock({
         {/* the return key already does this, so the button is the same key drawn small: it
             appears only when there is something to ask for, and says the rest in its tooltip */}
         {bar.trim() && (
-          <button className="run" onClick={onRun} disabled={busy} aria-label="make three variants"
-            title="make three variants of this page">
+          <button className="run" onClick={onRun} disabled={busy} aria-label="rewrite this page"
+            title="rewrite this page and keep the one you have">
             <Icon.enter />
           </button>
         )}

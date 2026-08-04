@@ -174,6 +174,10 @@ export default function App() {
       if (!localStorage.getItem('wall-model')) choose('claude-code')
       setAskedFrom(req.dir)
       setOnboarding(null)
+      // Reading the brief takes a model call of its own, and until now nothing said so: the
+      // setup screen had closed and the wall had not started, so the screen fell through to the
+      // message for someone who never described anything.
+      setBuilding({ arrived: null, landed: [] })
       await loadHeldKeys()
       const read = canWrite() ? await readBrief(req.brief).catch(() => null) : null
       const p: Product = read?.product ?? { ...EMPTY_PRODUCT, name: req.name ?? 'Product', oneLiner: req.brief }
@@ -277,11 +281,11 @@ export default function App() {
       flash(`Add a ${chosen().label} key to write copy with a model.`)
       return
     }
-    setBusy(`Writing three variants with ${chosen().label}.`)
+    setBusy(`Rewriting this page with ${chosen().label}.`)
     // streamed pages land at the end of the wall, so remember where the new run starts
     const firstNew = pages.length
     const made = await Promise.all(
-      [0, 1, 2].map(() =>
+      [0].map(() =>
         promptPage(page, instruction, product, 'model', upsertPage)
           .catch((e: unknown) => String(e instanceof Error ? e.message : e).slice(0, 160)),
       ),
@@ -296,7 +300,7 @@ export default function App() {
     good.forEach(upsertPage)
     setAt(firstNew)
     setBar('')
-    flash(`${good.length} variants ready. Use the arrow keys to compare them.`)
+    flash('A new page is waiting to the right.')
   }
 
   /** Draw the image for one section. It lands in the page content, so it ships with the file. */
@@ -514,10 +518,13 @@ export default function App() {
           </main>
         )}
 
-        {!page && view === 'studio' && !onboarding && (
+        {/* only when there is genuinely nothing happening: while a wall is being made the
+            skeleton is already saying so, and both at once made the skeleton look like a
+            decoration on top of a dead app */}
+        {!page && !building && view === 'studio' && !onboarding && (
           <main className="empty">
             <p>There is no page yet.</p>
-            <p className="dim">Open the brief, describe the product, then press new alternatives.</p>
+            <p className="dim">Open the brief, describe the product, then press write a new wall.</p>
           </main>
         )}
       </div>
