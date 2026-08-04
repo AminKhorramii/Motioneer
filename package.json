@@ -1,7 +1,10 @@
 {
   "name": "wall-mcp",
-  "description": "Twelve landing pages, then one. A wall of complete pages to compare, choose from, and hand back to your agent as a spec.",
-  "repository": "github:AminKhorramii/Wall",
+  "description": "A wall of complete landing pages to compare, choose from, and hand back to your agent as a spec. Runs on the Claude you already have.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AminKhorramii/Wall.git"
+  },
   "version": "0.1.0",
   "scripts": {
     "build": "tsc -b && vite build && vite build --ssr src/core.ts --outDir dist-core",
@@ -55,5 +58,16 @@
   ],
   "engines": {
     "node": ">=20"
-  }
+  },
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "claude",
+    "claude-code",
+    "landing-page",
+    "design",
+    "ai",
+    "agent"
+  ],
+  "homepage": "https://wall.bsct.so"
 }
