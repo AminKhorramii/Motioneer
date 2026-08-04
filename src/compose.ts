@@ -573,6 +573,7 @@ structure.numbered: numbers in the margin beside each section.
 structure.bleed: sections run edge to edge rather than sitting in a column.
 structure.measure: 44 to 82 characters per line. This is the single biggest lever on how a page reads.
 structure.figure: framed, bleed or plain.
+structure.rhythm: 4 to 8 padding multipliers between 0.4 and 3, cycled down the page, like [2.4, 0.8, 1.6, 0.6]. Adjacent sections must not breathe the same: a page with equal air everywhere reads as one treatment applied to all content, where a sparse beat against a dense one reads as paced.
 backdrop: none, contours, grain or ridge. Drawn behind the page from the palette.
 prefer: which layout each section wears, as {"hero":0-3,"logos":0-1,"features":0-2,"showcase":0-1,"quote":0-1,"pricing":0-1,"faq":0-1,"cta":0-1}. Keep them agreeing with each other: a page where every section picked differently reads as a shuffle rather than a design.
 sections: which sections the page is made of and in what order, as a list from hero, logos, features, showcase, quote, pricing, faq, cta, footer. Four to nine of them, repeats allowed. This is the shape of the page and it is yours to decide: a receipt is an itemised list and a total, not a testimonial and a pricing grid; a poster is a headline and one action; a field manual is mostly features and questions. Leave out anything the idea does not need, including the hero.

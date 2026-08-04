@@ -88,6 +88,10 @@ export const WORLDS: World[] = [
     // a numbered list is more swiss than a row of cards, and the grid has no closing band
     prefer: { hero: 2, features: 2, showcase: 0, quote: 0, pricing: 0, faq: 0 },
     compose: ['hero', 'features', 'showcase', 'pricing', 'faq', 'footer'],
+    // the one move: the folio of the opening section set enormous and almost gone.
+    // One committed move per world, because restraint plus commitment is what reads as
+    // designed, where several small flourishes read as generated.
+    css: `section:first-of-type>.wrap::before{font-size:9rem;opacity:.08;left:-.5rem;top:-3.2rem;letter-spacing:-.04em;color:var(--ink);font-weight:700}`,
   },
   {
     id: 'editorial',
@@ -100,6 +104,8 @@ export const WORLDS: World[] = [
     prefer: { hero: 2, features: 1, showcase: 1, quote: 0, pricing: 1, faq: 1, cta: 0 },
     // a read: the argument, one witness, the substance, proof it exists, and a quiet close
     compose: ['hero', 'quote', 'features', 'showcase', 'pricing', 'faq', 'cta', 'footer'],
+    // the one move: a masthead slug above the headline, the way a periodical opens
+    css: `#hero h1::before{content:'';display:block;width:2.4ch;height:4px;background:var(--accent);margin-bottom:1.6rem}`,
   },
   {
     id: 'terminal',
@@ -112,6 +118,10 @@ export const WORLDS: World[] = [
     // documentation does not testimonial: numbered features, no quote, no closing band
     prefer: { hero: 3, features: 2, showcase: 0, pricing: 0, faq: 0 },
     compose: ['hero', 'features', 'showcase', 'faq', 'pricing', 'footer'],
+    // the one move: the feature list prints inverted, a band of light in a dark page
+    css: `#features{background:var(--ink);color:var(--bg)}
+#features h2,#features h3{color:var(--bg)}
+#features p{color:color-mix(in srgb,var(--bg) 72%,var(--ink))}`,
   },
   {
     id: 'poster',
@@ -124,6 +134,8 @@ export const WORLDS: World[] = [
     prefer: { hero: 2, showcase: 1, quote: 0, cta: 1 },
     // five sections. A poster is what it leaves out, and the whitespace is the design
     compose: ['hero', 'showcase', 'quote', 'cta', 'footer'],
+    // the one move: the headline at the size of the wall, tighter than body type ever sits
+    css: `#hero h1{font-size:clamp(3.6rem,11.5vw,9.5rem)!important;line-height:.94!important;letter-spacing:-.045em;max-width:none!important;margin-left:-.05em}`,
   },
   {
     id: 'catalogue',
@@ -136,6 +148,8 @@ export const WORLDS: World[] = [
     // everything, listed: the one world that keeps all nine sections, set dense
     prefer: { hero: 1, features: 2, showcase: 0, quote: 1, pricing: 0, faq: 0, cta: 1, logos: 1 },
     compose: ['hero', 'logos', 'features', 'showcase', 'quote', 'pricing', 'faq', 'cta', 'footer'],
+    // the one move: double rules between sections, the way a ledger separates its entries
+    css: `section+section{border-top:4px double var(--line)!important}`,
   },
   {
     id: 'soft',
@@ -147,6 +161,8 @@ export const WORLDS: World[] = [
     backdrop: 'grain',
     prefer: { hero: 0, features: 1, showcase: 1, quote: 0, pricing: 1, faq: 1, cta: 0, logos: 1 },
     compose: ['hero', 'logos', 'features', 'showcase', 'quote', 'pricing', 'cta', 'footer'],
+    // the one move: the opening sits on its own tinted band, so the page has a shoreline
+    css: `#hero{background:var(--surface)}`,
   },
 ]
 
