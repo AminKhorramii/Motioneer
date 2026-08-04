@@ -206,6 +206,7 @@ button:disabled { opacity: 0.32; pointer-events: none; }
 }
 .filmbar button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.06); color: var(--ink); }
 .filmbar button:disabled { color: var(--dim2); opacity: 0.5; }
+.filmbar .pin.on { color: var(--accent); }
 .filmbar .angle {
   font-size: 11px; color: var(--ink2);
   padding-left: 0.55rem; border-left: 1px solid var(--hair2);
@@ -281,7 +282,7 @@ button:disabled { opacity: 0.32; pointer-events: none; }
   transition: box-shadow var(--t), transform 200ms cubic-bezier(0.2, 0.8, 0.3, 1.1);
 }
 .cell:hover { transform: translateY(-2px); box-shadow: 0 0 0 1px var(--hair2), 0 14px 34px rgba(0, 0, 0, 0.5); }
-.cell.pinned { box-shadow: 0 0 0 1px var(--accent), 0 14px 34px rgba(0, 0, 0, 0.5); }
+.cell.on { box-shadow: 0 0 0 1px var(--accent), 0 14px 34px rgba(0, 0, 0, 0.5); }
 .preview { position: absolute; inset: 0; overflow: hidden; }
 .cell iframe { border: 0; transform-origin: top left; pointer-events: none; display: block; }
 .cellbar {
@@ -290,9 +291,21 @@ button:disabled { opacity: 0.32; pointer-events: none; }
   background: linear-gradient(transparent, rgba(6, 7, 9, 0.92) 45%);
   opacity: 0; transition: opacity var(--t);
 }
-.cell:hover .cellbar, .cell.pinned .cellbar { opacity: 1; }
+.cell:hover .cellbar, .cell.on .cellbar, .cell.pinned .cellbar { opacity: 1; }
 .cellbar .arch { color: var(--ink2); }
 .cellbar .tname { color: var(--dim2); }
+/* a pinned cell says so all the time, because the mark is the memory of a pass already made */
+.cellbar .kept { margin-left: auto; color: var(--accent); }
+
+/* removing is done while looking, so the control lives on the cell and only under the cursor */
+.cell .cull {
+  position: absolute; top: 8px; right: 8px; display: grid; place-items: center;
+  width: 26px; height: 26px; border: none; border-radius: 7px;
+  background: rgba(6, 7, 9, 0.82); color: var(--dim); opacity: 0;
+  transition: opacity var(--t), color var(--t), background var(--t);
+}
+.cell:hover .cull { opacity: 1; }
+.cell .cull:hover { background: rgba(255, 255, 255, 0.1); color: var(--ink); }
 
 .empty { flex: 1; display: grid; place-content: center; text-align: center; padding: 3rem; gap: 0.4rem; }
 .empty p { color: var(--ink2); font-size: 14px; }

@@ -42,6 +42,10 @@ export default function App() {
   // starts, and without this they land on the new wall, which mixes pages built from two
   // different bases.
   const run = useRef(0)
+  // Triage. A removed page goes to the graveyard rather than away, so z brings it back, and
+  // its id stays refused so a page still streaming in cannot reappear after being turned away.
+  const graveyard = useRef<{ page: Page; index: number }[]>([])
+  const buried = useRef(new Set<string>())
 
   const page = pages[at] ?? null
 
@@ -58,6 +62,8 @@ export default function App() {
     setArmed(false)
     setPages([])
     setAt(0)
+    graveyard.current = []
+    buried.current.clear()
     setProduct(EMPTY_PRODUCT)
     setSelected(null)
     void host.writeState(null)
@@ -75,6 +81,7 @@ export default function App() {
 
   /** Put a streaming page on the wall, replacing it in place once it already has an id there. */
   const upsertPage = useCallback((page: Page) => {
+    if (buried.current.has(page.id)) return
     setPages((all) => {
       const i = all.findIndex((x) => x.id === page.id)
       if (i < 0) return [...all, page]
@@ -91,6 +98,9 @@ export default function App() {
    */
   const fill = useCallback(async (base: Page, p: Product) => {
     const mine = ++run.current
+    // a new wall is a new triage
+    graveyard.current = []
+    buried.current.clear()
     // the base page is kept so there is something to compare against, but it is not shown
     // while the wall is being made: an unwritten page looks like a finished one until you read
     // it, and the skeleton says plainly that nothing has arrived
@@ -204,12 +214,17 @@ export default function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement)?.matches?.('input, textarea') || onboarding) return
+      if (e.metaKey || e.ctrlKey || e.altKey) return
       if (e.key === 'ArrowRight') setAt((v) => Math.min(v + 1, pages.length - 1))
       if (e.key === 'ArrowLeft') setAt((v) => Math.max(v - 1, 0))
+      // triage: narrowing eight to one is a keyboard pass, not a mouse deliberation
+      if (e.key === 'p') pin()
+      if (e.key === 'x') kill(at)
+      if (e.key === 'z') revive()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [pages.length, onboarding])
+  })
 
   const onWheel = (e: React.WheelEvent) => {
     if (Math.abs(e.deltaX) < 22 || Math.abs(e.deltaX) < Math.abs(e.deltaY)) return
@@ -220,6 +235,39 @@ export default function App() {
   }
 
   const setPage = (fn: (p: Page) => Page) => setPages((all) => all.map((p, i) => (i === at ? fn(p) : p)))
+
+  /** Pin the paper in the middle and step on. Flagging is a pass over the wall, so pinning and
+      releasing both advance rather than leaving you parked on a page already judged. */
+  function pin() {
+    if (!page) return
+    setPage((p) => ({ ...p, pinned: !p.pinned }))
+    setAt((v) => Math.min(v + 1, pages.length - 1))
+  }
+
+  function kill(i: number) {
+    const p = pages[i]
+    if (!p) return
+    if (p.pinned) return flash('This page is pinned. Press p to release it before removing it.')
+    if (pages.length < 2) return flash('The last page stays, so the wall is never empty.')
+    graveyard.current.push({ page: p, index: i })
+    buried.current.add(p.id)
+    setPages((all) => all.filter((x) => x.id !== p.id))
+    if (i < at) setAt(at - 1)
+    else if (i === at && i === pages.length - 1) setAt(Math.max(0, i - 1))
+    flash('Removed. Press z to bring it back.')
+  }
+
+  function revive() {
+    const g = graveyard.current.pop()
+    if (!g) return flash('Nothing has been removed.')
+    buried.current.delete(g.page.id)
+    setPages((all) => {
+      const i = Math.min(g.index, all.length)
+      return [...all.slice(0, i), g.page, ...all.slice(i)]
+    })
+    setAt(Math.min(g.index, pages.length))
+    flash('Back on the wall.')
+  }
 
   async function runBar() {
     const instruction = bar.trim()
@@ -391,10 +439,13 @@ export default function App() {
               </div>
               <Dock
                 at={at} count={pages.length} angle={page.angle} world={page.world} bar={bar} busy={!!busy}
+                pinned={!!page.pinned}
                 onBar={setBar} onRun={runBar}
                 onModel={() => setOnboarding('first')}
                 onGo={(i) => setAt(Math.max(0, Math.min(i, pages.length - 1)))}
                 onWorld={() => setPage(cycleWorld)}
+                onPin={pin}
+                onKill={() => kill(at)}
                 onSend={askedFrom ? sendBack : undefined}
                 onOpen={() => void host.preview(renderPage(page, { title: product.name })).then(() => flash('Opened in your browser.'))}
                 onShip={() => void host.exportPage(renderPage(page, { title: product.name }), shipName).then(
@@ -427,11 +478,20 @@ export default function App() {
         {view === 'wall' && (
           <main className="grid">
             {pages.map((p, i) => (
-              <div key={p.id} className={`cell ${i === at ? 'pinned' : ''}`} onClick={() => { setAt(i); setView('studio') }}>
+              <div key={p.id} className={`cell ${i === at ? 'on' : ''}${p.pinned ? ' pinned' : ''}`}
+                onClick={() => { setAt(i); setView('studio') }}>
                 <Preview html={renderPage(p, { title: product.name })} />
+                {/* elimination is the grid's other act: drop a cell and the survivors spread
+                    out, so eight become one by removing rather than by staring */}
+                {!p.pinned && pages.length > 1 && (
+                  <button className="cull" aria-label="remove this page"
+                    title="take this page off the wall. z brings it back."
+                    onClick={(e) => { e.stopPropagation(); kill(i) }}><Icon.x /></button>
+                )}
                 <div className="cellbar">
                   <span className="arch">{p.sections.filter((s) => s.on).length} sections</span>
                   <span className="tname">{p.taste.name}</span>
+                  {p.pinned && <span className="kept">pinned</span>}
                 </div>
               </div>
             ))}

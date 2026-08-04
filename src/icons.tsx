@@ -10,6 +10,8 @@ const S = ({ children, size = 14 }: { children: React.ReactNode; size?: number }
 export const Icon = {
   left: () => <S><path d="M10 3 5 8l5 5" /></S>,
   right: () => <S><path d="M6 3l5 5-5 5" /></S>,
+  x: () => <S><path d="M4 4l8 8M12 4l-8 8" /></S>,
+  pin: () => <S><path d="M6 2.5h4M7 2.8v3L4.5 8.3h7L9 5.8v-3M8 8.5V13" /></S>,
   cycle: () => <S><path d="M13 7a5 5 0 1 0-.6 3.4M13 3.5V7h-3.4" /></S>,
   shown: () => <S><path d="M1.6 8S4 4 8 4s6.4 4 6.4 4-2.4 4-6.4 4-6.4-4-6.4-4Z" /><circle cx="8" cy="8" r="1.7" /></S>,
   hidden: () => <S><path d="M2 2l12 12M6.3 6.4A2 2 0 0 0 8 10a2 2 0 0 0 1.6-.8M4.2 4.7C2.6 5.9 1.6 8 1.6 8s2.4 4 6.4 4c1.2 0 2.2-.3 3.1-.8M9.4 4.2A6.7 6.7 0 0 0 8 4" /></S>,
