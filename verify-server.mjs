@@ -46,7 +46,8 @@ await page.goto(`http://127.0.0.1:${PORT}/`)
 await page.waitForSelector('.onboard .card', { timeout: 20000 })
 
 // the visitor holds no key, and the app must still offer the described path
-await page.evaluate(() => document.querySelector('.onboard .pick')?.click())
+await page.evaluate(() => [...document.querySelectorAll('.onboard .pick')]
+  .find((b) => b.getAttribute('aria-label') === 'Claude')?.click())
 await page.click('.onboard .primary')
 await page.waitForSelector('.onboard .tell', { timeout: 10000 })
 const offered = await page.evaluate(() => ({

@@ -20,7 +20,8 @@ const { page, errors, close } = await openApp({ env: { WALL_API_BASE: url } })
 await page.waitForSelector('.onboard .card', { timeout: 20000 })
 await page.evaluate(() => localStorage.setItem('wall-key-anthropic', 'test-key'))
 // setup is two steps now: the model, then the brief where the sample lives
-await page.evaluate(() => document.querySelector('.onboard .pick')?.click())
+await page.evaluate(() => [...document.querySelectorAll('.onboard .pick')]
+  .find((b) => b.getAttribute('aria-label') === 'Claude')?.click())
 await page.click('.onboard .primary')
 await page.waitForSelector('.sample', { timeout: 10000 })
 await page.click('.sample')
