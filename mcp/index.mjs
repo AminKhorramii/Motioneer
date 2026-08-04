@@ -45,7 +45,10 @@ const TOOLS = [
         name: { type: 'string', description: 'Product name, if it is known.' },
         dir: {
           type: 'string',
-          description: 'Working directory to write the handoff into. Defaults to the current one.',
+          description:
+            'Absolute path of the project this design is for. Always pass it. This server runs ' +
+            'as its own process and its working directory is not necessarily the project you ' +
+            'are in, so leaving it out can write the handoff somewhere nobody looks.',
         },
       },
       required: ['brief'],
@@ -58,7 +61,9 @@ const TOOLS = [
       'out and the person has since picked one.',
     inputSchema: {
       type: 'object',
-      properties: { dir: { type: 'string', description: 'The directory design() was given.' } },
+      properties: {
+        dir: { type: 'string', description: 'The absolute project path design() was given.' },
+      },
     },
   },
   {
@@ -166,14 +171,16 @@ async function call(name, args, id) {
     }
     return ok(
       id,
-      `A design was chosen. Implement it in this project's own stack rather than copying the ` +
-        `reference file: the spec below carries the tokens, the structure and every word.\n\n` +
-        `Reference render: ${got.html}\n\n${got.spec}`,
+      `A design was chosen and written to ${got.at}. Implement it in this project's own stack ` +
+        `rather than copying the reference file: the spec below carries the tokens, the ` +
+        `structure and every word.\n\nReference render: ${got.html}\n\n${got.spec}`,
     )
   }
   if (name === 'collect') {
     const got = await readChosen(args?.dir)
-    return got ? ok(id, got.spec) : fail(id, 'Nothing has been chosen yet.')
+    return got
+      ? ok(id, `Chosen design, from ${got.at}.\n\n${got.spec}`)
+      : fail(id, `Nothing has been chosen yet in ${handoffDir(args?.dir)}.`)
   }
   if (name === 'check') return ok(id, await check(String(args?.html ?? '')))
   return fail(id, `unknown tool: ${name}`)

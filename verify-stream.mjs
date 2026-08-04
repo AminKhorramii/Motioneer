@@ -138,16 +138,25 @@ const image = await page.evaluate(() => {
 })
 console.log('image drawn:', JSON.stringify(image))
 
+// The image arrives as PNG and is stored as JPEG, because the pipeline re-encodes it before it
+// reaches page content. Asserting the stored format is asserting the pipeline ran.
 const shipped = await page.evaluate(() => {
   const html = document.querySelector('.paper.here iframe').contentDocument.documentElement.outerHTML
-  const m = html.match(/data:image\/png;base64,([A-Za-z0-9+/=]+)/)
-  return { bytes: html.length, external: /src="http|href="http/.test(html), b64: m?.[1]?.slice(0, 64) ?? null }
+  const m = html.match(/data:image\/(png|jpeg);base64,([A-Za-z0-9+/=]+)/)
+  return {
+    bytes: html.length,
+    external: /src="http|href="http/.test(html),
+    format: m?.[1] ?? null,
+    b64: m?.[2]?.slice(0, 64) ?? null,
+  }
 })
 const raw = shipped.b64 ? Buffer.from(shipped.b64, 'base64') : Buffer.alloc(0)
 console.log('image in page:', JSON.stringify({
   pageBytes: shipped.bytes,
   noExternalRefs: !shipped.external,
-  decodesAsPng: raw.slice(1, 4).toString() === 'PNG',
+  storedAs: shipped.format,
+  shrunkBeforeStoring: shipped.format === 'jpeg',
+  decodesAsJpeg: raw[0] === 0xff && raw[1] === 0xd8 && raw[2] === 0xff,
 }))
 
 console.log('written wall toast:', JSON.stringify(await page.evaluate(() => document.querySelector('.toast')?.textContent ?? null)))
