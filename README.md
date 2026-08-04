@@ -5,6 +5,10 @@
 Generating a page is solved. What nobody gives you is *many at once*, live, side by side —
 which is how design decisions are actually made. WALL's one act is **compare and choose**.
 
+Docs: [flows](docs/flows.md) (every path through the app, and the code that carries it) ·
+[architecture](docs/architecture.md) (the module map and the boundaries) ·
+[landing page prompt](docs/landing-page-prompt.md) (a brief for Wall's own marketing page).
+
 ## The look
 
 Linear/Framer discipline: **Inter Variable** bundled (offline, no CDN), hairlines instead

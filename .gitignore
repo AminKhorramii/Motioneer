@@ -4,3 +4,10 @@ shots/
 .DS_Store
 *.log
 dist-core/
+
+# nothing that carries a key, and nothing a build wrote
+.env
+.env.*
+*.local
+*.tsbuildinfo
+.wall-test-key
