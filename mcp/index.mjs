@@ -87,6 +87,28 @@ async function readChosen(dir) {
   }
 }
 
+/**
+ * Which desktop to open.
+ *
+ * The Tauri build is the product, so it comes first; the Electron one is what the suites can
+ * drive and stays as a fallback. The binary is spawned rather than opened by bundle, because
+ * `open` does not carry environment through and the request path travels that way.
+ */
+function findShell() {
+  const tries = [
+    process.env.WALL_APP,
+    path.join(ROOT, 'src-tauri/target/release/bundle/macos/Wall.app/Contents/MacOS/wall'),
+    path.join(ROOT, 'src-tauri/target/release/wall'),
+    path.join(ROOT, 'src-tauri/target/debug/wall'),
+  ].filter(Boolean)
+  for (const at of tries) if (existsSync(at)) return { cmd: at, args: [], shell: 'tauri' }
+  try {
+    return { cmd: require('electron'), args: [ROOT], shell: 'electron' }
+  } catch {
+    return null
+  }
+}
+
 /** Launch the desktop app with the brief in hand, and wait for a design to appear on disk. */
 async function design({ brief, name, dir }) {
   const at = handoffDir(dir)
@@ -96,7 +118,9 @@ async function design({ brief, name, dir }) {
   const request = path.join(at, 'request.json')
   await writeFile(request, JSON.stringify({ brief, name }, null, 2), 'utf8')
 
-  const child = spawn(require('electron'), [ROOT], {
+  const found = findShell()
+  if (!found) return { noShell: true, at }
+  const child = spawn(found.cmd, found.args, {
     env: { ...process.env, WALL_REQUEST: request },
     stdio: 'ignore',
     detached: true,
@@ -124,6 +148,14 @@ async function check(html) {
 async function call(name, args, id) {
   if (name === 'design') {
     const got = await design(args ?? {})
+    if (got?.noShell) {
+      return fail(
+        id,
+        'No Wall desktop app was found. Build one with `npm run app:bundle` for the packaged ' +
+          'app, or `npm run app` to run it from source, then call design again. The brief is ' +
+          `already written to ${path.join(got.at, 'request.json')} and will be picked up.`,
+      )
+    }
     if (!got) {
       return fail(
         id,

@@ -1,70 +1,25 @@
-import { _electron } from 'playwright'
-import { createRequire } from 'node:module'
-import { mkdtempSync, rmSync, readFileSync, existsSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+/**
+ * The app, driven end to end in a real browser.
+ *
+ * It used to launch Electron, which made the one shell that could be driven also the only shell
+ * under test. It now opens the built dist the way any visitor does, so the suite proves the app
+ * rather than a shell, and the desktop shells are checked for agreement with it separately:
+ * verify-tauri.mjs statically, and the Rust suite for the commands only a desktop can answer.
+ */
+import { readFile } from 'node:fs/promises'
+import { openApp, useMock } from './harness.mjs'
 
-const electronPath = createRequire(import.meta.url)('electron')
-const OUT = process.env.OUT ?? '/private/tmp/claude-501/-Users-developer-Documents-code-side/1b19a499-5192-4808-9d84-e84eb6269c88/scratchpad'
-const dataDir = mkdtempSync(join(tmpdir(), 'wall-'))
-const exportDir = mkdtempSync(join(tmpdir(), 'wall-out-'))
+const OUT = process.env.OUT ?? '/tmp'
+const REAL = (process.env.WALL_KEY ?? '').trim()
 
-const app = await _electron.launch({
-  executablePath: electronPath,
-  args: ['.'],
-  env: { ...process.env, WALL_DATA: dataDir, WALL_TEST: '1', WALL_EXPORT_DIR: exportDir },
-})
-const page = await app.firstWindow()
-const errors = []
-page.on('pageerror', (e) => errors.push(String(e).slice(0, 200)))
-page.on('console', (m) => m.type() === 'error' && errors.push(m.text().slice(0, 200)))
-await page.waitForTimeout(1800)
+const { page, errors, close } = await openApp()
 
 // ——— 1. brief → a page with sections, alternatives either side ———
 // onboarding is the first thing a new user sees, so assert it before anything else
 await page.waitForSelector('.onboard .card', { timeout: 20000 })
-// With WALL_KEY set this drives the real streaming API. Without it a mock stands in, fed
-// through the same partial parser, so the suite runs offline and in CI either way.
-const REAL = (process.env.WALL_KEY ?? '').trim()
 console.log('model:', REAL ? 'live Claude' : 'mock')
-await page.evaluate((key) => {
-  localStorage.setItem('wall-key-anthropic', key || 'test-key')
-  if (key) return
-  window.__wall.setMock((instruction, shape) => instruction === 'worlds' ? {
-    worlds: Array.from({ length: 8 }, (_, i) => ({
-      name: ['wall label', 'field manual', 'night edition', 'receipt', 'broadsheet', 'sign system', 'zine', 'gallery card'][i],
-      note: 'a made world', voice: 'Write plainly.',
-      display: ['sans', 'grotesk', 'serif', 'mono'][i % 4], body: ['sans', 'grotesk', 'serif', 'mono'][(i + 2) % 4],
-      scale: 1.15 + i * 0.06, weight: 300 + i * 60, radius: i * 3, density: 0.3 + i * 0.07,
-      caps: i % 3 === 0, palette: ['as-is', 'mono', 'tinted', 'contrast'][i % 4],
-      backdrop: ['none', 'contours', 'grain', 'ridge'][i % 4],
-      structure: { rules: i % 2 === 0, numbered: i % 3 === 0, bleed: i % 4 === 0, measure: 46 + i * 4, figure: ['framed', 'bleed', 'plain'][i % 3] },
-      prefer: { hero: i % 4, features: i % 3 },
-      sections: [['hero', 'features', 'cta', 'footer'], ['hero', 'quote', 'pricing', 'footer'], ['features', 'faq', 'footer'],
-        ['hero', 'logos', 'showcase', 'cta', 'footer'], ['hero', 'features', 'features', 'footer'], ['hero', 'pricing', 'faq', 'cta', 'footer'],
-        ['quote', 'features', 'footer'], ['hero', 'logos', 'features', 'showcase', 'quote', 'pricing', 'faq', 'cta', 'footer']][i],
-      css: `section#hero .wrap{border:1px solid var(--line)} .eyebrow{letter-spacing:.${i}em}`,
-    })),
-  } : instruction === 'intake' ? {
-    product: {
-      name: 'Spoor',
-      oneLiner: 'Every session you ever ran, findable in one keystroke.',
-      what: String(shape).slice(0, 80),
-      audience: '',
-      cta: 'Download for macOS',
-    },
-    questions: [{ key: 'audience', question: 'Who specifically is this for?', why: 'the page needs a reader' }],
-  } : ({
-    sections: shape.map((s) => ({
-      id: s.id,
-      content: Object.fromEntries(
-        Object.entries(s.content).map(([k, v]) => [
-          k, typeof v === 'string' ? `${instruction.match(/"([^"]+)"/)?.[1] ?? instruction.slice(0, 14)} | ${v}` : v,
-        ]),
-      ),
-    })),
-  }))
-}, REAL)
+if (REAL) await page.evaluate((k) => localStorage.setItem('wall-key-anthropic', k), REAL)
+else await useMock(page)
 const onboard = await page.evaluate(() => ({
   steps: [...document.querySelectorAll('.onboard .steps button')].map((b) => b.textContent.trim()),
   heading: document.querySelector('.onboard h2')?.textContent,
@@ -106,7 +61,14 @@ const watch = setInterval(async () => {
 }, REAL ? 900 : 60)
 await page.waitForFunction(() => /of 9$/.test(document.querySelector('.filmbar span')?.textContent ?? ''), null, { timeout: REAL ? 180000 : 20000 })
 clearInterval(watch)
-console.log('streamed in:', JSON.stringify({ samples: [...new Set(growth.filter(Boolean))] }))
+// A mock answers faster than this can sample, so an empty result here means the sampler missed
+// rather than that nothing arrived progressively. Say which, because a check that reports
+// nothing and reads as a pass is worse than no check. verify-stream.mjs proves arrival properly,
+// against a real stream replayed at its recorded pace.
+const samples = [...new Set(growth.filter(Boolean))]
+console.log('streamed in:', JSON.stringify(
+  samples.length ? { samples } : { samples: [], note: 'too fast to sample under the mock, see verify-stream' },
+))
 // every paper must be its own written page, so headlines have to differ across the wall
 const wall = await page.evaluate(async () => {
   const seen = new Set(), angles = []
@@ -190,41 +152,7 @@ console.log('brief:', JSON.stringify({
 
 
 // ——— 5. the prompt bar makes variants (mocked model) ———
-await page.evaluate(() => {
-  localStorage.setItem('wall-key-anthropic', 'test-key')
-  window.__wall.setMock((instruction, shape) => instruction === 'worlds' ? {
-    worlds: Array.from({ length: 8 }, (_, i) => ({
-      name: ['wall label', 'field manual', 'night edition', 'receipt', 'broadsheet', 'sign system', 'zine', 'gallery card'][i],
-      note: 'a made world', voice: 'Write plainly.',
-      display: ['sans', 'grotesk', 'serif', 'mono'][i % 4], body: ['sans', 'grotesk', 'serif', 'mono'][(i + 2) % 4],
-      scale: 1.15 + i * 0.06, weight: 300 + i * 60, radius: i * 3, density: 0.3 + i * 0.07,
-      caps: i % 3 === 0, palette: ['as-is', 'mono', 'tinted', 'contrast'][i % 4],
-      backdrop: ['none', 'contours', 'grain', 'ridge'][i % 4],
-      structure: { rules: i % 2 === 0, numbered: i % 3 === 0, bleed: i % 4 === 0, measure: 46 + i * 4, figure: ['framed', 'bleed', 'plain'][i % 3] },
-      prefer: { hero: i % 4, features: i % 3 },
-      sections: [['hero', 'features', 'cta', 'footer'], ['hero', 'quote', 'pricing', 'footer'], ['features', 'faq', 'footer'],
-        ['hero', 'logos', 'showcase', 'cta', 'footer'], ['hero', 'features', 'features', 'footer'], ['hero', 'pricing', 'faq', 'cta', 'footer'],
-        ['quote', 'features', 'footer'], ['hero', 'logos', 'features', 'showcase', 'quote', 'pricing', 'faq', 'cta', 'footer']][i],
-      css: `section#hero .wrap{border:1px solid var(--line)} .eyebrow{letter-spacing:.${i}em}`,
-    })),
-  } : instruction === 'intake' ? {
-    product: {
-      name: 'Spoor',
-      oneLiner: 'Every session you ever ran, findable in one keystroke.',
-      what: String(shape).slice(0, 80),
-      audience: '',
-      cta: 'Download for macOS',
-    },
-    questions: [{ key: 'audience', question: 'Who specifically is this for?', why: 'the page needs a reader' }],
-  } : ({
-    sections: shape.map((s) => ({
-      id: s.id,
-      content: Object.fromEntries(
-        Object.entries(s.content).map(([k, v]) => [k, typeof v === 'string' ? `${v} [${instruction}]` : v]),
-      ),
-    })),
-  }))
-})
+if (!REAL) await useMock(page)
 const countBefore = await page.evaluate(() => document.querySelector('.filmbar span').textContent)
 await page.fill('.bar', 'punchier')
 await page.press('.bar', 'Enter')
@@ -237,11 +165,15 @@ console.log('prompt bar:', JSON.stringify({ before: countBefore, ...variants }))
 await page.screenshot({ path: `${OUT}/wall-variants.png` })
 
 // ——— 6. ship ———
-await page.evaluate(() => [...document.querySelectorAll('.filmbar button')].find((b) => b.textContent.includes('download')).click())
-await page.waitForTimeout(1400)
-const file = join(exportDir, 'pers-impressions')
-const shipped = existsSync(join(exportDir, 'spoor', 'index.html'))
-const html = shipped ? readFileSync(join(exportDir, 'spoor', 'index.html'), 'utf8') : ''
+// a browser hands the page over as a download rather than writing where it was told, which is
+// the one place the shells genuinely differ. What is asserted about the file is the same.
+const [download] = await Promise.all([
+  page.waitForEvent('download', { timeout: 20000 }),
+  page.evaluate(() => [...document.querySelectorAll('.filmbar button')].find((b) => b.textContent.includes('download')).click()),
+])
+const html = await readFile(await download.path(), 'utf8')
+const shipped = html.length > 0
+const shippedAs = download.suggestedFilename()
 // direct manipulation: the paper reports a drop, the app owns the reorder
 const drag = await page.evaluate(async () => {
   const names = () => [...document.querySelectorAll('.sec b')].map((b) => b.textContent)
@@ -271,13 +203,22 @@ console.log('header:', JSON.stringify(await page.evaluate(() => ({
 }))))
 console.log('shipped:', JSON.stringify({
   ok: shipped,
+  file: shippedAs,
   bytes: html.length,
   selfContained: shipped && !/(src|href)=["']https?:/.test(html),
   noGrips: !html.includes('wall-grip'),
   noEditScript: shipped && !html.includes('contenteditable'),
   sections: (html.match(/<section/g) ?? []).length,
 }))
-void file
+
+// state has to survive a reload. On the desktop that was a file, here it is localStorage, and
+// the assertion is the same either way: come back and the wall is still there.
+await page.reload()
+await page.waitForSelector('.paper.here', { timeout: 20000 })
+console.log('state kept:', JSON.stringify(await page.evaluate(() => ({
+  onboardingSkipped: document.querySelectorAll('.onboard').length === 0,
+  papers: document.querySelectorAll('.paper').length > 0,
+}))))
 
 // start over throws the wall away, so it must ask once and only then reset
 const over = await page.evaluate(async () => {
@@ -292,6 +233,4 @@ const over = await page.evaluate(async () => {
 console.log('start over:', JSON.stringify(over))
 
 console.log('errors:', errors.length ? errors.slice(0, 5) : 'none')
-await app.close()
-rmSync(dataDir, { recursive: true, force: true })
-rmSync(exportDir, { recursive: true, force: true })
+await close()

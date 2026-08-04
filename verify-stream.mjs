@@ -5,8 +5,7 @@
  * they exist, which is what makes this repeatable: capture once with a key, run forever
  * without one.
  */
-import { _electron } from 'playwright'
-import electronPath from 'electron'
+import { openApp } from './harness.mjs'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -35,16 +34,7 @@ console.log('upstream:', corpus ?? 'fixtures', fixtures ? `${fixtures} captured 
 // make the second run skip onboarding and test something else
 const DATA = mkdtempSync(join(tmpdir(), 'wall-'))
 
-const app = await _electron.launch({
-  args: ['.'],
-  executablePath: electronPath,
-  env: { ...process.env, WALL_TEST: '1', WALL_DATA: DATA, WALL_API_BASE: url },
-})
-const page = await app.firstWindow()
-await page.setViewportSize({ width: 1440, height: 900 })
-const errors = []
-page.on('pageerror', (e) => errors.push(String(e).slice(0, 300)))
-page.on('console', (m) => m.type() === 'error' && errors.push(m.text().slice(0, 300)))
+const { page, errors, close } = await openApp({ env: { WALL_API_BASE: url } })
 
 await page.waitForSelector('.onboard .card', { timeout: 20000 })
 await page.evaluate(() => localStorage.setItem('wall-key-anthropic', 'test-key-not-used-upstream'))
@@ -163,5 +153,5 @@ console.log('image in page:', JSON.stringify({
 console.log('written wall toast:', JSON.stringify(await page.evaluate(() => document.querySelector('.toast')?.textContent ?? null)))
 console.log('errors:', errors.length ? errors.slice(0, 5) : 'none')
 
-await app.close()
+await close()
 server.close()

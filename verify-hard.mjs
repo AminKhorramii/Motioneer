@@ -6,8 +6,7 @@
  * sections, and every string carries braces, quotes, markup, backslashes, newlines and
  * multi-byte characters, delivered in chunks that split those characters in half.
  */
-import { _electron } from 'playwright'
-import electronPath from 'electron'
+import { openApp } from './harness.mjs'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -16,16 +15,7 @@ import { fakeAnthropic } from './fake-upstream.mjs'
 const { server, url } = await fakeAnthropic('hard')
 const DATA = mkdtempSync(join(tmpdir(), 'wall-'))
 
-const app = await _electron.launch({
-  args: ['.'],
-  executablePath: electronPath,
-  env: { ...process.env, WALL_TEST: '1', WALL_DATA: DATA, WALL_API_BASE: url },
-})
-const page = await app.firstWindow()
-await page.setViewportSize({ width: 1440, height: 900 })
-const errors = []
-page.on('pageerror', (e) => errors.push(String(e).slice(0, 200)))
-page.on('console', (m) => m.type() === 'error' && errors.push(m.text().slice(0, 200)))
+const { page, errors, close } = await openApp({ env: { WALL_API_BASE: url } })
 
 await page.waitForSelector('.onboard .card', { timeout: 20000 })
 await page.evaluate(() => localStorage.setItem('wall-key-anthropic', 'test-key'))
@@ -134,5 +124,5 @@ const shipped = await page.evaluate(() => {
 console.log('shipped:', JSON.stringify({ bytes: shipped.bytes, selfContained: !shipped.external }))
 console.log('errors:', errors.length ? errors.slice(0, 5) : 'none')
 
-await app.close()
+await close()
 server.close()

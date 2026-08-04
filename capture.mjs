@@ -8,8 +8,7 @@
  *
  * Run: WALL_KEY=$(cat ~/.wall-test-key) node capture.mjs
  */
-import { _electron } from 'playwright'
-import electronPath from 'electron'
+import { openApp } from './harness.mjs'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -77,15 +76,7 @@ console.log('recording proxy at', url)
 // make the second run skip onboarding and test something else
 const DATA = mkdtempSync(join(tmpdir(), 'wall-'))
 
-const app = await _electron.launch({
-  args: ['.'],
-  executablePath: electronPath,
-  env: { ...process.env, WALL_TEST: '1', WALL_DATA: DATA, WALL_API_BASE: url },
-})
-const page = await app.firstWindow()
-await page.setViewportSize({ width: 1440, height: 900 })
-const errors = []
-page.on('pageerror', (e) => errors.push(String(e).slice(0, 300)))
+const { page, errors, close } = await openApp({ env: { WALL_API_BASE: url } })
 
 await page.waitForSelector('.onboard .card', { timeout: 20000 })
 await page.evaluate((key) => localStorage.setItem('wall-key-anthropic', key), KEY)
@@ -188,5 +179,5 @@ for (const p of wall.pages) console.log(`  [${p.angle ?? 'base'}] ${p.headline}`
 console.log('\nerrors:', errors.length ? errors.slice(0, 5) : 'none')
 console.log('fixtures written:', captured.length)
 
-await app.close()
+await close()
 proxy.close()
