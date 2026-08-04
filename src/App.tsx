@@ -5,7 +5,7 @@ import { renderPage } from '@/render'
 import { pageBrief } from '@/brief'
 import { slop } from '@/slop'
 import {
-  EMPTY_PRODUCT, addSection, alternatives, arrange, readBrief, canDraw, canWrite, choose, chosen, promptWorlds, setDesigned, cycleVariant, cycleWorld, dropSection, writeOne, writeWall, illustrate, loadHeldKeys, loadKeys, promptPage, sectionAlternatives, seeded, setMock, type Product,
+  EMPTY_PRODUCT, addSection, alternatives, arrange, readBrief, canDraw, canWrite, choose, chosen, promptWorlds, setDesigned, cycleVariant, cycleWorld, dropSection, writeOne, illustrate, loadHeldKeys, loadKeys, promptPage, sectionAlternatives, seeded, setMock, type Product,
 } from '@/compose'
 import { Onboarding } from '@/Onboarding'
 import { BriefRail } from '@/BriefRail'
@@ -114,15 +114,11 @@ export default function App() {
       setPages(alternatives(base, 8))
       return
     }
-    // How the pages get written depends on what is writing them. Over HTTP a request is cheap,
-    // so eight run in parallel and each starts the moment its own world is finished. Through the
-    // local CLI each call is a whole session with its own startup and its own thinking, and
-    // eight of those queue against each other on one account, so the wall is written in a single
-    // streamed reply instead. Either way a page is written for the world it lands in, and either
-    // way it appears the moment it closes.
+    // Each page starts the moment its own world is finished, rather than when the whole design
+    // is. Writing the wall in one call instead was measured against this and came out the same
+    // within noise, so this stays: one path, and the earliest first paper.
     setBuilding({ arrived: null, landed: [] })
     setBusy('designing')
-    const batched = chosen().wire === 'cli'
     const jobs: Promise<{ ok: number; error?: string }>[] = []
     const started: World[] = []
 
@@ -142,34 +138,18 @@ export default function App() {
       jobs.push(writeOne(base, p, world, i, arrived))
     }
 
-    const worlds = await promptWorlds(p, 8, batched ? undefined : startPage)
+    const worlds = await promptWorlds(p, 8, startPage)
     if (run.current !== mine) return
     setDesigned(worlds)
     registerWorlds(worlds)
     setBusy('writing')
 
-    let written = 0
-    let error: string | undefined
-    if (batched) {
-      const seen = new Set<string>()
-      setBuilding({ arrived: 0, landed: worlds.map((w) => w.name) })
-      const out = await writeWall(base, p, worlds, (page) => {
-        if (!seen.has(page.id)) {
-          seen.add(page.id)
-          setBuilding({ arrived: seen.size, landed: worlds.map((w) => w.name) })
-        }
-        arrived(page)
-      })
-      written = out.written
-      error = out.error
-    } else {
-      // a provider that does not stream hands the worlds over at the end, so anything that did
-      // not arrive as it was written starts here
-      worlds.forEach(startPage)
-      const results = await Promise.all(jobs)
-      written = results.reduce((a, b) => a + b.ok, 0)
-      error = results.find((r) => r.error)?.error
-    }
+    // a provider that does not stream hands the worlds over at the end, so anything that did
+    // not arrive as it was written starts here
+    worlds.forEach(startPage)
+    const results = await Promise.all(jobs)
+    const written = results.reduce((x, r) => x + r.ok, 0)
+    const error = results.find((r) => r.error)?.error
 
     if (run.current !== mine) return
     setBusy('')

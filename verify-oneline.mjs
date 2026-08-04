@@ -80,8 +80,8 @@ console.log('greeted with:', JSON.stringify(await page.evaluate(() => ({
 
 await page.waitForSelector('.paper.here', { timeout: 120000 })
 await page.waitForFunction(() => !document.querySelector('[data-busy]'), null, { timeout: 180000 })
-// the wall is written in one reply on this path, so check it still came out as eight pages
-console.log('batched wall:', JSON.stringify(await page.evaluate(async () => {
+// eight pages, each written for its own world, each arguing its own angle
+console.log('wall written:', JSON.stringify(await page.evaluate(async () => {
   const heads = new Set()
   const angles = new Set()
   for (let i = 0; i < 9; i++) {
