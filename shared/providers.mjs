@@ -13,6 +13,23 @@ const model = (fallback) => env('WALL_MODEL') || fallback
 const env = (name) =>
   globalThis[name] ?? (typeof process !== 'undefined' ? process.env?.[name] : '') ?? ''
 
+/**
+ * Which fetch this module calls.
+ *
+ * Electron's main process and Node have no CORS wall, and a browser holding its own key talks
+ * to the vendor directly, so the global is right in three of the four shells. Tauri's webview
+ * is the fourth: it is a real browser origin, so the request has to travel through the Rust
+ * side to avoid preflight. That is a transport difference and nothing more, so it is swapped
+ * here rather than answered with a second implementation of the request shapes, the SSE
+ * splitting and the delta extraction. One model path stays one.
+ */
+let doFetch = (...args) => globalThis.fetch(...args)
+
+/** Install a different transport. It must answer with a real Response, streaming body included. */
+export const setFetch = (fn) => {
+  doFetch = typeof fn === 'function' ? fn : (...args) => globalThis.fetch(...args)
+}
+
 const base = () => env('WALL_API_BASE')
 
 /**
@@ -80,7 +97,7 @@ async function suggest(url, key) {
   if (!url.includes('generativelanguage')) return ''
   try {
     const root = url.split('/v1beta')[0]
-    const res = await fetch(`${root}/v1beta/models?key=${encodeURIComponent(key)}`)
+    const res = await doFetch(`${root}/v1beta/models?key=${encodeURIComponent(key)}`)
     if (!res.ok) return ''
     const names = ((await res.json()).models ?? [])
       .map((m) => String(m.name ?? '').replace('models/', ''))
@@ -96,7 +113,7 @@ async function suggest(url, key) {
 export async function streamText(provider, system, user, key, onDelta, opts = {}) {
   const req = (REQUESTS[provider] ?? REQUESTS.anthropic)(system, user, key, opts)
   try {
-    const res = await fetch(req.url, { method: 'POST', headers: req.headers, body: JSON.stringify(req.body) })
+    const res = await doFetch(req.url, { method: 'POST', headers: req.headers, body: JSON.stringify(req.body) })
     if (!res.ok) {
       const why = (await res.text()).slice(0, 160)
       return { error: `${provider} ${res.status}: ${why}${res.status === 404 ? await suggest(req.url, key) : ''}` }
@@ -143,7 +160,7 @@ export const IMAGE_REQUESTS = {
 async function anImageModel(url, key) {
   try {
     const root = url.split('/v1beta')[0]
-    const res = await fetch(`${root}/v1beta/models?key=${encodeURIComponent(key)}`)
+    const res = await doFetch(`${root}/v1beta/models?key=${encodeURIComponent(key)}`)
     if (!res.ok) return ''
     return ((await res.json()).models ?? [])
       .map((m) => String(m.name ?? '').replace('models/', ''))
@@ -158,7 +175,7 @@ async function anImageModel(url, key) {
 export async function generateImage(provider, prompt, key, opts = {}) {
   const make = IMAGE_REQUESTS[provider] ?? IMAGE_REQUESTS.gemini
   const send = async (req) => {
-    const res = await fetch(req.url, { method: 'POST', headers: req.headers, body: JSON.stringify(req.body) })
+    const res = await doFetch(req.url, { method: 'POST', headers: req.headers, body: JSON.stringify(req.body) })
     return { ok: res.ok, status: res.status, body: res.ok ? await res.json() : await res.text() }
   }
   try {

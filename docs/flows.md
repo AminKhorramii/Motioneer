@@ -181,8 +181,24 @@ gradient without WebGL2, and cost about 2KB inside the page. Each world brings i
 Generated images are available where a section shows a figure, through Gemini, behind the same
 host boundary as everything else. `illustrate()` returns a data URL that is stored in the page
 content, so it still ships as one file. The prompt rules out text hardest of all, because words
-baked into an image cannot be edited on the paper and are usually wrong. Expect roughly a
-megabyte per image, which is why the drawn backdrops are the default.
+baked into an image cannot be edited on the paper and are usually wrong.
+
+**The image pipeline.** A generated image is the one thing in a Wall page measured in megabytes,
+so it is the one thing worth compressing. Before the data URL reaches page content it goes
+through `crates/wall-image`: decode, fit the long edge to 1400 because a page renders at 1280
+wide and a figure is never all of it, flatten transparency onto the page background rather than
+onto white, re-encode as JPEG at quality 82, and drop the metadata with the re-encode. On a
+2400x1200 generated image that is **7.9MB down to 91KB, in 302ms**.
+
+It is Rust compiled to wasm and inlined as base64, which means one implementation for the
+desktop app, the web build and a served deployment, and no fetch for an asset in a shell that
+loads its page over `file://`. It fails soft everywhere: an image that will not decode, a wasm
+that will not instantiate, or a re-encode that came out larger all return the original, because
+a slightly large picture is a better outcome than no picture.
+
+Rust is here for this and not for the rest of the app. A whole wall of eight pages renders to
+HTML in 0.18ms, which is a hundredth of a frame, so there is nothing else in the compute path
+worth moving.
 
 ---
 
@@ -203,19 +219,38 @@ No accounts, no hosting of ours, no lock-in. The file is yours and it opens on i
 
 ---
 
-## 8. One app, three shells
+## 8. One app, four shells
 
 `src/host.ts` is the only file that knows where Wall is running. Everything above it is the same
 code, so the web version is the desktop version rather than a reduced copy.
 
 | Shell | State | Export | Model calls | Keys |
 | --- | --- | --- | --- | --- |
+| Tauri | a command to the Rust side | a real file on disk | the page, over a fetch that travels through Rust | your machine |
 | Electron | IPC to the main process | a real file on disk | main process, no CORS wall | your machine |
 | Web | `localStorage` | Blob download | straight from the tab | your browser |
 | Served | `localStorage` | Blob download | `/api/stream` on the server | the server only |
 
-Which host answers is decided by what is present: Electron injects a bridge on `window.wall`, a
-server injects a flag into the page it serves, and neither means the visitor brings their own key.
+Which host answers is decided by what is present: Electron injects a bridge on `window.wall`,
+Tauri injects `__TAURI_INTERNALS__`, a server injects a flag into the page it serves, and none of
+them means the visitor brings their own key.
+
+**Why Tauri, and what it does not change.** Electron ships a browser, so the download is 150 to
+250MB. Tauri uses the system webview, so the same app is a fraction of that. Nothing gets faster:
+the wall is model latency, and the compute path was already a hundredth of a frame. It is a
+distribution change, and it is worth it because the product's own pitch is a download.
+
+The one thing it could have cost is the rule that `shared/providers.mjs` is the only model path.
+A Rust main process would mean the request shapes, the SSE splitting and the delta extraction
+written twice, and the second copy drifting. It does not, because only the transport moves:
+`setFetch()` takes Tauri's fetch, which goes through Rust and so has no preflight to negotiate,
+and every line above it is the same file the browser runs.
+
+Two smaller differences are real and handled. The window drag handle is `-webkit-app-region` in
+Chromium and a `data-tauri-drag-region` attribute in WebKit, so the header carries the attribute
+under Tauri or the window cannot be moved by its own header. And what a command is allowed to do
+is declared in `src-tauri/capabilities/default.json` rather than implied, which is why the model
+endpoints are listed there.
 
 `server/index.mjs` is one file with no dependencies. It serves the built `dist/` and holds the
 keys, and `/api/config` tells the app which providers it already has, so the app stops asking for
@@ -239,10 +274,17 @@ the picker.
 
 ```
 npm run app            # build, then the desktop app
+npm run app:electron   # the Electron shell, kept until the Tauri one has been lived in
 npm run web            # the Vite dev server
 npm run serve          # the built app behind the server, with its own keys
 npm run build:core     # the headless core, for a shell with no DOM
+npm run build:wasm     # rebuild the image crate and inline it, needs Rust
 ```
+
+Only `build:wasm` needs the Rust toolchain, and only someone changing `crates/wall-image` needs
+to run it, because its output is committed. A fresh clone builds, runs and verifies without Rust
+installed. Building the Tauri app itself needs Rust; building the web app and the Electron app
+does not.
 
 ### Verifying
 
@@ -253,8 +295,15 @@ npm run verify         # desktop, mock model
 npm run verify:web     # the same assertions in plain Chromium
 npm run verify:server  # the real server against a recorded upstream, asserting the visitor holds no key
 npm run verify:stream  # the real streaming path, no mock anywhere
+npm run verify:image   # the image pipeline, no browser and no Rust needed
 npm run verify:all     # all of them
 ```
+
+`verify:image` reads the committed wasm rather than the crate's build output, because that is
+what ships, and builds its own input with zlib rather than loading a fixture, because a suite
+with a binary to explain is a suite that rots. The input is low frequency colour with grain over
+it rather than static: pure noise is the one thing JPEG cannot compress and no model produces, so
+a suite built on it would measure the worst case and report it as the normal one.
 
 `verify:stream` runs the app against a local server speaking Anthropic's wire format, so the
 reader loop, SSE framing, split frames, fenced JSON, the partial JSON walk and the progressive

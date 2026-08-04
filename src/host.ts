@@ -5,7 +5,10 @@
  * desktop version rather than a reduced copy of it.
  */
 
-import { generateImage, streamText } from '../shared/providers.mjs'
+import { invoke } from '@tauri-apps/api/core'
+import { fetch as tauriFetch } from '@tauri-apps/plugin-http'
+
+import { generateImage, setFetch, streamText } from '../shared/providers.mjs'
 
 export interface ModelOpts {
   base?: string
@@ -118,17 +121,48 @@ const served: Host = {
   },
 }
 
-const win = window as unknown as { wall?: Host; __wallServed?: number; __wallProviders?: string[] }
+const win = window as unknown as {
+  wall?: Host
+  __wallServed?: number
+  __wallProviders?: string[]
+  __TAURI_INTERNALS__?: unknown
+}
+
+const onTauri = Boolean(win.__TAURI_INTERNALS__)
 
 /**
- * Which host answers is decided by what is present. Electron injects a bridge on window.wall.
- * A server injects a flag into the page it serves. Neither means the browser is on its own and
- * the visitor brings a key.
+ * The Tauri shell: the same window, at a tenth of the download.
+ *
+ * Only the four things a browser cannot do are commands. The model path is not one of them: the
+ * page calls providers.mjs itself, over a fetch that travels through the Rust side so a real
+ * browser origin does not have to negotiate preflight with every vendor. That keeps request
+ * shapes, SSE splitting and delta extraction in one file rather than one per shell, which is
+ * the whole reason this boundary is here.
  */
-export const host: Host = win.wall ?? (win.__wallServed ? served : web)
+const tauri: Host = {
+  ...web,
+  readState: () => invoke('read_state'),
+  writeState: async (v) => Boolean(await invoke('write_state', { value: v ?? null })),
+  exportPage: (html, name) => invoke('export_page', { html, name }),
+  preview: (html) => invoke('preview', { html }),
+  request: () => invoke('wall_request'),
+  handoff: (dir, files) => invoke('handoff', { dir, files }),
+}
 
-export const isDesktop = Boolean(win.wall)
-export const isServed = Boolean(!win.wall && win.__wallServed)
+// The transport, installed once and before anything streams. Swapping the fetch is the entire
+// difference between this shell and the browser's.
+if (onTauri) setFetch(tauriFetch)
+
+/**
+ * Which host answers is decided by what is present. Electron injects a bridge on window.wall,
+ * Tauri injects its own internals, and a server injects a flag into the page it serves. None of
+ * them means the browser is on its own and the visitor brings a key.
+ */
+export const host: Host = win.wall ?? (onTauri ? tauri : win.__wallServed ? served : web)
+
+export const isTauri = onTauri
+export const isDesktop = Boolean(win.wall) || onTauri
+export const isServed = Boolean(!win.wall && !onTauri && win.__wallServed)
 
 /** Providers the server already holds a key for, so the app can stop asking for one. */
 export const servedProviders = async (): Promise<string[]> => {

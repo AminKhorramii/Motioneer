@@ -26,8 +26,13 @@ src/
   models.tsx    the vendors, and their marks drawn rather than fetched
   wall.css      the chrome
 
+  imagepipe.ts  the image pipeline as the app sees it, wasm underneath
+  imagewasm.ts  generated: the crate, inlined as base64
+
 shared/providers.mjs   one model path for every shell
 electron/              main process and preload bridge
+src-tauri/             the same desktop app as a download a tenth the size
+crates/wall-image/     decode, fit, flatten, re-encode. compiled to wasm
 server/index.mjs       serves dist and holds the keys
 fixtures/              recorded upstream streams, response bodies only
 ```
@@ -65,6 +70,18 @@ the checks have no DOM dependency, which is what makes an agent tool or a render
 
 **`shared/providers.mjs`** separates Wall from the vendors. Two wire formats, Anthropic and
 OpenAI, cover every model in the picker; a new vendor is a row in `models.tsx` with a base URL.
+
+It also separates the wire format from the transport. `setFetch()` lets a shell hand in the
+fetch it needs without bringing a second copy of the request shapes with it: Electron's main
+process and Node use the global, and Tauri hands in one that travels through Rust because its
+webview is a real browser origin that would otherwise negotiate preflight with every vendor.
+That is the difference between four shells and four implementations.
+
+**`crates/wall-image`** is the only place with real compute, and it is one crate rather than one
+per shell. Compiled to wasm and inlined, the desktop app, the web build and a served deployment
+run the same binary. Rust is there because a generated image is the one thing in a Wall page
+measured in megabytes, not because the rest of the app is slow: a whole wall of eight pages
+renders in 0.18ms, which is a hundredth of a frame.
 
 **The iframe** separates a paper from the app. Model authored CSS runs inside a sandboxed frame
 holding nothing but the page, and `safeCss()` still strips imports and remote urls, because the
