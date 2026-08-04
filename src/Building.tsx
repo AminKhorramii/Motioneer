@@ -31,14 +31,26 @@ interface Props {
 
 export function Building({ arrived, total, landed, model }: Props) {
   const [tick, setTick] = useState(0)
+  /**
+   * Elapsed seconds, shown rather than hidden.
+   *
+   * Designing the worlds takes about a minute on its own, and eight pages follow it. A status
+   * that changes its wording but never its number reads as a hang, and someone who cannot tell
+   * the difference between slow and broken assumes broken.
+   */
+  const [since] = useState(() => Date.now())
+  const [secs, setSecs] = useState(0)
   useEffect(() => {
-    const t = setInterval(() => setTick((v) => v + 1), 2600)
+    const t = setInterval(() => {
+      setTick((v) => v + 1)
+      setSecs(Math.round((Date.now() - since) / 1000))
+    }, 1000)
     return () => clearInterval(t)
-  }, [])
+  }, [since])
 
   const designing = arrived === null
   const line = designing
-    ? DESIGNING[tick % DESIGNING.length]
+    ? DESIGNING[Math.floor(tick / 3) % DESIGNING.length]
     : landed.length
       ? `${landed[landed.length - 1]}, and ${total - (arrived ?? 0)} still coming.`
       : `${model} is writing the first page.`
@@ -61,6 +73,10 @@ export function Building({ arrived, total, landed, model }: Props) {
           ))}
         </div>
         <p className="line">{line}</p>
+        <p className="elapsed">
+          {secs < 60 ? `${secs}s` : `${Math.floor(secs / 60)}m ${secs % 60}s`}
+          {designing ? ' · designing takes about a minute' : ` · ${arrived} of ${total} written`}
+        </p>
       </div>
     </div>
   )

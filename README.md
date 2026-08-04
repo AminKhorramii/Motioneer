@@ -162,7 +162,13 @@ suite runs on a fresh clone.
 `src/slop.ts` names the patterns a model reaches for when it has nothing specific to say,
 following the catalogue at impeccable.style: hollow words, generic calls to action, vague
 headlines, hero eyebrow chips, ai beige, glassmorphism, default drop shadows, italic serif
-display, nested cards, card soup.
+display, nested cards, card soup, interchangeable claims, unverifiable user counts, made with
+love, the purple gradient, drawn terminal windows, transition on everything, over-rounding.
+
+`src/craft.ts` is its positive counterpart: what a page does when it has something to say,
+led by the swap test, that a claim must carry a detail a competitor could not paste without
+lying. Slop runs as a detector over a finished page; craft travels in the system prompt, where
+it shapes the writing before there is anything to detect.
 
 It runs locally on the page model and the rendered HTML, so it is free and instant. That is
 what lets it run *before* the model call, where its findings are passed into the prompt as

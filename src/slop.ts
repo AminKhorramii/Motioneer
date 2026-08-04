@@ -27,6 +27,10 @@ const GENERIC_CTA = /^(get started|start free|learn more|sign up|try it now|get 
 const EMOJI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u
 /** beige and its neighbours, the colour a model picks when it does not have a palette */
 const AI_BEIGE = /^#(f[0-9a-f]{2}(e|f)[0-9a-f]{2}(d|e)[0-9a-f]|f5f5f0|faf8f5|fdfcf8|f7f3ed)$/i
+/** claims that pass the grammar of a benefit while naming none, so any competitor could run them */
+const INTERCHANGEABLE = /\b(save time|grow your business|boost (?:your )?productivity|work smarter|built for scale|lightning[- ]fast|blazing(?:ly)? fast|all[- ]in[- ]one|the future of|10x your)\b/i
+const PLACEHOLDER_PROOF = /\b(?:trusted|loved|used) by [\d,.]+\s*[km]?\+?\s*(?:users|teams|companies|developers|customers)\b/i
+const LOVE_TAGLINE = /(?:built|made|crafted) with (?:love|❤|passion)/iu
 
 const text = (page: Page) =>
   page.sections
@@ -57,6 +61,19 @@ export function slop(page: Page, html?: string): Flag[] {
     if (key === 'cta' && GENERIC_CTA.test(value.trim())) {
       add('generic-cta', `generic call to action: ${value}`,
         'It names no outcome, so it reads as a button rather than an offer.', section)
+    }
+    const swap = value.match(INTERCHANGEABLE)
+    if (swap) {
+      add('interchangeable-claim', `interchangeable claim: ${swap[0].toLowerCase()}`,
+        'It would be as true on any competitor\'s page, so it argues for nobody in particular.', section)
+    }
+    if (PLACEHOLDER_PROOF.test(value)) {
+      add('placeholder-proof', 'unverifiable user count',
+        'A total nobody can check reads as decoration, where one named witness would read as evidence.', section)
+    }
+    if (LOVE_TAGLINE.test(value)) {
+      add('love-tagline', 'made with love',
+        'It is the sign-off every generated page reaches for, and it tells the reader nothing they can use.', section)
     }
   }
 
@@ -132,6 +149,25 @@ export function slop(page: Page, html?: string): Flag[] {
     if (cards >= 6) {
       add('card-soup', `${cards} cards on one page`,
         'When everything is boxed, nothing is emphasised, and the page reads as a list of tiles.')
+    }
+    if (/linear-gradient\([^)]*(?:#(?:7c3aed|8b5cf6|a78bfa|6366f1|4f46e5|9333ea)|\bpurple\b|\bviolet\b|\bindigo\b)/i.test(html)) {
+      add('purple-gradient', 'the purple gradient',
+        'It is the colour move a model makes when no palette was chosen, so it reads as nobody\'s brand.')
+    }
+    // the macOS traffic lights, drawn rather than captured. Two of the three hexes together is
+    // the signature of a mocked terminal, in either of the shades the mockups circulate in.
+    const dots = ['ff5f5', 'ffbd2e', 'febc2e', '27c93f', '28c840'].filter((c) => html.toLowerCase().includes(c))
+    if (dots.length >= 2) {
+      add('terminal-dots', 'a drawn terminal window',
+        'The three little circles promise a real window and deliver a picture of one, which is the gap between a screenshot and a prop.')
+    }
+    if (/transition:\s*all\b/.test(html)) {
+      add('transition-all', 'transition on everything',
+        'Motion that names no property is the framework default, so it decorates every hover instead of meaning one.')
+    }
+    if ((html.match(/border-radius:\s*(?:2[89]|[3-9]\d)px/g) ?? []).length >= 3) {
+      add('over-rounding', 'over-rounded corners',
+        'Past a certain radius every element becomes a pill, and softness turns into the only voice the page has.')
     }
   }
 

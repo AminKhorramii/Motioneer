@@ -3,6 +3,7 @@
 import { PRESETS, type Taste } from '@/taste'
 import { giveKey, host, isDesktop, isServed, servedProviders } from '@/host'
 import { slop, slopBrief } from '@/slop'
+import { craftBrief } from '@/craft'
 import { MODELS, modelById } from '@/models'
 import { BACKDROPS, type Backdrop } from '@/backdrop'
 import { shrinkDataUrl } from '@/imagepipe'
@@ -363,6 +364,8 @@ Return JSON shaped as {"sections":[{"id":"...","content":{...}}]}, reusing the s
 Write concrete sentences a stranger could understand, and keep them short, because people scan a landing page rather than read it. Prefer plain words over marketing vocabulary such as revolutionary, seamless, unlock, or empower, because those words describe nothing and readers skip them. Let each section keep its own job: the hero states the value, features explain how, the closing call asks for one action.
 
 This page sits beside seven others written from different angles, and the reader compares them side by side. Rewrite every headline so it differs from the one you were given in both wording and emphasis, because a page that matches its neighbour gives the reader nothing to choose between. Commit fully to the angle you are given, even where a safer line exists, since the safe version is already one of the other seven.
+
+${craftBrief()}
 
 Respond with the JSON object alone, because the reply is parsed directly.`
 

@@ -601,3 +601,8 @@ header .hactions button.on { color: var(--ink); }
 .slot { width: 18px; height: 2px; border-radius: 1px; background: var(--hair2); transition: background 400ms ease; }
 .slot.on { background: var(--ink2); }
 .progress .line { font-size: 12px; color: var(--dim); animation: rise 500ms ease both; }
+
+/* the number is the point: wording that changes while the number does not reads as a hang */
+.progress .elapsed {
+  font-size: 11px; color: var(--dim2); font-variant-numeric: tabular-nums;
+}
