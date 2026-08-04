@@ -8,6 +8,7 @@ import { alpha, luminance, mix, shift, type Taste } from '@/taste'
 import { type Page, type Section } from '@/sections'
 import { backdropHtml } from '@/backdrop'
 import { worldById, type World } from '@/worlds'
+import { TYPEFACES } from '@/typefaces'
 
 const esc = (s: unknown) =>
   String(s ?? '').replace(/[<>&]/g, (m) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' })[m]!)
@@ -32,8 +33,13 @@ function tokens(t: Taste) {
 
 function head(t: Taste, title: string, editable: boolean, w: World) {
   const { gap, surface, line, s, ease } = tokens(t)
+  // a bundled face rides inside the page, but only when this page actually wears it
+  const faces = TYPEFACES.filter((f) => t.display.includes(f.family) || t.body.includes(f.family))
+    .map((f) => `@font-face{font-family:'${f.family}';src:url(${f.dataUrl}) format('woff2-variations');font-weight:100 900;font-display:swap}`)
+    .join('\n')
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><style>
+${faces}
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--bg:${t.bg};--ink:${t.ink};--dim:${t.dim};--accent:${t.accent};--accent2:${t.accent2};
 --surface:${surface};--line:${line};--r:${t.radius}px;--gap:${(gap * 2 + 1).toFixed(2)}rem}
@@ -42,7 +48,7 @@ line-height:${(1.45 + gap * 0.28).toFixed(2)};-webkit-font-smoothing:antialiased
 a{color:inherit;text-decoration:none}
 h1,h2,h3{font-family:${t.display};font-weight:${t.weight};line-height:1.07;letter-spacing:-.022em}
 h1{font-size:clamp(2.3rem,6vw,${s(6)})}h2{font-size:clamp(1.5rem,3.2vw,${s(4)})}h3{font-size:${s(1)}}
-p{color:var(--dim)}
+p{color:var(--dim);hyphens:auto;text-wrap:pretty}
 .wrap{max-width:1080px;margin:0 auto;padding:0 clamp(1.2rem,4vw,2.4rem)}
 h1,h2{text-wrap:balance}
 .eyebrow{font-size:.8rem;letter-spacing:.08em;color:var(--dim);font-weight:500;

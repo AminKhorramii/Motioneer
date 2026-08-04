@@ -70,6 +70,9 @@ const GROTESK = "'Helvetica Neue', Arial, sans-serif"
 const SERIF = "'Charter', 'Iowan Old Style', Georgia, serif"
 const MONO = "ui-monospace, 'SF Mono', Menlo, monospace"
 const SANS = "'Inter Variable', 'Inter', -apple-system, sans-serif"
+// carried inside the page by render.ts, so these exist on every machine the file reaches
+const FRAUNCES = "'Fraunces Variable', 'Charter', 'Iowan Old Style', Georgia, serif"
+const ARCHIVO = "'Archivo Variable', 'Helvetica Neue', Arial, sans-serif"
 
 /** palette moves, each a relationship rather than a random shift */
 const mono = (t: Taste): Taste => ({ ...t, accent2: mix(t.accent, t.bg, 0.45) })
@@ -98,7 +101,7 @@ export const WORLDS: World[] = [
     name: 'editorial',
     note: 'a large serif and long lines, set like a page that expects to be read.',
     voice: 'Write in full sentences with rhythm. The measure is long and the type is large, so the copy can breathe and should.',
-    taste: (t) => ({ ...tinted(t), display: SERIF, body: SERIF, scale: 1.44, radius: 2, density: 0.35, weight: 500, caps: true }),
+    taste: (t) => ({ ...tinted(t), display: FRAUNCES, body: SERIF, scale: 1.44, radius: 2, density: 0.35, weight: 560, caps: true }),
     structure: { rules: false, numbered: false, bleed: true, measure: 74, figure: 'bleed', rhythm: [1.7, 0.6, 1.3, 0.75, 2, 0.9] },
     backdrop: 'grain',
     prefer: { hero: 2, features: 1, showcase: 1, quote: 0, pricing: 1, faq: 1, cta: 0 },
@@ -128,7 +131,7 @@ export const WORLDS: World[] = [
     name: 'poster',
     note: 'one headline at the size of a wall, and very little else competing with it.',
     voice: 'Write six words where you would write twenty. The headline carries the page alone and everything else is a whisper.',
-    taste: (t) => ({ ...contrast(t), display: GROTESK, body: SANS, scale: 1.62, radius: 0, density: 0.3, weight: 800, caps: false }),
+    taste: (t) => ({ ...contrast(t), display: ARCHIVO, body: SANS, scale: 1.62, radius: 0, density: 0.3, weight: 880, caps: false }),
     structure: { rules: false, numbered: false, bleed: true, measure: 52, figure: 'bleed', rhythm: [2.6, 0.9, 2.2, 1.2, 0.6] },
     backdrop: 'ridge',
     prefer: { hero: 2, showcase: 1, quote: 0, cta: 1 },
@@ -166,8 +169,15 @@ export const WORLDS: World[] = [
   },
 ]
 
-/** the four faces that are certain to be on the machine, since the page ships without webfonts */
-export const FACES: Record<string, string> = { sans: SANS, grotesk: GROTESK, serif: SERIF, mono: MONO }
+/**
+ * The faces a world may wear. Four are platform stacks certain to be on the machine; two are
+ * variable faces carried inside the page itself, because a face at factory defaults chosen by
+ * nobody is the deepest typographic tell of a generated page. render.ts embeds a face only
+ * when the page wears it, so a page in the platform stacks still ships with no font payload.
+ */
+export const FACES: Record<string, string> = {
+  sans: SANS, grotesk: GROTESK, serif: SERIF, mono: MONO, fraunces: FRAUNCES, archivo: ARCHIVO,
+}
 const PALETTES: Record<string, (t: Taste) => Taste> = {
   'as-is': (t) => t, mono, tinted, contrast,
 }

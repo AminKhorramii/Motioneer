@@ -479,7 +479,7 @@ Return JSON shaped as {"worlds":[{ ... }]} with exactly the number asked for. Ea
 name: two or three words, lowercase, naming the feeling rather than the technique. "wall label", "field manual", "night edition".
 note: one sentence on what it is, for a person choosing between them.
 voice: one sentence telling the writer how to write for it. A poster wants six words where a catalogue wants forty, and the copy is written from this line, so make it specific about length and register.
-display and body: one of sans, grotesk, serif, mono. Only these four, because the page ships as a single file with no downloaded fonts, and anything else would fall back to something you did not choose.
+display and body: one of sans, grotesk, serif, mono, fraunces, archivo. Only these six, because the page ships as a single file and anything else would fall back to something you did not choose. The first four are platform stacks and cost nothing. fraunces is a warm expressive serif and archivo a sturdy display grotesque, each carried inside the page at about 50KB, so spend one only where the type is the design.
 scale: 1.1 to 1.7. The ratio between heading sizes. Above 1.5 the headline dominates everything.
 weight: 300 to 800. 300 is thin and editorial, 800 is a poster shouting.
 radius: 0 to 24 pixels. 0 is architectural, 24 is friendly software.
