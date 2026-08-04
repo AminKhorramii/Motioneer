@@ -128,8 +128,8 @@ export async function streamText(provider, system, user, key, onDelta, opts = {}
  * Returns a data URL, since the whole product promise is one self-contained file.
  */
 export const IMAGE_REQUESTS = {
-  gemini: (prompt, key) => ({
-    url: `${base() || 'https://generativelanguage.googleapis.com'}/v1beta/models/${env('WALL_IMAGE_MODEL') || 'gemini-2.5-flash-image'}:generateContent?key=${encodeURIComponent(key)}`,
+  gemini: (prompt, key, opts = {}) => ({
+    url: `${base() || 'https://generativelanguage.googleapis.com'}/v1beta/models/${opts.model || env('WALL_IMAGE_MODEL') || 'gemini-2.5-flash-image'}:generateContent?key=${encodeURIComponent(key)}`,
     headers: { 'content-type': 'application/json' },
     body: { contents: [{ parts: [{ text: prompt }] }] },
     pick: (j) => {
@@ -139,16 +139,40 @@ export const IMAGE_REQUESTS = {
   }),
 }
 
-export async function generateImage(provider, prompt, key) {
-  const make = IMAGE_REQUESTS[provider] ?? IMAGE_REQUESTS.gemini
-  const req = make(prompt, key)
+/** Ask the account which image models it can actually reach, newest looking first. */
+async function anImageModel(url, key) {
   try {
+    const root = url.split('/v1beta')[0]
+    const res = await fetch(`${root}/v1beta/models?key=${encodeURIComponent(key)}`)
+    if (!res.ok) return ''
+    return ((await res.json()).models ?? [])
+      .map((m) => String(m.name ?? '').replace('models/', ''))
+      .filter((n) => n.includes('image') && !n.includes('embedding'))
+      .sort()
+      .reverse()[0] ?? ''
+  } catch {
+    return ''
+  }
+}
+
+export async function generateImage(provider, prompt, key, opts = {}) {
+  const make = IMAGE_REQUESTS[provider] ?? IMAGE_REQUESTS.gemini
+  const send = async (req) => {
     const res = await fetch(req.url, { method: 'POST', headers: req.headers, body: JSON.stringify(req.body) })
-    if (!res.ok) {
-      const why = (await res.text()).slice(0, 160)
-      return { error: `${provider} ${res.status}: ${why}${res.status === 404 ? await suggest(req.url, key) : ''}` }
+    return { ok: res.ok, status: res.status, body: res.ok ? await res.json() : await res.text() }
+  }
+  try {
+    const req = make(prompt, key, opts)
+    let out = await send(req)
+    // Google retires image models on a schedule and closes older ones to new keys, so a 404
+    // here is usually a name that has moved rather than a broken request. Ask which names the
+    // key can reach and use one, instead of handing back a dead end.
+    if (!out.ok && out.status === 404) {
+      const found = await anImageModel(req.url, key)
+      if (found) out = await send(make(prompt, key, { ...opts, model: found }))
     }
-    const dataUrl = req.pick(await res.json())
+    if (!out.ok) return { error: `${provider} ${out.status}: ${String(out.body).slice(0, 160)}` }
+    const dataUrl = req.pick(out.body)
     return dataUrl ? { dataUrl } : { error: 'the reply carried no image' }
   } catch (err) {
     return { error: String(err).slice(0, 200) }

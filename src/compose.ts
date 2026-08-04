@@ -280,29 +280,6 @@ const grabJson = (text: string) => {
   }
 }
 
-const SECTION_SYSTEM = `You write copy for one section of a landing page. You receive the section's current content as JSON and an instruction describing what to change.
-
-Return a single JSON object with exactly the same keys as the input, with the copy rewritten to follow the instruction. Keep the keys identical because the renderer reads them by name, and a missing key removes that text from the page.
-
-Write concrete sentences a stranger could understand, and keep them short, because people scan a landing page rather than read it. Prefer plain words over marketing vocabulary such as revolutionary, seamless, unlock, or empower, because those words describe nothing and readers skip them.
-
-Respond with the JSON object alone, because the reply is parsed directly.`
-
-export async function promptSection(
-  sec: Section,
-  instruction: string,
-  product: Product,
-  provider: Provider = 'claude',
-): Promise<Record<string, unknown> | null> {
-  if (mockReply) return mockReply(instruction, sec.content) as Record<string, unknown>
-  const text = await ask(
-    provider,
-    SECTION_SYSTEM,
-    `Product: ${product.name}. ${product.oneLiner}\n${product.what}\nAudience: ${product.audience}\n\nSection kind: ${sec.kind}\nCurrent content:\n${JSON.stringify(sec.content, null, 2)}\n\nInstruction: ${instruction}`,
-  )
-  return text ? grabJson(text) : null
-}
-
 const PAGE_SYSTEM = `You write copy for a whole landing page. You receive the page as JSON: an array of sections, each with an id, a kind, and content. You also receive an instruction describing what to change.
 
 Return JSON shaped as {"sections":[{"id":"...","content":{...}}]}, reusing the same ids and the same content keys, with the copy rewritten to follow the instruction. Reusing ids and keys matters because the app merges your reply into the existing page by id, and an unknown id or missing key is dropped.

@@ -150,7 +150,7 @@ console.log('direct edit:', JSON.stringify(edited))
 await page.click('.sec:nth-child(3)')
 await page.waitForTimeout(300)
 const secUi = await page.evaluate(() => ({
-  hasPrompt: Boolean(document.querySelector('.sec.sel .prow input')),
+  noSectionChat: !document.querySelector('.sec.sel .prow'),
   actions: [...document.querySelectorAll('.sec.sel .srow button')].map((b) => b.textContent.trim()),
 }))
 console.log('section panel:', JSON.stringify(secUi))

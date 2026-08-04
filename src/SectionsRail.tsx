@@ -1,28 +1,23 @@
 import { KIND_LABEL, KIND_VARIANTS, type Kind, type Page } from '@/sections'
 import { Icon } from '@/icons'
-import { chosen } from '@/compose'
-import { MARKS } from '@/models'
 
 const ALL_KINDS: Kind[] = ['hero', 'logos', 'features', 'showcase', 'quote', 'pricing', 'faq', 'cta', 'footer']
 
 interface Props {
   page: Page
   selected: string | null
-  prompts: Record<string, string>
   onSelect: (id: string) => void
   onCycle: (id: string) => void
   onDrop: (id: string, onto: string, after: boolean) => void
   onToggle: (id: string) => void
-  onPromptChange: (id: string, value: string) => void
-  onPromptRun: (id: string) => void
   onFanOut: (id: string) => void
   onDraw: (id: string) => void
   onAdd: (kind: Kind) => void
 }
 
 export function SectionsRail({
-  page, selected, prompts,
-  onSelect, onCycle, onDrop, onToggle, onPromptChange, onPromptRun, onFanOut, onDraw, onAdd,
+  page, selected,
+  onSelect, onCycle, onDrop, onToggle, onFanOut, onDraw, onAdd,
 }: Props) {
   const stop = (e: React.MouseEvent) => e.stopPropagation()
   return (
@@ -59,17 +54,6 @@ export function SectionsRail({
           </div>
           {selected === s.id && (
             <div className="secbody">
-              <div className="prow">
-                <input
-                  placeholder={`say what this ${KIND_LABEL[s.kind]} should say`}
-                  value={prompts[s.id] ?? ''}
-                  onChange={(e) => onPromptChange(s.id, e.currentTarget.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') onPromptRun(s.id) }}
-                />
-                <button title="rewrite this section" onClick={() => onPromptRun(s.id)}>
-                  {MARKS[chosen().id]?.() ?? <Icon.cycle />}
-                </button>
-              </div>
               <div className="srow">
                 <button onClick={() => onFanOut(s.id)}>all layouts</button>
                 {(s.kind === 'hero' || s.kind === 'showcase') && (

@@ -4,7 +4,7 @@ import { KIND_LABEL, applyEdit, starterPage, type Kind, type Page } from '@/sect
 import { renderPage } from '@/render'
 import { pageBrief } from '@/brief'
 import {
-  EMPTY_PRODUCT, addSection, alternatives, arrange, canDraw, canWrite, chosen, cycleBackdrop, promptWorlds, setDesigned, cycleVariant, cycleWorld, dropSection, fanOut, illustrate, loadHeldKeys, promptPage, promptSection, sectionAlternatives, seeded, setMock, type Product,
+  EMPTY_PRODUCT, addSection, alternatives, arrange, canDraw, canWrite, chosen, cycleBackdrop, promptWorlds, setDesigned, cycleVariant, cycleWorld, dropSection, fanOut, illustrate, loadHeldKeys, promptPage, sectionAlternatives, seeded, setMock, type Product,
 } from '@/compose'
 import { Onboarding } from '@/Onboarding'
 import { BriefRail } from '@/BriefRail'
@@ -24,7 +24,6 @@ export default function App() {
   const [pages, setPages] = useState<Page[]>([])
   const [at, setAt] = useState(0)
   const [selected, setSelected] = useState<string | null>(null)
-  const [prompts, setPrompts] = useState<Record<string, string>>({})
   const [bar, setBar] = useState('')
   const [busy, setBusy] = useState('')
   const [toast, setToast] = useState('')
@@ -233,20 +232,6 @@ export default function App() {
     }
   }
 
-  async function runSectionPrompt(id: string) {
-    const sec = page?.sections.find((s) => s.id === id)
-    const instruction = prompts[id]?.trim()
-    if (!sec || !instruction) return
-    if (!canWrite()) return flash('Add a model key in the brief panel to rewrite a section.')
-    setBusy(`Rewriting the ${KIND_LABEL[sec.kind]}.`)
-    const next = await promptSection(sec, instruction, product, 'model')
-    setBusy('')
-    if (!next) return flash('No usable copy came back.')
-    setPage((p) => ({ ...p, sections: p.sections.map((s) => (s.id === id ? { ...s, content: next } : s)) }))
-    setPrompts((v) => ({ ...v, [id]: '' }))
-    flash(`The ${KIND_LABEL[sec.kind]} was rewritten.`)
-  }
-
   const html = useMemo(
     () => (page ? renderPage(page, { editable: true, title: product.name }) : ''),
     [page, product.name],
@@ -361,7 +346,6 @@ export default function App() {
             <SectionsRail
               page={page}
               selected={selected}
-              prompts={prompts}
                             onSelect={setSelected}
               onCycle={(id) => setPage((p) => cycleVariant(p, id))}
               onDrop={(id, onto, after) => setPage((p) => dropSection(p, id, onto, after))}
@@ -369,8 +353,6 @@ export default function App() {
                 ...p,
                 sections: p.sections.map((s) => (s.id === id ? { ...s, on: !s.on } : s)),
               }))}
-              onPromptChange={(id, v) => setPrompts((all) => ({ ...all, [id]: v }))}
-              onPromptRun={runSectionPrompt}
               onFanOut={(id) => {
                 const alts = sectionAlternatives(page, id)
                 setPages((all) => [...all.slice(0, at + 1), ...alts.slice(1), ...all.slice(at + 1)])
