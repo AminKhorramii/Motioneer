@@ -124,6 +124,17 @@ Click one to open it in the studio.
 The papers are real scrollable DOM in sandboxed iframes, not screenshots, which is the whole
 claim: you are comparing pages, not pictures of pages.
 
+**Narrowing is a keyboard pass.** `p` pins the paper in the middle and steps on, `x` takes an
+unpinned paper off the wall, and `z` brings the last removed one back. A pinned page cannot be
+removed until it is released, so one stray key cannot lose the page you meant to keep, and the
+last page always stays, so the wall is never empty. In the grid every unpinned cell carries a
+remove control and the survivors spread out, which turns eight pages into one by elimination
+rather than by staring. Removed pages keep their ids refused, so a page still streaming in
+cannot reappear after being turned away, and a page derived from a pinned one starts unpinned,
+because the pin is a judgement about the paper you saw. The keys and the safety come from how
+photographers cull: flag or reject with one hand, auto advance, and nothing is ever more than
+one `z` from coming back.
+
 ---
 
 ## 4. Refining

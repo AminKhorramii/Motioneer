@@ -52,7 +52,8 @@ export function seeded(page: Page, p: Product): Page {
  */
 export function arrange(base: Page, i: number, worlds: World[] = WORLDS): Page {
   if (i === 0) {
-    return { ...base, id: uid(), sections: base.sections.map((s) => ({ ...s, content: structuredClone(s.content) })) }
+    // a derived page is a new candidate, so the triage pin stays behind on its parent
+    return { ...base, id: uid(), pinned: undefined, sections: base.sections.map((s) => ({ ...s, content: structuredClone(s.content) })) }
   }
   // Two axes, not one. A world decides how a page is built and a look decides how it feels, and
   // holding the look fixed made six worlds read as six versions of the same page. The look
@@ -61,7 +62,7 @@ export function arrange(base: Page, i: number, worlds: World[] = WORLDS): Page {
   const looks = [base.taste, ...PRESETS.filter((p) => p.name !== base.taste.name)]
   const world = worlds[(i - 1) % worlds.length]
   const look = looks[((i - 1) * 3) % looks.length]
-  return { ...inWorld({ ...base, taste: look }, world), id: uid() }
+  return { ...inWorld({ ...base, taste: look }, world), id: uid(), pinned: undefined }
 }
 
 /**
@@ -127,6 +128,7 @@ export function sectionAlternatives(page: Page, sectionId: string): Page[] {
   return KIND_VARIANTS[sec.kind].map((_, v) => ({
     ...page,
     id: uid(),
+    pinned: undefined,
     sections: page.sections.map((s) => (s.id === sectionId ? { ...s, variant: v } : s)),
   }))
 }
@@ -635,6 +637,7 @@ function mergeSections(
   return {
     ...page,
     id,
+    pinned: undefined,
     sections: page.sections.map((s) => (byId.has(s.id) ? { ...s, content: byId.get(s.id)! } : s)),
   }
 }

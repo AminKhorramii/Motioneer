@@ -18,11 +18,14 @@ interface Props {
   world?: WorldId
   bar: string
   busy: boolean
+  pinned: boolean
   onBar: (v: string) => void
   onRun: () => void
   onGo: (i: number) => void
   onModel: () => void
   onWorld: () => void
+  onPin: () => void
+  onKill: () => void
   /** present only when something asked for this design, which is what makes it the main act */
   onSend?: () => void
   onOpen: () => void
@@ -30,8 +33,8 @@ interface Props {
 }
 
 export function Dock({
-  at, count, angle, world, bar, busy,
-  onBar, onRun, onGo, onModel, onWorld, onSend, onOpen, onShip,
+  at, count, angle, world, bar, busy, pinned,
+  onBar, onRun, onGo, onModel, onWorld, onPin, onKill, onSend, onOpen, onShip,
 }: Props) {
   return (
     <div className="dock">
@@ -66,6 +69,15 @@ export function Dock({
           <button title="next alternative, or press the right arrow key"
             onClick={() => onGo(at + 1)} disabled={at >= count - 1}><Icon.right /></button>
         </div>
+        {/* triage sits beside the counter because narrowing is done while counting through */}
+        <button className={pinned ? 'pin on' : 'pin'} aria-label={pinned ? 'release the pin' : 'pin this page'}
+          title={pinned
+            ? 'pinned, so x cannot remove it. click or press p to release it.'
+            : 'pin this page so it cannot be removed, or press p'}
+          onClick={onPin}><Icon.pin /></button>
+        <button aria-label="remove this page"
+          title="take this page off the wall, or press x. z brings the last removed one back."
+          onClick={onKill}><Icon.x /></button>
         {/* the left side says what this paper is, and the world doubles as the control for it */}
         {angle && <span className="angle">{angle}</span>}
         <button className="world" title={`${worldById(world).note} click for the next world.`} onClick={onWorld}>

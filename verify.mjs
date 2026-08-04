@@ -108,6 +108,29 @@ const after = await page.evaluate(() => ({
 }))
 console.log('navigate:', JSON.stringify({ moved: before !== after.id, counter: after.counter }))
 
+// ——— 2b. triage: p pins, x removes, z brings back, and a pinned page cannot be lost ———
+const triage = await page.evaluate(async () => {
+  const count = () => document.querySelector('.filmbar .count')?.textContent
+  const press = async (key) => {
+    window.dispatchEvent(new KeyboardEvent('keydown', { key }))
+    await new Promise((r) => setTimeout(r, 250))
+  }
+  const start = count()
+  await press('p') // pin, which steps on to the next paper
+  const advanced = count() !== start
+  await press('ArrowLeft')
+  const pinShown = !!document.querySelector('.filmbar .pin.on')
+  await press('x') // pinned, so the wall must not shrink
+  const pinnedSurvived = count() === start
+  await press('p') // release, which steps on again
+  await press('ArrowLeft')
+  await press('x') // unpinned now, so it goes
+  const afterKill = count()
+  await press('z') // and comes back where it was
+  return { start, advanced, pinShown, pinnedSurvived, afterKill, restored: count() === start }
+})
+console.log('triage:', JSON.stringify(triage))
+
 // ——— 3. direct manipulation: edit text on the paper itself ———
 const edited = await page.evaluate(async () => {
   const f = document.querySelector('.paper.here iframe')

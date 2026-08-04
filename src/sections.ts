@@ -22,6 +22,9 @@ export interface Page {
   id: string
   taste: Taste
   sections: Section[]
+  /** marked as a keeper during triage. x cannot remove a pinned page, and the mark stays on
+      this one paper: a page derived from it starts unpinned, because a pin is a judgement
+      about what you saw, not about what it might become */
   pinned?: boolean
   /** the editorial position this page argues, when a model wrote it */
   angle?: string
