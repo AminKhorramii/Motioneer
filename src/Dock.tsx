@@ -1,8 +1,6 @@
 import { chosen } from '@/compose'
 import { Icon } from '@/icons'
 import { MARKS } from '@/models'
-import type { Flag } from '@/slop'
-import { BACKDROP_NOTE, type Backdrop } from '@/backdrop'
 import { worldById, type WorldId } from '@/worlds'
 
 /**
@@ -17,25 +15,21 @@ interface Props {
   at: number
   count: number
   angle?: string
-  flags: Flag[]
-  backdrop: Backdrop
   world?: WorldId
   bar: string
   busy: boolean
   onBar: (v: string) => void
   onRun: () => void
   onGo: (i: number) => void
-  onFlags: () => void
   onModel: () => void
-  onBackdrop: () => void
   onWorld: () => void
   onOpen: () => void
   onShip: () => void
 }
 
 export function Dock({
-  at, count, angle, flags, backdrop, world, bar, busy,
-  onBar, onRun, onGo, onFlags, onModel, onBackdrop, onWorld, onOpen, onShip,
+  at, count, angle, world, bar, busy,
+  onBar, onRun, onGo, onModel, onWorld, onOpen, onShip,
 }: Props) {
   return (
     <div className="dock">
@@ -68,19 +62,9 @@ export function Dock({
           {worldById(world).name}
         </button>
         <span className="spacer" />
-        <button title={`backdrop: ${BACKDROP_NOTE[backdrop]}. click for the next one.`} onClick={onBackdrop}>
-          {backdrop === 'none' ? 'no backdrop' : backdrop}
-        </button>
-        <button
-          className={flags.length ? 'flags' : 'flags ok'}
-          title={flags.length ? flags.map((f) => `${f.label}. ${f.why}`).join('\n') : 'nothing generic found'}
-          onClick={onFlags}
-        >
-          {flags.length ? `${flags.length} generic` : 'clean'}
-        </button>
-        <button title="open this page in your browser" onClick={onOpen}>open</button>
+        <button title="open this page in your browser" onClick={onOpen}>full view</button>
         <button className="go" title="write this page out as one HTML file" onClick={onShip}>
-          <Icon.ship /> ship
+          <Icon.ship /> download
         </button>
       </div>
     </div>

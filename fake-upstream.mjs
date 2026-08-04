@@ -251,7 +251,9 @@ export async function fakeAnthropic(dir = FIXTURES) {
     const ids = [...body.matchAll(/\\?"id\\?":\s*\\?"([a-z0-9]{5,})\\?"/g)].map((m) => m[1])
     // a design request asks for worlds, and the reply exercises the clamping on the way in, so
     // some values here are deliberately out of range
-    if (body.includes('worlds') && !body.includes('questions')) {
+    // route on the user message, not on words in the system prompt: the design prompt mentions
+    // questions as a section kind, which used to send it to the intake branch
+    if (body.includes('worlds for it')) {
       const faces = ['sans', 'grotesk', 'serif', 'mono']
       const backdrops = ['none', 'contours', 'grain', 'ridge']
       const palettes = ['as-is', 'mono', 'tinted', 'contrast']
@@ -274,6 +276,16 @@ export async function fakeAnthropic(dir = FIXTURES) {
             figure: ['framed', 'bleed', 'plain'][i % 3],
           },
           prefer: { hero: i % 4, features: i % 3, showcase: i % 2, quote: i % 2, pricing: i % 2, faq: i % 2, cta: i % 2, logos: i % 2 },
+          sections: [
+            ['hero', 'features', 'pricing', 'cta', 'footer'],
+            ['hero', 'quote', 'features', 'faq', 'cta', 'footer'],
+            ['features', 'pricing', 'footer'],
+            ['hero', 'logos', 'showcase', 'quote', 'cta', 'footer'],
+            ['hero', 'features', 'features', 'faq', 'footer'],
+            ['hero', 'showcase', 'pricing', 'faq', 'cta', 'footer'],
+            ['quote', 'features', 'cta', 'footer'],
+            ['hero', 'logos', 'features', 'showcase', 'quote', 'pricing', 'faq', 'cta', 'footer'],
+          ][i],
           css: i === 0
             ? '@import url(https://evil.example/x.css); section{border-top:2px dashed var(--line)} h1{letter-spacing:-.03em} .btn-primary{background:url(https://evil.example/a.png)}'
             : `section#hero .wrap{border:1px solid var(--line)} .card{border-radius:0} .eyebrow{letter-spacing:.${i}em}`,

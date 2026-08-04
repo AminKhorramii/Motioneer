@@ -50,6 +50,14 @@ export interface World {
    * rules and a perforated edge.
    */
   css?: string
+  /**
+   * The sections this world wants, in order.
+   *
+   * Until now every page was the same nine sections in the same order, so a world called
+   * printed receipt still had a testimonial and a three card pricing grid. A world that can
+   * choose its own composition changes the silhouette of a page rather than its surface.
+   */
+  compose?: Kind[]
 }
 
 const GROTESK = "'Helvetica Neue', Arial, sans-serif"
@@ -195,6 +203,12 @@ export function madeWorld(raw: Record<string, unknown>, i: number): World {
       : 'none',
     prefer,
     css: safeCss(raw.css),
+    compose: Array.isArray(raw.sections)
+      ? (raw.sections as unknown[])
+          .map((k) => String(k))
+          .filter((k): k is Kind => k in KIND_VARIANTS)
+          .slice(0, 12)
+      : undefined,
   }
 }
 

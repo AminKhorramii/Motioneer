@@ -53,6 +53,9 @@ await page.evaluate((key) => {
       backdrop: ['none', 'contours', 'grain', 'ridge'][i % 4],
       structure: { rules: i % 2 === 0, numbered: i % 3 === 0, bleed: i % 4 === 0, measure: 46 + i * 4, figure: ['framed', 'bleed', 'plain'][i % 3] },
       prefer: { hero: i % 4, features: i % 3 },
+      sections: [['hero', 'features', 'cta', 'footer'], ['hero', 'quote', 'pricing', 'footer'], ['features', 'faq', 'footer'],
+        ['hero', 'logos', 'showcase', 'cta', 'footer'], ['hero', 'features', 'features', 'footer'], ['hero', 'pricing', 'faq', 'cta', 'footer'],
+        ['quote', 'features', 'footer'], ['hero', 'logos', 'features', 'showcase', 'quote', 'pricing', 'faq', 'cta', 'footer']][i],
       css: `section#hero .wrap{border:1px solid var(--line)}`,
     })),
   } : ({
@@ -106,7 +109,7 @@ console.log('state kept:', JSON.stringify(await page.evaluate(() => ({
 // ship, which on the web is a download rather than a file write
 const [download] = await Promise.all([
   page.waitForEvent('download', { timeout: 15000 }),
-  page.evaluate(() => [...document.querySelectorAll('.filmbar button')].find((b) => b.textContent.includes('ship')).click()),
+  page.evaluate(() => [...document.querySelectorAll('.filmbar button')].find((b) => b.textContent.includes('download')).click()),
 ])
 const shipped = await readFile(await download.path(), 'utf8')
 console.log('shipped:', JSON.stringify({

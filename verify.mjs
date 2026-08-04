@@ -40,6 +40,9 @@ await page.evaluate((key) => {
       backdrop: ['none', 'contours', 'grain', 'ridge'][i % 4],
       structure: { rules: i % 2 === 0, numbered: i % 3 === 0, bleed: i % 4 === 0, measure: 46 + i * 4, figure: ['framed', 'bleed', 'plain'][i % 3] },
       prefer: { hero: i % 4, features: i % 3 },
+      sections: [['hero', 'features', 'cta', 'footer'], ['hero', 'quote', 'pricing', 'footer'], ['features', 'faq', 'footer'],
+        ['hero', 'logos', 'showcase', 'cta', 'footer'], ['hero', 'features', 'features', 'footer'], ['hero', 'pricing', 'faq', 'cta', 'footer'],
+        ['quote', 'features', 'footer'], ['hero', 'logos', 'features', 'showcase', 'quote', 'pricing', 'faq', 'cta', 'footer']][i],
       css: `section#hero .wrap{border:1px solid var(--line)} .eyebrow{letter-spacing:.${i}em}`,
     })),
   } : instruction === 'intake' ? {
@@ -199,6 +202,9 @@ await page.evaluate(() => {
       backdrop: ['none', 'contours', 'grain', 'ridge'][i % 4],
       structure: { rules: i % 2 === 0, numbered: i % 3 === 0, bleed: i % 4 === 0, measure: 46 + i * 4, figure: ['framed', 'bleed', 'plain'][i % 3] },
       prefer: { hero: i % 4, features: i % 3 },
+      sections: [['hero', 'features', 'cta', 'footer'], ['hero', 'quote', 'pricing', 'footer'], ['features', 'faq', 'footer'],
+        ['hero', 'logos', 'showcase', 'cta', 'footer'], ['hero', 'features', 'features', 'footer'], ['hero', 'pricing', 'faq', 'cta', 'footer'],
+        ['quote', 'features', 'footer'], ['hero', 'logos', 'features', 'showcase', 'quote', 'pricing', 'faq', 'cta', 'footer']][i],
       css: `section#hero .wrap{border:1px solid var(--line)} .eyebrow{letter-spacing:.${i}em}`,
     })),
   } : instruction === 'intake' ? {
@@ -231,7 +237,7 @@ console.log('prompt bar:', JSON.stringify({ before: countBefore, ...variants }))
 await page.screenshot({ path: `${OUT}/wall-variants.png` })
 
 // ——— 6. ship ———
-await page.evaluate(() => [...document.querySelectorAll('.filmbar button')].find((b) => b.textContent.includes('ship')).click())
+await page.evaluate(() => [...document.querySelectorAll('.filmbar button')].find((b) => b.textContent.includes('download')).click())
 await page.waitForTimeout(1400)
 const file = join(exportDir, 'pers-impressions')
 const shipped = existsSync(join(exportDir, 'spoor', 'index.html'))
@@ -256,37 +262,12 @@ const drag = await page.evaluate(async () => {
 })
 console.log('drag reorder:', JSON.stringify(drag))
 
-const back = await page.evaluate(async () => {
-  const seen = []
-  for (let i = 0; i < 4; i++) {
-    const b = [...document.querySelectorAll('.filmbar button')].find((x) => /backdrop|contours|grain|ridge/.test(x.textContent))
-    seen.push(b?.textContent)
-    b?.click()
-    await new Promise((r) => setTimeout(r, 350))
-  }
-  // land on a backdrop that draws, so the canvas assertion means something
-  while (!/contours|ridge/.test(document.querySelector('.filmbar button')?.textContent ?? '')) {
-    const b = [...document.querySelectorAll('.filmbar button')].find((x) => /backdrop|contours|grain|ridge/.test(x.textContent))
-    b?.click()
-    await new Promise((r) => setTimeout(r, 300))
-    if (seen.length > 12) break
-    seen.push('.')
-  }
-  const doc = document.querySelector('.paper.here iframe')?.contentDocument
-  return {
-    cycled: seen.filter((s) => s !== '.'),
-    canvasInPage: !!doc?.querySelector('#bd'),
-    webgl: !!doc?.querySelector('#bd')?.getContext?.('webgl2'),
-  }
-})
-console.log('backdrop:', JSON.stringify(back))
+console.log('dock:', JSON.stringify(await page.evaluate(() => ({
+  controls: [...document.querySelectorAll('.filmbar button')].map((b) => b.textContent.trim()).filter(Boolean),
+}))))
 console.log('header:', JSON.stringify(await page.evaluate(() => ({
   views: [...document.querySelectorAll('header .views button')].map((b) => b.textContent),
   actions: [...document.querySelectorAll('.hactions button')].map((b) => b.textContent.trim() || 'help'),
-}))))
-console.log('slop:', JSON.stringify(await page.evaluate(() => ({
-  badge: document.querySelector('.filmbar .flags')?.textContent,
-  detail: document.querySelector('.filmbar .flags')?.getAttribute('title')?.split('\n').map((s) => s.split('.')[0]),
 }))))
 console.log('shipped:', JSON.stringify({
   ok: shipped,

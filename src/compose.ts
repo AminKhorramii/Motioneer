@@ -62,15 +62,37 @@ export function arrange(base: Page, i: number, worlds: World[] = WORLDS): Page {
   return { ...inWorld({ ...base, taste: look }, world), id: uid() }
 }
 
-/** Rebuild a page inside a world: its palette, its type, its layouts, its backdrop. */
+/**
+ * Rebuild the page from a world's own composition, keeping the copy that already exists.
+ *
+ * A section of a kind the world asks for is reused, so the words survive a change of world.
+ * A kind it asks for that the page does not have arrives with defaults, and a kind the page
+ * has that the world does not want is dropped, which is the point: a world gets to decide the
+ * shape of the page and not only its finish.
+ */
+function composeSections(page: Page, wanted: Kind[]): Section[] {
+  const name = String(page.sections.find((s) => s.kind === 'footer')?.content.product ?? 'Product')
+  const pool = new Map<Kind, Section[]>()
+  for (const s of page.sections) pool.set(s.kind, [...(pool.get(s.kind) ?? []), s])
+  return wanted.map((kind) => {
+    const had = pool.get(kind)?.shift()
+    return had
+      ? { ...had, content: structuredClone(had.content) }
+      : { id: uid(), kind, variant: 0, on: true, content: defaultContent(kind, name) }
+  })
+}
+
+/** Rebuild a page inside a world: its palette, its type, its layouts, its shape. */
 function inWorld(page: Page, world: World): Page {
+  const sections = world.compose?.length ? composeSections(page, world.compose) : page.sections
   return {
     ...page,
     world: world.id,
     backdrop: world.backdrop,
     taste: world.taste(page.taste),
-    sections: page.sections.map((s) => ({
+    sections: sections.map((s) => ({
       ...s,
+      on: true,
       variant: Math.min(world.prefer[s.kind] ?? s.variant, KIND_VARIANTS[s.kind].length - 1),
       content: structuredClone(s.content),
     })),
@@ -375,6 +397,7 @@ structure.measure: 44 to 82 characters per line. This is the single biggest leve
 structure.figure: framed, bleed or plain.
 backdrop: none, contours, grain or ridge. Drawn behind the page from the palette.
 prefer: which layout each section wears, as {"hero":0-3,"logos":0-1,"features":0-2,"showcase":0-1,"quote":0-1,"pricing":0-1,"faq":0-1,"cta":0-1}. Keep them agreeing with each other: a page where every section picked differently reads as a shuffle rather than a design.
+sections: which sections the page is made of and in what order, as a list from hero, logos, features, showcase, quote, pricing, faq, cta, footer. Four to nine of them, repeats allowed. This is the shape of the page and it is yours to decide: a receipt is an itemised list and a total, not a testimonial and a pricing grid; a poster is a headline and one action; a field manual is mostly features and questions. Leave out anything the idea does not need, including the hero.
 css: the part that matters most. Thirty to sixty lines of CSS that make the idea real, because the fields above can only change size and spacing, and no arrangement of them will make a page look like a receipt or a departures board. This is where you draw.
 
 The page you are styling is plain HTML with these hooks, and nothing else:

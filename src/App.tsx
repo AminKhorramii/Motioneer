@@ -4,17 +4,16 @@ import { KIND_LABEL, applyEdit, starterPage, type Kind, type Page } from '@/sect
 import { renderPage } from '@/render'
 import { pageBrief } from '@/brief'
 import {
-  EMPTY_PRODUCT, addSection, alternatives, arrange, canDraw, canWrite, chosen, cycleBackdrop, promptWorlds, setDesigned, cycleVariant, cycleWorld, dropSection, fanOut, illustrate, loadHeldKeys, promptPage, sectionAlternatives, seeded, setMock, type Product,
+  EMPTY_PRODUCT, addSection, alternatives, arrange, canDraw, canWrite, chosen, promptWorlds, setDesigned, cycleVariant, cycleWorld, dropSection, fanOut, illustrate, loadHeldKeys, promptPage, sectionAlternatives, seeded, setMock, type Product,
 } from '@/compose'
 import { Onboarding } from '@/Onboarding'
 import { BriefRail } from '@/BriefRail'
 import { SectionsRail } from '@/SectionsRail'
 import { Dock } from '@/Dock'
 import { Icon } from '@/icons'
-import { slop } from '@/slop'
 import { register as registerWorlds } from '@/worlds'
 
-import { host, isDesktop } from '@/host'
+import { host } from '@/host'
 
 const PAGE_W = 1280
 
@@ -240,8 +239,6 @@ export default function App() {
     [page, product.name],
   )
 
-  // checked against the rendered page, because several patterns are visual rather than textual
-  const flags = useMemo(() => (page ? slop(page, html) : []), [page, html])
 
   async function onDropRef(e: React.DragEvent) {
     e.preventDefault()
@@ -328,20 +325,14 @@ export default function App() {
                 })}
               </div>
               <Dock
-                at={at} count={pages.length} angle={page.angle} flags={flags} backdrop={page.backdrop ?? 'none'} world={page.world} bar={bar} busy={!!busy}
+                at={at} count={pages.length} angle={page.angle} world={page.world} bar={bar} busy={!!busy}
                 onBar={setBar} onRun={runBar}
                 onModel={() => setOnboarding('first')}
                 onGo={(i) => setAt(Math.max(0, Math.min(i, pages.length - 1)))}
-                onFlags={() => flash(
-                  flags.length
-                    ? `${flags.length} generic patterns: ${flags.slice(0, 3).map((f) => f.label).join(', ')}.`
-                    : 'No generic patterns found on this page.',
-                )}
-                onBackdrop={() => setPage(cycleBackdrop)}
                 onWorld={() => setPage(cycleWorld)}
                 onOpen={() => void host.preview(renderPage(page, { title: product.name })).then(() => flash('Opened in your browser.'))}
                 onShip={() => void host.exportPage(renderPage(page, { title: product.name }), shipName).then(
-                  (r) => r && flash(isDesktop ? `Shipped to ${r.file}` : `${r.file} downloaded, ${r.bytes.toLocaleString()} bytes.`),
+                  (r) => r && flash(`${r.file} saved, ${r.bytes.toLocaleString()} bytes.`),
                 )}
               />
             </main>
