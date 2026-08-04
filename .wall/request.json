@@ -1,4 +1,0 @@
-{
-  "brief": "Wall is a landing page tool for solo founders. You describe what you are launching in a sentence, and it writes your page eight different ways at once: eight editorial angles crossed with eight design worlds, each world grounded in a real object rather than web conventions, with its own palette, typography, structure and hand-written CSS. You browse them side by side, edit any text directly on the page, drag sections to reorder, and ship one self-contained HTML file you own, with no framework and no runtime. It runs on your own model key, everything stays on your machine, and an agent can call it as a tool so the design you pick comes back as a spec it implements in your codebase.",
-  "name": "Wall"
-}
