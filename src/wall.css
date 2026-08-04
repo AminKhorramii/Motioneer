@@ -572,3 +572,54 @@ header .hactions button.on { color: var(--ink); }
   font-size: 11.5px; padding: 0.36rem 0.55rem; transition: background var(--t), color var(--t);
 }
 .barwrap .model:hover { background: rgba(255, 255, 255, 0.05); color: var(--ink); }
+
+/* ——— while a wall is being made ———
+   A skeleton in the shape of a page, because a spinner tells you to wait and a shape tells you
+   what is coming. The shimmer runs slowly: at half a minute, a fast pulse reads as anxiety. */
+
+.building {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 1.6rem; padding: 2rem;
+}
+.skel {
+  width: min(560px, 70%); display: flex; flex-direction: column; gap: 0.75rem;
+  padding: 2.4rem 2.2rem; border-radius: var(--rp);
+  border: 1px solid var(--hair2); background: var(--raise);
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.5);
+}
+.skel-bar, .skel-pill, .skel-figure {
+  border-radius: 5px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.045) 0%, rgba(255, 255, 255, 0.1) 50%, rgba(255, 255, 255, 0.045) 100%);
+  background-size: 220% 100%;
+  animation: sweep 2.8s ease-in-out infinite;
+}
+.skel-bar { height: 12px; }
+.skel-bar.tall { height: 22px; }
+.skel-bar.w70 { width: 70%; }
+.skel-bar.w55 { width: 55%; }
+.skel-bar.w40 { width: 40%; }
+.skel-bar.w30 { width: 30%; }
+.skel-row { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+.skel-pill { width: 116px; height: 32px; border-radius: 8px; }
+.skel-pill.ghost { width: 92px; opacity: 0.55; }
+.skel-figure { height: 150px; margin-top: 1rem; border-radius: 8px; opacity: 0.7; }
+/* each bar starts a little later, so the page fills like something being set rather than
+   flashing all at once */
+.skel > *:nth-child(2) { animation-delay: 0.12s }
+.skel > *:nth-child(3) { animation-delay: 0.24s }
+.skel > *:nth-child(4) { animation-delay: 0.36s }
+.skel > *:nth-child(5) { animation-delay: 0.48s }
+.skel > *:nth-child(6) { animation-delay: 0.6s }
+@keyframes sweep { 0% { background-position: 130% 0 } 100% { background-position: -30% 0 } }
+@media (prefers-reduced-motion: reduce) { .skel-bar, .skel-pill, .skel-figure { animation: none } }
+
+.progress { display: flex; flex-direction: column; align-items: center; gap: 0.55rem; }
+.slots { display: flex; gap: 5px; }
+.slot {
+  width: 26px; height: 3px; border-radius: 2px; background: var(--hair2);
+  transition: background 320ms ease;
+}
+.slot.on { background: var(--ink2); }
+.progress .line { font-size: 13px; color: var(--ink2); animation: rise 420ms ease both; }
+.progress .sub { font-size: 11.5px; color: var(--dim2); font-variant-numeric: tabular-nums; }

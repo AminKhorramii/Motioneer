@@ -10,6 +10,7 @@ import { Onboarding } from '@/Onboarding'
 import { BriefRail } from '@/BriefRail'
 import { SectionsRail } from '@/SectionsRail'
 import { Dock } from '@/Dock'
+import { Building } from '@/Building'
 import { Icon } from '@/icons'
 import { register as registerWorlds } from '@/worlds'
 
@@ -25,6 +26,8 @@ export default function App() {
   const [selected, setSelected] = useState<string | null>(null)
   const [bar, setBar] = useState('')
   const [busy, setBusy] = useState('')
+  /** null when nothing is being built, otherwise how far along the wall is */
+  const [building, setBuilding] = useState<{ arrived: number | null; landed: string[] } | null>(null)
   const [toast, setToast] = useState('')
   const [view, setView] = useState<'studio' | 'wall'>('studio')
   const [briefOpen, setBriefOpen] = useState(false)
@@ -86,6 +89,9 @@ export default function App() {
    */
   const fill = useCallback(async (base: Page, p: Product) => {
     const mine = ++run.current
+    // the base page is kept so there is something to compare against, but it is not shown
+    // while the wall is being made: an unwritten page looks like a finished one until you read
+    // it, and the skeleton says plainly that nothing has arrived
     setPages([arrange(base, 0)])
     setAt(0)
     // a served deployment answers which keys it holds asynchronously, and someone clicking
@@ -96,11 +102,14 @@ export default function App() {
       return
     }
     // ask for the visual systems first, so the wall is not limited to the six I wrote
-    setBusy(`Designing eight worlds with ${chosen().label}.`)
+    setBuilding({ arrived: null, landed: [] })
+    setBusy('designing')
     const worlds = await promptWorlds(p, 8)
+    if (run.current !== mine) return
     setDesigned(worlds)
     registerWorlds(worlds)
-    setBusy(`Writing eight pages with ${chosen().label}, one per angle.`)
+    setBuilding({ arrived: 0, landed: [] })
+    setBusy('writing')
     // a page keeps one id for its whole stream, so a paper appears on its first section and
     // then fills in, instead of arriving all at once when the model finishes
     const started = new Set<string>()
@@ -108,12 +117,15 @@ export default function App() {
       if (run.current !== mine) return
       if (!started.has(page.id)) {
         started.add(page.id)
-        setBusy(`${started.size} of 8 pages writing.`)
+        setBuilding({ arrived: started.size, landed: [...started].map((_, i) => worlds[i]?.name ?? '').filter(Boolean) })
+        // step onto the first written page, so the wall is never showing the unwritten one
+        setAt((v) => (v === 0 ? 1 : v))
       }
       upsertPage(page)
     }, worlds)
     if (run.current !== mine) return
     setBusy('')
+    setBuilding(null)
     if (!written) {
       setPages(alternatives(base, 8))
       flash(error ? `The model call failed: ${error}` : 'No copy came back, so the wall is arranged locally instead.')
@@ -291,7 +303,7 @@ export default function App() {
         </div>
       </header>
 
-      {busy && <p className="busy">{busy}</p>}
+      {busy && !building && <p className="busy">{busy}</p>}
 
       <div className="body">
         {briefOpen && (
@@ -307,7 +319,13 @@ export default function App() {
           />
         )}
 
-        {view === 'studio' && page && (
+        {view === 'studio' && building && pages.length < 2 && (
+          <main className="stage">
+            <Building arrived={building.arrived} total={8} landed={building.landed} model={chosen().label} />
+          </main>
+        )}
+
+        {view === 'studio' && page && !(building && pages.length < 2) && (
           <>
             <main className="studio" onWheel={onWheel}>
               <div className="film">
