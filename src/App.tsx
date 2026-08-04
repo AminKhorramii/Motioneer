@@ -276,7 +276,10 @@ export default function App() {
   const shipName = (product.name || 'landing').toLowerCase().replace(/\W+/g, '-')
 
   return (
-    <div className="wall" onDragOver={(e) => e.preventDefault()} onDrop={onDropRef}>
+    // a durable signal that work is in flight, independent of how it is presented, because
+    // hiding the status text once left every harness thinking the wall was finished
+    <div className="wall" data-busy={busy || building ? '1' : undefined}
+      onDragOver={(e) => e.preventDefault()} onDrop={onDropRef}>
       {/* The header carries what you switch between and the one thing that rebuilds the wall.
           Anything about the brief lives with the brief, and the view is a two state control
           rather than a button whose label is the state you are not in. */}

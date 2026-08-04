@@ -40,22 +40,18 @@ export function Building({ arrived, total, landed, model }: Props) {
   const line = designing
     ? DESIGNING[tick % DESIGNING.length]
     : landed.length
-      ? `${landed[landed.length - 1]} just landed.`
-      : 'Writing the first page.'
+      ? `${landed[landed.length - 1]}, and ${total - (arrived ?? 0)} still coming.`
+      : `${model} is writing the first page.`
 
   return (
     <div className="building">
+      {/* Three marks at the proportions of a page: a headline, a line under it, one action.
+          No card and no border, because a container around a placeholder is a second thing to
+          look at while there is nothing to look at. */}
       <div className="skel">
-        {/* the shape of a page rather than a spinner, so the wait has somewhere to go */}
-        <div className="skel-bar w40 tall" />
-        <div className="skel-bar w70 tall" />
-        <div className="skel-bar w55" />
-        <div className="skel-bar w30" />
-        <div className="skel-row">
-          <span className="skel-pill" />
-          <span className="skel-pill ghost" />
-        </div>
-        <div className="skel-figure" />
+        <div className="skel-bar head" />
+        <div className="skel-bar sub" />
+        <div className="skel-bar act" />
       </div>
 
       <div className="progress">
@@ -65,9 +61,6 @@ export function Building({ arrived, total, landed, model }: Props) {
           ))}
         </div>
         <p className="line">{line}</p>
-        <p className="sub">
-          {designing ? `${model} is designing ${total} worlds.` : `${arrived} of ${total} pages written.`}
-        </p>
       </div>
     </div>
   )

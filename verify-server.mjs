@@ -80,7 +80,7 @@ for (let i = 0; i < 8 && !(await page.locator('.paper.here').count()); i++) {
   await page.waitForTimeout(800)
 }
 await page.waitForSelector('.paper.here', { timeout: 60000 })
-await page.waitForFunction(() => !document.querySelector('.busy'), null, { timeout: 180000 })
+await page.waitForFunction(() => !document.querySelector('[data-busy]'), null, { timeout: 180000 })
 
 const wallState = await page.evaluate(() => ({
   counter: document.querySelector('.filmbar .count')?.textContent,

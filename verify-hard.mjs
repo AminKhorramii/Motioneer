@@ -58,7 +58,7 @@ console.log('rewrite click:', JSON.stringify(rewrite))
 if (rewrite.disabled) throw new Error('the rewrite button was disabled, so nothing was tested')
 for (let i = 0; i < 24; i++) {
   const s = await page.evaluate(() => ({
-    busy: document.querySelector('.busy')?.textContent ?? null,
+    busy: document.querySelector('.wall')?.dataset?.busy ?? null,
     papers: document.querySelector('.filmbar .count')?.textContent,
   }))
   if (!s.busy) break

@@ -64,7 +64,7 @@ const watch = setInterval(async () => {
 }, 25)
 // wait for the fan-out itself to finish rather than for a paper count, because a truncated
 // corpus legitimately produces fewer pages and should still be asserted, not time out
-await page.waitForFunction(() => !document.querySelector('.busy'), null, { timeout: 120000 })
+await page.waitForFunction(() => !document.querySelector('[data-busy]'), null, { timeout: 120000 })
 clearInterval(watch)
 // let the last papers commit before walking them, or the walk reads one paper nine times
 await page.waitForTimeout(600)

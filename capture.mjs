@@ -117,7 +117,7 @@ const ok = await page
   .catch(() => false)
 // a page appears on its first section, so the wall reaching nine does not mean the streams
 // have finished. The busy line clears only when the fan-out resolves, which is the real end.
-await page.waitForFunction(() => !document.querySelector('.busy'), null, { timeout: 240000 }).catch(() => {})
+await page.waitForFunction(() => !document.querySelector('[data-busy]'), null, { timeout: 240000 }).catch(() => {})
 clearInterval(watch)
 
 const wall = await page.evaluate(async () => {

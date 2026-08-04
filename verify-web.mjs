@@ -74,7 +74,7 @@ await page.click('.onboard .primary')
 await page.waitForSelector('.sample', { timeout: 10000 })
 await page.click('.sample')
 await page.waitForSelector('.paper.here', { timeout: 20000 })
-await page.waitForFunction(() => !document.querySelector('.busy'), null, { timeout: REAL ? 180000 : 40000 })
+await page.waitForFunction(() => !document.querySelector('[data-busy]'), null, { timeout: REAL ? 180000 : 40000 })
 console.log('counter:', await page.evaluate(() => document.querySelector('.filmbar .count')?.textContent))
 console.log('written wall:', JSON.stringify(await page.evaluate(async () => {
   const seen = new Set()
