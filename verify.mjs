@@ -12,6 +12,34 @@ import { openApp, useMock } from './harness.mjs'
 const OUT = process.env.OUT ?? '/tmp'
 const REAL = (process.env.WALL_KEY ?? '').trim()
 
+// ——— 0. the house obeys its own detector ———
+// Every built-in world on every preset look, rendered with the defaults and checked. The
+// detector polices model output everywhere else, so the pages Wall itself designs must pass
+// it, or the suite fails before a browser opens. This is the only intervention shown to
+// reduce slop: written guidance increases it, mechanical gates reverse it.
+const core = await import('./dist-core/core.js')
+const houseFlags = []
+for (const w of core.WORLDS) {
+  for (const look of core.PRESETS) {
+    const t = w.taste(look)
+    const base = core.starterPage(t, 'Spoor')
+    const ordered = w.compose?.length
+      ? w.compose.map((k) => base.sections.find((s) => s.kind === k)).filter(Boolean)
+      : base.sections
+    const page = {
+      ...base, world: w.id, backdrop: w.backdrop, taste: t,
+      sections: ordered.map((s) => ({
+        ...s,
+        variant: Math.min(w.prefer[s.kind] ?? s.variant, core.KIND_VARIANTS[s.kind].length - 1),
+      })),
+    }
+    const flags = core.slop(page, core.renderPage(page, { title: 'Spoor' }))
+    if (flags.length) houseFlags.push(`${w.id} on ${look.name}: ${flags.map((f) => f.label).join(', ')}`)
+  }
+}
+console.log('house pages:', JSON.stringify(houseFlags.length ? houseFlags.slice(0, 8) : 'clean, every world on every look'))
+if (houseFlags.length) throw new Error(`the house trips its own detector on ${houseFlags.length} pages`)
+
 const { page, errors, close } = await openApp()
 
 // ——— 1. brief → a page with sections, alternatives either side ———

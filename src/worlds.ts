@@ -37,6 +37,12 @@ export interface World {
     /** characters per line, the single biggest lever on how a page reads */
     measure: number
     figure: 'framed' | 'bleed' | 'plain'
+    /**
+     * Per-section padding multipliers, cycled down the page. Uniform rhythm is the deepest
+     * tell of a generated page: every section given equal air reads as one treatment applied
+     * to all content. A sequence with a sparse beat and a dense beat reads as paced.
+     */
+    rhythm?: number[]
   }
   backdrop: Backdrop
   /** the layout each kind wears in this world, so sections agree with each other */
@@ -77,9 +83,11 @@ export const WORLDS: World[] = [
     note: 'hairlines, numbered sections and tight tracking. The grid does the talking.',
     voice: 'Write plainly and exactly. Short sentences, concrete nouns, no flourish, because the grid is doing the talking.',
     taste: (t) => ({ ...mono(contrast(t)), display: GROTESK, body: SANS, scale: 1.26, radius: 0, density: 0.7, weight: 700, caps: false }),
-    structure: { rules: true, numbered: true, bleed: false, measure: 62, figure: 'framed' },
+    structure: { rules: true, numbered: true, bleed: false, measure: 62, figure: 'framed', rhythm: [1, 0.55, 1.5, 0.8, 1.9, 0.7] },
     backdrop: 'none',
-    prefer: { hero: 2, features: 0, showcase: 0, quote: 1, pricing: 0, faq: 0, cta: 1, logos: 0 },
+    // a numbered list is more swiss than a row of cards, and the grid has no closing band
+    prefer: { hero: 2, features: 2, showcase: 0, quote: 0, pricing: 0, faq: 0 },
+    compose: ['hero', 'features', 'showcase', 'pricing', 'faq', 'footer'],
   },
   {
     id: 'editorial',
@@ -87,9 +95,11 @@ export const WORLDS: World[] = [
     note: 'a large serif and long lines, set like a page that expects to be read.',
     voice: 'Write in full sentences with rhythm. The measure is long and the type is large, so the copy can breathe and should.',
     taste: (t) => ({ ...tinted(t), display: SERIF, body: SERIF, scale: 1.44, radius: 2, density: 0.35, weight: 500, caps: true }),
-    structure: { rules: false, numbered: false, bleed: true, measure: 74, figure: 'bleed' },
+    structure: { rules: false, numbered: false, bleed: true, measure: 74, figure: 'bleed', rhythm: [1.7, 0.6, 1.3, 0.75, 2, 0.9] },
     backdrop: 'grain',
-    prefer: { hero: 2, features: 1, showcase: 1, quote: 0, pricing: 1, faq: 1, cta: 0, logos: 1 },
+    prefer: { hero: 2, features: 1, showcase: 1, quote: 0, pricing: 1, faq: 1, cta: 0 },
+    // a read: the argument, one witness, the substance, proof it exists, and a quiet close
+    compose: ['hero', 'quote', 'features', 'showcase', 'pricing', 'faq', 'cta', 'footer'],
   },
   {
     id: 'terminal',
@@ -97,9 +107,11 @@ export const WORLDS: World[] = [
     note: 'monospace throughout and no rounded corners, for a product that is a tool.',
     voice: 'Write like good documentation. Precise, unpersuasive, comfortable with technical nouns.',
     taste: (t) => ({ ...mono(t), display: MONO, body: MONO, scale: 1.2, radius: 0, density: 0.8, weight: 500, caps: true }),
-    structure: { rules: true, numbered: false, bleed: false, measure: 68, figure: 'plain' },
+    structure: { rules: true, numbered: false, bleed: false, measure: 68, figure: 'plain', rhythm: [0.9, 0.5, 1.3, 0.6, 1.6, 0.7] },
     backdrop: 'contours',
-    prefer: { hero: 3, features: 0, showcase: 0, quote: 1, pricing: 0, faq: 0, cta: 1, logos: 0 },
+    // documentation does not testimonial: numbered features, no quote, no closing band
+    prefer: { hero: 3, features: 2, showcase: 0, pricing: 0, faq: 0 },
+    compose: ['hero', 'features', 'showcase', 'faq', 'pricing', 'footer'],
   },
   {
     id: 'poster',
@@ -107,9 +119,11 @@ export const WORLDS: World[] = [
     note: 'one headline at the size of a wall, and very little else competing with it.',
     voice: 'Write six words where you would write twenty. The headline carries the page alone and everything else is a whisper.',
     taste: (t) => ({ ...contrast(t), display: GROTESK, body: SANS, scale: 1.62, radius: 0, density: 0.3, weight: 800, caps: false }),
-    structure: { rules: false, numbered: false, bleed: true, measure: 52, figure: 'bleed' },
+    structure: { rules: false, numbered: false, bleed: true, measure: 52, figure: 'bleed', rhythm: [2.6, 0.9, 2.2, 1.2, 0.6] },
     backdrop: 'ridge',
-    prefer: { hero: 2, features: 1, showcase: 1, quote: 0, pricing: 1, faq: 1, cta: 0, logos: 1 },
+    prefer: { hero: 2, showcase: 1, quote: 0, cta: 1 },
+    // five sections. A poster is what it leaves out, and the whitespace is the design
+    compose: ['hero', 'showcase', 'quote', 'cta', 'footer'],
   },
   {
     id: 'catalogue',
@@ -117,9 +131,11 @@ export const WORLDS: World[] = [
     note: 'small type set densely, the way a page looks when it has a lot to list.',
     voice: 'Write densely and specifically. Numbers, names and lists rather than claims, because there is room for detail here.',
     taste: (t) => ({ ...mono(t), display: SANS, body: SANS, scale: 1.16, radius: 3, density: 0.85, weight: 600, caps: true }),
-    structure: { rules: true, numbered: true, bleed: false, measure: 58, figure: 'plain' },
+    structure: { rules: true, numbered: true, bleed: false, measure: 58, figure: 'plain', rhythm: [0.7, 0.45, 1.1, 0.5, 1.4, 0.6] },
     backdrop: 'none',
-    prefer: { hero: 1, features: 0, showcase: 0, quote: 1, pricing: 0, faq: 0, cta: 1, logos: 0 },
+    // everything, listed: the one world that keeps all nine sections, set dense
+    prefer: { hero: 1, features: 2, showcase: 0, quote: 1, pricing: 0, faq: 0, cta: 1, logos: 1 },
+    compose: ['hero', 'logos', 'features', 'showcase', 'quote', 'pricing', 'faq', 'cta', 'footer'],
   },
   {
     id: 'soft',
@@ -127,9 +143,10 @@ export const WORLDS: World[] = [
     note: 'rounded, roomy and framed, the register most software pages are written in.',
     voice: 'Write warmly and directly, the way a good product page speaks to a stranger who is in a hurry.',
     taste: (t) => ({ ...tinted(t), display: SANS, body: SANS, scale: 1.3, radius: 16, density: 0.45, weight: 600, caps: false }),
-    structure: { rules: false, numbered: false, bleed: false, measure: 66, figure: 'framed' },
+    structure: { rules: false, numbered: false, bleed: false, measure: 66, figure: 'framed', rhythm: [1.5, 0.7, 1.2, 0.6, 1.8, 0.8] },
     backdrop: 'grain',
     prefer: { hero: 0, features: 1, showcase: 1, quote: 0, pricing: 1, faq: 1, cta: 0, logos: 1 },
+    compose: ['hero', 'logos', 'features', 'showcase', 'quote', 'pricing', 'cta', 'footer'],
   },
 ]
 
@@ -197,6 +214,9 @@ export function madeWorld(raw: Record<string, unknown>, i: number): World {
       bleed: Boolean(s.bleed),
       measure: clamp(s.measure, 44, 82, 64),
       figure: (['framed', 'bleed', 'plain'] as const).includes(s.figure as never) ? (s.figure as World['structure']['figure']) : 'framed',
+      rhythm: Array.isArray(s.rhythm)
+        ? (s.rhythm as unknown[]).slice(0, 8).map((v) => clamp(v, 0.4, 3, 1))
+        : undefined,
     },
     backdrop: (['none', 'contours', 'grain', 'ridge'] as const).includes(raw.backdrop as never)
       ? (raw.backdrop as Backdrop)

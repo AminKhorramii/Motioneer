@@ -177,12 +177,14 @@ ${rows}
 <div style="position:absolute;left:8%;bottom:14%;width:${(18 + r(3) * 10).toFixed(0)}%;height:32px;background:${alpha(t.accent, 0.9)};border-radius:2px"></div></div>`
 }
 
-export function renderSection(sec: Section, t: Taste, seed: number, w: World): string {
+export function renderSection(sec: Section, t: Taste, seed: number, w: World, pad = 1): string {
   const c = sec.content as Record<string, string>
   // a generated image replaces the drawn placeholder wherever a section shows a figure
   const img = typeof c.image === 'string' && c.image.startsWith('data:') ? c.image : undefined
   const v = sec.variant
-  const open = `<section data-section="${sec.id}" id="${sec.kind}">`
+  // the world's rhythm paces the page: uniform air on every section is the deepest tell of
+  // one treatment applied to all content, so adjacent sections never breathe the same
+  const open = `<section data-section="${sec.id}" id="${sec.kind}"${pad === 1 ? '' : ` style="padding:calc(var(--gap)*${(2.2 * pad).toFixed(2)}) 0"`}>`
   // one primary action and one quiet link. Two buttons of equal weight is the formula every
   // generated hero wears, and it makes the page argue with itself about what happens next
   const ctas = `<div class="ctas"><a class="btn btn-primary" ${ed(sec.id, 'cta')}>${esc(c.cta)}</a>
@@ -346,9 +348,10 @@ justify-content:space-between;gap:1rem;flex-wrap:wrap;color:var(--dim);font-size
 export function renderPage(page: Page, opts: { editable?: boolean; title?: string } = {}): string {
   const world = worldById(page.world)
   const seed = page.sections.length * 17 + page.taste.radius
+  const beat = world.structure.rhythm
   const body = page.sections
     .filter((s) => s.on)
-    .map((s, i) => renderSection(s, page.taste, seed + i * 11, world))
+    .map((s, i) => renderSection(s, page.taste, seed + i * 11, world, beat?.length ? beat[i % beat.length] : 1))
     .join('\n')
   // the backdrop goes first so it sits behind the content without needing a stacking hack
   const art = backdropHtml(page.taste, page.backdrop ?? 'none')
