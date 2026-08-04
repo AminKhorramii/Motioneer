@@ -120,5 +120,15 @@ for (const hook of ['WALL_DATA', 'WALL_EXPORT_DIR', 'WALL_REQUEST', 'WALL_TEST']
   ok(main.includes(hook), `${hook} is honoured, so the shell can be pointed somewhere in a run`)
 }
 
+// ——— the one command that takes a filename from the caller ———
+//
+// Rust's join replaces the whole base when handed an absolute path, so without these a name
+// could write anywhere on the machine, and this command is reachable by anything in the webview.
+
+const handoff = main.slice(main.indexOf('fn handoff'))
+for (const guard of ["contains('/')", 'contains("..")', 'is_absolute()']) {
+  ok(handoff.includes(guard), 'handoff refuses a name that is a path', guard)
+}
+
 console.log(failed ? `\n${failed} failed` : '\nall good')
 process.exit(failed ? 1 : 0)

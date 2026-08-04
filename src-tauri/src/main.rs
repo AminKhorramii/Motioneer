@@ -166,6 +166,17 @@ fn handoff(dir: String, files: BTreeMap<String, String>) -> Handed {
     }
     let mut wrote = Vec::new();
     for (name, body) in &files {
+        // A name is a name, never a path. Rust's join replaces the whole base when given an
+        // absolute path, so an unchecked name here could write anywhere on the machine, and
+        // this command is reachable by anything running in the webview.
+        let bad = name.is_empty()
+            || name.contains('/')
+            || name.contains('\\')
+            || name.contains("..")
+            || Path::new(name).is_absolute();
+        if bad {
+            continue;
+        }
         if let Err(e) = fs::write(Path::new(&dir).join(name), body) {
             return fail(e);
         }
