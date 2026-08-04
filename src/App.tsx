@@ -3,6 +3,7 @@ import { PRESETS, tasteFromImage, type Taste } from '@/taste'
 import { KIND_LABEL, applyEdit, starterPage, type Kind, type Page } from '@/sections'
 import { renderPage } from '@/render'
 import { pageBrief } from '@/brief'
+import { slop } from '@/slop'
 import {
   EMPTY_PRODUCT, addSection, alternatives, arrange, readBrief, canDraw, canWrite, choose, chosen, promptWorlds, setDesigned, cycleVariant, cycleWorld, dropSection, fanOut, illustrate, loadHeldKeys, loadKeys, promptPage, sectionAlternatives, seeded, setMock, type Product,
 } from '@/compose'
@@ -329,6 +330,9 @@ export default function App() {
     () => (page ? renderPage(page, { editable: true, title: product.name }) : ''),
     [page, product.name],
   )
+  // the verdict on the paper in the middle. Local and instant, which is what lets it sit in
+  // the dock on every page rather than being a report you ask for
+  const flags = useMemo(() => (page ? slop(page, html) : []), [page, html])
 
 
   async function onDropRef(e: React.DragEvent) {
@@ -439,7 +443,7 @@ export default function App() {
               </div>
               <Dock
                 at={at} count={pages.length} angle={page.angle} world={page.world} bar={bar} busy={!!busy}
-                pinned={!!page.pinned}
+                pinned={!!page.pinned} flags={flags}
                 onBar={setBar} onRun={runBar}
                 onModel={() => setOnboarding('first')}
                 onGo={(i) => setAt(Math.max(0, Math.min(i, pages.length - 1)))}
@@ -477,24 +481,36 @@ export default function App() {
 
         {view === 'wall' && (
           <main className="grid">
-            {pages.map((p, i) => (
-              <div key={p.id} className={`cell ${i === at ? 'on' : ''}${p.pinned ? ' pinned' : ''}`}
-                onClick={() => { setAt(i); setView('studio') }}>
-                <Preview html={renderPage(p, { title: product.name })} />
-                {/* elimination is the grid's other act: drop a cell and the survivors spread
-                    out, so eight become one by removing rather than by staring */}
-                {!p.pinned && pages.length > 1 && (
-                  <button className="cull" aria-label="remove this page"
-                    title="take this page off the wall. z brings it back."
-                    onClick={(e) => { e.stopPropagation(); kill(i) }}><Icon.x /></button>
-                )}
-                <div className="cellbar">
-                  <span className="arch">{p.sections.filter((s) => s.on).length} sections</span>
-                  <span className="tname">{p.taste.name}</span>
-                  {p.pinned && <span className="kept">pinned</span>}
+            {pages.map((p, i) => {
+              const cellHtml = renderPage(p, { title: product.name })
+              // the verdict sits on every cell, so the generic pages announce themselves
+              // while you are deciding which cells to cull
+              const verdict = slop(p, cellHtml)
+              return (
+                <div key={p.id} className={`cell ${i === at ? 'on' : ''}${p.pinned ? ' pinned' : ''}`}
+                  onClick={() => { setAt(i); setView('studio') }}>
+                  <Preview html={cellHtml} />
+                  {/* elimination is the grid's other act: drop a cell and the survivors spread
+                      out, so eight become one by removing rather than by staring */}
+                  {!p.pinned && pages.length > 1 && (
+                    <button className="cull" aria-label="remove this page"
+                      title="take this page off the wall. z brings it back."
+                      onClick={(e) => { e.stopPropagation(); kill(i) }}><Icon.x /></button>
+                  )}
+                  <div className="cellbar">
+                    <span className="arch">{p.sections.filter((s) => s.on).length} sections</span>
+                    <span className="tname">{p.taste.name}</span>
+                    <span className={verdict.length ? 'flags' : 'flags ok'}
+                      title={verdict.length
+                        ? verdict.map((f) => `${f.label}. ${f.why}`).join('\n')
+                        : 'none of the catalogued generic patterns'}>
+                      {verdict.length ? `${verdict.length} generic` : 'clean'}
+                    </span>
+                    {p.pinned && <span className="kept">pinned</span>}
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </main>
         )}
 

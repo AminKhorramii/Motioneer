@@ -31,6 +31,14 @@ const AI_BEIGE = /^#(f[0-9a-f]{2}(e|f)[0-9a-f]{2}(d|e)[0-9a-f]|f5f5f0|faf8f5|fdf
 const INTERCHANGEABLE = /\b(save time|grow your business|boost (?:your )?productivity|work smarter|built for scale|lightning[- ]fast|blazing(?:ly)? fast|all[- ]in[- ]one|the future of|10x your)\b/i
 const PLACEHOLDER_PROOF = /\b(?:trusted|loved|used) by [\d,.]+\s*[km]?\+?\s*(?:users|teams|companies|developers|customers)\b/i
 const LOVE_TAGLINE = /(?:built|made|crafted) with (?:love|❤|passion)/iu
+/** constructions a model writes and nobody says across a desk, which is why readers hear them */
+const NOT_X_BUT_Y = /\b(?:it'?s|this is|we'?re) not (?:just )?(?:a |an |about )?[^,.;]{2,40}[,;.]?\s+(?:it'?s|but|this is)\b/i
+const WHETHER_YOURE = /\bwhether you'?re\b[^.]{0,80}\bor\b/i
+const AI_PHRASE = /\b(?:in today'?s (?:fast[- ]paced |digital |modern |ever[- ]changing )?(?:world|landscape|market|economy)|look no further|delve|dive (?:deep )?into|at the end of the day|to the next level|say goodbye to|say hello to|we'?ve got you covered|the possibilities are endless)\b/i
+/** the placeholder companies every mockup reaches for, which say the logos are props */
+const FAKE_LOGO = /\b(?:acme|globex|initech|umbrella corp|stark industries|wayne enterprises|hooli|vandelay|cyberdyne|massive dynamic)\b/i
+/** a bare figure with a suffix and no sentence, the unit a stat banner is built from */
+const BARE_STAT = /^[\d,.]+\s*(?:%|[kKmMbB]\+?|x|×|\+)$/
 
 const text = (page: Page) =>
   page.sections
@@ -75,6 +83,38 @@ export function slop(page: Page, html?: string): Flag[] {
       add('love-tagline', 'made with love',
         'It is the sign-off every generated page reaches for, and it tells the reader nothing they can use.', section)
     }
+    if (NOT_X_BUT_Y.test(value)) {
+      add('not-x-but-y', 'the "not X, it is Y" pivot',
+        'Nobody says it across a desk, so the sentence sounds like the model rather than the product.', section)
+    }
+    if (WHETHER_YOURE.test(value)) {
+      add('whether-youre', 'whether you are A or B',
+        'Addressing everyone at once addresses nobody, where naming one reader makes the page theirs.', section)
+    }
+    const phrase = value.match(AI_PHRASE)
+    if (phrase) {
+      add('ai-phrase', `stock phrase: ${phrase[0].toLowerCase()}`,
+        'It is filler every generated page shares, so it marks the copy as written by nobody.', section)
+    }
+    if (FAKE_LOGO.test(value)) {
+      add('fake-logos', 'placeholder company names',
+        'A made up logo row promises proof and delivers a prop, which costs more trust than an empty row.', section)
+    }
+  }
+
+  // an em dash is the punctuation a model leans on for energy it did not earn in the words,
+  // and more than one on a page is a tell rather than a choice
+  const dashes = text(page).reduce((n, f) => n + (f.value.match(/—/g)?.length ?? 0), 0)
+  if (dashes >= 2) {
+    add('em-dashes', `${dashes} em dashes`,
+      'Chained asides read as generated writing now, where a full sentence would carry the point.')
+  }
+
+  // three bare figures make a stat banner, which asks to be admired rather than believed
+  const bares = text(page).filter((f) => BARE_STAT.test(f.value.trim())).length
+  if (bares >= 3) {
+    add('stat-banner', 'a row of big statistics',
+      'A number outside a sentence says nothing about what it cost or saved, so the row decorates rather than argues.')
   }
 
   const hero = page.sections.find((s) => s.kind === 'hero' && s.on)
@@ -85,6 +125,11 @@ export function slop(page: Page, html?: string): Flag[] {
     if (!specific && words.length > 7) {
       add('vague-headline', 'vague headline',
         'It carries no number, no name and no concrete noun, so it could sit on any product.',
+        hero?.id)
+    }
+    if (/\?\s*$/.test(headline.trim()) || /^(?:tired of|struggling|still|ready to|what if|why settle)\b/i.test(headline.trim())) {
+      add('rhetorical-headline', 'a headline that asks',
+        'A question the page answers itself spends the headline warming up, where the answer would have been the headline.',
         hero?.id)
     }
   }
@@ -168,6 +213,14 @@ export function slop(page: Page, html?: string): Flag[] {
     if ((html.match(/border-radius:\s*(?:2[89]|[3-9]\d)px/g) ?? []).length >= 3) {
       add('over-rounding', 'over-rounded corners',
         'Past a certain radius every element becomes a pill, and softness turns into the only voice the page has.')
+    }
+    if (/border-left:\s*[2-8]px solid/.test(html)) {
+      add('accent-border-card', 'the coloured left border',
+        'It is the template shorthand for importance, so it reads as the framework speaking rather than the brand.')
+    }
+    if (/text-shadow:\s*[^;}]*\b\d{2,}px/.test(html)) {
+      add('glow-text', 'glowing text',
+        'A glow stands in for contrast the palette did not provide, and it costs the letterforms their edges.')
     }
   }
 

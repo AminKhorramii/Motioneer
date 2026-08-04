@@ -214,12 +214,14 @@ button:disabled { opacity: 0.32; pointer-events: none; }
 .filmbar .spacer { flex: 1; }
 
 /* the slop count sits beside ship, because it is the last thing worth checking before you
-   send a page out */
-.filmbar .flags::before {
+   send a page out, and on every grid cell, because generic should announce itself to triage */
+.filmbar .flags, .cellbar .flags { font-size: 11px; color: var(--dim); cursor: default; }
+.cellbar .flags { margin-left: auto; }
+.filmbar .flags::before, .cellbar .flags::before {
   content: ''; display: inline-block; width: 5px; height: 5px; border-radius: 50%;
   background: #c98b4b; margin-right: 6px; vertical-align: 1px;
 }
-.filmbar .flags.ok::before { background: var(--ok); }
+.filmbar .flags.ok::before, .cellbar .flags.ok::before { background: var(--ok); }
 
 :where(.dock) button:focus-visible, .side input:focus-visible {
   outline: 2px solid var(--accent); outline-offset: 1px;

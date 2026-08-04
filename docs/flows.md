@@ -178,6 +178,17 @@ are visual rather than textual. Being local and instant is what lets it run **be
 call, where its findings are passed into the prompt as things to avoid. A checker that only runs
 afterwards is a report; one that runs first is a constraint.
 
+The same catalogue covers the tells of generated writing, not only generated decoration: the
+"not X, it is Y" pivot, "whether you are A or B", the headline that asks a question the page
+answers, stock filler phrases, chained em dashes, rows of bare statistics, placeholder company
+logos, the coloured left border, glowing text. `src/craft.ts` carries the inverse of each into
+the system prompt, so the writing is shaped before there is anything to detect.
+
+**The verdict travels with the paper.** The dock shows `clean` or `N generic` beside ship for
+the page in the middle, with every reason in the tooltip, and the grid shows the same chip on
+every cell. It sits with triage on purpose: the generic pages announce themselves while you are
+deciding which cells to cull.
+
 ---
 
 ## 6. Images and backdrops

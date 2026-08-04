@@ -51,6 +51,26 @@ export const CRAFT: Rule[] = [
     rule: 'Give each section one thing to be about and let one section dominate the page, rather than three equal columns of everything.',
     why: 'Equal weight everywhere is the layout of not choosing, and the reader can feel that no choice was made.',
   },
+  {
+    id: 'said-across-a-desk',
+    rule: 'Every sentence survives being said aloud to one person: no "not X, it is Y" pivots, no "whether you are A or B", no question the page answers itself.',
+    why: 'Constructions nobody speaks are the accent of generated writing, and readers have learned to hear it.',
+  },
+  {
+    id: 'name-the-mechanism',
+    rule: 'When the page claims a result, one clause says how the product gets it, naming the mechanism.',
+    why: 'A claim with a mechanism can be checked, and checkable is the difference between a fact and a slogan.',
+  },
+  {
+    id: 'plain-punctuation',
+    rule: 'Full sentences with plain punctuation: no em dashes, no exclamation marks, and adjectives only where a fact backs them.',
+    why: 'These are the marks a writer leans on for energy the words did not earn, and they read as borrowed.',
+  },
+  {
+    id: 'cut-not-fill',
+    rule: 'A section with nothing specific to say is cut, never padded.',
+    why: 'Filler spends the trust the specific sections earned, because the reader cannot tell which kind they are in next.',
+  },
 ]
 
 /** The rules as prompt text. Static, so it never breaks the prompt cache across a wall. */

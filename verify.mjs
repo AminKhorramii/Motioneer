@@ -131,6 +131,25 @@ const triage = await page.evaluate(async () => {
 })
 console.log('triage:', JSON.stringify(triage))
 
+// ——— 2c. the slop verdict rides with every paper, so generic announces itself to triage ———
+await page.click('header .views button:nth-child(2)')
+await page.waitForTimeout(400)
+const verdicts = await page.evaluate(() => ({
+  cells: document.querySelectorAll('.grid .cell').length,
+  chips: document.querySelectorAll('.grid .cellbar .flags').length,
+  withReasons: [...document.querySelectorAll('.grid .cellbar .flags')]
+    .every((el) => (el.getAttribute('title') ?? '').length > 10),
+  sample: document.querySelector('.grid .cellbar .flags')?.textContent,
+}))
+console.log('slop chips:', JSON.stringify(verdicts))
+await page.click('header .views button:nth-child(1)')
+await page.waitForTimeout(300)
+const dockVerdict = await page.evaluate(() => ({
+  shown: !!document.querySelector('.filmbar .flags'),
+  text: document.querySelector('.filmbar .flags')?.textContent,
+}))
+console.log('dock verdict:', JSON.stringify(dockVerdict))
+
 // ——— 3. direct manipulation: edit text on the paper itself ———
 const edited = await page.evaluate(async () => {
   const f = document.querySelector('.paper.here iframe')

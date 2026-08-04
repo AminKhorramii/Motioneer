@@ -2,6 +2,7 @@ import { chosen } from '@/compose'
 import { Icon } from '@/icons'
 import { MARKS } from '@/models'
 import { worldById, type WorldId } from '@/worlds'
+import type { Flag } from '@/slop'
 
 /**
  * The dock: what you ask for on top, where you are underneath.
@@ -19,6 +20,8 @@ interface Props {
   bar: string
   busy: boolean
   pinned: boolean
+  /** what the slop detector found on this page, so the verdict travels with the paper */
+  flags: Flag[]
   onBar: (v: string) => void
   onRun: () => void
   onGo: (i: number) => void
@@ -33,7 +36,7 @@ interface Props {
 }
 
 export function Dock({
-  at, count, angle, world, bar, busy, pinned,
+  at, count, angle, world, bar, busy, pinned, flags,
   onBar, onRun, onGo, onModel, onWorld, onPin, onKill, onSend, onOpen, onShip,
 }: Props) {
   return (
@@ -84,6 +87,14 @@ export function Dock({
           {worldById(world).name}
         </button>
         <span className="spacer" />
+        {/* the verdict sits beside ship, because it is the last thing worth checking before a
+            page goes out, and the reasons ride in the tooltip rather than taking a panel */}
+        <span className={flags.length ? 'flags' : 'flags ok'}
+          title={flags.length
+            ? flags.map((f) => `${f.label}. ${f.why}`).join('\n')
+            : 'none of the catalogued generic patterns'}>
+          {flags.length ? `${flags.length} generic` : 'clean'}
+        </span>
         <button className="icon" aria-label="full view" title="open this page in your browser"
           onClick={onOpen}><Icon.open /></button>
         <button className={onSend ? 'icon' : 'go'} aria-label="download"
