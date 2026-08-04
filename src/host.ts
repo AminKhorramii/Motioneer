@@ -10,6 +10,8 @@ import { generateImage, streamText } from '../shared/providers.mjs'
 export interface ModelOpts {
   base?: string
   model?: string
+  /** a design reply carries CSS for eight worlds, which needs far more room than copy does */
+  maxTokens?: number
 }
 
 export interface Host {

@@ -84,6 +84,34 @@ export function slop(page: Page, html?: string): Flag[] {
   }
 
   if (html) {
+    // These checks exist because the model now writes CSS. Parameters could not produce an
+    // unreadable page, but hand written CSS can, and these are the ways it usually does.
+    const body = html.match(/font-size:\s*(\d+(?:\.\d+)?)px/g) ?? []
+    if (body.some((d) => Number(d.replace(/\D+/g, '')) < 14)) {
+      add('tiny-text', 'text under 14px',
+        'It looks refined on a designer\'s screen and is unreadable on everyone else\'s.')
+    }
+    if (/background-clip:\s*text|-webkit-background-clip:\s*text/.test(html)) {
+      add('gradient-text', 'gradient filled text',
+        'It is the decoration a page reaches for when the words are not carrying it.')
+    }
+    if (/\bp\s*\{[^}]*text-transform:\s*uppercase/.test(html)) {
+      add('shouting-body', 'body copy in capitals',
+        'Capitals remove the word shapes people read by, so a paragraph becomes a wall.')
+    }
+    if ((html.match(/box-shadow:/g) ?? []).length > 8) {
+      add('shadow-stack', 'shadows on everything',
+        'When every block floats, nothing is above anything, and the depth stops meaning anything.')
+    }
+    const faces = new Set((html.match(/font-family:\s*([^;}]+)/g) ?? []).map((f) => f.split(',')[0]))
+    if (faces.size > 3) {
+      add('face-soup', `${faces.size} typefaces`,
+        'Two faces is a system and four is an accident, since each one asks the reader to adjust.')
+    }
+    if (/@keyframes[^}]*}[^}]*}/.test(html) && /border-radius:\s*50%/.test(html) && /animation:/.test(html)) {
+      add('pulsing-dot', 'a pulsing dot',
+        'A small thing blinking forever takes attention it never gives back.')
+    }
     if (/backdrop-filter/.test(html)) {
       add('glassmorphism', 'glassmorphism',
         'Frosted panels read as a period effect rather than a decision, and they cost contrast.')

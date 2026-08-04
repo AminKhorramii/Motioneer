@@ -89,6 +89,10 @@ page.on('pageerror', (e) => errors.push(String(e).slice(0, 300)))
 
 await page.waitForSelector('.onboard .card', { timeout: 20000 })
 await page.evaluate((key) => localStorage.setItem('wall-key-anthropic', key), KEY)
+// setup is two steps now: pick the model, then the brief where the sample lives
+await page.evaluate(() => document.querySelector('.onboard .pick')?.click())
+await page.click('.onboard .primary')
+await page.waitForSelector('.sample', { timeout: 10000 })
 await page.click('.sample')
 await page.waitForSelector('.paper.here', { timeout: 20000 })
 
@@ -159,6 +163,26 @@ const cleanliness = await page.evaluate(async () => {
   return out
 })
 console.log('slop per paper:', JSON.stringify(cleanliness))
+const worlds = await page.evaluate(async () => {
+  const out = []
+  for (let i = 0; i < 9; i++) {
+    document.querySelectorAll('.filmbar .nav button')[0]?.click()
+    await new Promise((r) => setTimeout(r, 120))
+  }
+  for (let i = 0; i < 9; i++) {
+    const w = document.querySelector('.filmbar .world')?.textContent
+    const d = document.querySelector('.paper.here iframe')?.contentDocument
+    const b = d && getComputedStyle(d.body)
+    const h = d && d.querySelector('h1') && getComputedStyle(d.querySelector('h1'))
+    out.push(`${w} | ${b?.fontFamily?.split(',')[0]} | ${h?.fontSize} | ${b?.backgroundColor}`)
+    document.querySelectorAll('.filmbar .nav button')[1]?.click()
+    await new Promise((r) => setTimeout(r, 260))
+  }
+  return out
+})
+console.log('\nworlds Claude designed:')
+for (const w of worlds) console.log('  ' + w)
+
 console.log('\nwhat Claude actually wrote:')
 for (const p of wall.pages) console.log(`  [${p.angle ?? 'base'}] ${p.headline}`)
 console.log('\nerrors:', errors.length ? errors.slice(0, 5) : 'none')

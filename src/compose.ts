@@ -5,7 +5,7 @@ import { host, isServed, servedProviders } from '@/host'
 import { slop, slopBrief } from '@/slop'
 import { modelById } from '@/models'
 import { BACKDROPS, type Backdrop } from '@/backdrop'
-import { WORLDS, type World } from '@/worlds'
+import { WORLDS, madeWorld, worldById, type World } from '@/worlds'
 import { KIND_VARIANTS, defaultContent, uid, type Kind, type Page, type Section } from '@/sections'
 
 export interface Product {
@@ -48,7 +48,7 @@ export function seeded(page: Page, p: Product): Page {
  * produced variety without identity: a terminal hero above an editorial features block reads
  * as a shuffle rather than as a design.
  */
-export function arrange(base: Page, i: number): Page {
+export function arrange(base: Page, i: number, worlds: World[] = WORLDS): Page {
   if (i === 0) {
     return { ...base, id: uid(), sections: base.sections.map((s) => ({ ...s, content: structuredClone(s.content) })) }
   }
@@ -57,7 +57,7 @@ export function arrange(base: Page, i: number): Page {
   // advances by a stride so the pairs do not move in lockstep, which is what makes a wall of
   // eight look like eight rather than like three repeated.
   const looks = [base.taste, ...PRESETS.filter((p) => p.name !== base.taste.name)]
-  const world = WORLDS[(i - 1) % WORLDS.length]
+  const world = worlds[(i - 1) % worlds.length]
   const look = looks[((i - 1) * 3) % looks.length]
   return { ...inWorld({ ...base, taste: look }, world), id: uid() }
 }
@@ -77,10 +77,18 @@ function inWorld(page: Page, world: World): Page {
   }
 }
 
+/** Worlds a model designed for this product, so the renderer and the dock can find them by id. */
+let designed: World[] = []
+export const setDesigned = (w: World[]) => {
+  designed = w
+}
+export const allWorlds = () => [...designed, ...WORLDS]
+
 /** Move a page to the next world, keeping its copy. */
 export function cycleWorld(page: Page): Page {
-  const at = WORLDS.findIndex((w) => w.id === page.world)
-  return inWorld(page, WORLDS[(at + 1) % WORLDS.length])
+  const pool = allWorlds()
+  const at = pool.findIndex((w) => w.id === page.world)
+  return inWorld(page, pool[(at + 1) % pool.length])
 }
 
 /** alternatives of a whole page: same copy, different arrangement. The path with no key. */
@@ -186,6 +194,7 @@ async function ask(
   system: string,
   user: string,
   onDelta?: (delta: string) => void,
+  extra?: { maxTokens?: number },
 ): Promise<string | null> {
   const key = keyFor(provider)
   // a served deployment holds the key, so an empty one here is not a reason to stop
@@ -198,7 +207,7 @@ async function ask(
   if (onDelta) streams.set(id, onDelta)
   try {
     const m = chosen()
-    const res = await host.stream(id, m.wire, system, user, key, optsFor(m))
+    const res = await host.stream(id, m.wire, system, user, key, { ...optsFor(m), ...extra })
     if (res?.error) throw new Error(res.error)
     return res?.text ?? null
   } finally {
@@ -215,12 +224,12 @@ async function ask(
  * makes almost every delta trigger a scan, and re-reading turns one page into quadratic work.
  * With several pages streaming at once that is enough to stall the app.
  */
-function scanSections(buf: string, from: number) {
+function scanSections(buf: string, from: number, key = '"sections"') {
   const out: { id: string; content: Record<string, unknown> }[] = []
   let cursor = from
   if (from === 0) {
-    const key = buf.indexOf('"sections"')
-    const open = key < 0 ? -1 : buf.indexOf('[', key)
+    const at = buf.indexOf(key)
+    const open = at < 0 ? -1 : buf.indexOf('[', at)
     if (open < 0) return { out, cursor }
     cursor = open + 1
   }
@@ -246,7 +255,9 @@ function scanSections(buf: string, from: number) {
       if (depth === 0 && start >= 0) {
         try {
           const obj = JSON.parse(buf.slice(start, i + 1)) as { id?: string; content?: Record<string, unknown> }
-          if (obj.id && obj.content) out.push({ id: obj.id, content: obj.content })
+          if (obj.id !== undefined || obj.content !== undefined || key !== '"sections"') {
+            out.push(obj as { id: string; content: Record<string, unknown> })
+          }
         } catch {
           // an object that fails to parse is simply not finished yet
         }
@@ -341,10 +352,18 @@ export async function promptPage(
   // the detector runs before the call, so its findings steer the writing instead of only
   // describing it afterwards
   const avoid = slopBrief(slop(page))
+  // the copy is written into a design, so it is told which one. Without this a poster and a
+  // catalogue come back at the same length, when one wants six words and the other wants forty.
+  const w = worldById(page.world)
+  const design = [
+    `Design: ${w.name}. ${w.note}`,
+    w.voice,
+    `The measure is ${w.structure.measure} characters, the type scale is ${page.taste.scale.toFixed(2)} and the page is ${page.taste.density > 0.65 ? 'dense' : page.taste.density < 0.4 ? 'airy' : 'evenly spaced'}.`,
+  ].filter(Boolean).join(' ')
   const text = await ask(
     provider,
     PAGE_SYSTEM,
-    `Product: ${product.name}. ${product.oneLiner}\n${product.what}\nAudience: ${product.audience}\n\nPage:\n${JSON.stringify(shape, null, 2)}\n\nInstruction: ${instruction}${avoid ? `\n\n${avoid}` : ''}`,
+    `Product: ${product.name}. ${product.oneLiner}\n${product.what}\nAudience: ${product.audience}\n\n${design}\n\nPage:\n${JSON.stringify(shape, null, 2)}\n\nInstruction: ${instruction}${avoid ? `\n\n${avoid}` : ''}`,
     feed,
   )
   if (!text) return null
@@ -354,6 +373,78 @@ export async function promptPage(
   // a truncated reply costs the tail of a page instead of the entire page.
   const sections = json?.sections ?? found
   return sections.length ? mergeSections(page, sections, outId) : null
+}
+
+const WORLDS_SYSTEM = `You are designing the visual systems for a set of landing pages, one system per page. Each is a "world": one set of decisions that hold together, in the way a magazine, a timetable and a museum wall label each hold together while looking nothing like each other.
+
+Return JSON shaped as {"worlds":[{ ... }]} with exactly the number asked for. Each world has these fields, and every one of them is a real lever on how the page looks:
+
+name: two or three words, lowercase, naming the feeling rather than the technique. "wall label", "field manual", "night edition".
+note: one sentence on what it is, for a person choosing between them.
+voice: one sentence telling the writer how to write for it. A poster wants six words where a catalogue wants forty, and the copy is written from this line, so make it specific about length and register.
+display and body: one of sans, grotesk, serif, mono. Only these four, because the page ships as a single file with no downloaded fonts, and anything else would fall back to something you did not choose.
+scale: 1.1 to 1.7. The ratio between heading sizes. Above 1.5 the headline dominates everything.
+weight: 300 to 800. 300 is thin and editorial, 800 is a poster shouting.
+radius: 0 to 24 pixels. 0 is architectural, 24 is friendly software.
+density: 0.25 to 0.9, where 0.25 is airy and 0.9 is packed.
+caps: true or false, for small capitalised labels.
+palette: as-is, mono, tinted or contrast. mono drops the second accent, tinted pushes the background toward the accent, contrast pulls ink and background apart.
+structure.rules: hairlines between sections, which is what makes a grid read as a grid.
+structure.numbered: numbers in the margin beside each section.
+structure.bleed: sections run edge to edge rather than sitting in a column.
+structure.measure: 44 to 82 characters per line. This is the single biggest lever on how a page reads.
+structure.figure: framed, bleed or plain.
+backdrop: none, contours, grain or ridge. Drawn behind the page from the palette.
+prefer: which layout each section wears, as {"hero":0-3,"logos":0-1,"features":0-2,"showcase":0-1,"quote":0-1,"pricing":0-1,"faq":0-1,"cta":0-1}. Keep them agreeing with each other: a page where every section picked differently reads as a shuffle rather than a design.
+css: the part that matters most. Thirty to sixty lines of CSS that make the idea real, because the fields above can only change size and spacing, and no arrangement of them will make a page look like a receipt or a departures board. This is where you draw.
+
+The page you are styling is plain HTML with these hooks, and nothing else:
+  section[data-section] wraps every section and carries id="hero", "features", "pricing" and so on, so you can style one kind differently from another
+  .wrap is the column inside each section
+  h1 and h2 are the headings, p is body copy
+  .eyebrow is the small label above a headline
+  .ctas holds the buttons, .btn is a button, .btn-primary and .btn-ghost are the two kinds
+  .card is a bordered block, .grid is a row of them
+  img sits inside a bordered figure
+These custom properties are already set from the palette and are the colours you should use: --bg, --ink, --dim, --accent, --accent2, --surface, --line, --r for radius, --gap for rhythm.
+
+Write CSS that commits to the idea. A receipt has a narrow column, dashed rules, tabular figures and a torn edge. A departures board has slabs of solid colour, tight uppercase rows and hard shadows. A gallery card has enormous margins, one hairline and nothing else. Use borders, background gradients, pseudo elements, counters, transforms, grid and mix-blend-mode. Change the shape of things, not only their size.
+
+Avoid the patterns that make a page look generated rather than designed, and the reasons matter more than the list: frosted glass panels, because they read as a period effect and cost contrast; default drop shadows under everything, because when every block floats nothing is above anything; cards inside cards, because two borders around the same content divide attention without adding structure; gradient filled headlines, because that is the decoration a page reaches for when the words are not carrying it; more than three typefaces, because two is a system and four is an accident; body text under fifteen pixels, because it looks refined on your screen and is unreadable on everyone else's; and small labels blinking forever, because they take attention they never give back.
+
+Two rules on the CSS, both about the page still working when it leaves here. Use no @import and no remote urls, because the page ships as a single file with nothing to fetch. Keep body text at least 15px and keep it legible against the background, because a page nobody can read is not a daring design, it is a broken one.
+
+Make them far apart. Two worlds that differ only in radius are one world, and the whole point is that someone can choose. Push each one until it commits: if it is dense, make it genuinely dense; if it is quiet, take things away rather than shrinking them. Ground each in something real that already exists in the world, a field guide, a receipt, an airport sign, a gallery card, a terminal session, a broadsheet, and let that decide the whole set of values rather than picking them one at a time.
+
+At least one of them should be uncomfortable. A set where everything is tasteful is a set with nothing to choose between.
+
+Ground each world in something that already exists and is not a website: a luggage tag, a seed packet, a hospital chart, a betting slip, a concert poster, a tide table, a museum vitrine. Then build the whole set of values, including the CSS, from that one thing. Worlds invented from web design vocabulary come out looking like every other page, and worlds taken from an object in the world come out looking like themselves.
+
+Respond with the JSON object alone, because the reply is parsed directly.`
+
+/**
+ * Ask for a set of visual systems rather than choosing from mine.
+ *
+ * Six hand written worlds is six points in a space, and every page the app could make was
+ * inside a box I drew. This lets the space be explored instead of enumerated. Every value is
+ * clamped on the way in, so a model can be daring without being able to produce an unreadable
+ * page, and the built in worlds remain the fallback when the call fails.
+ */
+export async function promptWorlds(product: Product, n: number, provider: Provider = 'model'): Promise<World[]> {
+  const text = await ask(
+    provider,
+    WORLDS_SYSTEM,
+    `Product: ${product.name}. ${product.oneLiner}\n${product.what}\nAudience: ${product.audience}\n\nDesign ${n} worlds for it.`,
+    undefined,
+    { maxTokens: 24000 },
+  ).catch(() => null)
+  // A world carries CSS now, so eight of them is a long reply and a cut one used to yield
+  // nothing at all. The same walk that recovers half-arrived sections recovers half-arrived
+  // worlds, so a truncated design still gives whatever finished.
+  const json = text ? (grabJson(text) as { worlds?: Record<string, unknown>[] } | null) : null
+  const raw = json?.worlds ?? (text ? (scanSections(text, 0, '"worlds"').out as unknown as Record<string, unknown>[]) : [])
+  const made = raw.map(madeWorld).filter((w) => w.name)
+  return made.length >= 2 ? made : WORLDS
 }
 
 /**
@@ -384,12 +475,13 @@ export async function fanOut(
   provider: Provider,
   n: number,
   onPage: (page: Page) => void,
+  worlds: World[] = WORLDS,
 ): Promise<{ written: number; error?: string }> {
   const done = await Promise.all(
     ANGLES.slice(0, n).map(async (angle, i) => {
       try {
         const written = await promptPage(
-          arrange(base, i + 1), `Write this page as "${angle.name}". ${angle.instruction}`, product, provider,
+          arrange(base, i + 1, worlds), `Write this page as "${angle.name}". ${angle.instruction}`, product, provider,
           (partial) => onPage({ ...partial, angle: angle.name }),
         )
         if (!written) return { ok: 0, error: 'the reply was not usable JSON' }

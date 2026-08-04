@@ -246,6 +246,41 @@ export async function fakeAnthropic(dir = FIXTURES) {
     }
     // the page shape is embedded in a JSON body, so its quotes arrive escaped
     const ids = [...body.matchAll(/\\?"id\\?":\s*\\?"([a-z0-9]{5,})\\?"/g)].map((m) => m[1])
+    // a design request asks for worlds, and the reply exercises the clamping on the way in, so
+    // some values here are deliberately out of range
+    if (body.includes('worlds') && !body.includes('questions')) {
+      const faces = ['sans', 'grotesk', 'serif', 'mono']
+      const backdrops = ['none', 'contours', 'grain', 'ridge']
+      const palettes = ['as-is', 'mono', 'tinted', 'contrast']
+      const reply = '```json\n' + JSON.stringify({
+        worlds: Array.from({ length: 8 }, (_, i) => ({
+          name: ['wall label', 'field manual', 'night edition', 'receipt', 'broadsheet', 'sign system', 'zine', 'gallery card'][i],
+          note: `a made world number ${i + 1}`,
+          voice: i % 2 ? 'Write six words where you would write twenty.' : 'Write densely and specifically.',
+          display: faces[i % 4], body: faces[(i + 2) % 4],
+          scale: i === 0 ? 9 : 1.15 + i * 0.06,
+          weight: i === 1 ? 5000 : 300 + i * 60,
+          radius: i === 2 ? 400 : i * 3,
+          density: 0.3 + i * 0.07,
+          caps: i % 3 === 0,
+          palette: palettes[i % 4],
+          backdrop: i === 3 ? 'nonsense' : backdrops[i % 4],
+          structure: {
+            rules: i % 2 === 0, numbered: i % 3 === 0, bleed: i % 4 === 0,
+            measure: i === 0 ? 400 : 46 + i * 4,
+            figure: ['framed', 'bleed', 'plain'][i % 3],
+          },
+          prefer: { hero: i % 4, features: i % 3, showcase: i % 2, quote: i % 2, pricing: i % 2, faq: i % 2, cta: i % 2, logos: i % 2 },
+          css: i === 0
+            ? '@import url(https://evil.example/x.css); section{border-top:2px dashed var(--line)} h1{letter-spacing:-.03em} .btn-primary{background:url(https://evil.example/a.png)}'
+            : `section#hero .wrap{border:1px solid var(--line)} .card{border-radius:0} .eyebrow{letter-spacing:.${i}em}`,
+        })),
+      }) + '\n```'
+      res.writeHead(200, { ...CORS, 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
+      for (const { text } of chunkUp(intakeStream(reply))) res.write(text)
+      return res.end()
+    }
+
     // an intake asks for a product and questions rather than sections, so it needs its own reply
     // match without quotes: the prompt travels inside a JSON body, so its quotes are escaped
     if (body.includes('questions')) {

@@ -4,7 +4,7 @@ import { KIND_LABEL, applyEdit, starterPage, type Kind, type Page } from '@/sect
 import { renderPage } from '@/render'
 import { pageBrief } from '@/brief'
 import {
-  EMPTY_PRODUCT, addSection, alternatives, arrange, canDraw, canWrite, chosen, cycleBackdrop, cycleVariant, cycleWorld, dropSection, fanOut, illustrate, loadHeldKeys, promptPage, promptSection, sectionAlternatives, seeded, setMock, type Product,
+  EMPTY_PRODUCT, addSection, alternatives, arrange, canDraw, canWrite, chosen, cycleBackdrop, promptWorlds, setDesigned, cycleVariant, cycleWorld, dropSection, fanOut, illustrate, loadHeldKeys, promptPage, promptSection, sectionAlternatives, seeded, setMock, type Product,
 } from '@/compose'
 import { Onboarding } from '@/Onboarding'
 import { BriefRail } from '@/BriefRail'
@@ -12,6 +12,7 @@ import { SectionsRail } from '@/SectionsRail'
 import { Dock } from '@/Dock'
 import { Icon } from '@/icons'
 import { slop } from '@/slop'
+import { register as registerWorlds } from '@/worlds'
 
 import { host, isDesktop } from '@/host'
 
@@ -93,6 +94,11 @@ export default function App() {
       setPages(alternatives(base, 8))
       return
     }
+    // ask for the visual systems first, so the wall is not limited to the six I wrote
+    setBusy(`Designing eight worlds with ${chosen().label}.`)
+    const worlds = await promptWorlds(p, 8)
+    setDesigned(worlds)
+    registerWorlds(worlds)
     setBusy(`Writing eight pages with ${chosen().label}, one per angle.`)
     // a page keeps one id for its whole stream, so a paper appears on its first section and
     // then fills in, instead of arriving all at once when the model finishes
@@ -104,7 +110,7 @@ export default function App() {
         setBusy(`${started.size} of 8 pages writing.`)
       }
       upsertPage(page)
-    })
+    }, worlds)
     if (run.current !== mine) return
     setBusy('')
     if (!written) {

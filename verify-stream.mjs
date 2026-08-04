@@ -106,6 +106,21 @@ const wall = await page.evaluate(async () => {
   }
 })
 console.log('written wall:', JSON.stringify(wall))
+
+// a world brings CSS with it, and that CSS must not be able to make the page fetch anything
+const worldCss = await page.evaluate(async () => {
+  const found = { styled: 0, imports: 0, remote: 0 }
+  for (let i = 0; i < 9; i++) {
+    const html = document.querySelector('.paper.here iframe')?.contentDocument?.documentElement?.outerHTML ?? ''
+    if (html.includes('/* world */')) found.styled++
+    if (/@import/i.test(html)) found.imports++
+    if (/url\(\s*['"]?https?:/i.test(html)) found.remote++
+    document.querySelectorAll('.filmbar .nav button')[1]?.click()
+    await new Promise((r) => setTimeout(r, 260))
+  }
+  return found
+})
+console.log('world css:', JSON.stringify(worldCss))
 // images: one response rather than a stream, and the promise is that it ships inside the file
 await page.evaluate(() => localStorage.setItem('wall-key-gemini', 'test-key'))
 // go back to the first paper, so the assertion is not at the mercy of which world is centred

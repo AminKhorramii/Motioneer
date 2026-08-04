@@ -64,6 +64,7 @@ font-size:.72rem;letter-spacing:.14em;color:var(--dim);font-variant-numeric:tabu
 @media(max-width:1100px){section>.wrap::before{display:none}}` : ''}
 ${w.structure.bleed ? '.wrap{max-width:none;padding-left:6vw;padding-right:6vw}' : ''}
 p{max-width:${w.structure.measure}ch}
+${w.css ? `\n/* world */\n${w.css}\n` : ''}
 ${editable ? `[data-edit]{outline:0;transition:box-shadow .15s ease;border-radius:3px}
 [data-edit]:hover{box-shadow:0 0 0 1px ${alpha(t.accent, 0.45)}}
 [data-edit]:focus{box-shadow:0 0 0 2px ${t.accent};background:${alpha(t.accent, 0.06)}}` : ''}

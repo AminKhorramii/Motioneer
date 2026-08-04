@@ -29,7 +29,7 @@ export const REQUESTS = {
     body: {
       model: opts.model || model('gpt-5.2'),
       messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
-      max_completion_tokens: 8000,
+      max_completion_tokens: opts.maxTokens || 8000,
       stream: true,
     },
     delta: (j) => j?.choices?.[0]?.delta?.content ?? '',
@@ -46,7 +46,7 @@ export const REQUESTS = {
     body: {
       model: opts.model || model('claude-sonnet-5'),
       // nine sections of copy runs past 2000, and a truncated reply is a lost page
-      max_tokens: 8000,
+      max_tokens: opts.maxTokens || 8000,
       system,
       messages: [{ role: 'user', content: user }],
       stream: true,
