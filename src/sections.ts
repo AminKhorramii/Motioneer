@@ -59,14 +59,16 @@ export function defaultContent(kind: Kind, product = 'Product'): Record<string, 
   switch (kind) {
     case 'hero':
       return {
-        eyebrow: 'for people who build',
+        eyebrow: 'One plain line that earns the claim.',
         headline: 'A sentence that makes the value obvious.',
         sub: 'Two lines a stranger would understand, without adjectives.',
-        cta: 'Start free',
+        // the button names what happens, because a button that names enthusiasm is furniture
+        cta: `Download ${product}`,
         cta2: 'See how it works',
       }
     case 'logos':
-      return { label: 'used by teams at', names: ['Northwind', 'Acme', 'Vector', 'Halden', 'Fold'] }
+      // no invented companies: a made up logo row promises proof and delivers a prop
+      return { label: 'used by teams at', names: ['Replace', 'these', 'with', 'real', 'names'] }
     case 'features':
       return {
         title: 'What it does',

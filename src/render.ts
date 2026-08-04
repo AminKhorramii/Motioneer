@@ -44,15 +44,17 @@ h1,h2,h3{font-family:${t.display};font-weight:${t.weight};line-height:1.07;lette
 h1{font-size:clamp(2.3rem,6vw,${s(6)})}h2{font-size:clamp(1.5rem,3.2vw,${s(4)})}h3{font-size:${s(1)}}
 p{color:var(--dim)}
 .wrap{max-width:1080px;margin:0 auto;padding:0 clamp(1.2rem,4vw,2.4rem)}
-.eyebrow{font-size:.76rem;letter-spacing:.24em;color:var(--accent);font-weight:600;
+h1,h2{text-wrap:balance}
+.eyebrow{font-size:.8rem;letter-spacing:.08em;color:var(--dim);font-weight:500;
 ${t.caps ? 'text-transform:uppercase;' : ''}font-family:${t.body}}
 .btn{display:inline-block;padding:.82em 1.5em;border-radius:var(--r);font-weight:600;font-size:.95rem;
 font-family:${t.body};transition:transform .18s ${ease},filter .18s ease}
 .btn:hover{transform:translateY(-2px);filter:brightness(1.08)}
 .btn-primary{background:var(--accent);color:${luminance(t.accent) > 0.6 ? '#101216' : '#fff'}}
-.btn-ghost{border:1px solid var(--line)}
+.link{color:var(--dim);font-size:.95rem;text-decoration:underline;text-underline-offset:4px;align-self:center}
+.link:hover{color:var(--ink)}
 section{padding:calc(var(--gap)*2.2) 0}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:calc(var(--gap)*.95)}
+.card{background:var(--surface);border-radius:var(--r);padding:calc(var(--gap)*.95)}
 .grid{display:grid;gap:calc(var(--gap)*.8)}
 .ctas{display:flex;gap:.7rem;flex-wrap:wrap;margin-top:calc(var(--gap)*.9)}
 ${w.structure.rules ? 'section+section{border-top:1px solid var(--line)}' : ''}
@@ -159,18 +161,20 @@ function figure(t: Taste, seed: number, ratio = '16/10', img?: string, treatment
     return `<div style="overflow:hidden;${frame};aspect-ratio:${ratio}">
 <img src="${img}" alt="" style="width:100%;height:100%;object-fit:cover;display:block"></div>`
   }
+  // A wireframe of a product screen rather than abstract art. Orbs and stripe textures are
+  // the decoration a generator reaches for; a sketched interface could only belong to a product.
   const r = (n: number) => Math.abs(Math.sin(seed * 3301 + n * 7919)) % 1
-  const blobs = Array.from({ length: 4 }, (_, i) => {
-    const c = i % 2 ? t.accent2 : t.accent
-    return `radial-gradient(${(30 + r(i) * 40).toFixed(0)}% ${(28 + r(i + 9) * 36).toFixed(0)}% at ${(12 + r(i + 3) * 76).toFixed(0)}% ${(14 + r(i + 5) * 72).toFixed(0)}%,${alpha(c, 0.5 - i * 0.08)} 0%,transparent 70%)`
-  }).join(',')
   const dark = luminance(t.bg) < 0.5
+  const rows = Array.from({ length: 3 + Math.round(r(1) * 2) }, (_, i) =>
+    `<div style="position:absolute;left:52%;right:8%;top:${(24 + i * 11).toFixed(0)}%;height:1px;background:${alpha(t.ink, 0.1)}"></div>
+<div style="position:absolute;right:8%;top:${(20 + i * 11).toFixed(0)}%;width:${(6 + r(i + 4) * 8).toFixed(0)}%;height:7px;background:${alpha(t.ink, 0.12)}"></div>`).join('')
   return `<div style="position:relative;overflow:hidden;${frame};
-aspect-ratio:${ratio};background:${blobs},${mix(t.bg, dark ? '#fff' : '#000', 0.05)}">
-<div style="position:absolute;inset:0;background:repeating-linear-gradient(115deg,${alpha(t.ink, 0.05)} 0 1px,transparent 1px 7px)"></div>
-<div style="position:absolute;left:8%;top:13%;right:8%;height:9px;border-radius:99px;background:${alpha(t.ink, 0.14)}"></div>
-<div style="position:absolute;left:8%;top:23%;width:44%;height:9px;border-radius:99px;background:${alpha(t.ink, 0.1)}"></div>
-<div style="position:absolute;left:8%;bottom:14%;width:32%;height:34px;border-radius:var(--r);background:${alpha(t.accent, 0.45)}"></div></div>`
+aspect-ratio:${ratio};background:${mix(t.bg, dark ? '#fff' : '#000', 0.04)}">
+<div style="position:absolute;left:0;top:0;right:0;height:${(9 + r(7) * 4).toFixed(0)}%;border-bottom:1px solid ${alpha(t.ink, 0.09)}"></div>
+<div style="position:absolute;left:8%;top:24%;width:34%;height:10px;background:${alpha(t.ink, 0.16)}"></div>
+<div style="position:absolute;left:8%;top:33%;width:${(20 + r(2) * 14).toFixed(0)}%;height:10px;background:${alpha(t.ink, 0.09)}"></div>
+${rows}
+<div style="position:absolute;left:8%;bottom:14%;width:${(18 + r(3) * 10).toFixed(0)}%;height:32px;background:${alpha(t.accent, 0.9)};border-radius:2px"></div></div>`
 }
 
 export function renderSection(sec: Section, t: Taste, seed: number, w: World): string {
@@ -179,22 +183,22 @@ export function renderSection(sec: Section, t: Taste, seed: number, w: World): s
   const img = typeof c.image === 'string' && c.image.startsWith('data:') ? c.image : undefined
   const v = sec.variant
   const open = `<section data-section="${sec.id}" id="${sec.kind}">`
+  // one primary action and one quiet link. Two buttons of equal weight is the formula every
+  // generated hero wears, and it makes the page argue with itself about what happens next
   const ctas = `<div class="ctas"><a class="btn btn-primary" ${ed(sec.id, 'cta')}>${esc(c.cta)}</a>
-<a class="btn btn-ghost" ${ed(sec.id, 'cta2')}>${esc(c.cta2)}</a></div>`
+<a class="link" ${ed(sec.id, 'cta2')}>${esc(c.cta2)}</a></div>`
 
   switch (sec.kind) {
     case 'hero': {
       const body = {
-        0: `<div class="wrap" style="max-width:820px;text-align:center">
-<span class="eyebrow" ${ed(sec.id, 'eyebrow')}>${esc(c.eyebrow)}</span>
-<h1 style="margin:1rem 0 1.1rem" ${ed(sec.id, 'headline')}>${esc(c.headline)}</h1>
-<p style="font-size:1.16rem;max-width:56ch;margin:0 auto" ${ed(sec.id, 'sub')}>${esc(c.sub)}</p>
-<div class="ctas" style="justify-content:center"><a class="btn btn-primary" ${ed(sec.id, 'cta')}>${esc(c.cta)}</a>
-<a class="btn btn-ghost" ${ed(sec.id, 'cta2')}>${esc(c.cta2)}</a></div>
-<div style="margin-top:calc(var(--gap)*1.6)">${figure(t, seed, '16/10', img, w.structure.figure)}</div></div>`,
+        // set off axis on purpose: the centered stack with a badge on top is the opening move
+        // of every generated page, so the plain hero leads from the left and leaves air
+        0: `<div class="wrap"><div style="max-width:58%;min-width:min(34rem,100%)">
+<h1 style="margin:0 0 1.1rem;max-width:16ch" ${ed(sec.id, 'headline')}>${esc(c.headline)}</h1>
+<p style="font-size:1.16rem;max-width:52ch" ${ed(sec.id, 'sub')}>${esc(c.sub)}</p>${ctas}</div>
+<div style="margin-top:calc(var(--gap)*1.6)">${figure(t, seed, '21/9', img, w.structure.figure)}</div></div>`,
         1: `<div class="wrap" style="display:grid;grid-template-columns:1.05fr .95fr;gap:calc(var(--gap)*1.4);align-items:center">
-<div><span class="eyebrow" ${ed(sec.id, 'eyebrow')}>${esc(c.eyebrow)}</span>
-<h1 style="margin:.9rem 0 1rem" ${ed(sec.id, 'headline')}>${esc(c.headline)}</h1>
+<div><h1 style="margin:0 0 1rem" ${ed(sec.id, 'headline')}>${esc(c.headline)}</h1>
 <p style="font-size:1.1rem;max-width:46ch" ${ed(sec.id, 'sub')}>${esc(c.sub)}</p>${ctas}</div>
 <div>${figure(t, seed, '4/5', img, w.structure.figure)}</div></div>`,
         2: `<div class="wrap" style="max-width:900px">
@@ -204,9 +208,10 @@ border-top:1px solid var(--line);padding-top:calc(var(--gap)*.9)">
 <p style="font-size:1.12rem" ${ed(sec.id, 'sub')}>${esc(c.sub)}</p>
 <div><p style="color:var(--ink)" ${ed(sec.id, 'eyebrow')}>${esc(c.eyebrow)}</p>${ctas}</div></div>
 ${img ? `<div style="margin-top:calc(var(--gap)*1.2)">${figure(t, seed, '16/10', img, w.structure.figure)}</div>` : ''}</div>`,
+        // a transcript, not a drawing of a window. The three traffic light dots promise a real
+        // window and deliver a prop, which is the renderer tripping its own detector
         3: `<div class="wrap" style="max-width:900px"><div class="card" style="font-family:ui-monospace,Menlo,monospace">
-<div style="display:flex;gap:6px;margin-bottom:1.1rem">${['#ff5f57', '#febc2e', '#28c840'].map((x) => `<i style="width:11px;height:11px;border-radius:50%;background:${x};display:block"></i>`).join('')}</div>
-<p style="color:var(--accent);font-size:.92rem" ${ed(sec.id, 'eyebrow')}>${esc(c.eyebrow)}</p>
+<p style="color:var(--dim);font-size:.92rem"><span style="color:var(--accent)">$</span> <span ${ed(sec.id, 'eyebrow')}>${esc(c.eyebrow)}</span></p>
 <h1 style="font-size:clamp(1.9rem,4.4vw,2.9rem);margin:1rem 0" ${ed(sec.id, 'headline')}>${esc(c.headline)}</h1>
 <p style="max-width:58ch" ${ed(sec.id, 'sub')}>${esc(c.sub)}</p>${ctas}</div>
 <div style="margin-top:calc(var(--gap)*1.2)">${figure(t, seed, '16/10', img, w.structure.figure)}</div></div>`,
@@ -244,9 +249,9 @@ ${v === 0 ? `<p class="eyebrow" style="margin-bottom:1.1rem" ${ed(sec.id, 'label
         return `${open}<div class="wrap"><h2 ${ed(sec.id, 'title')}>${esc(c.title)}</h2>
 <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:calc(var(--gap)*.7);margin-top:calc(var(--gap)*.9)">
 <div class="card" style="grid-column:span 2;grid-row:span 2;display:flex;flex-direction:column;justify-content:space-between">
-<div><h3 ${ed(sec.id, 'items.0.title')}>${esc(items[0]?.title)}</h3>
-<p style="margin-top:.4rem" ${ed(sec.id, 'items.0.body')}>${esc(items[0]?.body)}</p></div>
-<div style="height:130px;border-radius:var(--r);margin-top:1rem;background:linear-gradient(135deg,${alpha(t.accent, 0.4)},${alpha(t.accent2, 0.16)})"></div></div>
+<div><h3 style="font-size:${tokens(t).s(2)};max-width:18ch" ${ed(sec.id, 'items.0.title')}>${esc(items[0]?.title)}</h3>
+<p style="margin-top:.6rem;max-width:44ch" ${ed(sec.id, 'items.0.body')}>${esc(items[0]?.body)}</p></div>
+<div style="margin-top:1.4rem">${figure(t, seed + 5, '21/9', undefined, 'plain')}</div></div>
 ${items.slice(1).map((f, i) => `<div class="card"><h3 ${ed(sec.id, `items.${i + 1}.title`)}>${esc(f.title)}</h3>
 <p style="margin-top:.35rem;font-size:.95rem" ${ed(sec.id, `items.${i + 1}.body`)}>${esc(f.body)}</p></div>`).join('')}
 </div></div></section>`
@@ -256,7 +261,6 @@ ${items.slice(1).map((f, i) => `<div class="card"><h3 ${ed(sec.id, `items.${i + 
 ${items
         .map(
           (f, i) => `<div class="card">
-<div style="width:34px;height:34px;border-radius:${t.radius > 8 ? '50%' : 'var(--r)'};background:${i % 2 ? alpha(t.accent2, 0.22) : alpha(t.accent, 0.22)};margin-bottom:.9rem"></div>
 <h3 ${ed(sec.id, `items.${i}.title`)}>${esc(f.title)}</h3>
 <p style="margin-top:.45rem" ${ed(sec.id, `items.${i}.body`)}>${esc(f.body)}</p></div>`,
         )
@@ -289,13 +293,13 @@ ${items
 ${shown
         .map((p, i) => {
           const idx = v === 1 ? 1 : i
-          return `<div class="card"${idx === 1 ? ` style="border-color:${alpha(t.accent, 0.5)}"` : ''}>
+          return `<div class="card"${idx === 1 ? ` style="background:${alpha(t.accent, 0.09)}"` : ''}>
 <h3 ${ed(sec.id, `plans.${idx}.name`)}>${esc(p.name)}</h3>
-<p style="font-size:2rem;color:var(--ink);font-family:${t.display};margin:.5rem 0 .2rem" ${ed(sec.id, `plans.${idx}.price`)}>${esc(p.price)}</p>
+<p style="font-size:2rem;color:var(--ink);font-family:${t.display};margin:.5rem 0 .2rem;font-variant-numeric:tabular-nums" ${ed(sec.id, `plans.${idx}.price`)}>${esc(p.price)}</p>
 <p ${ed(sec.id, `plans.${idx}.line`)}>${esc(p.line)}</p>
 <div style="margin:1rem 0 1.2rem;display:flex;flex-direction:column;gap:.4rem">
 ${(p.features ?? []).map((f, j) => `<span style="font-size:.94rem;color:var(--dim)" ${ed(sec.id, `plans.${idx}.features.${j}`)}>${esc(f)}</span>`).join('')}</div>
-<a class="btn ${idx === 1 ? 'btn-primary' : 'btn-ghost'}">Choose ${esc(p.name)}</a></div>`
+${idx === 1 ? `<a class="btn btn-primary">Choose ${esc(p.name)}</a>` : `<a class="link">Choose ${esc(p.name)}</a>`}</div>`
         })
         .join('')}</div></div></section>`
     }
@@ -320,17 +324,22 @@ ${items
 <p style="margin-top:.7rem" ${ed(sec.id, 'sub')}>${esc(c.sub)}</p>
 <div class="ctas" style="justify-content:center"><a class="btn btn-primary" ${ed(sec.id, 'cta')}>${esc(c.cta)}</a></div>
 </div></section>`
-        : `${open}<div class="wrap"><div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:1.4rem;flex-wrap:wrap;
-background:linear-gradient(120deg,${alpha(t.accent, 0.16)},${alpha(t.accent2, 0.08)})">
+        : `${open}<div class="wrap"><div style="border-top:1px solid var(--line);padding-top:calc(var(--gap)*1.1);
+display:flex;justify-content:space-between;align-items:flex-end;gap:1.4rem;flex-wrap:wrap">
 <div><h2 style="font-size:${tokens(t).s(3)}" ${ed(sec.id, 'headline')}>${esc(c.headline)}</h2>
 <p style="margin-top:.4rem" ${ed(sec.id, 'sub')}>${esc(c.sub)}</p></div>
 <a class="btn btn-primary" ${ed(sec.id, 'cta')}>${esc(c.cta)}</a></div></div></section>`
 
-    case 'footer':
+    case 'footer': {
+      // a colophon when nothing else is said: apparatus is the cheapest sign of editorial
+      // hands, because generators never credit their own typography
+      const face = (stack: string) => stack.split(',')[0].replace(/['"]/g, '').trim()
+      const note = c.note || `Set in ${face(t.display)}${face(t.body) !== face(t.display) ? ` and ${face(t.body)}` : ''}.`
       return `${open}<div class="wrap"><div style="border-top:1px solid var(--line);padding:2rem 0;display:flex;
 justify-content:space-between;gap:1rem;flex-wrap:wrap;color:var(--dim);font-size:.85rem">
 <span ${ed(sec.id, 'product')}>© ${new Date().getFullYear()} ${esc(c.product)}</span>
-<span ${ed(sec.id, 'note')}>${esc(c.note)}</span></div></div></section>`
+<span ${ed(sec.id, 'note')}>${esc(note)}</span></div></div></section>`
+    }
   }
 }
 
