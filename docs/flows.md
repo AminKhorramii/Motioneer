@@ -30,9 +30,11 @@ flowchart LR
 `localStorage['wall-onboarded']` marks it done. The help button in the header reopens the same
 card in `explainOnly` mode, so the explanation is never lost.
 
-Keys live in `localStorage` under `wall-key-<vendor>`, and never leave the machine except as the
-authorization header of the call they belong to. A served deployment holds its own keys instead,
-which is flow 8.
+Keys never leave the machine except as the authorization header of the call they belong to. Where
+they rest depends on the shell: the desktop app puts them in the system keychain, which is
+encrypted at rest and gated by the login session, a browser keeps them in `localStorage` under
+`wall-key-<vendor>`, and a served deployment holds its own so none ever reaches the page. That is
+flow 8.
 
 ---
 
@@ -219,26 +221,24 @@ No accounts, no hosting of ours, no lock-in. The file is yours and it opens on i
 
 ---
 
-## 8. One app, four shells
+## 8. One app, three shells
 
 `src/host.ts` is the only file that knows where Wall is running. Everything above it is the same
 code, so the web version is the desktop version rather than a reduced copy.
 
 | Shell | State | Export | Model calls | Keys |
 | --- | --- | --- | --- | --- |
-| Tauri | a command to the Rust side | a real file on disk | the page, over a fetch that travels through Rust | your machine |
-| Electron | IPC to the main process | a real file on disk | main process, no CORS wall | your machine |
+| Tauri | a command to the Rust side | a real file on disk | the page, over a fetch that travels through Rust | the system keychain |
 | Web | `localStorage` | Blob download | straight from the tab | your browser |
 | Served | `localStorage` | Blob download | `/api/stream` on the server | the server only |
 
-Which host answers is decided by what is present: Electron injects a bridge on `window.wall`,
-Tauri injects `__TAURI_INTERNALS__`, a server injects a flag into the page it serves, and none of
-them means the visitor brings their own key.
+Which host answers is decided by what is present: Tauri injects `__TAURI_INTERNALS__`, a server
+injects a flag into the page it serves, and neither means the visitor brings their own key.
 
-**Why Tauri, and what it does not change.** Electron ships a browser, so the download is 150 to
-250MB. Tauri uses the system webview, so the same app is a fraction of that. Nothing gets faster:
-the wall is model latency, and the compute path was already a hundredth of a frame. It is a
-distribution change, and it is worth it because the product's own pitch is a download.
+**Why Tauri, and what it does not change.** Electron shipped a whole browser, so the download was
+150 to 250MB; the Tauri build is a 5.9MB app and a 3.0MB dmg, which is 46 times smaller. Nothing
+got faster: the wall is model latency, and the compute path was already a hundredth of a frame. It
+is a distribution change, and it is worth it because the product's own pitch is a download.
 
 The one thing it could have cost is the rule that `shared/providers.mjs` is the only model path.
 A Rust main process would mean the request shapes, the SSE splitting and the delta extraction
@@ -273,8 +273,8 @@ the picker.
 ## 9. Development flows
 
 ```
-npm run app            # build, then the desktop app
-npm run app:electron   # the Electron shell, kept until the Tauri one has been lived in
+npm run app            # the desktop app
+npm run app:bundle     # a real .app and dmg
 npm run web            # the Vite dev server
 npm run serve          # the built app behind the server, with its own keys
 npm run build:core     # the headless core, for a shell with no DOM
@@ -283,8 +283,7 @@ npm run build:wasm     # rebuild the image crate and inline it, needs Rust
 
 Only `build:wasm` needs the Rust toolchain, and only someone changing `crates/wall-image` needs
 to run it, because its output is committed. A fresh clone builds, runs and verifies without Rust
-installed. Building the Tauri app itself needs Rust; building the web app and the Electron app
-does not.
+installed. Building the desktop app needs Rust; building and verifying the web app does not.
 
 ### Verifying
 

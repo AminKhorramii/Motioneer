@@ -14,8 +14,8 @@ Docs: [flows](docs/flows.md) (every path through the app, and the code that carr
 Linear/Framer discipline: **Inter Variable** bundled (offline, no CDN), hairlines instead
 of borders, one accent (indigo), 10–13px type with real tracking, controls that are
 invisible until hovered, a floating dock over the canvas rather than docked toolbars, and
-130ms transitions. The header is the window drag handle (controls opt out) — the standard
-Electron pattern, not an overlay strip.
+130ms transitions. The header is the window drag handle (controls opt out) rather than an
+overlay strip.
 
 ## The studio
 
@@ -25,9 +25,9 @@ centre. Click any alternative to make it the working page.
 
 **AI-native.** A prompt bar runs under the paper with model chips — **Claude** or **GPT**
 — and prompting makes *variants*: one instruction produces three new pages placed to the
-right, so you compare rather than overwrite. Both providers are called from Electron's
-main process, so there is no CORS wall and no proxy. Keys stay on your machine, and
-everything except copywriting works without them.
+right, so you compare rather than overwrite. The desktop app's requests travel through its
+own process, so there is no CORS wall and no proxy. Keys stay on your machine, in the system
+keychain, and everything except copywriting works without them.
 
 **Section by section.** The right rail lists every section: cycle its layout, move it,
 hide it, add new ones — and each has **its own prompt** ("make this section about the
@@ -53,7 +53,7 @@ back into the page model, not just the pixels.
 5. **Open · ship this** — exports a real self-contained `index.html` you own (inlined CSS,
    no framework, no runtime of ours), or opens it in your browser.
 
-## Verified (`node verify.mjs`, headless Electron)
+## Verified (`node verify.mjs`, headless Chromium)
 
 twelve cells covering all six archetypes · **12 structurally distinct documents**, not
 clones (checked by computed styles inside each iframe) · pages are live DOM with real
@@ -90,23 +90,23 @@ far from 1k lines.
 ## Verifying
 
 ```
-npm run build && node verify.mjs   # full suite against the real Electron app
+npm run build && node verify.mjs   # the full suite against the built app
 node shots.mjs                     # screenshots into shots/
 ```
 
 ## Two builds, one app
 
-`src/host.ts` is the only file that knows where Wall is running. Electron answers over IPC,
-because the main process has no CORS wall and can write real files. The browser answers for
-itself with localStorage, a Blob download, and a direct call to the model. Everything above
-that boundary is the same code, so the web version is the desktop version rather than a
+`src/host.ts` is the only file that knows where Wall is running. The desktop app answers with
+Rust commands, because it can write real files and reach a vendor without preflight. The browser
+answers for itself with localStorage, a Blob download, and a direct call to the model. Everything
+above that boundary is the same code, so the web version is the desktop version rather than a
 reduced copy.
 
 ```
 npm run app          # desktop
 npm run web          # web, at the Vite dev server
-npm run verify       # desktop suite
-npm run verify:web   # the same assertions in plain Chromium
+npm run verify       # the app, driven in a real browser
+npm run verify:tauri # the desktop shell, checked without a window
 ```
 
 The web build is a static `dist/`, with `base: './'`, so it hosts anywhere.
@@ -129,10 +129,10 @@ the same content.
 Three suites, in order of how much they prove:
 
 ```
-npm run verify         # desktop, mock model
-npm run verify:web     # the same assertions in plain Chromium
+npm run verify         # the app, mock model
 npm run verify:stream  # the real streaming path, no mock anywhere
-npm run verify:all     # all three
+npm run verify:image   # the image pipeline
+npm run verify:all     # everything
 ```
 
 `verify:stream` runs the app against a local server speaking Anthropic's wire format, so the
@@ -210,8 +210,8 @@ quietly converging is a test failure rather than something you notice months lat
 `server/index.mjs` is one file with no dependencies. It serves the built app and holds the
 model keys, so they never reach a browser. The same `dist/` works either way: the server
 announces itself by injecting a flag into the page it serves, and the app picks its host from
-what is present. Electron uses its bridge, a served page uses the server, and a plain static
-build falls back to the visitor's own key.
+what is present. The desktop app uses its commands, a served page uses the server, and a plain
+static build falls back to the visitor's own key.
 
 ```
 ANTHROPIC_API_KEY=... npm run serve          # self hosted, your key, your machine

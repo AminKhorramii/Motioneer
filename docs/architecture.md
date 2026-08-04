@@ -30,8 +30,8 @@ src/
   imagewasm.ts  generated: the crate, inlined as base64
 
 shared/providers.mjs   one model path for every shell
-electron/              main process and preload bridge
-src-tauri/             the same desktop app as a download a tenth the size
+src-tauri/             the desktop app: a download, not a bundled browser
+harness.mjs            one way to open the app for a suite
 crates/wall-image/     decode, fit, flatten, re-encode. compiled to wasm
 server/index.mjs       serves dist and holds the keys
 fixtures/              recorded upstream streams, response bodies only
@@ -72,10 +72,10 @@ the checks have no DOM dependency, which is what makes an agent tool or a render
 OpenAI, cover every model in the picker; a new vendor is a row in `models.tsx` with a base URL.
 
 It also separates the wire format from the transport. `setFetch()` lets a shell hand in the
-fetch it needs without bringing a second copy of the request shapes with it: Electron's main
-process and Node use the global, and Tauri hands in one that travels through Rust because its
-webview is a real browser origin that would otherwise negotiate preflight with every vendor.
-That is the difference between four shells and four implementations.
+fetch it needs without bringing a second copy of the request shapes with it: Node and a browser
+holding its own key use the global, and the desktop app hands in one that travels through Rust,
+because its webview is a real browser origin that would otherwise negotiate preflight with every
+vendor. That is the difference between three shells and three implementations.
 
 **`crates/wall-image`** is the only place with real compute, and it is one crate rather than one
 per shell. Compiled to wasm and inlined, the desktop app, the web build and a served deployment
