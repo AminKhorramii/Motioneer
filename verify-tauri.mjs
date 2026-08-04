@@ -1,13 +1,15 @@
 /**
  * The Tauri shell, checked without running it.
  *
- * Tauri has no WebDriver on macOS, so the Playwright suites that drive Electron cannot drive
- * this one. That is a real gap and it is stated rather than papered over. What can be checked
- * is the class of bug the gap would otherwise hide: a command name that exists on one side of
- * the boundary and not the other, a permission the code needs and the capabilities file does
- * not grant, and a Host method one desktop shell implements and the other quietly does not.
+ * Tauri has no WebDriver on macOS, so no Playwright suite can drive this shell. That is a real
+ * gap and it is stated rather than papered over. What can be checked is the class of bug the gap
+ * would otherwise hide: a command name that exists on one side of the boundary and not the
+ * other, a permission the code needs and the capabilities file does not grant, and a Host method
+ * declared and then never answered.
  *
- * All three are text, so none of them needs a window.
+ * All three are text, so none of them needs a window. What a window would prove is covered
+ * elsewhere: the app itself by verify.mjs in a real browser against the same dist this shell
+ * loads, and the commands only a desktop can answer by the Rust suite in src-tauri.
  *
  * Run: node verify-tauri.mjs
  */
@@ -29,7 +31,6 @@ const host = read('src/host.ts')
 const main = read('src-tauri/src/main.rs')
 const conf = JSON.parse(read('src-tauri/tauri.conf.json'))
 const caps = JSON.parse(read('src-tauri/capabilities/default.json'))
-const preload = read('electron/preload.cjs')
 
 // ——— every command the page calls exists on the Rust side ———
 
@@ -49,17 +50,24 @@ for (const name of declared) {
   ok(handled.includes(name), `${name} is not declared and then forgotten`)
 }
 
-// ——— the two desktop shells expose the same thing ———
+// ——— the shell answers the whole interface ———
 
-const electronMethods = [...preload.matchAll(/^\s{2}(\w+):/gm)].map((m) => m[1]).sort()
+// Electron used to be the reference to compare against. With one desktop shell left, the
+// reference is the interface itself, which is stricter: a method added to Host has to be
+// answered rather than merely matched against whatever the other shell happened to have.
+const declaredMethods = [...host.slice(host.indexOf('export interface Host'), host.indexOf('const STATE_KEY'))
+  .matchAll(/^\s{2}(\w+):/gm)].map((m) => m[1])
 const tauriBlock = host.slice(host.indexOf('const tauri: Host'), host.indexOf('if (onTauri)'))
 const tauriOwn = [...tauriBlock.matchAll(/^\s{2}(\w+):/gm)].map((m) => m[1])
 // the rest are inherited from the web host by spread, which is the point of the spread
 const inherited = tauriBlock.includes('...web')
 ok(inherited, 'the tauri host inherits the browser answers it does not need to change')
+ok(declaredMethods.length >= 8, 'the Host interface was found', declaredMethods.join(', '))
 
-const missing = electronMethods.filter((m) => !tauriOwn.includes(m) && !inherited)
-ok(missing.length === 0, 'no Host method exists in one desktop shell and not the other', missing.join(', ') || 'none')
+const webBlock = host.slice(host.indexOf('const web: Host'), host.indexOf('const deltaFns'))
+const webOwn = [...webBlock.matchAll(/^\s{2}(\w+):/gm)].map((m) => m[1])
+const unanswered = declaredMethods.filter((m) => !tauriOwn.includes(m) && !webOwn.includes(m))
+ok(unanswered.length === 0, 'every Host method is answered somewhere', unanswered.join(', ') || 'none')
 
 for (const m of ['readState', 'writeState', 'exportPage', 'preview', 'request', 'handoff']) {
   ok(tauriOwn.includes(m), `${m} is answered natively rather than by the browser fallback`)
@@ -106,10 +114,10 @@ ok(
   'the header carries the WebKit drag attribute, or the window cannot be moved by it',
 )
 
-// ——— the test hooks the suites drive Electron with are answered here too ———
+// ——— the hooks that let this shell be driven or scripted ———
 
 for (const hook of ['WALL_DATA', 'WALL_EXPORT_DIR', 'WALL_REQUEST', 'WALL_TEST']) {
-  ok(main.includes(hook), `${hook} is honoured, so the shells can be driven the same way`)
+  ok(main.includes(hook), `${hook} is honoured, so the shell can be pointed somewhere in a run`)
 }
 
 console.log(failed ? `\n${failed} failed` : '\nall good')

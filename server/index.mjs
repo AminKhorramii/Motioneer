@@ -13,6 +13,7 @@
  *   WALL_REQUEST                                          a brief to open with
  *   WALL_HANDOFF_DIR                                      where a chosen design is written
  *   PORT                                                  default 8080
+ *   WALL_HOST                                             default 127.0.0.1, loopback only
  *   WALL_WALLS_PER_HOUR                                   per address ceiling, unset means none
  *   WALL_DAILY_OUTPUT_TOKENS                              whole deployment ceiling, unset means none
  */
@@ -27,6 +28,14 @@ import { generateImage, streamText } from '../shared/providers.mjs'
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 const DIST = path.join(ROOT, 'dist')
 const PORT = Number(process.env.PORT ?? 8080)
+/**
+ * Loopback unless told otherwise.
+ *
+ * This process holds API keys, so binding every interface would put them behind nothing but a
+ * port number for anyone on the same network. A deployment that genuinely wants to serve others
+ * sets WALL_HOST and means it.
+ */
+const HOST = process.env.WALL_HOST ?? '127.0.0.1'
 
 /**
  * Keys live in a file rather than in the page.
@@ -124,6 +133,14 @@ const server = createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost')
   const address = req.socket.remoteAddress ?? 'unknown'
 
+  // A name that resolves to this machine is not the same as this machine. Rejecting any other
+  // Host closes rebinding, where a page a person visits is pointed at their own loopback and
+  // then counts as same origin.
+  const host = (req.headers.host ?? '').split(':')[0]
+  if (HOST === '127.0.0.1' && !['localhost', '127.0.0.1', '[::1]', '::1', ''].includes(host)) {
+    return json(res, 403, { error: 'this server answers on loopback only' })
+  }
+
   if (url.pathname === '/api/config') {
     // the app hides its key fields when the server already holds one
     return json(res, 200, { providers: Object.keys(KEYS).filter((k) => KEYS[k]), handoff: Boolean(HANDOFF) })
@@ -199,7 +216,7 @@ const server = createServer(async (req, res) => {
 
 // PORT=0 binds whatever is free and reports it, which is what tests use so a leftover process
 // from an earlier run cannot quietly answer in this one
-server.listen(PORT, () => {
+server.listen(PORT, HOST, () => {
   const held = Object.keys(KEYS).filter((k) => KEYS[k])
   console.log(`wall on http://localhost:${server.address().port}`)
   console.log(held.length ? `holding keys for ${held.join(', ')}` : 'holding no keys, so visitors bring their own')

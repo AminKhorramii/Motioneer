@@ -95,9 +95,9 @@ async function readChosen(dir) {
 /**
  * Which desktop to open.
  *
- * The Tauri build is the product, so it comes first; the Electron one is what the suites can
- * drive and stays as a fallback. The binary is spawned rather than opened by bundle, because
- * `open` does not carry environment through and the request path travels that way.
+ * One shell now, looked for where a build leaves it. The binary is spawned rather than opened by
+ * bundle, because `open` does not carry environment through and the request path travels that
+ * way. Nothing found means the browser route, which needs no build at all.
  */
 function findShell() {
   // set when a run should take the browser route regardless of what is installed
@@ -109,11 +109,7 @@ function findShell() {
     path.join(ROOT, 'src-tauri/target/debug/wall'),
   ].filter(Boolean)
   for (const at of tries) if (existsSync(at)) return { cmd: at, args: [], shell: 'tauri' }
-  try {
-    return { cmd: require('electron'), args: [ROOT], shell: 'electron' }
-  } catch {
-    return null
-  }
+  return null
 }
 
 /**

@@ -1,8 +1,10 @@
 /**
- * The one boundary between Wall and whatever it is running inside. Electron answers over IPC
- * because the main process has no CORS wall and can write real files. The browser answers for
- * itself. Everything above this file is identical in both builds, so the web version is the
- * desktop version rather than a reduced copy of it.
+ * The one boundary between Wall and whatever it is running inside.
+ *
+ * Three answers: the desktop app calls Rust commands for the things a browser cannot do, a
+ * served deployment calls its server so the keys never enter the page, and a plain browser
+ * answers for itself. Everything above this file is identical in all three, so the web version
+ * is the desktop version rather than a reduced copy of it.
  */
 
 import { invoke } from '@tauri-apps/api/core'
@@ -142,7 +144,6 @@ const served: Host = {
 }
 
 const win = window as unknown as {
-  wall?: Host
   __wallServed?: number
   __wallProviders?: string[]
   __TAURI_INTERNALS__?: unknown
@@ -174,15 +175,15 @@ const tauri: Host = {
 if (onTauri) setFetch(tauriFetch)
 
 /**
- * Which host answers is decided by what is present. Electron injects a bridge on window.wall,
- * Tauri injects its own internals, and a server injects a flag into the page it serves. None of
- * them means the browser is on its own and the visitor brings a key.
+ * Which host answers is decided by what is present. Tauri injects its own internals, and a
+ * server injects a flag into the page it serves. Neither means the browser is on its own and
+ * the visitor brings a key.
  */
-export const host: Host = win.wall ?? (onTauri ? tauri : win.__wallServed ? served : web)
+export const host: Host = onTauri ? tauri : win.__wallServed ? served : web
 
 export const isTauri = onTauri
-export const isDesktop = Boolean(win.wall) || onTauri
-export const isServed = Boolean(!win.wall && !onTauri && win.__wallServed)
+export const isDesktop = onTauri
+export const isServed = Boolean(!onTauri && win.__wallServed)
 
 /**
  * Hand a key to the server rather than keeping it in the page.
