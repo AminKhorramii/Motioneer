@@ -24,3 +24,4 @@ src-tauri/gen/
 # The cut icons are committed, because building the app should not require running the generator.
 src-tauri/icon-source.png
 wall-mcp-*.tgz
+.try/
