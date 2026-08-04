@@ -55,14 +55,135 @@ export function arrange(base: Page, i: number, worlds: World[] = WORLDS): Page {
     // a derived page is a new candidate, so the triage pin stays behind on its parent
     return { ...base, id: uid(), pinned: undefined, sections: base.sections.map((s) => ({ ...s, content: structuredClone(s.content) })) }
   }
-  // Two axes, not one. A world decides how a page is built and a look decides how it feels, and
-  // holding the look fixed made six worlds read as six versions of the same page. The look
-  // advances by a stride so the pairs do not move in lockstep, which is what makes a wall of
-  // eight look like eight rather than like three repeated.
+  return arrangeIn(base, i, worlds[(i - 1) % worlds.length])
+}
+
+/**
+ * The i-th arrangement, in a named world.
+ *
+ * Two axes, not one. A world decides how a page is built and a look decides how it feels, and
+ * holding the look fixed made six worlds read as six versions of the same page. The look
+ * advances by a stride so the pairs do not move in lockstep, which is what makes a wall of
+ * eight look like eight rather than like three repeated.
+ */
+export function arrangeIn(base: Page, i: number, world: World): Page {
   const looks = [base.taste, ...PRESETS.filter((p) => p.name !== base.taste.name)]
-  const world = worlds[(i - 1) % worlds.length]
   const look = looks[((i - 1) * 3) % looks.length]
   return { ...inWorld({ ...base, taste: look }, world), id: uid(), pinned: undefined }
+}
+
+const WALL_SYSTEM = `You write the copy for a whole wall of landing pages at once. Each page argues a different case for the same product, in a different design, and they are compared side by side.
+
+You receive one block per page: the angle it argues, the design it will be set in, and its sections as JSON with an id, a kind and the current content.
+
+Return JSON shaped as {"pages":[{"angle":"...","sections":[{"id":"...","content":{...}}]}]}, one entry per page, in the order you were given, reusing every angle name, every id and every content key exactly. Reusing them matters because each reply is merged into the page it belongs to by angle and by id, and an unknown one is dropped.
+
+Write concrete sentences a stranger could understand, and keep them short, because people scan a landing page rather than read it. Prefer plain words over marketing vocabulary such as revolutionary, seamless, unlock or empower, because those words describe nothing and readers skip them.
+
+Write each page for the design it is going into: the voice given with it says how, and the measure and scale say how much room there is. A poster wants six words where a catalogue wants forty.
+
+Make the pages disagree with each other. Rewrite every headline so no two are alike in wording or in emphasis, because a wall where two pages could be swapped gives the reader nothing to choose between. Commit fully to each angle, even where a safer line exists, since the safe version is already one of the others.
+
+Respond with the JSON object alone, because the reply is parsed directly.`
+
+/**
+ * Write the whole wall in one call, streamed.
+ *
+ * Ten separate sessions per wall is the wrong unit when each one carries its own startup and its
+ * own thinking before it writes a character. Over HTTP a request is cheap and eight of them in
+ * parallel is right; through a local CLI on one account it is eight processes queueing against
+ * each other. This is the same work as one reply, and pages still arrive one at a time because
+ * each is lifted out of the stream the moment it closes.
+ */
+export async function writeWall(
+  base: Page,
+  product: Product,
+  worlds: World[],
+  onPage: (page: Page) => void,
+): Promise<{ written: number; error?: string }> {
+  const angles = ANGLES.slice(0, worlds.length)
+  const arranged = worlds.map((w, i) => arrangeIn(base, i + 1, w))
+  const blocks = arranged.map((page, i) => {
+    const w = worlds[i]
+    const shape = page.sections.filter((s) => s.on).map((s) => ({ id: s.id, kind: s.kind, content: s.content }))
+    return [
+      `Page ${i + 1}, angle "${angles[i].name}": ${angles[i].instruction}`,
+      `Design: ${w.name}. ${w.note} ${w.voice} The measure is ${w.structure.measure} characters and the type scale is ${page.taste.scale.toFixed(2)}.`,
+      `Sections:\n${JSON.stringify(shape)}`,
+    ].join('\n')
+  })
+
+  const landed = new Set<number>()
+  let buf = ''
+  let cursor = 0
+  const take = (raw: Record<string, unknown>) => {
+    const name = String(raw.angle ?? '')
+    const i = angles.findIndex((a) => a.name === name)
+    if (i < 0 || landed.has(i)) return
+    const sections = (raw.sections ?? []) as { id: string; content: Record<string, unknown> }[]
+    if (!sections.length) return
+    landed.add(i)
+    onPage({ ...mergeSections(arranged[i], sections, arranged[i].id), angle: angles[i].name })
+  }
+
+  try {
+    const text = await ask(
+      'model',
+      WALL_SYSTEM,
+      `Product: ${product.name}. ${product.oneLiner}\n${product.what}\nAudience: ${product.audience}\n\n${blocks.join('\n\n')}`,
+      (delta) => {
+        buf += delta
+        if (!delta.includes('}')) return
+        const scan = scanSections(buf, cursor, '"pages"')
+        cursor = scan.cursor
+        for (const raw of scan.out) take(raw as unknown as Record<string, unknown>)
+      },
+      { maxTokens: 24000 },
+    )
+    // a reply that never streamed, or one cut short, still has whatever finished in it
+    if (text) {
+      const whole = grabJson(text) as { pages?: Record<string, unknown>[] } | null
+      for (const raw of whole?.pages ?? []) take(raw)
+    }
+    return {
+      written: landed.size,
+      error: landed.size < worlds.length ? `${worlds.length - landed.size} pages did not arrive` : undefined,
+    }
+  } catch (e) {
+    return { written: landed.size, error: String(e instanceof Error ? e.message : e).slice(0, 160) }
+  }
+}
+
+/**
+ * Write one page: one angle, in one world.
+ *
+ * The unit both paths share. A page is written for the world it lands in, because the voice,
+ * the measure and the density are all in its prompt. That is why the world has to exist before
+ * the writing starts, and why restyling a finished page into a different world afterwards would
+ * be a different and worse thing.
+ */
+export async function writeOne(
+  base: Page,
+  product: Product,
+  world: World,
+  i: number,
+  onPage: (page: Page) => void,
+): Promise<{ ok: number; error?: string }> {
+  const angle = ANGLES[i % ANGLES.length]
+  try {
+    const written = await promptPage(
+      arrangeIn(base, i + 1, world),
+      `Write this page as "${angle.name}". ${angle.instruction}`,
+      product,
+      'model',
+      (partial) => onPage({ ...partial, angle: angle.name }),
+    )
+    if (!written) return { ok: 0, error: 'the reply was not usable JSON' }
+    onPage({ ...written, angle: angle.name })
+    return { ok: 1 }
+  } catch (e) {
+    return { ok: 0, error: String(e instanceof Error ? e.message : e).slice(0, 160) }
+  }
 }
 
 /**
@@ -272,7 +393,7 @@ async function ask(
   // the local Claude has no key and no endpoint: it is a process, not a request
   if (m.wire === 'cli') {
     if (!host.cli) return null
-    const out = await host.cli(system, user)
+    const out = await host.cli(system, user, onDelta)
     if (out.error) throw new Error(out.error)
     return out.text ?? null
   }
@@ -489,18 +610,41 @@ Respond with the JSON object alone, because the reply is parsed directly.`
  * clamped on the way in, so a model can be daring without being able to produce an unreadable
  * page, and the built in worlds remain the fallback when the call fails.
  */
-export async function promptWorlds(product: Product, n: number, provider: Provider = 'model'): Promise<World[]> {
+export async function promptWorlds(
+  product: Product,
+  n: number,
+  onWorld?: (world: World, i: number) => void,
+  provider: Provider = 'model',
+): Promise<World[]> {
   // the mock stands in here too, or an offline run reaches the real API and fails on the key
   if (mockReply) {
     const out = mockReply('worlds', n) as { worlds?: Record<string, unknown>[] } | null
     const fromMock = (out?.worlds ?? []).map(madeWorld).filter((w) => w.name)
     return fromMock.length >= 2 ? fromMock : WORLDS
   }
+  // A world is complete long before the reply is, and the page for it can start then. Half of
+  // the fifty seconds this call takes is the model thinking before it writes anything, so
+  // reading the rest as it arrives is what turns one long wait into eight overlapping ones.
+  let buf = ''
+  let cursor = 0
+  let seen = 0
+  const feed = onWorld
+    ? (delta: string) => {
+        buf += delta
+        if (!delta.includes('}')) return
+        const scan = scanSections(buf, cursor, '"worlds"')
+        cursor = scan.cursor
+        for (const raw of scan.out) {
+          onWorld(madeWorld(raw as unknown as Record<string, unknown>, seen), seen)
+          seen += 1
+        }
+      }
+    : undefined
   const text = await ask(
     provider,
     WORLDS_SYSTEM,
     `Product: ${product.name}. ${product.oneLiner}\n${product.what}\nAudience: ${product.audience}\n\nDesign ${n} worlds for it.`,
-    undefined,
+    feed,
     { maxTokens: 24000 },
   ).catch(() => null)
   // A world carries CSS now, so eight of them is a long reply and a cut one used to yield

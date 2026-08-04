@@ -42,9 +42,18 @@ export interface Host {
    * The model the person already has. A shell that can start a process answers this; a plain
    * browser cannot, which is the one thing it will never be able to do.
    */
-  cli?: (system: string, user: string) => Promise<{ text?: string; error?: string }>
+  cli?: (system: string, user: string, onDelta?: (d: string) => void)
+    => Promise<{ text?: string; error?: string }>
   /** a brief handed in from outside, when something launched this window to ask for a design */
-  request: () => Promise<{ brief?: string; name?: string; dir?: string } | null>
+  request: () => Promise<{
+    brief?: string
+    name?: string
+    oneLiner?: string
+    what?: string
+    audience?: string
+    cta?: string
+    dir?: string
+  } | null>
   /** write the chosen design back where whoever asked can find it */
   handoff: (dir: string, files: Record<string, string>) => Promise<{ dir?: string; error?: string }>
 }
@@ -130,14 +139,26 @@ const served: Host = {
     }
     return { text }
   },
-  cli: async (system, user) => {
+  cli: async (system, user, onDelta) => {
     try {
       const r = await fetch('/api/cli', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ system, user }),
       })
-      return r.json()
+      if (!r.ok || !r.body) return { error: `server ${r.status}` }
+      const reader = r.body.getReader()
+      const dec = new TextDecoder()
+      let text = ''
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        const d = dec.decode(value, { stream: true })
+        if (!d) continue
+        text += d
+        onDelta?.(d)
+      }
+      return text ? { text } : { error: 'no reply' }
     } catch (e) {
       return { error: String(e).slice(0, 160) }
     }

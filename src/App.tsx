@@ -5,7 +5,7 @@ import { renderPage } from '@/render'
 import { pageBrief } from '@/brief'
 import { slop } from '@/slop'
 import {
-  EMPTY_PRODUCT, addSection, alternatives, arrange, readBrief, canDraw, canWrite, choose, chosen, promptWorlds, setDesigned, cycleVariant, cycleWorld, dropSection, fanOut, illustrate, loadHeldKeys, loadKeys, promptPage, sectionAlternatives, seeded, setMock, type Product,
+  EMPTY_PRODUCT, addSection, alternatives, arrange, readBrief, canDraw, canWrite, choose, chosen, promptWorlds, setDesigned, cycleVariant, cycleWorld, dropSection, writeOne, writeWall, illustrate, loadHeldKeys, loadKeys, promptPage, sectionAlternatives, seeded, setMock, type Product,
 } from '@/compose'
 import { Onboarding } from '@/Onboarding'
 import { BriefRail } from '@/BriefRail'
@@ -13,7 +13,7 @@ import { SectionsRail } from '@/SectionsRail'
 import { Dock } from '@/Dock'
 import { Building } from '@/Building'
 import { Icon } from '@/icons'
-import { register as registerWorlds } from '@/worlds'
+import { register as registerWorlds, type World } from '@/worlds'
 
 import { host, isTauri } from '@/host'
 
@@ -114,28 +114,63 @@ export default function App() {
       setPages(alternatives(base, 8))
       return
     }
-    // ask for the visual systems first, so the wall is not limited to the six I wrote
+    // How the pages get written depends on what is writing them. Over HTTP a request is cheap,
+    // so eight run in parallel and each starts the moment its own world is finished. Through the
+    // local CLI each call is a whole session with its own startup and its own thinking, and
+    // eight of those queue against each other on one account, so the wall is written in a single
+    // streamed reply instead. Either way a page is written for the world it lands in, and either
+    // way it appears the moment it closes.
     setBuilding({ arrived: null, landed: [] })
     setBusy('designing')
-    const worlds = await promptWorlds(p, 8)
+    const batched = chosen().wire === 'cli'
+    const jobs: Promise<{ ok: number; error?: string }>[] = []
+    const started: World[] = []
+
+    const arrived = (page: Page) => {
+      if (run.current !== mine) return
+      // step onto the first written page, so the wall is never showing the unwritten one
+      setAt((v) => (v === 0 ? 1 : v))
+      upsertPage(page)
+    }
+
+    const startPage = (world: World, i: number) => {
+      if (run.current !== mine || started[i]) return
+      started[i] = world
+      registerWorlds([world])
+      setBuilding({ arrived: jobs.length + 1, landed: started.filter(Boolean).map((w) => w.name) })
+      setBusy('writing')
+      jobs.push(writeOne(base, p, world, i, arrived))
+    }
+
+    const worlds = await promptWorlds(p, 8, batched ? undefined : startPage)
     if (run.current !== mine) return
     setDesigned(worlds)
     registerWorlds(worlds)
-    setBuilding({ arrived: 0, landed: [] })
     setBusy('writing')
-    // a page keeps one id for its whole stream, so a paper appears on its first section and
-    // then fills in, instead of arriving all at once when the model finishes
-    const started = new Set<string>()
-    const { written, error } = await fanOut(base, p, 'model', 8, (page) => {
-      if (run.current !== mine) return
-      if (!started.has(page.id)) {
-        started.add(page.id)
-        setBuilding({ arrived: started.size, landed: [...started].map((_, i) => worlds[i]?.name ?? '').filter(Boolean) })
-        // step onto the first written page, so the wall is never showing the unwritten one
-        setAt((v) => (v === 0 ? 1 : v))
-      }
-      upsertPage(page)
-    }, worlds)
+
+    let written = 0
+    let error: string | undefined
+    if (batched) {
+      const seen = new Set<string>()
+      setBuilding({ arrived: 0, landed: worlds.map((w) => w.name) })
+      const out = await writeWall(base, p, worlds, (page) => {
+        if (!seen.has(page.id)) {
+          seen.add(page.id)
+          setBuilding({ arrived: seen.size, landed: worlds.map((w) => w.name) })
+        }
+        arrived(page)
+      })
+      written = out.written
+      error = out.error
+    } else {
+      // a provider that does not stream hands the worlds over at the end, so anything that did
+      // not arrive as it was written starts here
+      worlds.forEach(startPage)
+      const results = await Promise.all(jobs)
+      written = results.reduce((a, b) => a + b.ok, 0)
+      error = results.find((r) => r.error)?.error
+    }
+
     if (run.current !== mine) return
     setBusy('')
     setBuilding(null)
@@ -179,8 +214,21 @@ export default function App() {
       // message for someone who never described anything.
       setBuilding({ arrived: null, landed: [] })
       await loadHeldKeys()
-      const read = canWrite() ? await readBrief(req.brief).catch(() => null) : null
-      const p: Product = read?.product ?? { ...EMPTY_PRODUCT, name: req.name ?? 'Product', oneLiner: req.brief }
+      // The agent that asked already knew what this is, so if it said so there is nothing to
+      // work out. Reading the brief back through a model cost about forty seconds to recover
+      // what the caller had already written down.
+      const told = req.oneLiner?.trim()
+      const read = !told && canWrite() ? await readBrief(req.brief).catch(() => null) : null
+      const p: Product = told
+        ? {
+            ...EMPTY_PRODUCT,
+            name: req.name?.trim() || 'Product',
+            oneLiner: told,
+            what: req.what?.trim() || req.brief,
+            audience: req.audience?.trim() || '',
+            cta: req.cta?.trim() || EMPTY_PRODUCT.cta,
+          }
+        : read?.product ?? { ...EMPTY_PRODUCT, name: req.name ?? 'Product', oneLiner: req.brief }
       setProduct(p)
       build(p, taste)
     })

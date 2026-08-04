@@ -218,7 +218,14 @@ const server = createServer(async (req, res) => {
     const denied = overLimit(address)
     if (denied) return json(res, 429, { error: denied })
     const { system, user } = await readBody(req)
-    return json(res, 200, await runClaude(String(system ?? ''), String(user ?? '')))
+    // plain chunked text, the same shape /api/stream uses: every chunk is a delta and the whole
+    // body is the reply, so a caller that wants to act on partial output can
+    res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' })
+    const out = await runClaude(String(system ?? ''), String(user ?? ''), {
+      onDelta: (d) => res.write(d),
+    })
+    if (out.error) console.error('cli failed:', out.error)
+    return res.end()
   }
 
   if (url.pathname === '/api/image' && req.method === 'POST') {

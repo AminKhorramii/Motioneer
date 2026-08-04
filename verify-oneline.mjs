@@ -80,6 +80,25 @@ console.log('greeted with:', JSON.stringify(await page.evaluate(() => ({
 
 await page.waitForSelector('.paper.here', { timeout: 120000 })
 await page.waitForFunction(() => !document.querySelector('[data-busy]'), null, { timeout: 180000 })
+// the wall is written in one reply on this path, so check it still came out as eight pages
+console.log('batched wall:', JSON.stringify(await page.evaluate(async () => {
+  const heads = new Set()
+  const angles = new Set()
+  for (let i = 0; i < 9; i++) {
+    document.querySelectorAll('.filmbar .nav button')[1]?.click()
+    await new Promise((r) => setTimeout(r, 260))
+    const d = document.querySelector('.paper.here iframe')?.contentDocument
+    heads.add(d?.querySelector('h1, h2')?.innerText ?? '')
+    const a = document.querySelector('.filmbar .angle')?.textContent
+    if (a) angles.add(a)
+  }
+  for (let i = 0; i < 9; i++) {
+    document.querySelectorAll('.filmbar .nav button')[0]?.click()
+    await new Promise((r) => setTimeout(r, 90))
+  }
+  return { papers: document.querySelector('.filmbar .count')?.textContent, distinctHeadlines: heads.size, angles: angles.size }
+})))
+
 const sent = await page.evaluate(async () => {
   const b = [...document.querySelectorAll('.filmbar button')].find((x) => x.textContent.includes('to Claude'))
   b?.click()

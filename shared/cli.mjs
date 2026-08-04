@@ -22,13 +22,27 @@ import { spawn } from 'node:child_process'
 export const CLI_MODEL = () =>
   (typeof process !== 'undefined' ? process.env?.WALL_CLI_MODEL : '') || 'sonnet'
 
-export function runClaude(system, user, { model = CLI_MODEL(), bin = 'claude' } = {}) {
+/**
+ * Run it, optionally handing back every delta as it arrives.
+ *
+ * Streaming matters more here than it looks. Designing eight worlds takes about fifty seconds,
+ * and roughly half of that is the model thinking before it writes a character. The rest is
+ * generation, and a caller that can see worlds finish one at a time can start writing the page
+ * for world one while world eight is still being drawn.
+ *
+ * The streamed shape is the vendor's own frames wrapped one level deep, so the same delta
+ * extraction works: type stream_event, event.type content_block_delta, event.delta.text.
+ */
+export function runClaude(system, user, { model = CLI_MODEL(), bin = 'claude', onDelta } = {}) {
+  const streaming = typeof onDelta === 'function'
   return new Promise((resolve) => {
     const child = spawn(
       bin,
       [
         '-p',
-        '--output-format', 'json',
+        ...(streaming
+          ? ['--output-format', 'stream-json', '--include-partial-messages', '--verbose']
+          : ['--output-format', 'json']),
         '--model', model,
         '--system-prompt', system,
         // the CLI's own context is about editing code, and this is about writing a page
@@ -39,7 +53,33 @@ export function runClaude(system, user, { model = CLI_MODEL(), bin = 'claude' } 
     )
     let out = ''
     let err = ''
-    child.stdout.on('data', (d) => (out += d))
+    let text = ''
+    let line = ''
+    child.stdout.on('data', (d) => {
+      if (!streaming) {
+        out += d
+        return
+      }
+      line += d
+      const lines = line.split('\n')
+      line = lines.pop() ?? ''
+      for (const l of lines) {
+        if (!l.trim()) continue
+        let j
+        try {
+          j = JSON.parse(l)
+        } catch {
+          continue
+        }
+        const delta = j?.type === 'stream_event' && j.event?.type === 'content_block_delta'
+          ? j.event.delta?.text
+          : ''
+        if (delta) {
+          text += delta
+          onDelta(delta)
+        }
+      }
+    })
     child.stderr.on('data', (d) => (err += d))
     child.on('error', (e) =>
       resolve({
@@ -50,6 +90,9 @@ export function runClaude(system, user, { model = CLI_MODEL(), bin = 'claude' } 
       }),
     )
     child.on('close', () => {
+      if (streaming) {
+        return resolve(text ? { text } : { error: (err || 'no reply').slice(0, 200) })
+      }
       try {
         const j = JSON.parse(out)
         if (j.is_error) return resolve({ error: String(j.result ?? 'the session returned an error').slice(0, 200) })

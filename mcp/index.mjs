@@ -45,6 +45,19 @@ const TOOLS = [
           description: 'What is being launched, in whatever shape it already exists. A README, a note, two sentences.',
         },
         name: { type: 'string', description: 'Product name, if it is known.' },
+        oneLiner: {
+          type: 'string',
+          description:
+            'One sentence a stranger would understand, saying what this is. Fill this in: you ' +
+            'have already read the project and know it, and supplying it here saves a whole ' +
+            'model call that would otherwise re-read your own brief to work it out.',
+        },
+        what: { type: 'string', description: 'What it is, in at most two sentences.' },
+        audience: { type: 'string', description: 'Who it is for, in a few words.' },
+        cta: {
+          type: 'string',
+          description: 'The words on the main button, naming the action: "Download for macOS" rather than "Get started".',
+        },
         dir: {
           type: 'string',
           description:
@@ -152,7 +165,7 @@ function openInBrowser(request, at) {
 }
 
 /** Launch the desktop app with the brief in hand, and wait for a design to appear on disk. */
-async function design({ brief, name, dir }) {
+async function design({ brief, name, oneLiner, what, audience, cta, dir }) {
   const at = handoffDir(dir)
   await mkdir(at, { recursive: true })
   // a stale answer from a previous run would resolve instantly and look like this one
