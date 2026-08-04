@@ -606,3 +606,25 @@ header .hactions button.on { color: var(--ink); }
 .progress .elapsed {
   font-size: 11px; color: var(--dim2); font-variant-numeric: tabular-nums;
 }
+
+/* ——— the dock, reduced ———
+   Marks where a mark is enough, one name on the thing that matters. A row of labelled buttons
+   competes with the page it sits under, which is the only thing anyone is here to look at. */
+
+.barwrap .model { padding: 0.34rem 0.4rem; }
+.filmbar .icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 24px; padding: 0; border-radius: 7px;
+}
+.filmbar .send { display: inline-flex; align-items: center; gap: 6px; }
+.filmbar .send svg { width: 14px; height: 14px; }
+/* the return key, drawn. Nothing to read, and it only exists while there is something to run */
+.barwrap .run {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 26px; border-radius: 8px; padding: 0;
+  background: rgba(255, 255, 255, 0.08); border: 1px solid var(--hair2); color: var(--ink2);
+  transition: background var(--t), color var(--t), transform var(--t);
+}
+.barwrap .run:hover:not(:disabled) { background: rgba(255, 255, 255, 0.14); color: var(--ink); }
+.barwrap .run:active:not(:disabled) { transform: scale(0.94); }
+.barwrap .run:disabled { opacity: 0.4; }

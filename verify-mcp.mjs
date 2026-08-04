@@ -87,7 +87,7 @@ await page.waitForSelector('.paper.here', { timeout: 120000 })
 await page.waitForFunction(() => !document.querySelector('[data-busy]'), null, { timeout: 180000 })
 
 const sent = await page.evaluate(async () => {
-  const b = [...document.querySelectorAll('.filmbar button')].find((x) => x.textContent.includes('send back'))
+  const b = [...document.querySelectorAll('.filmbar button')].find((x) => x.textContent.includes('to Claude'))
   b?.click()
   await new Promise((r) => setTimeout(r, 1200))
   return { hadButton: !!b, toast: document.querySelector('.toast')?.textContent ?? null }

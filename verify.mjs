@@ -169,7 +169,7 @@ await page.screenshot({ path: `${OUT}/wall-variants.png` })
 // the one place the shells genuinely differ. What is asserted about the file is the same.
 const [download] = await Promise.all([
   page.waitForEvent('download', { timeout: 20000 }),
-  page.evaluate(() => [...document.querySelectorAll('.filmbar button')].find((b) => b.textContent.includes('download')).click()),
+  page.evaluate(() => [...document.querySelectorAll('.filmbar button')].find((b) => b.getAttribute('aria-label') === 'download').click()),
 ])
 const html = await readFile(await download.path(), 'utf8')
 const shipped = html.length > 0

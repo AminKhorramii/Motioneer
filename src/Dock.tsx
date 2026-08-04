@@ -36,9 +36,10 @@ export function Dock({
   return (
     <div className="dock">
       <div className="barwrap">
-        {/* the model is a whole configuration now, so it is shown and changed in one place */}
-        <button className="model" onClick={onModel} title={`writing with ${chosen().label}. click to change.`}>
-          {MARKS[chosen().id]?.() ?? <Icon.claude />} {chosen().label}
+        {/* the mark alone: the name is in the tooltip, and a row of words competes with the page */}
+        <button className="model" onClick={onModel} aria-label={`writing with ${chosen().label}`}
+          title={`writing with ${chosen().label}. click to change.`}>
+          {MARKS[chosen().id]?.() ?? <Icon.claude />}
         </button>
         <input
           className="bar"
@@ -47,7 +48,14 @@ export function Dock({
           onChange={(e) => onBar(e.currentTarget.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') onRun() }}
         />
-        <button className="go" onClick={onRun} disabled={!bar.trim() || busy}>make 3 variants</button>
+        {/* the return key already does this, so the button is the same key drawn small: it
+            appears only when there is something to ask for, and says the rest in its tooltip */}
+        {bar.trim() && (
+          <button className="run" onClick={onRun} disabled={busy} aria-label="make three variants"
+            title="make three variants of this page">
+            <Icon.enter />
+          </button>
+        )}
       </div>
 
       <div className="filmbar">
@@ -64,15 +72,20 @@ export function Dock({
           {worldById(world).name}
         </button>
         <span className="spacer" />
-        <button title="open this page in your browser" onClick={onOpen}>full view</button>
+        <button className="icon" aria-label="full view" title="open this page in your browser"
+          onClick={onOpen}><Icon.open /></button>
+        <button className={onSend ? 'icon' : 'go'} aria-label="download"
+          title="write this page out as one HTML file" onClick={onShip}>
+          <Icon.down />{onSend ? '' : ' download'}
+        </button>
+        {/* when something asked for this design, handing it back is the whole point of being
+            here, so it is the one thing wearing a name */}
         {onSend && (
-          <button className="go" title="write this design back for the agent that asked" onClick={onSend}>
-            send back
+          <button className="go send" title="hand this design back to the agent that asked"
+            onClick={onSend}>
+            {MARKS['claude-code']?.() ?? <Icon.claude />} to Claude
           </button>
         )}
-        <button className="go" title="write this page out as one HTML file" onClick={onShip}>
-          <Icon.ship /> download
-        </button>
       </div>
     </div>
   )
