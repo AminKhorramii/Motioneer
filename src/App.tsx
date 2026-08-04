@@ -89,6 +89,9 @@ export default function App() {
     const mine = ++run.current
     setPages([arrange(base, 0)])
     setAt(0)
+    // a served deployment answers which keys it holds asynchronously, and someone clicking
+    // straight through setup can arrive here before that answer does
+    if (!canWrite()) await loadHeldKeys()
     if (!canWrite()) {
       setPages(alternatives(base, 8))
       return

@@ -173,8 +173,10 @@ export const keyFor = (_p?: Provider) => localStorage.getItem(chosen().keyName) 
  * question as "is there a key in this browser". Everything that gates on writing asks this.
  */
 let held: string[] = []
+let asking: Promise<string[]> | null = null
 export async function loadHeldKeys() {
-  held = await servedProviders()
+  asking ??= servedProviders()
+  held = await asking
 }
 export const canWrite = (_p?: Provider) => Boolean(keyFor()) || held.includes(chosen().wire)
 export const canDraw = () => Boolean(imageKey()) || held.includes('gemini')

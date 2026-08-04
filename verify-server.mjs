@@ -88,6 +88,7 @@ const wallState = await page.evaluate(() => ({
   keysInBrowser: Object.keys(localStorage).filter((k) => k.startsWith('wall-key')).map((k) => localStorage.getItem(k)).filter(Boolean).length,
 }))
 console.log('wall written by the server:', JSON.stringify(wallState))
+console.log('toast:', await page.evaluate(() => document.querySelector('.toast')?.textContent ?? null))
 console.log('errors:', errors.length ? errors.slice(0, 5) : 'none')
 
 await browser.close()

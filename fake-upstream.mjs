@@ -27,7 +27,10 @@ const CORS = {
 async function loadFixtures(dir) {
   try {
     const names = (await readdir(dir)).filter((f) => f.endsWith('.json')).sort()
-    return await Promise.all(names.map(async (f) => JSON.parse(await readFile(path.join(dir, f), 'utf8'))))
+    const all = await Promise.all(names.map(async (f) => JSON.parse(await readFile(path.join(dir, f), 'utf8'))))
+    // a capture now contains the design reply as well as the page replies, and replaying a set
+    // of worlds where a page was asked for is one guaranteed failure per wall
+    return all.filter((fx) => !(fx.chunks ?? []).map((c) => c.text).join('').includes('"worlds"'))
   } catch {
     return []
   }
