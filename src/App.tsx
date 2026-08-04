@@ -4,7 +4,7 @@ import { KIND_LABEL, applyEdit, starterPage, type Kind, type Page } from '@/sect
 import { renderPage } from '@/render'
 import { pageBrief } from '@/brief'
 import {
-  EMPTY_PRODUCT, addSection, alternatives, arrange, readBrief, canDraw, canWrite, chosen, promptWorlds, setDesigned, cycleVariant, cycleWorld, dropSection, fanOut, illustrate, loadHeldKeys, promptPage, sectionAlternatives, seeded, setMock, type Product,
+  EMPTY_PRODUCT, addSection, alternatives, arrange, readBrief, canDraw, canWrite, chosen, promptWorlds, setDesigned, cycleVariant, cycleWorld, dropSection, fanOut, illustrate, loadHeldKeys, loadKeys, promptPage, sectionAlternatives, seeded, setMock, type Product,
 } from '@/compose'
 import { Onboarding } from '@/Onboarding'
 import { BriefRail } from '@/BriefRail'
@@ -147,6 +147,7 @@ export default function App() {
   // ask the deployment which keys it holds before anything gates on having one
   useEffect(() => {
     void loadHeldKeys()
+    void loadKeys()
   }, [])
 
   /**

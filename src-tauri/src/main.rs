@@ -119,6 +119,30 @@ fn preview(app: tauri::AppHandle, html: String) -> String {
 /// The handoff is files in a directory rather than a return value, because the agent that asked
 /// may have timed out, moved on, or been restarted by the time someone finishes choosing, and a
 /// file is still there when it comes back.
+/// A key belongs in the keychain, not in a file and not in the page.
+///
+/// The webview's own storage is a file on disk readable by anything running as this user. The
+/// system keychain is encrypted at rest and unlocked with the login session, which is the same
+/// place every other application on the machine keeps its credentials.
+fn entry(name: &str) -> Option<keyring::Entry> {
+    keyring::Entry::new("wall", name).ok()
+}
+
+#[tauri::command]
+fn get_key(name: String) -> Option<String> {
+    entry(&name)?.get_password().ok()
+}
+
+#[tauri::command]
+fn set_key(name: String, value: String) -> bool {
+    let Some(e) = entry(&name) else { return false };
+    if value.is_empty() {
+        // deleting a key that was never there is success, not failure
+        return matches!(e.delete_credential(), Ok(()) | Err(keyring::Error::NoEntry));
+    }
+    e.set_password(&value).is_ok()
+}
+
 #[tauri::command]
 fn wall_request() -> Option<serde_json::Value> {
     let file = std::env::var("WALL_REQUEST").ok()?;
@@ -228,6 +252,8 @@ fn main() {
             export_page,
             preview,
             wall_request,
+            get_key,
+            set_key,
             handoff
         ])
         .setup(|app| {

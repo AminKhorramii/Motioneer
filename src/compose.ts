@@ -1,9 +1,9 @@
 /** Making pages: alternatives, section prompts, and the model path (with a mock for tests). */
 
 import { PRESETS, type Taste } from '@/taste'
-import { host, isServed, servedProviders } from '@/host'
+import { giveKey, host, isDesktop, isServed, servedProviders } from '@/host'
 import { slop, slopBrief } from '@/slop'
-import { modelById } from '@/models'
+import { MODELS, modelById } from '@/models'
 import { BACKDROPS, type Backdrop } from '@/backdrop'
 import { shrinkDataUrl } from '@/imagepipe'
 import { WORLDS, madeWorld, worldById, type World } from '@/worlds'
@@ -187,9 +187,49 @@ export function optsFor(m = chosen()) {
 /** Images are a separate provider axis: the model writing the copy and the model drawing the
  *  picture are chosen independently, so the key is stored separately too. */
 export const IMAGE_KEY_NAME = 'wall-key-gemini'
-export const imageKey = () => localStorage.getItem(IMAGE_KEY_NAME) ?? ''
+export const imageKey = () => vault[IMAGE_KEY_NAME] ?? localStorage.getItem(IMAGE_KEY_NAME) ?? ''
 
-export const keyFor = (_p?: Provider) => localStorage.getItem(chosen().keyName) ?? ''
+/**
+ * Keys read from wherever the shell keeps them.
+ *
+ * The desktop keeps them in the system keychain, which is asynchronous, and everything that
+ * gates on having a key asks synchronously. So they are read once at startup into memory and
+ * written through to the keychain, which also means a key is never read from disk twice.
+ */
+const vault: Record<string, string> = {}
+
+export async function loadKeys() {
+  if (!isDesktop) return
+  const names = new Set([...MODELS.map((m) => m.keyName), IMAGE_KEY_NAME])
+  await Promise.all(
+    [...names].map(async (name) => {
+      const got = await host.getKey(name).catch(() => null)
+      if (got) vault[name] = got
+    }),
+  )
+}
+
+/** Put a key where this shell keeps them, which is not the same place in each. */
+export async function setKey(name: string, value: string) {
+  if (isServed) {
+    await giveKey(name === IMAGE_KEY_NAME ? 'gemini' : chosen().wire, value)
+    await loadHeldKeys()
+    return
+  }
+  vault[name] = value
+  await host.setKey(name, value)
+}
+
+/** Where this shell keeps them, said plainly, because it is the one thing worth knowing. */
+export const keyHome = () =>
+  isDesktop
+    ? 'Kept in your system keychain, never in a file or a page.'
+    : isServed
+      ? 'Kept by the local server on this machine, never in the page.'
+      : 'Kept in this browser only, and sent straight to the provider.'
+
+export const keyFor = (_p?: Provider) =>
+  vault[chosen().keyName] ?? localStorage.getItem(chosen().keyName) ?? ''
 
 /**
  * A deployment can hold the keys instead of the visitor, so "can this write" is not the same

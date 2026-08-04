@@ -31,6 +31,13 @@ export interface Host {
   onDelta: (fn: (id: string, delta: string) => void) => () => void
   /** one response rather than a stream, returned as a data URL so the page stays one file */
   image: (provider: string, prompt: string, key: string) => Promise<{ dataUrl?: string; error?: string }>
+  /**
+   * Where a key is kept. The desktop answers with the system keychain, which is encrypted at
+   * rest and gated by the login session, and is where every other application on the machine
+   * keeps its credentials. A browser has nowhere better than its own storage.
+   */
+  getKey: (name: string) => Promise<string | null>
+  setKey: (name: string, value: string) => Promise<boolean>
   /** a brief handed in from outside, when something launched this window to ask for a design */
   request: () => Promise<{ brief?: string; name?: string; dir?: string } | null>
   /** write the chosen design back where whoever asked can find it */
@@ -74,6 +81,12 @@ const web: Host = {
   stream: (id, provider, system, user, key, opts) =>
     streamText(provider, system, user, key, (delta) => deltaFns.forEach((fn) => fn(id, delta)), opts),
   image: (provider, prompt, key) => generateImage(provider, prompt, key),
+  getKey: async (name) => localStorage.getItem(name),
+  setKey: async (name, value) => {
+    if (value) localStorage.setItem(name, value)
+    else localStorage.removeItem(name)
+    return true
+  },
   // a browser cannot be launched by an agent holding a directory, so there is nothing to hand
   request: async () => null,
   handoff: async () => ({ error: 'handing off needs the desktop app' }),
@@ -166,6 +179,8 @@ const tauri: Host = {
   writeState: async (v) => Boolean(await invoke('write_state', { value: v ?? null })),
   exportPage: (html, name) => invoke('export_page', { html, name }),
   preview: (html) => invoke('preview', { html }),
+  getKey: (name) => invoke('get_key', { name }),
+  setKey: (name, value) => invoke('set_key', { name, value }),
   request: () => invoke('wall_request'),
   handoff: (dir, files) => invoke('handoff', { dir, files }),
 }

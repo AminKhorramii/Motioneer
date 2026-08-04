@@ -17,10 +17,8 @@
 import { spawn } from 'node:child_process'
 import { mkdir, readFile, writeFile, rm } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
-import { createRequire } from 'node:module'
 import path from 'node:path'
 
-const require = createRequire(import.meta.url)
 const ROOT = path.join(path.dirname(new URL(import.meta.url).pathname), '..')
 const WAIT_MS = Number(process.env.WALL_WAIT_MS ?? 900_000)
 
