@@ -110,6 +110,26 @@ const served: Host = {
     }
     return { text }
   },
+  request: async () => {
+    try {
+      return await (await fetch('/api/request')).json()
+    } catch {
+      return null
+    }
+  },
+  // the directory is the server's, not ours to choose: it was started knowing where this goes
+  handoff: async (_dir, files) => {
+    try {
+      const r = await fetch('/api/handoff', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ files }),
+      })
+      return r.json()
+    } catch (e) {
+      return { error: String(e).slice(0, 160) }
+    }
+  },
   image: async (_provider, prompt) => {
     const res = await fetch('/api/image', {
       method: 'POST',
@@ -163,6 +183,23 @@ export const host: Host = win.wall ?? (onTauri ? tauri : win.__wallServed ? serv
 export const isTauri = onTauri
 export const isDesktop = Boolean(win.wall) || onTauri
 export const isServed = Boolean(!win.wall && !onTauri && win.__wallServed)
+
+/**
+ * Hand a key to the server rather than keeping it in the page.
+ *
+ * localStorage is per origin, so a server on a different port every run would lose it and ask
+ * again. Held by the server it survives restarts and every project, and never enters a page.
+ */
+export async function giveKey(provider: string, key: string): Promise<string[]> {
+  const r = await fetch('/api/key', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ provider, key }),
+  })
+  const out = (await r.json()) as { providers?: string[] }
+  win.__wallProviders = out.providers ?? []
+  return win.__wallProviders
+}
 
 /** Providers the server already holds a key for, so the app can stop asking for one. */
 export const servedProviders = async (): Promise<string[]> => {

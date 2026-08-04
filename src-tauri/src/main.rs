@@ -153,6 +153,70 @@ fn handoff(dir: String, files: BTreeMap<String, String>) -> Handed {
     }
 }
 
+/// The two commands a browser cannot answer, tested where they live.
+///
+/// The agent handoff used to be proved end to end by driving Electron, which is gone. The UI half
+/// of that flow now has no automated cover and says so in the docs; this is the half that can be
+/// tested honestly, because writing files is not a thing a window has to be open to do.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn tmp(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("wall-test-{name}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        dir
+    }
+
+    #[test]
+    fn handoff_writes_every_file_where_the_agent_will_look() {
+        let dir = tmp("handoff");
+        let mut files = BTreeMap::new();
+        files.insert("chosen.md".to_string(), "# a spec".to_string());
+        files.insert("chosen.html".to_string(), "<!doctype html>".to_string());
+        files.insert("chosen.json".to_string(), "{}".to_string());
+
+        let out = handoff(dir.to_string_lossy().into_owned(), files);
+        assert!(out.error.is_none(), "{:?}", out.error);
+        assert_eq!(out.wrote.unwrap().len(), 3);
+        assert_eq!(fs::read_to_string(dir.join("chosen.md")).unwrap(), "# a spec");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn handoff_creates_the_directory_rather_than_failing_on_it() {
+        let dir = tmp("nested").join("deep").join("deeper");
+        let mut files = BTreeMap::new();
+        files.insert("chosen.json".to_string(), "{}".to_string());
+        let out = handoff(dir.to_string_lossy().into_owned(), files);
+        assert!(out.error.is_none());
+        assert!(dir.join("chosen.json").exists());
+    }
+
+    #[test]
+    fn a_request_carries_the_directory_it_came_from() {
+        let dir = tmp("request");
+        fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("request.json");
+        fs::write(&file, r#"{"brief":"a product","name":"Spoor"}"#).unwrap();
+        std::env::set_var("WALL_REQUEST", &file);
+
+        let got = wall_request().expect("a written request should be read");
+        assert_eq!(got["name"], "Spoor");
+        // the agent collects from the directory, so the app has to be told which one it is
+        assert_eq!(got["dir"], dir.to_string_lossy().as_ref());
+
+        std::env::remove_var("WALL_REQUEST");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn no_request_is_not_an_error() {
+        std::env::remove_var("WALL_REQUEST");
+        assert!(wall_request().is_none());
+    }
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())

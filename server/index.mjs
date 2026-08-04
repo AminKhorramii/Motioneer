@@ -10,13 +10,16 @@
  * imports, so there is one place where a request is built and one place where a reply is read.
  *
  *   ANTHROPIC_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY   the keys it holds
+ *   WALL_REQUEST                                          a brief to open with
+ *   WALL_HANDOFF_DIR                                      where a chosen design is written
  *   PORT                                                  default 8080
  *   WALL_WALLS_PER_HOUR                                   per address ceiling, unset means none
  *   WALL_DAILY_OUTPUT_TOKENS                              whole deployment ceiling, unset means none
  */
 
 import { createServer } from 'node:http'
-import { readFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import os from 'node:os'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { generateImage, streamText } from '../shared/providers.mjs'
@@ -25,11 +28,28 @@ const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 const DIST = path.join(ROOT, 'dist')
 const PORT = Number(process.env.PORT ?? 8080)
 
-const KEYS = {
-  anthropic: process.env.ANTHROPIC_API_KEY ?? '',
-  openai: process.env.OPENAI_API_KEY ?? '',
-  gemini: process.env.GEMINI_API_KEY ?? '',
+/**
+ * Keys live in a file rather than in the page.
+ *
+ * A browser tab keeps them in localStorage, which is per origin, so a server on a different
+ * port every run would lose them and ask again. Held here they survive restarts, work across
+ * every project, and never reach a page at all.
+ */
+const CONFIG = path.join(os.homedir(), '.wall', 'config.json')
+let saved = {}
+try {
+  saved = JSON.parse(await readFile(CONFIG, 'utf8'))
+} catch {
+  saved = {}
 }
+const KEYS = {
+  anthropic: process.env.ANTHROPIC_API_KEY || saved.anthropic || '',
+  openai: process.env.OPENAI_API_KEY || saved.openai || '',
+  gemini: process.env.GEMINI_API_KEY || saved.gemini || '',
+}
+
+/** Only ever the directory this server was started for, never one a page asks for. */
+const HANDOFF = process.env.WALL_HANDOFF_DIR ?? ''
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -106,7 +126,46 @@ const server = createServer(async (req, res) => {
 
   if (url.pathname === '/api/config') {
     // the app hides its key fields when the server already holds one
+    return json(res, 200, { providers: Object.keys(KEYS).filter((k) => KEYS[k]), handoff: Boolean(HANDOFF) })
+  }
+
+  if (url.pathname === '/api/key' && req.method === 'POST') {
+    const { provider, key } = await readBody(req)
+    if (!(provider in KEYS)) return json(res, 400, { error: 'unknown provider' })
+    KEYS[provider] = String(key ?? '').trim()
+    saved[provider] = KEYS[provider]
+    await mkdir(path.dirname(CONFIG), { recursive: true })
+    await writeFile(CONFIG, JSON.stringify(saved, null, 2), { mode: 0o600 })
     return json(res, 200, { providers: Object.keys(KEYS).filter((k) => KEYS[k]) })
+  }
+
+  if (url.pathname === '/api/request') {
+    if (!process.env.WALL_REQUEST) return json(res, 200, null)
+    try {
+      const raw = JSON.parse(await readFile(process.env.WALL_REQUEST, 'utf8'))
+      return json(res, 200, { ...raw, dir: HANDOFF })
+    } catch {
+      return json(res, 200, null)
+    }
+  }
+
+  if (url.pathname === '/api/handoff' && req.method === 'POST') {
+    // the directory comes from how this server was started, not from the page: a local server
+    // is reachable by anything running in the browser, and a caller supplied path would let any
+    // of it write wherever it liked
+    if (!HANDOFF) return json(res, 400, { error: 'this server was not started for a handoff' })
+    const { files } = await readBody(req)
+    try {
+      await mkdir(HANDOFF, { recursive: true })
+      for (const [name, body] of Object.entries(files ?? {})) {
+        // a name is a name, never a path
+        if (name.includes('/') || name.includes('\\') || name.includes('..')) continue
+        await writeFile(path.join(HANDOFF, name), String(body), 'utf8')
+      }
+      return json(res, 200, { dir: HANDOFF })
+    } catch (e) {
+      return json(res, 500, { error: String(e).slice(0, 200) })
+    }
   }
 
   if (url.pathname === '/api/stream' && req.method === 'POST') {

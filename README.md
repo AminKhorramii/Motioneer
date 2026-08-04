@@ -239,10 +239,28 @@ and asserts the visitor never holds a key.
 
 ## Wall as a tool your agent can call
 
-`mcp/index.mjs` is an MCP server with no dependencies. Add it once:
+One line, and nothing else to install:
 
 ```
-claude mcp add wall -- node /path/to/wall/mcp/index.mjs
+claude mcp add --scope user wall -- npx -y wall-mcp
+```
+
+Ask for a landing page. Wall opens, you pick one, and the choice arrives in your project as a
+spec your agent implements.
+
+Where it opens depends on what is there. A desktop app if one is installed, and otherwise a
+local server and whichever browser you already have. The browser route is the one a first run
+takes: no download, no toolchain, and nothing for the operating system to refuse to open, which
+matters because the install is the part of a first run that leaks most. It also means Windows
+and Linux work without a build.
+
+Keys are held by the local server in `~/.wall/config.json`, not by the page. A browser tab keeps
+them per origin, so a server on a different port every run would lose them and ask again.
+
+From a clone, point it at the file instead:
+
+```
+claude mcp add --scope user wall -- node /path/to/wall/mcp/index.mjs
 ```
 
 Then ask for a landing page. Your agent calls `design` with whatever brief exists, the desktop

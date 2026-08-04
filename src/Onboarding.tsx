@@ -3,6 +3,8 @@ import type { Taste } from '@/taste'
 import { CUSTOM, IMAGE_KEY_NAME, canWrite, choose, readBrief, type Intake } from '@/compose'
 import type { Product } from '@/compose'
 import { MARKS, MODELS, modelById } from '@/models'
+import { giveKey, isServed } from '@/host'
+import { loadHeldKeys } from '@/compose'
 
 /**
  * First run, in two steps: which model writes, and what it writes about.
@@ -51,6 +53,12 @@ export function Onboarding({ product, taste, explainOnly, onProduct, onBuild, on
 
   const saveKey = (keyName: string, value: string) => {
     setKeys((k) => ({ ...k, [keyName]: value }))
+    // a served deployment holds keys itself, so the page hands it over rather than keeping it
+    if (isServed) {
+      const wire = keyName === IMAGE_KEY_NAME ? 'gemini' : model.wire
+      void giveKey(wire, value.trim()).then(() => loadHeldKeys())
+      return
+    }
     localStorage.setItem(keyName, value.trim())
   }
   const take = (id: string) => {

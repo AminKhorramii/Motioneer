@@ -1,16 +1,21 @@
 /**
  * The agent path, end to end, in the three pieces it actually has.
  *
- * The protocol is spoken to the real server. The desktop is launched the way the server
- * launches it, with a request file, and driven the way a person drives it. The handoff is then
- * read back through the server's own collect tool. Nothing is stubbed but the model.
+ * The protocol is spoken to the real MCP server. The app is opened with a request in hand and
+ * driven the way a person drives it. The handoff is then read back through the MCP server's own
+ * collect tool. Nothing is stubbed but the model.
+ *
+ * The app is served rather than launched as a desktop window, because Tauri has no WebDriver on
+ * macOS and Electron is gone. The served host answers request and handoff over /api, so the same
+ * flow runs: a brief arrives from outside, the page skips setup, and choosing writes the three
+ * files where the agent will look. What is not covered here is the desktop shell's own commands,
+ * which are tested in Rust, in src-tauri/src/main.rs.
  */
 import { spawn } from 'node:child_process'
 import { mkdtempSync, existsSync, writeFileSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { _electron } from 'playwright'
-import electronPath from 'electron'
+import { chromium } from 'playwright'
 import { fakeAnthropic } from './fake-upstream.mjs'
 
 const { server, url } = await fakeAnthropic()
@@ -53,16 +58,23 @@ console.log('collect before choosing:', JSON.stringify({ isError: !!(await waitF
 const request = join(at, 'request.json')
 writeFileSync(request, JSON.stringify({ brief: 'Spoor makes every AI session searchable, locally.', name: 'Spoor' }), 'utf8')
 
-const app = await _electron.launch({
-  args: ['.'],
-  executablePath: electronPath,
-  env: { ...process.env, WALL_TEST: '1', WALL_DATA: mkdtempSync(join(tmpdir(), 'wall-')), WALL_API_BASE: url, WALL_REQUEST: request },
+const wall = spawn('node', ['server/index.mjs'], {
+  env: { ...process.env, PORT: '0', ANTHROPIC_API_KEY: 'server-held-key', WALL_API_BASE: url, WALL_REQUEST: request, WALL_HANDOFF_DIR: at },
+  stdio: ['ignore', 'pipe', 'pipe'],
 })
-const page = await app.firstWindow()
-await page.setViewportSize({ width: 1440, height: 900 })
+const PORT = await new Promise((resolve, reject) => {
+  wall.stdout.on('data', (d) => {
+    const m = String(d).match(/localhost:(\d+)/)
+    if (m) resolve(Number(m[1]))
+  })
+  wall.stderr.on('data', (d) => reject(new Error('server failed: ' + d)))
+})
+
+const browser = await chromium.launch()
+const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
 const errors = []
 page.on('pageerror', (e) => errors.push(String(e).slice(0, 200)))
-await page.evaluate(() => localStorage.setItem('wall-key-anthropic', 'k')).catch(() => {})
+await page.goto(`http://127.0.0.1:${PORT}/`)
 
 // a brief handed in from outside must skip setup entirely
 await page.waitForTimeout(1200)
@@ -82,7 +94,8 @@ const sent = await page.evaluate(async () => {
 })
 console.log('sent back:', JSON.stringify(sent))
 console.log('files written:', JSON.stringify(['chosen.md', 'chosen.html', 'chosen.json'].filter((f) => existsSync(join(at, f)))))
-await app.close()
+await browser.close()
+wall.kill()
 
 // ——— 3. the agent picks it up ———
 rpc({ jsonrpc: '2.0', id: 5, method: 'tools/call', params: { name: 'collect', arguments: { dir: work } } })

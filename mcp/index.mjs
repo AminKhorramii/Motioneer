@@ -100,6 +100,8 @@ async function readChosen(dir) {
  * `open` does not carry environment through and the request path travels that way.
  */
 function findShell() {
+  // set when a run should take the browser route regardless of what is installed
+  if (process.env.WALL_NO_DESKTOP) return null
   const tries = [
     process.env.WALL_APP,
     path.join(ROOT, 'src-tauri/target/release/bundle/macos/Wall.app/Contents/MacOS/wall'),
@@ -114,6 +116,37 @@ function findShell() {
   }
 }
 
+/**
+ * The route that needs nothing installed.
+ *
+ * Starts the local server, which holds the keys and writes the handoff, then opens whatever
+ * browser is already there. No download, no toolchain, and nothing for the operating system to
+ * refuse to open, which matters because the install is the part of a first run that leaks most.
+ */
+function openInBrowser(request, at) {
+  return new Promise((resolve) => {
+    const child = spawn('node', [path.join(ROOT, 'server', 'index.mjs')], {
+      env: { ...process.env, PORT: '0', WALL_REQUEST: request, WALL_HANDOFF_DIR: at },
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+    let out = ''
+    const give = async (url) => {
+      // written down as well as opened, so a browser that did not launch is still reachable
+      await writeFile(path.join(at, 'open.txt'), url, 'utf8').catch(() => {})
+      const open = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open'
+      spawn(open, [url], { stdio: 'ignore', detached: true }).unref()
+      resolve({ child, url })
+    }
+    child.stdout.on('data', (d) => {
+      out += d
+      const m = out.match(/http:\/\/localhost:(\d+)/)
+      if (m) give(m[0])
+    })
+    // if it never says where it is, there is nothing to open and nothing to wait for
+    setTimeout(() => resolve({ child, url: null }), 8000)
+  })
+}
+
 /** Launch the desktop app with the brief in hand, and wait for a design to appear on disk. */
 async function design({ brief, name, dir }) {
   const at = handoffDir(dir)
@@ -124,21 +157,27 @@ async function design({ brief, name, dir }) {
   await writeFile(request, JSON.stringify({ brief, name }, null, 2), 'utf8')
 
   const found = findShell()
-  if (!found) return { noShell: true, at }
-  const child = spawn(found.cmd, found.args, {
-    env: { ...process.env, WALL_REQUEST: request },
-    stdio: 'ignore',
-    detached: true,
-  })
-  child.unref()
+  let server = null
+  let where = 'the Wall window'
+  if (found) {
+    spawn(found.cmd, found.args, { env: { ...process.env, WALL_REQUEST: request }, stdio: 'ignore', detached: true }).unref()
+  } else {
+    const opened = await openInBrowser(request, at)
+    server = opened.child
+    if (!opened.url) return { noShell: true, at }
+    where = opened.url
+  }
 
   const until = Date.now() + WAIT_MS
   while (Date.now() < until) {
     const got = await readChosen(dir)
-    if (got) return got
+    if (got) {
+      server?.kill()
+      return got
+    }
     await new Promise((r) => setTimeout(r, 700))
   }
-  return null
+  return { waiting: true, at, where }
 }
 
 async function check(html) {
@@ -154,11 +193,14 @@ async function call(name, args, id) {
   if (name === 'design') {
     const got = await design(args ?? {})
     if (got?.noShell) {
+      return fail(id, `Wall could not open a window or a browser. The brief is written to ${got.at}.`)
+    }
+    if (got?.waiting) {
       return fail(
         id,
-        'No Wall desktop app was found. Build one with `npm run app:bundle` for the packaged ' +
-          'app, or `npm run app` to run it from source, then call design again. The brief is ' +
-          `already written to ${path.join(got.at, 'request.json')} and will be picked up.`,
+        `Wall is open at ${got.where} and waiting for a choice. Nothing has been picked yet.\n` +
+          `Call collect with dir "${args?.dir ?? process.cwd()}" once they have, or read ` +
+          `${path.join(got.at, 'chosen.md')} directly.`,
       )
     }
     if (!got) {
