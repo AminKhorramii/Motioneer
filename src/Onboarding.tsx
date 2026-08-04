@@ -3,6 +3,7 @@ import type { Taste } from '@/taste'
 import { CUSTOM, IMAGE_KEY_NAME, canWrite, choose, keyHome, readBrief, setKey, type Intake } from '@/compose'
 import type { Product } from '@/compose'
 import { MARKS, MODELS, modelById } from '@/models'
+import { host } from '@/host'
 
 
 /**
@@ -45,6 +46,9 @@ export function Onboarding({ product, taste, explainOnly, onProduct, onBuild, on
       [IMAGE_KEY_NAME, localStorage.getItem(IMAGE_KEY_NAME) ?? ''],
     ]),
   )
+  // a shell that cannot start a process cannot ask the local Claude, and offering a choice that
+  // cannot work is worse than offering one fewer
+  const offered = MODELS.filter((m) => m.wire !== 'cli' || Boolean(host.cli))
   const model = modelById(pick)
   const picked = Boolean(pick)
   const shown = hover || pick ? modelById(hover || pick) : null
@@ -100,7 +104,7 @@ export function Onboarding({ product, taste, explainOnly, onProduct, onBuild, on
             {/* one row of marks, and one line that names whichever is under the cursor. Ten
                 labelled tiles was four rows of reading to make one choice. */}
             <div className="picks" onMouseLeave={() => setHover('')}>
-              {MODELS.map((m) => (
+              {offered.map((m) => (
                 <button key={m.id} className={m.id === pick ? 'pick on' : 'pick'} aria-label={m.label}
                   onMouseEnter={() => setHover(m.id)} onFocus={() => setHover(m.id)} onClick={() => take(m.id)}>
                   {MARKS[m.id]?.()}
@@ -111,7 +115,7 @@ export function Onboarding({ product, taste, explainOnly, onProduct, onBuild, on
               {shown ? `${shown.label}: ${shown.note}` : 'Pick one. Wall asks for short copy, not code, so a small model does it well.'}
             </p>
 
-            {picked && (
+            {picked && model.wire !== 'cli' && (
             <div className="fields">
               <label className="keyline">
                 <span>{model.label} key</span>

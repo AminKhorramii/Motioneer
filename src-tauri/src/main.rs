@@ -120,6 +120,57 @@ fn preview(app: tauri::AppHandle, html: String) -> String {
 /// The handoff is files in a directory rather than a return value, because the agent that asked
 /// may have timed out, moved on, or been restarted by the time someone finishes choosing, and a
 /// file is still there when it comes back.
+/// The model the person already has.
+///
+/// Someone who reached Wall through their agent has a working Claude session on this machine,
+/// and asking for an API key to reach a second one buys nothing. The flags matter as much as the
+/// call: an identical system prompt across a wall means the first request builds the cache and
+/// the rest read it, and the parts of the CLI's own prompt that are about editing code are
+/// excluded because none of it helps write a page and all of it would be paid for.
+#[tauri::command]
+fn claude_text(system: String, user: String) -> serde_json::Value {
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+
+    let model = std::env::var("WALL_CLI_MODEL").unwrap_or_else(|_| "sonnet".into());
+    let spawned = Command::new("claude")
+        .args([
+            "-p",
+            "--output-format",
+            "json",
+            "--model",
+            &model,
+            "--system-prompt",
+            &system,
+            "--exclude-dynamic-system-prompt-sections",
+            "--strict-mcp-config",
+        ])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn();
+
+    let mut child = match spawned {
+        Ok(c) => c,
+        Err(_) => return serde_json::json!({ "error": "the claude command was not found on this machine" }),
+    };
+    if let Some(mut stdin) = child.stdin.take() {
+        let _ = stdin.write_all(user.as_bytes());
+    }
+    let out = match child.wait_with_output() {
+        Ok(o) => o,
+        Err(e) => return serde_json::json!({ "error": e.to_string() }),
+    };
+    match serde_json::from_slice::<serde_json::Value>(&out.stdout) {
+        Ok(j) if j["is_error"] != serde_json::Value::Bool(true) => {
+            serde_json::json!({ "text": j["result"].as_str().unwrap_or_default() })
+        }
+        _ => serde_json::json!({
+            "error": String::from_utf8_lossy(&out.stderr).chars().take(200).collect::<String>()
+        }),
+    }
+}
+
 /// A key belongs in the keychain, not in a file and not in the page.
 ///
 /// The webview's own storage is a file on disk readable by anything running as this user. The
@@ -264,6 +315,7 @@ fn main() {
             export_page,
             preview,
             wall_request,
+            claude_text,
             get_key,
             set_key,
             handoff

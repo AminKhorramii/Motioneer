@@ -38,6 +38,11 @@ export interface Host {
    */
   getKey: (name: string) => Promise<string | null>
   setKey: (name: string, value: string) => Promise<boolean>
+  /**
+   * The model the person already has. A shell that can start a process answers this; a plain
+   * browser cannot, which is the one thing it will never be able to do.
+   */
+  cli?: (system: string, user: string) => Promise<{ text?: string; error?: string }>
   /** a brief handed in from outside, when something launched this window to ask for a design */
   request: () => Promise<{ brief?: string; name?: string; dir?: string } | null>
   /** write the chosen design back where whoever asked can find it */
@@ -125,6 +130,18 @@ const served: Host = {
     }
     return { text }
   },
+  cli: async (system, user) => {
+    try {
+      const r = await fetch('/api/cli', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ system, user }),
+      })
+      return r.json()
+    } catch (e) {
+      return { error: String(e).slice(0, 160) }
+    }
+  },
   request: async () => {
     try {
       return await (await fetch('/api/request')).json()
@@ -179,6 +196,7 @@ const tauri: Host = {
   writeState: async (v) => Boolean(await invoke('write_state', { value: v ?? null })),
   exportPage: (html, name) => invoke('export_page', { html, name }),
   preview: (html) => invoke('preview', { html }),
+  cli: (system, user) => invoke('claude_text', { system, user }),
   getKey: (name) => invoke('get_key', { name }),
   setKey: (name, value) => invoke('set_key', { name, value }),
   request: () => invoke('wall_request'),

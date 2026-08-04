@@ -4,7 +4,7 @@ import { KIND_LABEL, applyEdit, starterPage, type Kind, type Page } from '@/sect
 import { renderPage } from '@/render'
 import { pageBrief } from '@/brief'
 import {
-  EMPTY_PRODUCT, addSection, alternatives, arrange, readBrief, canDraw, canWrite, chosen, promptWorlds, setDesigned, cycleVariant, cycleWorld, dropSection, fanOut, illustrate, loadHeldKeys, loadKeys, promptPage, sectionAlternatives, seeded, setMock, type Product,
+  EMPTY_PRODUCT, addSection, alternatives, arrange, readBrief, canDraw, canWrite, choose, chosen, promptWorlds, setDesigned, cycleVariant, cycleWorld, dropSection, fanOut, illustrate, loadHeldKeys, loadKeys, promptPage, sectionAlternatives, seeded, setMock, type Product,
 } from '@/compose'
 import { Onboarding } from '@/Onboarding'
 import { BriefRail } from '@/BriefRail'
@@ -158,6 +158,9 @@ export default function App() {
   useEffect(() => {
     void host.request().then(async (req) => {
       if (!req?.brief || !req.dir) return
+      // an agent opened this window, so the Claude that opened it is right there. Nothing to
+      // configure is a better first run than a good default.
+      if (!localStorage.getItem('wall-model')) choose('claude-code')
       setAskedFrom(req.dir)
       setOnboarding(null)
       await loadHeldKeys()

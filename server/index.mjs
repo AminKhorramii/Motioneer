@@ -24,6 +24,7 @@ import os from 'node:os'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { generateImage, streamText } from '../shared/providers.mjs'
+import { runClaude } from '../shared/cli.mjs'
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 const DIST = path.join(ROOT, 'dist')
@@ -143,7 +144,11 @@ const server = createServer(async (req, res) => {
 
   if (url.pathname === '/api/config') {
     // the app hides its key fields when the server already holds one
-    return json(res, 200, { providers: Object.keys(KEYS).filter((k) => KEYS[k]), handoff: Boolean(HANDOFF) })
+    return json(res, 200, {
+      providers: Object.keys(KEYS).filter((k) => KEYS[k]),
+      handoff: Boolean(HANDOFF),
+      cli: true,
+    })
   }
 
   if (url.pathname === '/api/key' && req.method === 'POST') {
@@ -199,6 +204,14 @@ const server = createServer(async (req, res) => {
     if (DAILY_TOKENS) day.tokens += Math.ceil((out.text?.length ?? 0) / 4)
     if (out.error) console.error('stream failed:', out.error)
     return res.end()
+  }
+
+  if (url.pathname === '/api/cli' && req.method === 'POST') {
+    // no key is involved, so there is nothing to hold and nothing to check beyond the ceiling
+    const denied = overLimit(address)
+    if (denied) return json(res, 429, { error: denied })
+    const { system, user } = await readBody(req)
+    return json(res, 200, await runClaude(String(system ?? ''), String(user ?? '')))
   }
 
   if (url.pathname === '/api/image' && req.method === 'POST') {

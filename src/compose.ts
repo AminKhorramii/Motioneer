@@ -222,7 +222,9 @@ export async function setKey(name: string, value: string) {
 
 /** Where this shell keeps them, said plainly, because it is the one thing worth knowing. */
 export const keyHome = () =>
-  isDesktop
+  chosen().wire === 'cli'
+    ? 'No key is stored. It asks the Claude already on this machine.'
+    : isDesktop
     ? 'Kept in your system keychain, never in a file or a page.'
     : isServed
       ? 'Kept by the local server on this machine, never in the page.'
@@ -241,7 +243,9 @@ export async function loadHeldKeys() {
   asking ??= servedProviders()
   held = await asking
 }
-export const canWrite = (_p?: Provider) => Boolean(keyFor()) || held.includes(chosen().wire)
+/** A model the person already has needs no key, only a shell that can start a process. */
+export const canWrite = (_p?: Provider) =>
+  (chosen().wire === 'cli' ? Boolean(host.cli) : Boolean(keyFor())) || held.includes(chosen().wire)
 export const canDraw = () => Boolean(imageKey()) || held.includes('gemini')
 
 // One delta listener for the whole app, fanned out by request id, because several pages
@@ -261,6 +265,14 @@ async function ask(
   onDelta?: (delta: string) => void,
   extra?: { maxTokens?: number },
 ): Promise<string | null> {
+  const m = chosen()
+  // the local Claude has no key and no endpoint: it is a process, not a request
+  if (m.wire === 'cli') {
+    if (!host.cli) return null
+    const out = await host.cli(system, user)
+    if (out.error) throw new Error(out.error)
+    return out.text ?? null
+  }
   const key = keyFor(provider)
   // a served deployment holds the key, so an empty one here is not a reason to stop
   if (!key && !isServed) return null
@@ -271,7 +283,6 @@ async function ask(
   const id = uid()
   if (onDelta) streams.set(id, onDelta)
   try {
-    const m = chosen()
     const res = await host.stream(id, m.wire, system, user, key, { ...optsFor(m), ...extra })
     if (res?.error) throw new Error(res.error)
     return res?.text ?? null

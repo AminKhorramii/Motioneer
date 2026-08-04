@@ -24,7 +24,8 @@ const mcp = spawn('node', ['mcp/index.mjs'], {
     WALL_API_BASE: upstreamUrl,
     WALL_WAIT_MS: '150000',
     WALL_NO_DESKTOP: '1',
-    ANTHROPIC_API_KEY: 'server-held',
+    // no key anywhere: the route under test is the one that asks the local Claude instead
+    PATH: '/tmp/fakebin:' + process.env.PATH,
     HOME: work,
   },
   stdio: ['pipe', 'pipe', 'pipe'],
@@ -54,6 +55,7 @@ rpc({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: {
   arguments: { brief: 'Spoor makes every AI session searchable, locally.', name: 'Spoor', dir: work },
 } })
 
+// the model is the one already on the machine, which is what a first run should default to
 // the server prints where it is; find it the way the person's browser was pointed at it
 let url = null
 const until = Date.now() + 20000
@@ -85,6 +87,11 @@ const sent = await page.evaluate(async () => {
   return { hadButton: !!b, toast: document.querySelector('.toast')?.textContent ?? null }
 })
 console.log('sent back:', JSON.stringify(sent))
+// the point of this route: nothing was configured and no key exists anywhere
+console.log('nothing configured:', JSON.stringify(await page.evaluate(() => ({
+  model: localStorage.getItem('wall-model'),
+  keysInBrowser: Object.keys(localStorage).filter((k) => k.startsWith('wall-key')).length,
+}))))
 
 const done = await waitFor(1, 30000)
 const text = done?.result?.content?.[0]?.text ?? ''
