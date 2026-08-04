@@ -30,7 +30,19 @@ console.log('model:', REAL ? 'live Claude' : 'mock')
 await page.evaluate((key) => {
   localStorage.setItem('wall-key-anthropic', key || 'test-key')
   if (key) return
-  window.__wall.setMock((instruction, shape) => instruction === 'intake' ? {
+  window.__wall.setMock((instruction, shape) => instruction === 'worlds' ? {
+    worlds: Array.from({ length: 8 }, (_, i) => ({
+      name: ['wall label', 'field manual', 'night edition', 'receipt', 'broadsheet', 'sign system', 'zine', 'gallery card'][i],
+      note: 'a made world', voice: 'Write plainly.',
+      display: ['sans', 'grotesk', 'serif', 'mono'][i % 4], body: ['sans', 'grotesk', 'serif', 'mono'][(i + 2) % 4],
+      scale: 1.15 + i * 0.06, weight: 300 + i * 60, radius: i * 3, density: 0.3 + i * 0.07,
+      caps: i % 3 === 0, palette: ['as-is', 'mono', 'tinted', 'contrast'][i % 4],
+      backdrop: ['none', 'contours', 'grain', 'ridge'][i % 4],
+      structure: { rules: i % 2 === 0, numbered: i % 3 === 0, bleed: i % 4 === 0, measure: 46 + i * 4, figure: ['framed', 'bleed', 'plain'][i % 3] },
+      prefer: { hero: i % 4, features: i % 3 },
+      css: `section#hero .wrap{border:1px solid var(--line)} .eyebrow{letter-spacing:.${i}em}`,
+    })),
+  } : instruction === 'intake' ? {
     product: {
       name: 'Spoor',
       oneLiner: 'Every session you ever ran, findable in one keystroke.',
@@ -177,7 +189,19 @@ console.log('brief:', JSON.stringify({
 // ——— 5. the prompt bar makes variants (mocked model) ———
 await page.evaluate(() => {
   localStorage.setItem('wall-key-anthropic', 'test-key')
-  window.__wall.setMock((instruction, shape) => instruction === 'intake' ? {
+  window.__wall.setMock((instruction, shape) => instruction === 'worlds' ? {
+    worlds: Array.from({ length: 8 }, (_, i) => ({
+      name: ['wall label', 'field manual', 'night edition', 'receipt', 'broadsheet', 'sign system', 'zine', 'gallery card'][i],
+      note: 'a made world', voice: 'Write plainly.',
+      display: ['sans', 'grotesk', 'serif', 'mono'][i % 4], body: ['sans', 'grotesk', 'serif', 'mono'][(i + 2) % 4],
+      scale: 1.15 + i * 0.06, weight: 300 + i * 60, radius: i * 3, density: 0.3 + i * 0.07,
+      caps: i % 3 === 0, palette: ['as-is', 'mono', 'tinted', 'contrast'][i % 4],
+      backdrop: ['none', 'contours', 'grain', 'ridge'][i % 4],
+      structure: { rules: i % 2 === 0, numbered: i % 3 === 0, bleed: i % 4 === 0, measure: 46 + i * 4, figure: ['framed', 'bleed', 'plain'][i % 3] },
+      prefer: { hero: i % 4, features: i % 3 },
+      css: `section#hero .wrap{border:1px solid var(--line)} .eyebrow{letter-spacing:.${i}em}`,
+    })),
+  } : instruction === 'intake' ? {
     product: {
       name: 'Spoor',
       oneLiner: 'Every session you ever ran, findable in one keystroke.',

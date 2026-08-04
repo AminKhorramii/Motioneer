@@ -408,6 +408,12 @@ Respond with the JSON object alone, because the reply is parsed directly.`
  * page, and the built in worlds remain the fallback when the call fails.
  */
 export async function promptWorlds(product: Product, n: number, provider: Provider = 'model'): Promise<World[]> {
+  // the mock stands in here too, or an offline run reaches the real API and fails on the key
+  if (mockReply) {
+    const out = mockReply('worlds', n) as { worlds?: Record<string, unknown>[] } | null
+    const fromMock = (out?.worlds ?? []).map(madeWorld).filter((w) => w.name)
+    return fromMock.length >= 2 ? fromMock : WORLDS
+  }
   const text = await ask(
     provider,
     WORLDS_SYSTEM,
