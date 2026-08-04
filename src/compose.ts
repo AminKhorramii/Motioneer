@@ -5,6 +5,7 @@ import { host, isServed, servedProviders } from '@/host'
 import { slop, slopBrief } from '@/slop'
 import { modelById } from '@/models'
 import { BACKDROPS, type Backdrop } from '@/backdrop'
+import { shrinkDataUrl } from '@/imagepipe'
 import { WORLDS, madeWorld, worldById, type World } from '@/worlds'
 import { KIND_VARIANTS, defaultContent, uid, type Kind, type Page, type Section } from '@/sections'
 
@@ -547,7 +548,11 @@ export async function readBrief(text: string, provider: Provider = 'claude'): Pr
  * announce itself, and rules out text hardest of all: words baked into a picture cannot be
  * edited on the paper, cannot be translated, and are usually misspelled.
  */
-export async function illustrate(sec: Section, product: Product, taste: Taste): Promise<string | null> {
+export async function illustrate(
+  sec: Section,
+  product: Product,
+  taste: Taste,
+): Promise<{ dataUrl: string; before: number; after: number } | null> {
   const key = imageKey()
   if (!key && !isServed) return null
   const prompt = [
@@ -560,7 +565,11 @@ export async function illustrate(sec: Section, product: Product, taste: Taste): 
   ].join('\n')
   const res = await host.image('gemini', prompt, key)
   if (res.error) throw new Error(res.error)
-  return res.dataUrl ?? null
+  if (!res.dataUrl) return null
+  // The reply is a PNG of about a megabyte, and it goes into the page content, so it ships with
+  // the file. Fitting it to the width a page actually renders at is the difference between an
+  // illustrated page that is still one small file and one that is mostly picture.
+  return shrinkDataUrl(res.dataUrl, { background: taste.bg })
 }
 
 function mergeSections(

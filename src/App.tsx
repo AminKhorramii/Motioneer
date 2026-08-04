@@ -14,7 +14,7 @@ import { Building } from '@/Building'
 import { Icon } from '@/icons'
 import { register as registerWorlds } from '@/worlds'
 
-import { host } from '@/host'
+import { host, isTauri } from '@/host'
 
 const PAGE_W = 1280
 
@@ -253,13 +253,19 @@ export default function App() {
     if (!canDraw()) return flash('Add a Gemini key in the brief panel to draw images.')
     setBusy(`Drawing the ${KIND_LABEL[sec.kind]} image.`)
     try {
-      const dataUrl = await illustrate(sec, product, page!.taste)
-      if (!dataUrl) return flash('No image came back.')
+      const drawn = await illustrate(sec, product, page!.taste)
+      if (!drawn) return flash('No image came back.')
       setPage((p) => ({
         ...p,
-        sections: p.sections.map((s) => (s.id === id ? { ...s, content: { ...s.content, image: dataUrl } } : s)),
+        sections: p.sections.map((s) => (s.id === id ? { ...s, content: { ...s.content, image: drawn.dataUrl } } : s)),
       }))
-      flash(`Image drawn, ${Math.round((dataUrl.length * 3) / 4 / 1024)}KB inside the page.`)
+      const kb = (n: number) => Math.round(n / 1024)
+      // the saving is worth saying, because the page is a file you are about to ship
+      flash(
+        drawn.after < drawn.before
+          ? `Image drawn, ${kb(drawn.after)}KB inside the page, down from ${kb(drawn.before)}KB.`
+          : `Image drawn, ${kb(drawn.after)}KB inside the page.`,
+      )
     } catch (e) {
       flash(`The image call failed: ${String(e instanceof Error ? e.message : e).slice(0, 140)}`)
     } finally {
@@ -315,7 +321,9 @@ export default function App() {
       {/* The header carries what you switch between and the one thing that rebuilds the wall.
           Anything about the brief lives with the brief, and the view is a two state control
           rather than a button whose label is the state you are not in. */}
-      <header>
+      {/* The drag handle is a CSS property in Chromium and an attribute in WebKit, so the Tauri
+          shell needs the attribute or its window cannot be moved by its own header. */}
+      <header {...(isTauri ? { 'data-tauri-drag-region': true } : {})}>
         <div className="views">
           <button className={view === 'studio' ? 'on' : ''} onClick={() => setView('studio')}
             title="one paper, with the alternatives either side">one</button>
