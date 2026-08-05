@@ -193,6 +193,7 @@ taste never touches machinery and machinery never hides taste:
 | `design/angles.ts` | the editorial positions a wall argues from | the fan-out |
 | `design/craft.ts` | the writing standards that travel in every prompt | the prompts |
 | `design/slop.ts` | the catalogue of tells, copy and markup, as data | the detector in `slop.ts` |
+| `design/directions.ts` | fifty grounded design directions, dealt as seeds to the world design calls | `compose.ts` |
 | `design/prompts.ts` | the three system prompts: writing, world design, intake | `compose.ts`, which sends them |
 
 The split rule for the slop catalogue: a tell that is a pattern lives in the data file; a

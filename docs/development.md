@@ -18,7 +18,7 @@ either side of the paper — scroll sideways (or ← →) and the next one slide
 centre. Click any alternative to make it the working page.
 
 **AI-native.** A prompt bar runs under the paper with model chips — **Claude** or **GPT**
-— and prompting makes *variants*: one instruction produces three new pages placed to the
+— and prompting makes *variants*: an instruction produces a new page placed to the
 right, so you compare rather than overwrite. The desktop app's requests travel through its
 own process, so there is no CORS wall and no proxy. Keys stay on your machine, in the system
 keychain, and everything except copywriting works without them.
@@ -50,8 +50,8 @@ back into the page model, not just the pixels.
 ## First run
 
 Onboarding runs once and ends by building your page, so the setup produces something
-instead of only explaining. Three steps: what Wall is, your product, your taste. Reopen the
-explanation any time from the help button in the header.
+instead of only explaining. Two steps: which model writes, and what it writes about. Reopen
+the explanation any time from the help button in the header.
 
 Model keys are optional. Wall builds pages, layouts, and variants on your machine with no
 key at all. A key is used only when you ask a model to write copy, and it stays in this
@@ -66,7 +66,7 @@ onboarding card, so a regression fails the suite rather than shipping.
 Code follows the thermo-nuclear review skill. The model lives in `sections.ts`, HTML
 generation in `render.ts`, markdown briefs in `brief.ts`, and the model path in
 `compose.ts`. Everything opinionated, worlds, presets, faces, angles, craft rules, the slop
-catalogue, the system prompts, is data under `src/design/`, one file per kind of knowledge,
+catalogue, the direction library, the system prompts, is data under `src/design/`, one file per kind of knowledge,
 so taste is tuned without touching machinery. Keep logic in whichever file owns the data it
 reads, and keep every file far from 1k lines.
 
@@ -114,11 +114,11 @@ npm run verify:all     # everything
 node shots.mjs         # screenshots into shots/
 ```
 
-What `verify.mjs` (headless Chromium) asserts: twelve cells covering all six archetypes ·
-**12 structurally distinct documents**, not clones (checked by computed styles inside each
-iframe) · pages are live DOM with real headings and working links · pin + cross produces a
-child variant · **ship writes a 5.6 KB self-contained HTML file** containing your headline ·
-zero errors.
+What `verify.mjs` (headless Chromium) asserts: the house gate first, every built-in world
+on every preset look rendered and failed if Wall's own output trips the slop catalogue ·
+onboarding, intake and the required-field gate · a nine paper wall with distinct headlines ·
+triage: pin survives x, remove, restore · slop chips with reasons on every grid cell · direct
+edits landing in the model · ship writes a self-contained HTML file · zero page errors.
 
 `verify:stream` runs the app against a local server speaking Anthropic's wire format, so the
 reader loop, SSE framing, split frames, fenced JSON, the partial JSON walk and the
