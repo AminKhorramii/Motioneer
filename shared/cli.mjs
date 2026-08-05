@@ -59,8 +59,27 @@ export function runClaude(system, user, { model = CLI_MODEL(), bin = 'claude', o
         // the CLI's own context is about editing code, and this is about writing a page
         '--exclude-dynamic-system-prompt-sections',
         '--strict-mcp-config',
+        // Nothing here is a task with steps. The reply is one JSON object, and a session that can
+        // read and write files will sometimes go and do that instead of answering: measured, the
+        // design call spent a whole round trip on a tool before writing a character. Handing it no
+        // tools removes the detour and the definitions that described them.
+        '--tools', '',
       ],
-      { stdio: ['pipe', 'pipe', 'pipe'] },
+      {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        // Thinking is most of the wait and also most of the design, which is why it stays on.
+        //
+        // Measured on the same eight-world prompt: with thinking the first character arrives at
+        // 72.7s and the call takes 167s; without it, 2.3s and 69s. But the worlds that arrive
+        // quickly are thinner ones. Each came back with fifteen to nineteen lines of CSS against
+        // a floor of thirty, and described itself as "a wagering-ticket confidence for performance
+        // media people" where the thinking run wrote "paid media pitched as a betting slip:
+        // stakes, odds, blunt payout math". Same objects, half the design.
+        //
+        // So it is offered rather than taken. Turning it on is for the iteration loop, where
+        // waiting three minutes to see whether a prompt change landed is its own kind of expensive.
+        env: process.env.WALL_FAST ? { ...process.env, MAX_THINKING_TOKENS: '0' } : process.env,
+      },
     )
     let out = ''
     let err = ''
