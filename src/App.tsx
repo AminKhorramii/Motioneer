@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { tasteFromImage, type Taste } from '@/taste'
 import { PRESETS } from '@/design/presets'
 import { ROLE_LABEL, applyEdit, migratePage, starterPage, type Page, type Role } from '@/sections'
@@ -474,8 +474,9 @@ export default function App() {
                     <div key={p.id} className={`paper ${d === 0 ? 'here' : 'aside'}`}
                       style={{ transform: `translateX(${d * 76}%) scale(${d === 0 ? 1 : 0.85})`, opacity: d === 0 ? 1 : 0.32, zIndex: 10 - Math.abs(d) }}
                       onClick={() => d !== 0 && setAt(i)}>
-                      <iframe title={p.id} srcDoc={d === 0 ? html : renderPage(p, { title: product.name })}
-                        sandbox="allow-scripts allow-same-origin" />
+                      {d === 0
+                        ? <iframe title={p.id} srcDoc={html} sandbox="allow-scripts allow-same-origin" />
+                        : <Aside page={p} title={product.name} />}
                     </div>
                   )
                 })}
@@ -520,36 +521,12 @@ export default function App() {
 
         {view === 'wall' && (
           <main className="grid">
-            {pages.map((p, i) => {
-              const cellHtml = renderPage(p, { title: product.name })
-              // the verdict sits on every cell, so the generic pages announce themselves
-              // while you are deciding which cells to cull
-              const verdict = slop(p, cellHtml)
-              return (
-                <div key={p.id} className={`cell ${i === at ? 'on' : ''}${p.pinned ? ' pinned' : ''}`}
-                  onClick={() => { setAt(i); setView('studio') }}>
-                  <Preview html={cellHtml} />
-                  {/* elimination is the grid's other act: drop a cell and the survivors spread
-                      out, so eight become one by removing rather than by staring */}
-                  {!p.pinned && pages.length > 1 && (
-                    <button className="cull" aria-label="remove this page"
-                      title="take this page off the wall. z brings it back."
-                      onClick={(e) => { e.stopPropagation(); kill(i) }}><Icon.x /></button>
-                  )}
-                  <div className="cellbar">
-                    <span className="arch">{p.sections.filter((s) => s.on).length} sections</span>
-                    <span className="tname">{p.taste.name}</span>
-                    <span className={verdict.length ? 'flags' : 'flags ok'}
-                      title={verdict.length
-                        ? verdict.map((f) => `${f.label}. ${f.why}`).join('\n')
-                        : 'none of the catalogued generic patterns'}>
-                      {verdict.length ? `${verdict.length} generic` : 'clean'}
-                    </span>
-                    {p.pinned && <span className="kept">pinned</span>}
-                  </div>
-                </div>
-              )
-            })}
+            {pages.map((p, i) => (
+              <Cell key={p.id} page={p} title={product.name} current={i === at}
+                canCull={!p.pinned && pages.length > 1}
+                onOpen={() => { setAt(i); setView('studio') }}
+                onCull={() => kill(i)} />
+            ))}
           </main>
         )}
 
@@ -581,6 +558,50 @@ export default function App() {
   )
 }
 
+/**
+ * A paper beside the centre: still, frozen backdrop, and memoised on the page object, so
+ * typing in the bar or a toast appearing never re-parses four documents. Handlers are not
+ * compared because they are recreated every render on purpose; the page is the identity.
+ */
+const Aside = memo(function Aside({ page, title }: { page: Page; title: string }) {
+  return <iframe title={page.id} srcDoc={renderPage(page, { title, still: true })}
+    sandbox="allow-scripts allow-same-origin" />
+})
+
+/** One grid cell: still page, frozen backdrop, verdict computed once per page object. */
+const Cell = memo(function Cell({ page, title, current, canCull, onOpen, onCull }: {
+  page: Page; title: string; current: boolean; canCull: boolean
+  onOpen: () => void; onCull: () => void
+}) {
+  const cellHtml = useMemo(() => renderPage(page, { title, still: true }), [page, title])
+  // the verdict sits on every cell, so the generic pages announce themselves while you are
+  // deciding which cells to cull
+  const verdict = useMemo(() => slop(page, cellHtml), [page, cellHtml])
+  return (
+    <div className={`cell ${current ? 'on' : ''}${page.pinned ? ' pinned' : ''}`} onClick={onOpen}>
+      <Preview html={cellHtml} />
+      {/* elimination is the grid's other act: drop a cell and the survivors spread out,
+          so eight become one by removing rather than by staring */}
+      {canCull && (
+        <button className="cull" aria-label="remove this page"
+          title="take this page off the wall. z brings it back."
+          onClick={(e) => { e.stopPropagation(); onCull() }}><Icon.x /></button>
+      )}
+      <div className="cellbar">
+        <span className="arch">{page.sections.filter((s) => s.on).length} sections</span>
+        <span className="tname">{page.taste.name}</span>
+        <span className={verdict.length ? 'flags' : 'flags ok'}
+          title={verdict.length
+            ? verdict.map((f) => `${f.label}. ${f.why}`).join('\n')
+            : 'none of the catalogued generic patterns'}>
+          {verdict.length ? `${verdict.length} generic` : 'clean'}
+        </span>
+        {page.pinned && <span className="kept">pinned</span>}
+      </div>
+    </div>
+  )
+}, (a, b) => a.page === b.page && a.title === b.title && a.current === b.current && a.canCull === b.canCull)
+
 function Preview({ html }: { html: string }) {
   const box = useRef<HTMLDivElement>(null)
   const [scale, setScale] = useState(0.25)
@@ -594,8 +615,8 @@ function Preview({ html }: { html: string }) {
   }, [])
   return (
     <div className="preview" ref={box}>
-      <iframe title="alternative" srcDoc={html} scrolling="no"
-        style={{ width: PAGE_W, height: 960, transform: `scale(${scale})` }} />
+      <iframe title="alternative" srcDoc={html} scrolling="no" loading="lazy"
+        style={{ width: PAGE_W, height: 1707, transform: `scale(${scale})` }} />
     </div>
   )
 }

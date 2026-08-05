@@ -31,7 +31,7 @@ function tokens(t: Taste) {
   }
 }
 
-function head(t: Taste, title: string, editable: boolean, w: World) {
+function head(t: Taste, title: string, editable: boolean, w: World, still: boolean) {
   const { gap, surface, line, s, ease } = tokens(t)
   // a bundled face rides inside the page, but only when this page actually wears it
   const faces = TYPEFACES.filter((f) => t.display.includes(f.family) || t.body.includes(f.family))
@@ -65,7 +65,7 @@ section{padding:calc(var(--gap)*2.2) 0}
 .ctas{display:flex;gap:.7rem;flex-wrap:wrap;margin-top:calc(var(--gap)*.9)}
 ${/* the entrance belongs to the finished page: the editable paper repaints per streamed
    section and per keystroke, and a page that settles on every repaint reads as flicker */ ''}
-${!editable && t.motion !== 'still' ? `@media (prefers-reduced-motion:no-preference){
+${!editable && !still && t.motion !== 'still' ? `@media (prefers-reduced-motion:no-preference){
 @keyframes settle{from{opacity:0;transform:translateY(${t.motion === 'lively' ? 16 : 9}px)}to{opacity:1;transform:none}}
 section{animation:settle ${t.motion === 'lively' ? '.55s' : '.75s'} ${ease} both}
 ${Array.from({ length: 12 }, (_, i) => `section:nth-of-type(${i + 1}){animation-delay:${i * (t.motion === 'lively' ? 60 : 85)}ms}`).join('')}
@@ -362,7 +362,13 @@ justify-content:space-between;gap:1rem;flex-wrap:wrap;color:var(--dim);font-size
   }
 }
 
-export function renderPage(page: Page, opts: { editable?: boolean; title?: string } = {}): string {
+/**
+ * `still` renders the page without its entrance and with a frozen backdrop. The in-app
+ * views use it for every paper that is not being read full size: an aside that replays its
+ * entrance on every streamed section reads as flicker, and nine preview cells each running
+ * a shader loop is a heater, not a wall.
+ */
+export function renderPage(page: Page, opts: { editable?: boolean; title?: string; still?: boolean } = {}): string {
   const world = worldById(page.world)
   const seed = page.sections.length * 17 + page.taste.radius
   const beat = world.structure.rhythm
@@ -371,7 +377,7 @@ export function renderPage(page: Page, opts: { editable?: boolean; title?: strin
     .map((s, i) => renderSection(s, page.taste, seed + i * 11, world, beat?.length ? beat[i % beat.length] : 1))
     .join('\n')
   // the backdrop goes first so it sits behind the content without needing a stacking hack
-  const art = backdropHtml(page.taste, page.backdrop ?? 'none')
-  return `${head(page.taste, opts.title ?? 'Landing', !!opts.editable, world)}${art}${body}${opts.editable ? EDIT_SCRIPT : ''}</body></html>`
+  const art = backdropHtml(page.taste, page.backdrop ?? 'none', !!opts.still)
+  return `${head(page.taste, opts.title ?? 'Landing', !!opts.editable, world, !!opts.still)}${art}${body}${opts.editable ? EDIT_SCRIPT : ''}</body></html>`
 }
 

@@ -60,8 +60,12 @@ void main(){
   o=vec4(col,1.);
 }`
 
-/** Returns the markup and script for a backdrop, or an empty string for none. */
-export function backdropHtml(t: Taste, kind: Backdrop): string {
+/**
+ * Returns the markup and script for a backdrop, or an empty string for none.
+ * `frozen` draws the single still frame the reduced-motion path already draws, and never
+ * starts the loop: a preview cell does not need sixty frames a second of topography.
+ */
+export function backdropHtml(t: Taste, kind: Backdrop, frozen = false): string {
   if (kind === 'none') return ''
   const seed = seedOf(t)
   const style = `<style>#bd{position:fixed;inset:0;width:100%;height:100vh;z-index:0;
@@ -102,7 +106,7 @@ g.uniform3f(g.getUniformLocation(p,'c2'),${r2.toFixed(3)},${g2.toFixed(3)},${b2.
 function size(){var d=Math.min(devicePixelRatio||1,2);c.width=innerWidth*d;c.height=innerHeight*d;
 g.viewport(0,0,c.width,c.height);g.uniform2f(ur,c.width,c.height)}
 size();addEventListener('resize',size);
-var still=matchMedia('(prefers-reduced-motion:reduce)').matches,run=true;
+var still=${frozen}||matchMedia('(prefers-reduced-motion:reduce)').matches,run=true;
 document.addEventListener('visibilitychange',function(){run=!document.hidden;if(run&&!still)requestAnimationFrame(f)});
 function f(n){g.uniform1f(ut,n/1000);g.drawArrays(g.TRIANGLES,0,3);
 if(run&&!still)requestAnimationFrame(f)}
