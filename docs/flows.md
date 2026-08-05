@@ -124,6 +124,13 @@ Click one to open it in the studio.
 The papers are real scrollable DOM in sandboxed iframes, not screenshots, which is the whole
 claim: you are comparing pages, not pictures of pages.
 
+**A finished page settles in.** Shipped pages, previews and the papers beside the centre carry
+one orchestrated entrance: sections rise a few pixels in sequence, once, and then stillness,
+with the pace set by the taste sheet's motion token and nothing at all under
+`prefers-reduced-motion` or on a taste marked still. The editable paper in the middle never
+animates, because it repaints per streamed section and per keystroke, and a page that settles
+on every repaint reads as flicker.
+
 **Narrowing is a keyboard pass.** `p` pins the paper in the middle and steps on, `x` takes an
 unpinned paper off the wall, and `z` brings the last removed one back. A pinned page cannot be
 removed until it is released, so one stray key cannot lose the page you meant to keep, and the
@@ -170,6 +177,29 @@ pixels. Sections can also be dragged on the paper itself.
 reads the system out of it: background, ink, dim, two accents, contrast. It becomes the taste
 sheet for every page on the wall. "More like this, less like a template" becomes a spec rather
 than a wish.
+
+---
+
+## 4b. The design layer
+
+Everything opinionated is data in `src/design/`, one file per kind of knowledge, so tuning
+taste never touches machinery and machinery never hides taste:
+
+| File | What it holds | Read by |
+| --- | --- | --- |
+| `design/faces.ts` | the face vocabulary: platform stacks and the two bundled variable faces | tastes, presets, worlds |
+| `design/presets.ts` | the looks offered at setup | onboarding, the brief rail |
+| `design/worlds.ts` | the six built-in worlds and the palette moves | `worlds.ts`, which dresses pages |
+| `design/angles.ts` | the editorial positions a wall argues from | the fan-out |
+| `design/craft.ts` | the writing standards that travel in every prompt | the prompts |
+| `design/slop.ts` | the catalogue of tells, copy and markup, as data | the detector in `slop.ts` |
+| `design/prompts.ts` | the three system prompts: writing, world design, intake | `compose.ts`, which sends them |
+
+The split rule for the slop catalogue: a tell that is a pattern lives in the data file; a
+tell that has to count or compare lives as code in the detector, because a counting
+mini-language would be harder to read than the count. Add a tell, add a world, add an angle,
+sharpen a prompt: each is one edit in one file, and the gate in `verify.mjs` re-judges the
+house on the next run.
 
 ---
 

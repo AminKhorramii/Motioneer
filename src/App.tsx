@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { PRESETS, tasteFromImage, type Taste } from '@/taste'
+import { tasteFromImage, type Taste } from '@/taste'
+import { PRESETS } from '@/design/presets'
 import { ROLE_LABEL, applyEdit, migratePage, starterPage, type Page, type Role } from '@/sections'
 import { renderPage } from '@/render'
 import { pageBrief } from '@/brief'

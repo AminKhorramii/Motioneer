@@ -63,6 +63,13 @@ section{padding:calc(var(--gap)*2.2) 0}
 .card{background:var(--surface);border-radius:var(--r);padding:calc(var(--gap)*.95)}
 .grid{display:grid;gap:calc(var(--gap)*.8)}
 .ctas{display:flex;gap:.7rem;flex-wrap:wrap;margin-top:calc(var(--gap)*.9)}
+${/* the entrance belongs to the finished page: the editable paper repaints per streamed
+   section and per keystroke, and a page that settles on every repaint reads as flicker */ ''}
+${!editable && t.motion !== 'still' ? `@media (prefers-reduced-motion:no-preference){
+@keyframes settle{from{opacity:0;transform:translateY(${t.motion === 'lively' ? 16 : 9}px)}to{opacity:1;transform:none}}
+section{animation:settle ${t.motion === 'lively' ? '.55s' : '.75s'} ${ease} both}
+${Array.from({ length: 12 }, (_, i) => `section:nth-of-type(${i + 1}){animation-delay:${i * (t.motion === 'lively' ? 60 : 85)}ms}`).join('')}
+}` : ''}
 ${w.structure.rules ? 'section+section{border-top:1px solid var(--line)}' : ''}
 ${w.structure.numbered ? `body{counter-reset:sec}
 section{counter-increment:sec}

@@ -65,8 +65,10 @@ onboarding card, so a regression fails the suite rather than shipping.
 
 Code follows the thermo-nuclear review skill. The model lives in `sections.ts`, HTML
 generation in `render.ts`, markdown briefs in `brief.ts`, and the model path in
-`compose.ts`. Keep logic in whichever of those owns the data it reads, and keep every file
-far from 1k lines.
+`compose.ts`. Everything opinionated, worlds, presets, faces, angles, craft rules, the slop
+catalogue, the system prompts, is data under `src/design/`, one file per kind of knowledge,
+so taste is tuned without touching machinery. Keep logic in whichever file owns the data it
+reads, and keep every file far from 1k lines.
 
 ## Two builds, one app
 

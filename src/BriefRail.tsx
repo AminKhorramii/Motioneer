@@ -1,4 +1,5 @@
-import { PRESETS, type Taste } from '@/taste'
+import { PRESETS } from '@/design/presets'
+import type { Taste } from '@/taste'
 import { starterPage } from '@/sections'
 import { renderPage } from '@/render'
 import { seeded, type Product } from '@/compose'

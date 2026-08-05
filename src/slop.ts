@@ -1,10 +1,11 @@
 /**
  * Slop detection.
  *
- * Named after the patterns catalogued at impeccable.style: the defaults a model reaches for
- * when it has nothing specific to say. Every check runs locally on the page model and the
- * rendered HTML, so it costs nothing, runs on all eight papers at once, and can therefore be
- * fed back into the next prompt rather than only shown after the fact.
+ * The catalogue of tells lives in design/slop.ts as data; this file is the detector that
+ * runs it, plus the handful of checks that have to count or compare rather than match.
+ * Every check runs locally on the page model and the rendered HTML, so it costs nothing,
+ * runs on all eight papers at once, and can therefore be fed back into the next prompt
+ * rather than only shown after the fact.
  *
  * A flag is never fatal. It names the pattern and says why it reads as generic, because the
  * point is to give the writer something specific to change, and sometimes the right answer is
@@ -12,6 +13,7 @@
  */
 
 import type { Page } from '@/sections'
+import { COPY_TELLS, MARKUP_TELLS } from '@/design/slop'
 
 export interface Flag {
   id: string
@@ -22,23 +24,8 @@ export interface Flag {
   section?: string
 }
 
-const HOLLOW = /\b(revolutionary|seamless|unlock|empower|transform|elevate|effortless|powerful|cutting[- ]edge|game[- ]?chang\w*|supercharge|unleash|next[- ]generation|leverage|streamline|robust|innovative|best[- ]in[- ]class|world[- ]class)\b/i
-const GENERIC_CTA = /^(get started|start free|learn more|sign up|try it now|get started free|start now|join now|contact us)$/i
-const EMOJI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u
 /** beige and its neighbours, the colour a model picks when it does not have a palette */
 const AI_BEIGE = /^#(f[0-9a-f]{2}(e|f)[0-9a-f]{2}(d|e)[0-9a-f]|f5f5f0|faf8f5|fdfcf8|f7f3ed)$/i
-/** claims that pass the grammar of a benefit while naming none, so any competitor could run them */
-const INTERCHANGEABLE = /\b(save time|grow your business|boost (?:your )?productivity|work smarter|built for scale|lightning[- ]fast|blazing(?:ly)? fast|all[- ]in[- ]one|the future of|10x your)\b/i
-const PLACEHOLDER_PROOF = /\b(?:trusted|loved|used) by [\d,.]+\s*[km]?\+?\s*(?:users|teams|companies|developers|customers)\b/i
-const LOVE_TAGLINE = /(?:built|made|crafted) with (?:love|❤|passion)/iu
-/** constructions a model writes and nobody says across a desk, which is why readers hear them */
-const NOT_X_BUT_Y = /\b(?:it'?s|this is|we'?re) not (?:just )?(?:a |an |about )?[^,.;]{2,40}[,;.]?\s+(?:it'?s|but|this is)\b/i
-const WHETHER_YOURE = /\bwhether you'?re\b[^.]{0,80}\bor\b/i
-const AI_PHRASE = /\b(?:in today'?s (?:fast[- ]paced |digital |modern |ever[- ]changing )?(?:world|landscape|market|economy)|look no further|delve|dive (?:deep )?into|at the end of the day|to the next level|say goodbye to|say hello to|we'?ve got you covered|the possibilities are endless)\b/i
-/** the placeholder companies every mockup reaches for, which say the logos are props */
-const FAKE_LOGO = /\b(?:acme|globex|initech|umbrella corp|stark industries|wayne enterprises|hooli|vandelay|cyberdyne|massive dynamic)\b/i
-/** a bare figure with a suffix and no sentence, the unit a stat banner is built from */
-const BARE_STAT = /^[\d,.]+\s*(?:%|[kKmMbB]\+?|x|×|\+)$/
 
 const text = (page: Page) =>
   page.sections
@@ -57,48 +44,11 @@ export function slop(page: Page, html?: string): Flag[] {
   }
 
   for (const { section, key, value } of text(page)) {
-    const hollow = value.match(HOLLOW)
-    if (hollow) {
-      add('hollow-word', `hollow word: ${hollow[0].toLowerCase()}`,
-        'It describes nothing, so a reader cannot tell what the product does from it.', section)
-    }
-    if (EMOJI.test(value)) {
-      add('emoji', 'emoji in the copy',
-        'It stands in for a tone the words are not carrying on their own.', section)
-    }
-    if (key === 'cta' && GENERIC_CTA.test(value.trim())) {
-      add('generic-cta', `generic call to action: ${value}`,
-        'It names no outcome, so it reads as a button rather than an offer.', section)
-    }
-    const swap = value.match(INTERCHANGEABLE)
-    if (swap) {
-      add('interchangeable-claim', `interchangeable claim: ${swap[0].toLowerCase()}`,
-        'It would be as true on any competitor\'s page, so it argues for nobody in particular.', section)
-    }
-    if (PLACEHOLDER_PROOF.test(value)) {
-      add('placeholder-proof', 'unverifiable user count',
-        'A total nobody can check reads as decoration, where one named witness would read as evidence.', section)
-    }
-    if (LOVE_TAGLINE.test(value)) {
-      add('love-tagline', 'made with love',
-        'It is the sign-off every generated page reaches for, and it tells the reader nothing they can use.', section)
-    }
-    if (NOT_X_BUT_Y.test(value)) {
-      add('not-x-but-y', 'the "not X, it is Y" pivot',
-        'Nobody says it across a desk, so the sentence sounds like the model rather than the product.', section)
-    }
-    if (WHETHER_YOURE.test(value)) {
-      add('whether-youre', 'whether you are A or B',
-        'Addressing everyone at once addresses nobody, where naming one reader makes the page theirs.', section)
-    }
-    const phrase = value.match(AI_PHRASE)
-    if (phrase) {
-      add('ai-phrase', `stock phrase: ${phrase[0].toLowerCase()}`,
-        'It is filler every generated page shares, so it marks the copy as written by nobody.', section)
-    }
-    if (FAKE_LOGO.test(value)) {
-      add('fake-logos', 'placeholder company names',
-        'A made up logo row promises proof and delivers a prop, which costs more trust than an empty row.', section)
+    const v = value.trim()
+    for (const tell of COPY_TELLS) {
+      if (tell.key && tell.key !== key) continue
+      const m = v.match(tell.find)
+      if (m) add(tell.id, tell.label(m[0]), tell.why, section)
     }
   }
 
@@ -111,7 +61,7 @@ export function slop(page: Page, html?: string): Flag[] {
   }
 
   // three bare figures make a stat banner, which asks to be admired rather than believed
-  const bares = text(page).filter((f) => BARE_STAT.test(f.value.trim())).length
+  const bares = text(page).filter((f) => /^[\d,.]+\s*(?:%|[kKmMbB]\+?|x|×|\+)$/.test(f.value.trim())).length
   if (bares >= 3) {
     add('stat-banner', 'a row of big statistics',
       'A number outside a sentence says nothing about what it cost or saved, so the row decorates rather than argues.')
@@ -146,20 +96,15 @@ export function slop(page: Page, html?: string): Flag[] {
   }
 
   if (html) {
-    // These checks exist because the model now writes CSS. Parameters could not produce an
-    // unreadable page, but hand written CSS can, and these are the ways it usually does.
+    for (const tell of MARKUP_TELLS) {
+      if (tell.find.every((r) => r.test(html))) add(tell.id, tell.label, tell.why)
+    }
+    // The counted checks. These exist because the model writes CSS: parameters could not
+    // produce an unreadable page, but hand written CSS can, and these are the ways it does.
     const body = html.match(/font-size:\s*(\d+(?:\.\d+)?)px/g) ?? []
     if (body.some((d) => Number(d.replace(/\D+/g, '')) < 14)) {
       add('tiny-text', 'text under 14px',
-        'It looks refined on a designer\'s screen and is unreadable on everyone else\'s.')
-    }
-    if (/background-clip:\s*text|-webkit-background-clip:\s*text/.test(html)) {
-      add('gradient-text', 'gradient filled text',
-        'It is the decoration a page reaches for when the words are not carrying it.')
-    }
-    if (/\bp\s*\{[^}]*text-transform:\s*uppercase/.test(html)) {
-      add('shouting-body', 'body copy in capitals',
-        'Capitals remove the word shapes people read by, so a paragraph becomes a wall.')
+        "It looks refined on a designer's screen and is unreadable on everyone else's.")
     }
     if ((html.match(/box-shadow:/g) ?? []).length > 8) {
       add('shadow-stack', 'shadows on everything',
@@ -170,34 +115,10 @@ export function slop(page: Page, html?: string): Flag[] {
       add('face-soup', `${faces.size} typefaces`,
         'Two faces is a system and four is an accident, since each one asks the reader to adjust.')
     }
-    if (/@keyframes[^}]*}[^}]*}/.test(html) && /border-radius:\s*50%/.test(html) && /animation:/.test(html)) {
-      add('pulsing-dot', 'a pulsing dot',
-        'A small thing blinking forever takes attention it never gives back.')
-    }
-    if (/backdrop-filter/.test(html)) {
-      add('glassmorphism', 'glassmorphism',
-        'Frosted panels read as a period effect rather than a decision, and they cost contrast.')
-    }
-    if (/box-shadow:\s*0 4px 6px|0 1px 3px rgba\(0,\s*0,\s*0,\s*0?\.1\)/.test(html)) {
-      add('generic-shadow', 'default drop shadow',
-        'It is the framework default, so it adds depth without saying anything about the product.')
-    }
-    if (/font-style:\s*italic/.test(html) && /serif/.test(html)) {
-      add('italic-serif', 'italic serif display',
-        'It is the fastest way to look editorial, which is why it now reads as a template.')
-    }
     const cards = (html.match(/class="card/g) ?? []).length
-    if (/class="card[^"]*"[^>]*>(?:(?!<\/)[\s\S]){0,400}?class="card/.test(html)) {
-      add('nested-cards', 'cards inside cards',
-        'Two borders around the same content divide attention without adding structure.')
-    }
     if (cards >= 6) {
       add('card-soup', `${cards} cards on one page`,
         'When everything is boxed, nothing is emphasised, and the page reads as a list of tiles.')
-    }
-    if (/linear-gradient\([^)]*(?:#(?:7c3aed|8b5cf6|a78bfa|6366f1|4f46e5|9333ea)|\bpurple\b|\bviolet\b|\bindigo\b)/i.test(html)) {
-      add('purple-gradient', 'the purple gradient',
-        'It is the colour move a model makes when no palette was chosen, so it reads as nobody\'s brand.')
     }
     // the macOS traffic lights, drawn rather than captured. Two of the three hexes together is
     // the signature of a mocked terminal, in either of the shades the mockups circulate in.
@@ -206,21 +127,9 @@ export function slop(page: Page, html?: string): Flag[] {
       add('terminal-dots', 'a drawn terminal window',
         'The three little circles promise a real window and deliver a picture of one, which is the gap between a screenshot and a prop.')
     }
-    if (/transition:\s*all\b/.test(html)) {
-      add('transition-all', 'transition on everything',
-        'Motion that names no property is the framework default, so it decorates every hover instead of meaning one.')
-    }
     if ((html.match(/border-radius:\s*(?:2[89]|[3-9]\d)px/g) ?? []).length >= 3) {
       add('over-rounding', 'over-rounded corners',
         'Past a certain radius every element becomes a pill, and softness turns into the only voice the page has.')
-    }
-    if (/border-left:\s*[2-8]px solid/.test(html)) {
-      add('accent-border-card', 'the coloured left border',
-        'It is the template shorthand for importance, so it reads as the framework speaking rather than the brand.')
-    }
-    if (/text-shadow:\s*[^;}]*\b\d{2,}px/.test(html)) {
-      add('glow-text', 'glowing text',
-        'A glow stands in for contrast the palette did not provide, and it costs the letterforms their edges.')
     }
   }
 
