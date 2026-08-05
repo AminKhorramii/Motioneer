@@ -76,7 +76,20 @@ export function Onboarding({ product, taste, explainOnly, onProduct, onBuild, on
     }
     setFailed(false)
     onProduct(got.product)
-    const gaps = got.questions.filter((q) => !String(got.product[q.key] ?? '').trim()).slice(0, 2)
+    // The button waits on a name and a one liner, so a question for each must be on screen
+    // whenever it is missing. The model asks up to three and only two are kept, and nothing
+    // used to guarantee the required ones survived, which left the button disabled with every
+    // visible field filled and no way to satisfy it.
+    const missing = (k: keyof Product) => !String(got.product[k] ?? '').trim()
+    const wanted = got.questions.filter((q) => missing(q.key))
+    const required = ([
+      { key: 'name', question: 'What is it called?', why: 'The name sits in the headline and the footer.' },
+      { key: 'oneLiner', question: 'Say it in one line.', why: 'It becomes the headline a stranger reads first.' },
+    ] as Intake['questions'])
+      .filter((q) => missing(q.key))
+      .map((q) => wanted.find((w) => w.key === q.key) ?? q)
+    const optional = wanted.filter((q) => q.key !== 'name' && q.key !== 'oneLiner')
+    const gaps = [...required, ...optional].slice(0, Math.max(2, required.length))
     setAsked(gaps)
     if (!gaps.length && got.product.name && got.product.oneLiner) finish(got.product)
   }

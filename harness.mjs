@@ -106,14 +106,20 @@ export const MOCK = `(instruction, shape) => instruction === 'worlds' ? {
     css: 'section#hero .wrap{border:1px solid var(--line)} .eyebrow{letter-spacing:.' + i + 'em}',
   })),
 } : instruction === 'intake' ? {
+  // the name is left empty and no question asks for it, which is the shape that once left
+  // the write button disabled forever: the button waits on the name, the model never asked,
+  // and the two kept questions were about something else
   product: {
-    name: 'Spoor',
+    name: '',
     oneLiner: 'Every session you ever ran, findable in one keystroke.',
     what: String(shape).slice(0, 80),
     audience: '',
     cta: 'Download for macOS',
   },
-  questions: [{ key: 'audience', question: 'Who specifically is this for?', why: 'the page needs a reader' }],
+  questions: [
+    { key: 'audience', question: 'Who specifically is this for?', why: 'the page needs a reader' },
+    { key: 'cta', question: 'What is the one action?', why: 'the button has to name it' },
+  ],
 } : ({
   sections: shape.map((s) => ({
     id: s.id,

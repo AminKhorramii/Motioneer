@@ -70,14 +70,23 @@ await page.waitForSelector('.onboard .tell', { timeout: 10000 })
 await page.fill('.onboard .tell', 'Spoor makes every AI session you ever ran searchable, locally.')
 await page.click('.onboard .primary')
 await page.waitForSelector('.onboard .fields label span', { timeout: 15000 })
-// a prompt, plus only what the description did not carry, and no form echoing it back
+// a prompt, plus only what the description did not carry, and no form echoing it back.
+// The mock leaves the name empty and never asks for it, so a question for it has to be
+// synthesised and shown first, and the button has to stay shut until the name arrives:
+// the regression here was a button waiting on a field no visible input could fill.
 const intake = await page.evaluate(() => ({
   asked: [...document.querySelectorAll('.onboard .fields label span')].map((s) => s.textContent),
   textInputs: document.querySelectorAll('.onboard .pane input:not([type=password])').length,
   boxes: document.querySelectorAll('.onboard .tell').length,
+  shutWithoutName: document.querySelector('.onboard .primary')?.disabled === true,
 }))
 console.log('intake:', JSON.stringify(intake))
-await page.fill('.onboard .fields input:not([type=password])', 'people who build with agents')
+await page.fill('.onboard .fields label:nth-of-type(1) input', 'Spoor')
+const gate = await page.evaluate(() => ({
+  openWithName: document.querySelector('.onboard .primary')?.disabled === false,
+}))
+await page.fill('.onboard .fields label:nth-of-type(2) input', 'people who build with agents')
+console.log('intake gate:', JSON.stringify(gate))
 await page.click('.onboard .primary')
 await page.waitForSelector('.paper.here', { timeout: 20000 })
 console.log('onboarding closed:', JSON.stringify({ gone: (await page.locator('.onboard').count()) === 0 }))
