@@ -624,6 +624,16 @@ header .hactions button.on { color: var(--ink); }
   font-size: 11.5px; color: var(--dim); font-variant-numeric: tabular-nums;
 }
 
+/* One beat from the model, once a second, for the minute before it writes anything. It fades
+   rather than blinks, because a mark that snaps on and off asks to be watched and this one only
+   has to be noticed. Nothing animates it: every change is a message that arrived. */
+.progress .beat {
+  display: inline-block; width: 4px; height: 4px; border-radius: 50%;
+  margin-right: 7px; vertical-align: middle;
+  background: var(--ink); opacity: 0.18; transition: opacity 700ms ease;
+}
+.progress .beat[data-on] { opacity: 0.75; }
+
 /* ——— the dock, reduced ———
    Marks where a mark is enough, one name on the thing that matters. A row of labelled buttons
    competes with the page it sits under, which is the only thing anyone is here to look at. */

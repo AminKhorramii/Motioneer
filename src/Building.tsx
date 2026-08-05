@@ -10,16 +10,13 @@ import { useEffect, useState } from 'react'
  *
  * The lines change because a wall takes half a minute, and a status that never moves in half a
  * minute reads as a hang rather than as work.
+ *
+ * They used to change on a timer, which meant the page claimed to be writing CSS at the fourth
+ * rotation whether or not it was. Now the movement comes from the call itself: the model beats
+ * once a second while it thinks, and this shows the beats. A status that invents its own progress
+ * is the same lie as a progress bar that fills at a fixed rate, and it is worse here, because the
+ * one thing someone waiting a minute needs to know is whether anything is actually happening.
  */
-
-const DESIGNING = [
-  'Reading your brief.',
-  'Looking for eight different ways to build this.',
-  'Borrowing from receipts, timetables and wall labels.',
-  'Deciding what each page should leave out.',
-  'Choosing type, measure and how dense to set it.',
-  'Writing the CSS for each one.',
-]
 
 interface Props {
   /** null while designing, otherwise how many pages have arrived */
@@ -27,11 +24,14 @@ interface Props {
   total: number
   /** the worlds that have landed so far, newest last */
   landed: string[]
+  /** beats from the model while it thinks, before it has written anything anyone can read */
+  thoughts: number
   model: string
 }
 
-export function Building({ arrived, total, landed, model }: Props) {
-  const [tick, setTick] = useState(0)
+export function Building({ arrived, total, landed, thoughts, model }: Props) {
+  // the timer still runs, but only to count seconds: nothing on screen moves without a reason
+  const [, setTick] = useState(0)
   /**
    * Elapsed seconds, shown rather than hidden.
    *
@@ -51,7 +51,11 @@ export function Building({ arrived, total, landed, model }: Props) {
 
   const designing = arrived === null
   const line = designing
-    ? DESIGNING[Math.floor(tick / 3) % DESIGNING.length]
+    ? thoughts
+      // it is deciding all eight together, and which part it is on is not something the stream
+      // says, so this says the true general thing rather than a specific invented one
+      ? `${model} is working out eight different ways to build this.`
+      : 'Reading your brief.'
     : landed.length
       ? `${landed[landed.length - 1]}, and ${total - (arrived ?? 0)} still coming.`
       : `${model} is writing the first page.`
@@ -75,6 +79,9 @@ export function Building({ arrived, total, landed, model }: Props) {
         </div>
         <p className="line">{line}</p>
         <p className="elapsed">
+          {/* one mark that moves only when the call moves. It is the difference between a page
+              that is waiting and a page that has stopped, and nothing else on screen can say it. */}
+          {designing && <span className="beat" data-on={thoughts % 2 ? '1' : undefined} />}
           {secs < 60 ? `${secs}s` : `${Math.floor(secs / 60)}m ${secs % 60}s`}
           {designing ? ' · designing takes about a minute' : ` · ${arrived} of ${total} written`}
         </p>

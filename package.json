@@ -14,7 +14,7 @@
     "verify": "npm run build && node verify.mjs",
     "verify:stream": "npm run build && node verify-stream.mjs",
     "capture": "npm run build && node capture.mjs",
-    "verify:all": "npm run build && node verify.mjs && node verify-server.mjs && node verify-stream.mjs && node verify-stream.mjs fixtures/truncated && node verify-mcp.mjs && node verify-image.mjs && node verify-tauri.mjs && node verify-oneline.mjs && node verify-update.mjs",
+    "verify:all": "npm run build && node verify.mjs && node verify-server.mjs && node verify-stream.mjs && node verify-stream.mjs fixtures/truncated && node verify-beat.mjs && node verify-mcp.mjs && node verify-image.mjs && node verify-tauri.mjs && node verify-oneline.mjs && node verify-update.mjs",
     "verify:stream:truncated": "node verify-stream.mjs fixtures/truncated",
     "serve": "npm run build && node server/index.mjs",
     "verify:server": "npm run build && node verify-server.mjs",
@@ -28,7 +28,8 @@
     "verify:update": "node verify-update.mjs",
     "prepublishOnly": "npm run build",
     "watch": "vite build --watch",
-    "try": "node try.mjs"
+    "try": "node try.mjs",
+    "verify:beat": "node verify-beat.mjs"
   },
   "devDependencies": {
     "@fontsource-variable/archivo": "^5.3.0",

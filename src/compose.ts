@@ -478,6 +478,8 @@ export async function promptWorlds(
   n: number,
   onWorld?: (world: World, i: number) => void,
   provider: Provider = 'model',
+  /** called each time the model proves it is still thinking, before any of it can be shown */
+  onThinking?: () => void,
 ): Promise<World[]> {
   // the mock stands in here too, or an offline run reaches the real API and fails on the key
   if (mockReply) {
@@ -493,6 +495,8 @@ export async function promptWorlds(
   let seen = 0
   const feed = onWorld
     ? (delta: string) => {
+        // an empty delta is a beat rather than words: the call is alive and has written nothing
+        if (!delta) return onThinking?.()
         buf += delta
         if (!delta.includes('}')) return
         const scan = scanSections(buf, cursor, '"worlds"')

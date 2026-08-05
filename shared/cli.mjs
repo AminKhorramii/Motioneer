@@ -43,8 +43,14 @@ export const DESIGN_MODEL = () =>
  *
  * The streamed shape is the vendor's own frames wrapped one level deep, so the same delta
  * extraction works: type stream_event, event.type content_block_delta, event.delta.text.
+ *
+ * onThink is the other half of that stream and the reason the wait used to look like a hang.
+ * Thinking arrives as its own kind of delta, and dropping it left the connection open with
+ * nothing crossing it for over a minute, which reads as broken rather than busy. The text is not
+ * ours to show, but the fact of it is, so it goes to a separate callback that never touches the
+ * reply.
  */
-export function runClaude(system, user, { model = CLI_MODEL(), bin = 'claude', onDelta } = {}) {
+export function runClaude(system, user, { model = CLI_MODEL(), bin = 'claude', onDelta, onThink } = {}) {
   const streaming = typeof onDelta === 'function'
   return new Promise((resolve) => {
     const child = spawn(
@@ -101,12 +107,16 @@ export function runClaude(system, user, { model = CLI_MODEL(), bin = 'claude', o
         } catch {
           continue
         }
-        const delta = j?.type === 'stream_event' && j.event?.type === 'content_block_delta'
-          ? j.event.delta?.text
-          : ''
-        if (delta) {
-          text += delta
-          onDelta(delta)
+        const d = j?.type === 'stream_event' && j.event?.type === 'content_block_delta' ? j.event.delta : null
+        if (!d) continue
+        if (d.text) {
+          text += d.text
+          onDelta(d.text)
+        } else if (d.type === 'thinking_delta') {
+          // The CLI sends these with the words already taken out and a running token estimate in
+          // their place, so there is nothing here to leak and nothing to test for truthiness: an
+          // empty thinking field is the normal case, and the type is what says it happened.
+          onThink?.(d.estimated_tokens ?? 0)
         }
       }
     })

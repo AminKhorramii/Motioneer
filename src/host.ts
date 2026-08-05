@@ -155,8 +155,15 @@ const served: Host = {
         if (done) break
         const d = dec.decode(value, { stream: true })
         if (!d) continue
-        text += d
-        onDelta?.(d)
+        // NUL is the server's beat while the model thinks, never part of what it wrote. An empty
+        // delta is how that reaches the caller: the reply is unchanged, and anyone counting
+        // deltas learns the call is alive.
+        const said = d.replace(/\0/g, '')
+        if (said) {
+          text += said
+          onDelta?.(said)
+        }
+        if (said.length !== d.length) onDelta?.('')
       }
       return text ? { text } : { error: 'no reply' }
     } catch (e) {

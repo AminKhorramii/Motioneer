@@ -29,7 +29,7 @@ export default function App() {
   const [bar, setBar] = useState('')
   const [busy, setBusy] = useState('')
   /** null when nothing is being built, otherwise how far along the wall is */
-  const [building, setBuilding] = useState<{ arrived: number | null; landed: string[] } | null>(null)
+  const [building, setBuilding] = useState<{ arrived: number | null; landed: string[]; thoughts: number } | null>(null)
   const [toast, setToast] = useState('')
   const [view, setView] = useState<'studio' | 'wall'>('studio')
   const [briefOpen, setBriefOpen] = useState(false)
@@ -118,7 +118,7 @@ export default function App() {
     // Each page starts the moment its own world is finished, rather than when the whole design
     // is. Writing the wall in one call instead was measured against this and came out the same
     // within noise, so this stays: one path, and the earliest first paper.
-    setBuilding({ arrived: null, landed: [] })
+    setBuilding({ arrived: null, landed: [], thoughts: 0 })
     setBusy('designing')
     const jobs: Promise<{ ok: number; error?: string }>[] = []
     const started: World[] = []
@@ -134,12 +134,16 @@ export default function App() {
       if (run.current !== mine || started[i]) return
       started[i] = world
       registerWorlds([world])
-      setBuilding({ arrived: jobs.length + 1, landed: started.filter(Boolean).map((w) => w.name) })
+      setBuilding((b) => ({ arrived: jobs.length + 1, landed: started.filter(Boolean).map((w) => w.name), thoughts: b?.thoughts ?? 0 }))
       setBusy('writing')
       jobs.push(writeOne(base, p, world, i, arrived))
     }
 
-    const worlds = await promptWorlds(p, 8, startPage)
+    // every beat is the model proving it is still thinking, which is the only thing there is to
+    // report during the minute before the first world
+    const worlds = await promptWorlds(p, 8, startPage, 'model', () => {
+      if (run.current === mine) setBuilding((b) => (b ? { ...b, thoughts: b.thoughts + 1 } : b))
+    })
     if (run.current !== mine) return
     setDesigned(worlds)
     registerWorlds(worlds)
@@ -193,7 +197,7 @@ export default function App() {
       // Reading the brief takes a model call of its own, and until now nothing said so: the
       // setup screen had closed and the wall had not started, so the screen fell through to the
       // message for someone who never described anything.
-      setBuilding({ arrived: null, landed: [] })
+      setBuilding({ arrived: null, landed: [], thoughts: 0 })
       await loadHeldKeys()
       // The agent that asked already knew what this is, so if it said so there is nothing to
       // work out. Reading the brief back through a model cost about forty seconds to recover
@@ -454,7 +458,8 @@ export default function App() {
 
         {view === 'studio' && building && pages.length < 2 && (
           <main className="stage">
-            <Building arrived={building.arrived} total={8} landed={building.landed} model={chosen().label} />
+            <Building arrived={building.arrived} total={8} landed={building.landed} thoughts={building.thoughts}
+              model={chosen().label} />
           </main>
         )}
 

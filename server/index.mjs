@@ -221,9 +221,20 @@ const server = createServer(async (req, res) => {
     // plain chunked text, the same shape /api/stream uses: every chunk is a delta and the whole
     // body is the reply, so a caller that wants to act on partial output can
     res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' })
+    // A beat while it thinks, so the connection carries something during the minute before the
+    // first word. NUL is the one byte that cannot appear in the reply, which is JSON the model
+    // wrote, so the reader can take these out without knowing anything about what it is reading.
+    // Once a second is plenty to prove life and few enough to ignore.
+    let beat = 0
     const out = await runClaude(String(system ?? ''), String(user ?? ''), {
       ...(kind === 'design' ? { model: DESIGN_MODEL() } : {}),
       onDelta: (d) => res.write(d),
+      onThink: () => {
+        const now = Date.now()
+        if (now - beat < 1000) return
+        beat = now
+        res.write('\0')
+      },
     })
     if (out.error) console.error('cli failed:', out.error)
     return res.end()
