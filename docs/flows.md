@@ -74,8 +74,8 @@ each angle argues a different reason to care rather than rephrasing the same one
 **The worlds.** A world is one set of decisions that propagate together: type pairing and
 scale, tracking and weight, radius, density, whether sections carry hairline rules or numbers,
 whether they sit in a column or bleed edge to edge, the measure in characters, how figures are
-treated, which backdrop belongs to it, which layout each section kind wears, the CSS it brings,
-and which sections exist at all. `src/worlds.ts` holds six built in ones (swiss grid, editorial,
+treated, which backdrop belongs to it, which form each role of the argument wears, the CSS it
+brings, and which roles exist at all. `src/worlds.ts` holds six built in ones (swiss grid, editorial,
 terminal, poster, catalogue, soft product); `promptWorlds()` asks the model for eight more,
 designed for your product specifically.
 
@@ -149,11 +149,17 @@ pages placed to the right, so you compare rather than overwrite. `runBar()` in `
 calls `promptPage()` three times in parallel and jumps you to the first new one.
 
 **The world is a control.** The name under the paper is the world it was built in; clicking it
-rebuilds the page in the next one. Copy survives the change, because a section of a kind the
-new world also wants is reused rather than rewritten.
+rebuilds the page in the next one. Copy survives the change, because a section arguing a role
+the new world also wants is reused rather than rewritten.
 
-**The sections rail** lists every section: cycle its layout, drag to reorder, hide it, add a new
-one, fan its layouts out into new pages beside this one, or draw its image.
+**The sections rail** lists every section by the role it argues, claim, proof, substance, the
+offer, questions, the invitation, credits, and the form it is set in. Cycle its form, drag to
+reorder, hide it, add a new role, fan its forms out into new pages beside this one, or draw its
+image. Role and form are the two axes of the model: what a section argues and how it is set,
+because conflating them is what made every generated page assemble from the same nine
+marketing categories. A world maps roles to forms, so the same offer is a table in a catalogue,
+one sentence on a poster, and a transcript line in a terminal, and two rules hold at dressing
+time: adjacent sections never share a form, and a repeated role never repeats its form.
 
 **Direct manipulation on the paper.** The editable render injects a small script that makes text
 `contenteditable` and posts changes back over `postMessage`. `applyEdit()` writes the value into

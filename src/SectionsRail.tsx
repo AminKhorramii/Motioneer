@@ -1,7 +1,5 @@
-import { KIND_LABEL, KIND_VARIANTS, type Kind, type Page } from '@/sections'
+import { ROLES, ROLE_LABEL, type Page, type Role } from '@/sections'
 import { Icon } from '@/icons'
-
-const ALL_KINDS: Kind[] = ['hero', 'logos', 'features', 'showcase', 'quote', 'pricing', 'faq', 'cta', 'footer']
 
 interface Props {
   page: Page
@@ -12,7 +10,7 @@ interface Props {
   onToggle: (id: string) => void
   onFanOut: (id: string) => void
   onDraw: (id: string) => void
-  onAdd: (kind: Kind) => void
+  onAdd: (role: Role) => void
 }
 
 export function SectionsRail({
@@ -45,9 +43,9 @@ export function SectionsRail({
           }}
         >
           <div className="secline">
-            <b>{KIND_LABEL[s.kind]}</b>
-            <span className="vname">{KIND_VARIANTS[s.kind][s.variant]}</span>
-            <button title="try the next layout" onClick={(e) => { stop(e); onCycle(s.id) }}><Icon.cycle /></button>
+            <b>{ROLE_LABEL[s.role]}</b>
+            <span className="vname">{s.form}</span>
+            <button title="try the next form" onClick={(e) => { stop(e); onCycle(s.id) }}><Icon.cycle /></button>
             <button title={s.on ? 'hide this section' : 'show this section'} onClick={(e) => { stop(e); onToggle(s.id) }}>
               {s.on ? <Icon.shown /> : <Icon.hidden />}
             </button>
@@ -55,8 +53,8 @@ export function SectionsRail({
           {selected === s.id && (
             <div className="secbody">
               <div className="srow">
-                <button onClick={() => onFanOut(s.id)}>all layouts</button>
-                {(s.kind === 'hero' || s.kind === 'showcase') && (
+                <button onClick={() => onFanOut(s.id)}>all forms</button>
+                {(s.role === 'claim' || s.role === 'substance') && (
                   <button onClick={() => onDraw(s.id)}>draw image</button>
                 )}
               </div>
@@ -65,8 +63,8 @@ export function SectionsRail({
         </div>
       ))}
       <div className="addrow">
-        {ALL_KINDS.map((k) => (
-          <button key={k} onClick={() => onAdd(k)}>add {KIND_LABEL[k]}</button>
+        {ROLES.map((r) => (
+          <button key={r} onClick={() => onAdd(r)}>add {ROLE_LABEL[r]}</button>
         ))}
       </div>
     </aside>

@@ -7,8 +7,8 @@ import { craftBrief } from '@/craft'
 import { MODELS, modelById } from '@/models'
 import { BACKDROPS, type Backdrop } from '@/backdrop'
 import { shrinkDataUrl } from '@/imagepipe'
-import { WORLDS, madeWorld, worldById, type World } from '@/worlds'
-import { KIND_VARIANTS, defaultContent, uid, type Kind, type Page, type Section } from '@/sections'
+import { WORLDS, dressSections, madeWorld, worldById, type World } from '@/worlds'
+import { ROLE_FORMS, defaultContent, uid, type Form, type Page, type Role, type Section } from '@/sections'
 
 export interface Product {
   name: string
@@ -26,17 +26,17 @@ export function seeded(page: Page, p: Product): Page {
     ...page,
     sections: page.sections.map((s) => {
       const c = { ...s.content } as Record<string, unknown>
-      if (s.kind === 'hero') {
+      if (s.role === 'claim') {
         c.eyebrow = p.audience || c.eyebrow
         c.headline = p.oneLiner || c.headline
         c.sub = p.what || c.sub
         c.cta = p.cta || c.cta
       }
-      if (s.kind === 'cta') {
+      if (s.role === 'invitation') {
         c.headline = `Start with ${p.name || 'it'} today.`
         c.cta = p.cta || c.cta
       }
-      if (s.kind === 'footer') c.product = p.name || c.product
+      if (s.role === 'credits') c.product = p.name || c.product
       return { ...s, content: c }
     }),
   }
@@ -107,24 +107,24 @@ export async function writeOne(
 /**
  * Rebuild the page from a world's own composition, keeping the copy that already exists.
  *
- * A section of a kind the world asks for is reused, so the words survive a change of world.
- * A kind it asks for that the page does not have arrives with defaults, and a kind the page
- * has that the world does not want is dropped, which is the point: a world gets to decide the
- * shape of the page and not only its finish.
+ * A section arguing a role the world asks for is reused, so the words survive a change of
+ * world. A role it asks for that the page does not have arrives with defaults, and a role the
+ * page has that the world does not want is dropped, which is the point: a world gets to decide
+ * the shape of the page and not only its finish.
  */
-function composeSections(page: Page, wanted: Kind[]): Section[] {
-  const name = String(page.sections.find((s) => s.kind === 'footer')?.content.product ?? 'Product')
-  const pool = new Map<Kind, Section[]>()
-  for (const s of page.sections) pool.set(s.kind, [...(pool.get(s.kind) ?? []), s])
-  return wanted.map((kind) => {
-    const had = pool.get(kind)?.shift()
+function composeSections(page: Page, wanted: Role[]): Section[] {
+  const name = String(page.sections.find((s) => s.role === 'credits')?.content.product ?? 'Product')
+  const pool = new Map<Role, Section[]>()
+  for (const s of page.sections) pool.set(s.role, [...(pool.get(s.role) ?? []), s])
+  return wanted.map((role) => {
+    const had = pool.get(role)?.shift()
     return had
       ? { ...had, content: structuredClone(had.content) }
-      : { id: uid(), kind, variant: 0, on: true, content: defaultContent(kind, name) }
+      : { id: uid(), role, form: ROLE_FORMS[role][0], on: true, content: defaultContent(role, name) }
   })
 }
 
-/** Rebuild a page inside a world: its palette, its type, its layouts, its shape. */
+/** Rebuild a page inside a world: its palette, its type, its forms, its shape. */
 function inWorld(page: Page, world: World): Page {
   const sections = world.compose?.length ? composeSections(page, world.compose) : page.sections
   return {
@@ -132,12 +132,10 @@ function inWorld(page: Page, world: World): Page {
     world: world.id,
     backdrop: world.backdrop,
     taste: world.taste(page.taste),
-    sections: sections.map((s) => ({
-      ...s,
-      on: true,
-      variant: Math.min(world.prefer[s.kind] ?? s.variant, KIND_VARIANTS[s.kind].length - 1),
-      content: structuredClone(s.content),
-    })),
+    sections: dressSections(
+      sections.map((s) => ({ ...s, on: true, content: structuredClone(s.content) })),
+      world,
+    ),
   }
 }
 
@@ -164,16 +162,16 @@ export function alternatives(base: Page, n: number): Page[] {
 export function sectionAlternatives(page: Page, sectionId: string): Page[] {
   const sec = page.sections.find((s) => s.id === sectionId)
   if (!sec) return [page]
-  return KIND_VARIANTS[sec.kind].map((_, v) => ({
+  return ROLE_FORMS[sec.role].map((form) => ({
     ...page,
     id: uid(),
     pinned: undefined,
-    sections: page.sections.map((s) => (s.id === sectionId ? { ...s, variant: v } : s)),
+    sections: page.sections.map((s) => (s.id === sectionId ? { ...s, form } : s)),
   }))
 }
 
-export function addSection(page: Page, kind: Kind, product: string, at?: number): Page {
-  const sec: Section = { id: uid(), kind, variant: 0, on: true, content: defaultContent(kind, product) }
+export function addSection(page: Page, role: Role, product: string, at?: number): Page {
+  const sec: Section = { id: uid(), role, form: ROLE_FORMS[role][0], on: true, content: defaultContent(role, product) }
   const list = [...page.sections]
   list.splice(at ?? list.length - 1, 0, sec)
   return { ...page, sections: list }
@@ -185,13 +183,16 @@ export function cycleBackdrop(page: Page): Page {
   return { ...page, backdrop: BACKDROPS[(at + 1) % BACKDROPS.length] as Backdrop }
 }
 
-/** Cycle a section to its next layout. The wrap lives here because KIND_VARIANTS defines the range. */
-export function cycleVariant(page: Page, id: string): Page {
+/** Cycle a section to its next form. The wrap lives here because ROLE_FORMS defines the range. */
+export function cycleForm(page: Page, id: string): Page {
   return {
     ...page,
-    sections: page.sections.map((s) =>
-      s.id === id ? { ...s, variant: (s.variant + 1) % KIND_VARIANTS[s.kind].length } : s,
-    ),
+    sections: page.sections.map((s) => {
+      if (s.id !== id) return s
+      const forms = ROLE_FORMS[s.role]
+      const next: Form = forms[(forms.indexOf(s.form) + 1) % forms.length]
+      return { ...s, form: next }
+    }),
   }
 }
 
@@ -398,7 +399,7 @@ const grabJson = (text: string) => {
   }
 }
 
-const PAGE_SYSTEM = `You write copy for a whole landing page. You receive the page as JSON: an array of sections, each with an id, a kind, and content. You also receive an instruction describing what to change.
+const PAGE_SYSTEM = `You write copy for a whole landing page. You receive the page as JSON: an array of sections, each with an id, a role it plays in the argument, the form it is set in, and content. You also receive an instruction describing what to change.
 
 Return JSON shaped as {"sections":[{"id":"...","content":{...}}]}, reusing the same ids and the same content keys, with the copy rewritten to follow the instruction. Reusing ids and keys matters because the app merges your reply into the existing page by id, and an unknown id or missing key is dropped.
 
@@ -420,7 +421,7 @@ export async function promptPage(
 ): Promise<Page | null> {
   const shape = page.sections
     .filter((s) => s.on)
-    .map((s) => ({ id: s.id, kind: s.kind, content: s.content }))
+    .map((s) => ({ id: s.id, role: s.role, form: s.form, content: s.content }))
   const outId = uid()
   let buf = ''
   let cursor = 0
@@ -493,16 +494,16 @@ structure.measure: 44 to 82 characters per line. This is the single biggest leve
 structure.figure: framed, bleed or plain.
 structure.rhythm: 4 to 8 padding multipliers between 0.4 and 3, cycled down the page, like [2.4, 0.8, 1.6, 0.6]. Adjacent sections must not breathe the same: a page with equal air everywhere reads as one treatment applied to all content, where a sparse beat against a dense one reads as paced.
 backdrop: none, contours, grain or ridge. Drawn behind the page from the palette.
-prefer: which layout each section wears, as {"hero":0-3,"logos":0-1,"features":0-2,"showcase":0-1,"quote":0-1,"pricing":0-1,"faq":0-1,"cta":0-1}. Keep them agreeing with each other: a page where every section picked differently reads as a shuffle rather than a design.
-sections: which sections the page is made of and in what order, as a list from hero, logos, features, showcase, quote, pricing, faq, cta, footer. Four to nine of them, repeats allowed. This is the shape of the page and it is yours to decide: a receipt is an itemised list and a total, not a testimonial and a pricing grid; a poster is a headline and one action; a field manual is mostly features and questions. Leave out anything the idea does not need, including the hero.
+wear: which form each role of the argument takes, as {"claim":"statement","proof":"quote","substance":"list","offer":"table","objections":"prose","invitation":"band"}. The forms each role can wear: claim takes prose, marginalia, statement or transcript. proof takes quote, list or statement. substance takes list, figure, prose or table. offer takes table, statement, prose or transcript. objections takes list or prose. invitation takes band or statement. This is where a world speaks: a receipt prices in a table where a poster prices in one sentence, and the same argument comes out looking like a different page.
+sections: the argument of the page in order, as a list from claim, proof, substance, offer, objections, invitation, credits. Four to nine of them, repeats allowed, and a repeated role will be set in a different form the second time. This is the shape of the page and it is yours to decide: a receipt is substance and an offer, not proof and a pricing grid; a poster is a claim and an invitation; a field manual is mostly substance and objections. Leave out anything the idea does not need.
 css: the part that matters most. Thirty to sixty lines of CSS that make the idea real, because the fields above can only change size and spacing, and no arrangement of them will make a page look like a receipt or a departures board. This is where you draw.
 
 The page you are styling is plain HTML with these hooks, and nothing else:
-  section[data-section] wraps every section and carries id="hero", "features", "pricing" and so on, so you can style one kind differently from another
+  section[data-section] wraps every section and carries id="claim", "substance", "offer" and so on by role, plus data-form="statement", "table", "transcript" and so on, so you can style an argument or a form
   .wrap is the column inside each section
   h1 and h2 are the headings, p is body copy
   .eyebrow is the small label above a headline
-  .ctas holds the buttons, .btn is a button, .btn-primary and .btn-ghost are the two kinds
+  .ctas holds the actions, .btn-primary is the one real button and .link is the quiet one beside it
   .card is a bordered block, .grid is a row of them
   img sits inside a bordered figure
 These custom properties are already set from the palette and are the colours you should use: --bg, --ink, --dim, --accent, --accent2, --surface, --line, --r for radius, --gap for rhythm.
@@ -675,7 +676,7 @@ export async function illustrate(
   const key = imageKey()
   if (!key && !isServed) return null
   const prompt = [
-    `Draw one abstract image for the ${sec.kind} section of a landing page.`,
+    `Draw one abstract image for the ${sec.role} section of a landing page.`,
     `The product: ${product.name}. ${product.oneLiner}`,
     `Use this palette and nothing else: background ${taste.bg}, foreground ${taste.ink}, accent ${taste.accent}.`,
     'Compose it wide and calm, around a single idea, with generous empty space, because it sits behind and beside text that has to stay readable.',

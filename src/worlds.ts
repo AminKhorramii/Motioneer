@@ -10,7 +10,7 @@
  */
 
 import { mix, shift, type Taste } from '@/taste'
-import { KIND_VARIANTS, type Kind } from '@/sections'
+import { ROLE_FORMS, legacyRole, type Form, type Role, type Section } from '@/sections'
 import type { Backdrop } from '@/backdrop'
 
 export type WorldId = string
@@ -45,8 +45,11 @@ export interface World {
     rhythm?: number[]
   }
   backdrop: Backdrop
-  /** the layout each kind wears in this world, so sections agree with each other */
-  prefer: Partial<Record<Kind, number>>
+  /**
+   * The form each role takes here. This is where a world speaks: the same offer is a table
+   * in a catalogue, one sentence on a poster, and a transcript line in a terminal.
+   */
+  wear: Partial<Record<Role, Form>>
   /**
    * CSS the world brings with it, written against the page's own classes and tokens.
    *
@@ -57,13 +60,13 @@ export interface World {
    */
   css?: string
   /**
-   * The sections this world wants, in order.
+   * The argument this world makes, in order: which roles, and how often.
    *
    * Until now every page was the same nine sections in the same order, so a world called
    * printed receipt still had a testimonial and a three card pricing grid. A world that can
    * choose its own composition changes the silhouette of a page rather than its surface.
    */
-  compose?: Kind[]
+  compose?: Role[]
 }
 
 const GROTESK = "'Helvetica Neue', Arial, sans-serif"
@@ -89,8 +92,8 @@ export const WORLDS: World[] = [
     structure: { rules: true, numbered: true, bleed: false, measure: 62, figure: 'framed', rhythm: [1, 0.55, 1.5, 0.8, 1.9, 0.7] },
     backdrop: 'none',
     // a numbered list is more swiss than a row of cards, and the grid has no closing band
-    prefer: { hero: 2, features: 2, showcase: 0, quote: 0, pricing: 0, faq: 0 },
-    compose: ['hero', 'features', 'showcase', 'pricing', 'faq', 'footer'],
+    wear: { claim: 'statement', substance: 'list', offer: 'table', objections: 'list' },
+    compose: ['claim', 'substance', 'substance', 'offer', 'objections', 'credits'],
     // the one move: the folio of the opening section set enormous and almost gone.
     // One committed move per world, because restraint plus commitment is what reads as
     // designed, where several small flourishes read as generated.
@@ -104,11 +107,11 @@ export const WORLDS: World[] = [
     taste: (t) => ({ ...tinted(t), display: FRAUNCES, body: SERIF, scale: 1.44, radius: 2, density: 0.35, weight: 560, caps: true }),
     structure: { rules: false, numbered: false, bleed: true, measure: 74, figure: 'bleed', rhythm: [1.7, 0.6, 1.3, 0.75, 2, 0.9] },
     backdrop: 'grain',
-    prefer: { hero: 2, features: 1, showcase: 1, quote: 0, pricing: 1, faq: 1, cta: 0 },
-    // a read: the argument, one witness, the substance, proof it exists, and a quiet close
-    compose: ['hero', 'quote', 'features', 'showcase', 'pricing', 'faq', 'cta', 'footer'],
+    wear: { claim: 'statement', proof: 'quote', substance: 'prose', offer: 'statement', objections: 'prose', invitation: 'statement' },
+    // a read: the argument, one witness, the substance twice over, the terms, a quiet close
+    compose: ['claim', 'proof', 'substance', 'substance', 'offer', 'objections', 'invitation', 'credits'],
     // the one move: a masthead slug above the headline, the way a periodical opens
-    css: `#hero h1::before{content:'';display:block;width:2.4ch;height:4px;background:var(--accent);margin-bottom:1.6rem}`,
+    css: `#claim h1::before{content:'';display:block;width:2.4ch;height:4px;background:var(--accent);margin-bottom:1.6rem}`,
   },
   {
     id: 'terminal',
@@ -118,13 +121,13 @@ export const WORLDS: World[] = [
     taste: (t) => ({ ...mono(t), display: MONO, body: MONO, scale: 1.2, radius: 0, density: 0.8, weight: 500, caps: true }),
     structure: { rules: true, numbered: false, bleed: false, measure: 68, figure: 'plain', rhythm: [0.9, 0.5, 1.3, 0.6, 1.6, 0.7] },
     backdrop: 'contours',
-    // documentation does not testimonial: numbered features, no quote, no closing band
-    prefer: { hero: 3, features: 2, showcase: 0, pricing: 0, faq: 0 },
-    compose: ['hero', 'features', 'showcase', 'faq', 'pricing', 'footer'],
-    // the one move: the feature list prints inverted, a band of light in a dark page
-    css: `#features{background:var(--ink);color:var(--bg)}
-#features h2,#features h3{color:var(--bg)}
-#features p{color:color-mix(in srgb,var(--bg) 72%,var(--ink))}`,
+    // documentation does not testimonial: everything is a listing or a transcript
+    wear: { claim: 'transcript', substance: 'list', offer: 'transcript', objections: 'list' },
+    compose: ['claim', 'substance', 'substance', 'objections', 'offer', 'credits'],
+    // the one move: the substance prints inverted, a band of light in a dark page
+    css: `#substance{background:var(--ink);color:var(--bg)}
+#substance h2,#substance h3{color:var(--bg)}
+#substance p{color:color-mix(in srgb,var(--bg) 72%,var(--ink))}`,
   },
   {
     id: 'poster',
@@ -134,11 +137,11 @@ export const WORLDS: World[] = [
     taste: (t) => ({ ...contrast(t), display: ARCHIVO, body: SANS, scale: 1.62, radius: 0, density: 0.3, weight: 880, caps: false }),
     structure: { rules: false, numbered: false, bleed: true, measure: 52, figure: 'bleed', rhythm: [2.6, 0.9, 2.2, 1.2, 0.6] },
     backdrop: 'ridge',
-    prefer: { hero: 2, showcase: 1, quote: 0, cta: 1 },
+    wear: { claim: 'statement', substance: 'figure', proof: 'quote', invitation: 'statement' },
     // five sections. A poster is what it leaves out, and the whitespace is the design
-    compose: ['hero', 'showcase', 'quote', 'cta', 'footer'],
+    compose: ['claim', 'substance', 'proof', 'invitation', 'credits'],
     // the one move: the headline at the size of the wall, tighter than body type ever sits
-    css: `#hero h1{font-size:clamp(3.6rem,11.5vw,9.5rem)!important;line-height:.94!important;letter-spacing:-.045em;max-width:none!important;margin-left:-.05em}`,
+    css: `#claim h1{font-size:clamp(3.6rem,11.5vw,9.5rem)!important;line-height:.94!important;letter-spacing:-.045em;max-width:none!important;margin-left:-.05em}`,
   },
   {
     id: 'catalogue',
@@ -148,9 +151,9 @@ export const WORLDS: World[] = [
     taste: (t) => ({ ...mono(t), display: SANS, body: SANS, scale: 1.16, radius: 3, density: 0.85, weight: 600, caps: true }),
     structure: { rules: true, numbered: true, bleed: false, measure: 58, figure: 'plain', rhythm: [0.7, 0.45, 1.1, 0.5, 1.4, 0.6] },
     backdrop: 'none',
-    // everything, listed: the one world that keeps all nine sections, set dense
-    prefer: { hero: 1, features: 2, showcase: 0, quote: 1, pricing: 0, faq: 0, cta: 1, logos: 1 },
-    compose: ['hero', 'logos', 'features', 'showcase', 'quote', 'pricing', 'faq', 'cta', 'footer'],
+    // everything, listed: the fullest argument, set dense, priced in a table
+    wear: { claim: 'prose', proof: 'list', substance: 'table', offer: 'table', objections: 'list', invitation: 'band' },
+    compose: ['claim', 'proof', 'substance', 'substance', 'proof', 'offer', 'objections', 'invitation', 'credits'],
     // the one move: double rules between sections, the way a ledger separates its entries
     css: `section+section{border-top:4px double var(--line)!important}`,
   },
@@ -162,10 +165,10 @@ export const WORLDS: World[] = [
     taste: (t) => ({ ...tinted(t), display: SANS, body: SANS, scale: 1.3, radius: 16, density: 0.45, weight: 600, caps: false }),
     structure: { rules: false, numbered: false, bleed: false, measure: 66, figure: 'framed', rhythm: [1.5, 0.7, 1.2, 0.6, 1.8, 0.8] },
     backdrop: 'grain',
-    prefer: { hero: 0, features: 1, showcase: 1, quote: 0, pricing: 1, faq: 1, cta: 0, logos: 1 },
-    compose: ['hero', 'logos', 'features', 'showcase', 'quote', 'pricing', 'cta', 'footer'],
+    wear: { claim: 'prose', proof: 'list', substance: 'figure', offer: 'table', invitation: 'band' },
+    compose: ['claim', 'proof', 'substance', 'substance', 'proof', 'offer', 'invitation', 'credits'],
     // the one move: the opening sits on its own tinted band, so the page has a shoreline
-    css: `#hero{background:var(--surface)}`,
+    css: `#claim{background:var(--surface)}`,
   },
 ]
 
@@ -213,10 +216,20 @@ export function madeWorld(raw: Record<string, unknown>, i: number): World {
   const s = (raw.structure ?? {}) as Record<string, unknown>
   const face = (k: unknown, fallback: string) => FACES[String(k)] ?? fallback
   const palette = PALETTES[String(raw.palette)] ?? PALETTES['as-is']
-  const prefer: Partial<Record<Kind, number>> = {}
-  for (const [kind, v] of Object.entries((raw.prefer ?? {}) as Record<string, unknown>)) {
-    if (kind in KIND_VARIANTS) {
-      prefer[kind as Kind] = Math.max(0, Math.min(Math.round(Number(v) || 0), KIND_VARIANTS[kind as Kind].length - 1))
+  const asRole = (k: string): Role | null => (k in ROLE_FORMS ? (k as Role) : legacyRole(k))
+  const wear: Partial<Record<Role, Form>> = {}
+  for (const [k, v] of Object.entries((raw.wear ?? {}) as Record<string, unknown>)) {
+    const role = asRole(k)
+    const form = String(v) as Form
+    if (role && ROLE_FORMS[role].includes(form)) wear[role] = form
+  }
+  // worlds recorded before forms said prefer as {kind: layout number}; the numbers still
+  // index into the role's forms, so an old design keeps meaning something
+  for (const [k, v] of Object.entries((raw.prefer ?? {}) as Record<string, unknown>)) {
+    const role = asRole(k)
+    if (role && wear[role] === undefined) {
+      const allowed = ROLE_FORMS[role]
+      wear[role] = allowed[Math.max(0, Math.min(Math.round(Number(v) || 0), allowed.length - 1))]
     }
   }
   return {
@@ -247,12 +260,12 @@ export function madeWorld(raw: Record<string, unknown>, i: number): World {
     backdrop: (['none', 'contours', 'grain', 'ridge'] as const).includes(raw.backdrop as never)
       ? (raw.backdrop as Backdrop)
       : 'none',
-    prefer,
+    wear,
     css: safeCss(raw.css),
     compose: Array.isArray(raw.sections)
       ? (raw.sections as unknown[])
-          .map((k) => String(k))
-          .filter((k): k is Kind => k in KIND_VARIANTS)
+          .map((k) => asRole(String(k)))
+          .filter((r): r is Role => r !== null)
           .slice(0, 12)
       : undefined,
   }
@@ -267,6 +280,33 @@ const made = new Map<string, World>()
 export const register = (list: World[]) => list.forEach((w) => made.set(w.id, w))
 
 export const worldById = (id?: WorldId) => made.get(String(id)) ?? WORLDS.find((w) => w.id === id) ?? WORLDS[0]
+
+/**
+ * Dress sections in a world's forms, under two rules a template system cannot state:
+ * adjacent sections never share a form, because the repeat is what reads as one treatment
+ * applied to all content, and a repeated role never repeats its form, because saying the
+ * same thing twice deserves a second register. The advance is deterministic, so the same
+ * world dresses the same page the same way every time.
+ */
+export function dressSections(sections: Section[], world: World): Section[] {
+  const taken = new Map<Role, Set<Form>>()
+  let prev: Form | null = null
+  return sections.map((s) => {
+    const allowed = ROLE_FORMS[s.role]
+    const wanted = world.wear[s.role]
+    let form = wanted && allowed.includes(wanted) ? wanted : allowed.includes(s.form) ? s.form : allowed[0]
+    let i = allowed.indexOf(form)
+    const used = taken.get(s.role) ?? new Set<Form>()
+    for (let guard = 0; guard < allowed.length && (form === prev || used.has(form)); guard++) {
+      i = (i + 1) % allowed.length
+      form = allowed[i]
+    }
+    used.add(form)
+    taken.set(s.role, used)
+    prev = form
+    return { ...s, form }
+  })
+}
 
 /** The signature a page wears, used to check that a wall spans real ground. */
 export const worldSignature = (w: World, t: Taste) =>

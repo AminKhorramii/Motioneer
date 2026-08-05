@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PRESETS, tasteFromImage, type Taste } from '@/taste'
-import { KIND_LABEL, applyEdit, starterPage, type Kind, type Page } from '@/sections'
+import { ROLE_LABEL, applyEdit, migratePage, starterPage, type Page, type Role } from '@/sections'
 import { renderPage } from '@/render'
 import { pageBrief } from '@/brief'
 import { slop } from '@/slop'
 import {
-  EMPTY_PRODUCT, addSection, alternatives, arrange, readBrief, canDraw, canWrite, choose, chosen, promptWorlds, setDesigned, cycleVariant, cycleWorld, dropSection, writeOne, illustrate, loadHeldKeys, loadKeys, promptPage, sectionAlternatives, seeded, setMock, type Product,
+  EMPTY_PRODUCT, addSection, alternatives, arrange, readBrief, canDraw, canWrite, choose, chosen, promptWorlds, setDesigned, cycleForm, cycleWorld, dropSection, writeOne, illustrate, loadHeldKeys, loadKeys, promptPage, sectionAlternatives, seeded, setMock, type Product,
 } from '@/compose'
 import { Onboarding } from '@/Onboarding'
 import { BriefRail } from '@/BriefRail'
@@ -220,7 +220,8 @@ export default function App() {
       const s = raw as { product: Product; page: Page } | null
       if (s?.page?.sections?.length) {
         setProduct(s.product)
-        setPages(alternatives(s.page, 7))
+        // a wall saved before roles and forms comes back dressed in them
+        setPages(alternatives(migratePage(s.page), 7))
       }
     })
   }, [])
@@ -336,7 +337,7 @@ export default function App() {
     const sec = page?.sections.find((s) => s.id === id)
     if (!sec) return
     if (!canDraw()) return flash('Add a Gemini key in the brief panel to draw images.')
-    setBusy(`Drawing the ${KIND_LABEL[sec.kind]} image.`)
+    setBusy(`Drawing the ${ROLE_LABEL[sec.role]} image.`)
     try {
       const drawn = await illustrate(sec, product, page!.taste)
       if (!drawn) return flash('No image came back.')
@@ -396,7 +397,7 @@ export default function App() {
     const res = await host.handoff(askedFrom, {
       'chosen.md': pageBrief(page, product.name),
       'chosen.html': renderPage(page, { title: product.name }),
-      'chosen.json': JSON.stringify({ format: 1, product, page }, null, 2),
+      'chosen.json': JSON.stringify({ format: 2, product, page }, null, 2),
     })
     flash(res.error ? `Could not write the handoff: ${res.error}` : 'Sent back. Your agent can pick it up now.')
   }
@@ -494,7 +495,7 @@ export default function App() {
               page={page}
               selected={selected}
                             onSelect={setSelected}
-              onCycle={(id) => setPage((p) => cycleVariant(p, id))}
+              onCycle={(id) => setPage((p) => cycleForm(p, id))}
               onDrop={(id, onto, after) => setPage((p) => dropSection(p, id, onto, after))}
               onToggle={(id) => setPage((p) => ({
                 ...p,
@@ -506,7 +507,7 @@ export default function App() {
                 flash(`${alts.length - 1} more layouts are waiting to the right.`)
               }}
               onDraw={(id) => void drawImage(id)}
-              onAdd={(kind: Kind) => setPage((p) => addSection(p, kind, product.name))}
+              onAdd={(role: Role) => setPage((p) => addSection(p, role, product.name))}
             />
           </>
         )}

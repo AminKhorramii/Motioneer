@@ -23,15 +23,16 @@ for (const w of core.WORLDS) {
   for (const look of core.PRESETS) {
     const t = w.taste(look)
     const base = core.starterPage(t, 'Spoor')
+    const pool = new Map()
+    for (const s of base.sections) pool.set(s.role, [...(pool.get(s.role) ?? []), s])
     const ordered = w.compose?.length
-      ? w.compose.map((k) => base.sections.find((s) => s.kind === k)).filter(Boolean)
+      ? w.compose.map((r) => pool.get(r)?.shift() ?? {
+          id: r, role: r, form: core.ROLE_FORMS[r][0], on: true, content: core.defaultContent(r, 'Spoor'),
+        })
       : base.sections
     const page = {
       ...base, world: w.id, backdrop: w.backdrop, taste: t,
-      sections: ordered.map((s) => ({
-        ...s,
-        variant: Math.min(w.prefer[s.kind] ?? s.variant, core.KIND_VARIANTS[s.kind].length - 1),
-      })),
+      sections: core.dressSections(ordered, w),
     }
     const flags = core.slop(page, core.renderPage(page, { title: 'Spoor' }))
     if (flags.length) houseFlags.push(`${w.id} on ${look.name}: ${flags.map((f) => f.label).join(', ')}`)

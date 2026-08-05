@@ -117,7 +117,7 @@ export function slop(page: Page, html?: string): Flag[] {
       'A number outside a sentence says nothing about what it cost or saved, so the row decorates rather than argues.')
   }
 
-  const hero = page.sections.find((s) => s.kind === 'hero' && s.on)
+  const hero = page.sections.find((s) => s.role === 'claim' && s.on)
   const headline = typeof hero?.content.headline === 'string' ? hero.content.headline : ''
   if (headline) {
     const words = headline.trim().split(/\s+/)

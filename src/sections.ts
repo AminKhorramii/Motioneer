@@ -1,19 +1,46 @@
 /**
- * The page model. A page is an ordered list of sections; each section has a
- * kind, a layout variant, and content. Rendering lives in render.ts and brief
- * generation in brief.ts so this file stays the single source of shape.
+ * The page model. A page is an ordered list of sections; each section has a role, a form,
+ * and content. Rendering lives in render.ts and brief generation in brief.ts so this file
+ * stays the single source of shape.
+ *
+ * A role is what the section argues; a form is how it is set. The old model had one axis,
+ * kind, which conflated the two: pricing was both the offer and the three card grid, so every
+ * page was assembled from the same nine marketing categories and read as the same page. Split,
+ * the same argument renders unrecognisably across worlds: the offer on a poster is one
+ * sentence, on a catalogue a table, in a terminal a transcript line.
  */
 
 import type { Taste } from '@/taste'
 import type { Backdrop } from '@/backdrop'
 import type { WorldId } from '@/worlds'
 
-export type Kind = 'hero' | 'logos' | 'features' | 'showcase' | 'quote' | 'pricing' | 'faq' | 'cta' | 'footer'
+export type Role = 'claim' | 'proof' | 'substance' | 'offer' | 'objections' | 'invitation' | 'credits'
+export type Form =
+  | 'statement' | 'prose' | 'marginalia' | 'transcript'
+  | 'quote' | 'list' | 'table' | 'figure' | 'band'
+
+/** the forms each role can wear. Fewer, better set forms beat many templates each okay */
+export const ROLE_FORMS: Record<Role, Form[]> = {
+  claim: ['prose', 'marginalia', 'statement', 'transcript'],
+  proof: ['quote', 'list', 'statement'],
+  substance: ['list', 'figure', 'prose', 'table'],
+  offer: ['table', 'statement', 'prose', 'transcript'],
+  objections: ['list', 'prose'],
+  invitation: ['band', 'statement'],
+  credits: ['prose'],
+}
+
+export const ROLES: Role[] = ['claim', 'proof', 'substance', 'offer', 'objections', 'invitation', 'credits']
+
+export const ROLE_LABEL: Record<Role, string> = {
+  claim: 'the claim', proof: 'proof', substance: 'substance', offer: 'the offer',
+  objections: 'questions', invitation: 'the invitation', credits: 'credits',
+}
 
 export interface Section {
   id: string
-  kind: Kind
-  variant: number
+  role: Role
+  form: Form
   on: boolean
   content: Record<string, unknown>
 }
@@ -34,30 +61,18 @@ export interface Page {
   world?: WorldId
 }
 
-export const KIND_VARIANTS: Record<Kind, string[]> = {
-  hero: ['centered', 'split', 'editorial', 'terminal'],
-  logos: ['row', 'muted line'],
-  features: ['three cards', 'bento', 'numbered list'],
-  showcase: ['wide frame', 'offset frame'],
-  quote: ['big quote', 'card'],
-  pricing: ['three plans', 'single plan'],
-  faq: ['two columns', 'stacked'],
-  cta: ['banner', 'centered'],
-  footer: ['simple'],
-}
-
-export const KIND_LABEL: Record<Kind, string> = {
-  hero: 'hero', logos: 'social proof', features: 'features', showcase: 'showcase',
-  quote: 'testimonial', pricing: 'pricing', faq: 'questions', cta: 'closing call', footer: 'footer',
-}
-
 export const uid = () => Math.random().toString(36).slice(2, 9)
 
 // ——— defaults ———
 
-export function defaultContent(kind: Kind, product = 'Product'): Record<string, unknown> {
-  switch (kind) {
-    case 'hero':
+/**
+ * Content is keyed the same regardless of form, so a section survives changing its clothes,
+ * and the keys are unchanged from the old model, so recorded replies and saved pages still
+ * merge. A form reads the keys it needs and ignores the rest.
+ */
+export function defaultContent(role: Role, product = 'Product'): Record<string, unknown> {
+  switch (role) {
+    case 'claim':
       return {
         eyebrow: 'One plain line that earns the claim.',
         headline: 'A sentence that makes the value obvious.',
@@ -66,23 +81,24 @@ export function defaultContent(kind: Kind, product = 'Product'): Record<string, 
         cta: `Download ${product}`,
         cta2: 'See how it works',
       }
-    case 'logos':
+    case 'proof':
       // no invented companies: a made up logo row promises proof and delivers a prop
-      return { label: 'used by teams at', names: ['Replace', 'these', 'with', 'real', 'names'] }
-    case 'features':
+      return {
+        quote: 'It replaced three tools and a spreadsheet.',
+        name: 'A real person', role: 'founder, somewhere',
+        label: 'used by teams at', names: ['Replace', 'these', 'with', 'real', 'names'],
+      }
+    case 'substance':
       return {
         title: 'What it does',
+        caption: 'A moment from the product.',
         items: [
           { title: 'The first thing', body: 'One line about why it matters.' },
           { title: 'The second thing', body: 'One line about why it matters.' },
           { title: 'The third thing', body: 'One line about why it matters.' },
         ],
       }
-    case 'showcase':
-      return { title: 'See it working', caption: 'A moment from the product.' }
-    case 'quote':
-      return { quote: 'It replaced three tools and a spreadsheet.', name: 'A real person', role: `founder, somewhere` }
-    case 'pricing':
+    case 'offer':
       return {
         title: 'Simple pricing',
         plans: [
@@ -91,7 +107,7 @@ export function defaultContent(kind: Kind, product = 'Product'): Record<string, 
           { name: 'Team', price: '$49', line: 'per month', features: ['Shared workspace', 'Roles', 'Invoicing'] },
         ],
       }
-    case 'faq':
+    case 'objections':
       return {
         title: 'Questions',
         items: [
@@ -100,25 +116,63 @@ export function defaultContent(kind: Kind, product = 'Product'): Record<string, 
           { q: 'Does it work offline?', a: 'Yes. That is the point.' },
         ],
       }
-    case 'cta':
+    case 'invitation':
       return { headline: 'Start in under a minute.', sub: 'No account needed to try it.', cta: 'Download' }
-    case 'footer':
+    case 'credits':
       return { product, note: '' }
   }
 }
 
 export function starterPage(taste: Taste, product = 'Product'): Page {
-  const kinds: Kind[] = ['hero', 'logos', 'features', 'showcase', 'quote', 'pricing', 'faq', 'cta', 'footer']
+  const argue: [Role, Form][] = [
+    ['claim', 'prose'], ['proof', 'list'], ['substance', 'list'], ['substance', 'figure'],
+    ['proof', 'quote'], ['offer', 'table'], ['objections', 'list'], ['invitation', 'band'],
+    ['credits', 'prose'],
+  ]
   return {
     id: uid(),
     taste,
-    sections: kinds.map((kind) => ({
+    sections: argue.map(([role, form]) => ({
       id: uid(),
-      kind,
-      variant: 0,
+      role,
+      form,
       on: true,
-      content: defaultContent(kind, product),
+      content: defaultContent(role, product),
     })),
+  }
+}
+
+// ——— reading pages written before roles and forms ———
+
+/** what each old kind argued, and which form each of its numbered layouts wore */
+const LEGACY: Record<string, { role: Role; forms: Form[] }> = {
+  hero: { role: 'claim', forms: ['prose', 'marginalia', 'statement', 'transcript'] },
+  logos: { role: 'proof', forms: ['list', 'list'] },
+  quote: { role: 'proof', forms: ['quote', 'quote'] },
+  features: { role: 'substance', forms: ['list', 'figure', 'list'] },
+  showcase: { role: 'substance', forms: ['figure', 'figure'] },
+  pricing: { role: 'offer', forms: ['table', 'statement'] },
+  faq: { role: 'objections', forms: ['list', 'prose'] },
+  cta: { role: 'invitation', forms: ['band', 'statement'] },
+  footer: { role: 'credits', forms: ['prose'] },
+}
+
+/** old kind names still arrive from saved state and recorded worlds, and they map cleanly */
+export const legacyRole = (kind: string): Role | null => LEGACY[kind]?.role ?? null
+
+/** A page saved before roles and forms opens as if it had always had them. */
+export function migratePage(raw: unknown): Page {
+  type Old = Omit<Section, 'role' | 'form'> & { kind?: string; variant?: number; role?: Role; form?: Form }
+  const p = raw as Omit<Page, 'sections'> & { sections?: Old[] }
+  if (!p?.sections?.some((s) => s.kind)) return raw as Page
+  return {
+    ...p,
+    sections: p.sections.map((s) => {
+      if (!s.kind || !LEGACY[s.kind]) return s as Section
+      const { role, forms } = LEGACY[s.kind]
+      const { kind: _kind, variant, ...rest } = s
+      return { ...rest, role, form: forms[Math.min(variant ?? 0, forms.length - 1)] }
+    }),
   }
 }
 
@@ -142,4 +196,3 @@ export function applyEdit(page: Page, path: string, value: string): Page {
     }),
   }
 }
-

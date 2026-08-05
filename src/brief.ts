@@ -7,7 +7,7 @@
  * nine times, which was most of its length and none of its information.
  */
 
-import { KIND_LABEL, KIND_VARIANTS, type Page } from '@/sections'
+import { ROLE_LABEL, type Page } from '@/sections'
 import { worldById } from '@/worlds'
 
 /** a value on one line, so a nested list reads as a list rather than as run together text */
@@ -52,7 +52,7 @@ export function pageBrief(page: Page, product: string): string {
     '## Sections',
     ...on.flatMap((sec, i) => [
       '',
-      `### ${i + 1}. ${KIND_LABEL[sec.kind]}, layout ${KIND_VARIANTS[sec.kind][sec.variant] ?? 'default'}`,
+      `### ${i + 1}. ${ROLE_LABEL[sec.role]}, set as ${sec.form}`,
       ...lines(sec.content, ''),
     ]),
     '',
