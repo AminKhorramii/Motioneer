@@ -42,7 +42,7 @@ export interface Host {
    * The model the person already has. A shell that can start a process answers this; a plain
    * browser cannot, which is the one thing it will never be able to do.
    */
-  cli?: (system: string, user: string, onDelta?: (d: string) => void)
+  cli?: (system: string, user: string, onDelta?: (d: string) => void, kind?: string)
     => Promise<{ text?: string; error?: string }>
   /** a brief handed in from outside, when something launched this window to ask for a design */
   request: () => Promise<{
@@ -139,12 +139,12 @@ const served: Host = {
     }
     return { text }
   },
-  cli: async (system, user, onDelta) => {
+  cli: async (system, user, onDelta, kind) => {
     try {
       const r = await fetch('/api/cli', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ system, user }),
+        body: JSON.stringify({ system, user, kind }),
       })
       if (!r.ok || !r.body) return { error: `server ${r.status}` }
       const reader = r.body.getReader()

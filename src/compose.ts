@@ -305,13 +305,13 @@ async function ask(
   system: string,
   user: string,
   onDelta?: (delta: string) => void,
-  extra?: { maxTokens?: number },
+  extra?: { maxTokens?: number; kind?: string },
 ): Promise<string | null> {
   const m = chosen()
   // the local Claude has no key and no endpoint: it is a process, not a request
   if (m.wire === 'cli') {
     if (!host.cli) return null
-    const out = await host.cli(system, user, onDelta)
+    const out = await host.cli(system, user, onDelta, extra?.kind)
     if (out.error) throw new Error(out.error)
     return out.text ?? null
   }
@@ -564,7 +564,7 @@ export async function promptWorlds(
     WORLDS_SYSTEM,
     `Product: ${product.name}. ${product.oneLiner}\n${product.what}\nAudience: ${product.audience}\n\nDesign ${n} worlds for it.`,
     feed,
-    { maxTokens: 24000 },
+    { maxTokens: 24000, kind: 'design' },
   ).catch(() => null)
   // A world carries CSS now, so eight of them is a long reply and a cut one used to yield
   // nothing at all. The same walk that recovers half-arrived sections recovers half-arrived

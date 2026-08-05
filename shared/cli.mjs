@@ -23,6 +23,17 @@ export const CLI_MODEL = () =>
   (typeof process !== 'undefined' ? process.env?.WALL_CLI_MODEL : '') || 'sonnet'
 
 /**
+ * The model that designs the worlds, which need not be the one that writes the words.
+ *
+ * Measured on the same prompt, alternating: haiku reached the first world in 10.7s against
+ * sonnet's 23.3s, and finished all eight in 45s against 74s. Both returned eight valid worlds.
+ * Sonnet reached for the more particular object though, a nursery stake where haiku said
+ * greenhouse, so this defaults to leaving it alone and exists to be tried.
+ */
+export const DESIGN_MODEL = () =>
+  (typeof process !== 'undefined' ? process.env?.WALL_DESIGN_MODEL : '') || CLI_MODEL()
+
+/**
  * Run it, optionally handing back every delta as it arrives.
  *
  * Streaming matters more here than it looks. Designing eight worlds takes about fifty seconds,

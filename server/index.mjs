@@ -24,7 +24,7 @@ import os from 'node:os'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { generateImage, streamText } from '../shared/providers.mjs'
-import { runClaude } from '../shared/cli.mjs'
+import { DESIGN_MODEL, runClaude } from '../shared/cli.mjs'
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 const DIST = path.join(ROOT, 'dist')
@@ -217,11 +217,12 @@ const server = createServer(async (req, res) => {
     // no key is involved, so there is nothing to hold and nothing to check beyond the ceiling
     const denied = overLimit(address)
     if (denied) return json(res, 429, { error: denied })
-    const { system, user } = await readBody(req)
+    const { system, user, kind } = await readBody(req)
     // plain chunked text, the same shape /api/stream uses: every chunk is a delta and the whole
     // body is the reply, so a caller that wants to act on partial output can
     res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' })
     const out = await runClaude(String(system ?? ''), String(user ?? ''), {
+      ...(kind === 'design' ? { model: DESIGN_MODEL() } : {}),
       onDelta: (d) => res.write(d),
     })
     if (out.error) console.error('cli failed:', out.error)
