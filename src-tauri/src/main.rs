@@ -128,12 +128,21 @@ fn preview(app: tauri::AppHandle, html: String) -> String {
 /// the rest read it, and the parts of the CLI's own prompt that are about editing code are
 /// excluded because none of it helps write a page and all of it would be paid for.
 #[tauri::command]
-fn claude_text(system: String, user: String) -> serde_json::Value {
+fn claude_text(system: String, user: String, kind: Option<String>) -> serde_json::Value {
     use std::io::Write;
     use std::process::{Command, Stdio};
 
-    let model = std::env::var("WALL_CLI_MODEL").unwrap_or_else(|_| "sonnet".into());
-    let spawned = Command::new("claude")
+    // designing the worlds and writing the words are different jobs, and a deployment may want a
+    // different model on each, so the caller says which one this is
+    let writing = std::env::var("WALL_CLI_MODEL").unwrap_or_else(|_| "sonnet".into());
+    let model = if kind.as_deref() == Some("design") {
+        std::env::var("WALL_DESIGN_MODEL").unwrap_or(writing)
+    } else {
+        writing
+    };
+
+    let mut command = Command::new("claude");
+    command
         .args([
             "-p",
             "--output-format",
@@ -144,11 +153,20 @@ fn claude_text(system: String, user: String) -> serde_json::Value {
             &system,
             "--exclude-dynamic-system-prompt-sections",
             "--strict-mcp-config",
+            // the reply is one JSON object, not a task with steps, and a session holding Read and
+            // Write will sometimes spend a whole round trip using one before it answers
+            "--tools",
+            "",
         ])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn();
+        .stderr(Stdio::piped());
+
+    // thinking is most of the wait and also most of the design, so it goes only when asked
+    if std::env::var("WALL_FAST").is_ok() {
+        command.env("MAX_THINKING_TOKENS", "0");
+    }
+    let spawned = command.spawn();
 
     let mut child = match spawned {
         Ok(c) => c,
