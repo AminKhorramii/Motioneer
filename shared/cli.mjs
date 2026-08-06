@@ -34,6 +34,37 @@ export const DESIGN_MODEL = () =>
   (typeof process !== 'undefined' ? process.env?.WALL_DESIGN_MODEL : '') || CLI_MODEL()
 
 /**
+ * How many of these may run at once.
+ *
+ * Every call is a whole CLI session, not a request, and a wall wants eleven or more of them
+ * within a few seconds: the designs, then a page for each world as it lands. Measured with no
+ * limit, a wall peaked at thirteen concurrent sessions, took 373s, left one straggler running
+ * alone for two minutes after everything else had finished, and lost a page to a session that
+ * exited without a reply. The work was not the problem. The contention was.
+ *
+ * So they queue. A call that has to wait its turn starts later and finishes sooner than one that
+ * starts immediately and then fights for the machine.
+ */
+const MAX_AT_ONCE = Number(
+  (typeof process !== 'undefined' ? process.env?.WALL_MAX_CALLS : '') || 5,
+)
+let running = 0
+const waiting = []
+function take() {
+  if (running < MAX_AT_ONCE) {
+    running += 1
+    return Promise.resolve()
+  }
+  return new Promise((go) => waiting.push(go))
+}
+function give() {
+  const next = waiting.shift()
+  // the slot passes straight to whoever is next rather than being released and retaken
+  if (!next) running -= 1
+  else next()
+}
+
+/**
  * Run it, optionally handing back every delta as it arrives.
  *
  * Streaming matters more here than it looks. Designing eight worlds takes about fifty seconds,
@@ -50,8 +81,9 @@ export const DESIGN_MODEL = () =>
  * ours to show, but the fact of it is, so it goes to a separate callback that never touches the
  * reply.
  */
-export function runClaude(system, user, { model = CLI_MODEL(), bin = 'claude', onDelta, onThink } = {}) {
+export async function runClaude(system, user, { model = CLI_MODEL(), bin = 'claude', onDelta, onThink } = {}) {
   const streaming = typeof onDelta === 'function'
+  await take()
   return new Promise((resolve) => {
     const child = spawn(
       bin,
@@ -87,6 +119,14 @@ export function runClaude(system, user, { model = CLI_MODEL(), bin = 'claude', o
         env: process.env.WALL_FAST ? { ...process.env, MAX_THINKING_TOKENS: '0' } : process.env,
       },
     )
+    // whichever way this ends, the next call in the queue gets the slot
+    let ended = false
+    const done = (result) => {
+      if (ended) return
+      ended = true
+      give()
+      resolve(result)
+    }
     let out = ''
     let err = ''
     let text = ''
@@ -122,7 +162,7 @@ export function runClaude(system, user, { model = CLI_MODEL(), bin = 'claude', o
     })
     child.stderr.on('data', (d) => (err += d))
     child.on('error', (e) =>
-      resolve({
+      done({
         error:
           e.code === 'ENOENT'
             ? 'the claude command was not found on this machine'
@@ -131,14 +171,14 @@ export function runClaude(system, user, { model = CLI_MODEL(), bin = 'claude', o
     )
     child.on('close', () => {
       if (streaming) {
-        return resolve(text ? { text } : { error: (err || 'no reply').slice(0, 200) })
+        return done(text ? { text } : { error: (err || 'no reply').slice(0, 200) })
       }
       try {
         const j = JSON.parse(out)
-        if (j.is_error) return resolve({ error: String(j.result ?? 'the session returned an error').slice(0, 200) })
-        return resolve({ text: String(j.result ?? '') })
+        if (j.is_error) return done({ error: String(j.result ?? 'the session returned an error').slice(0, 200) })
+        return done({ text: String(j.result ?? '') })
       } catch {
-        return resolve({ error: (err || out || 'no reply').slice(0, 200) })
+        return done({ error: (err || out || 'no reply').slice(0, 200) })
       }
     })
     child.stdin.end(user)

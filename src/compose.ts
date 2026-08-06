@@ -473,6 +473,41 @@ export async function promptPage(
  * clamped on the way in, so a model can be daring without being able to produce an unreadable
  * page, and the built in worlds remain the fallback when the call fails.
  */
+/**
+ * Somewhere for each call to look, since none of them can see the others.
+ *
+ * Splitting the design across concurrent calls is what makes it fast, but a call that only knows
+ * the brief reaches for the same objects as its neighbours: eight independent calls came back
+ * with a betting slip twice and four names built on the word closing. Naming a territory each is
+ * enough to keep them apart, and it costs nothing, because the prompt was already listing
+ * examples and these are the same kind of thing.
+ */
+const TERRITORIES = [
+  'a receipt, a cloakroom ticket or a parking stub',
+  'a betting slip, a form guide or a lottery ticket',
+  'a departures board, a platform indicator or a bus timetable',
+  'a tide table, a fire exit plan or a weather chart',
+  'a hospital chart, a lab notebook or a prescription',
+  'a ledger, an inventory card or a library index drawer',
+  'a concert poster, a theatre programme or a banner over a street',
+  'a museum wall label, a vitrine card or a broadsheet front page',
+]
+
+/**
+ * How many worlds one call designs.
+ *
+ * Thinking is priced in seconds and scales with how much is being decided at once, so this is
+ * the single biggest lever on how long a wall takes. Measured on the same brief, eight worlds
+ * either way: one call took 166s to the first world and 232s to the last; four calls of two took
+ * 57s and 118s; eight calls of one took 42s and 106s.
+ *
+ * Two rather than one, because splitting further stops paying. The gap between four calls and
+ * eight is inside the run-to-run noise, and a call designing two is told to make its pair far
+ * apart, where a call designing one has nothing to be far apart from. That instruction is worth
+ * more than the seconds it costs.
+ */
+const PER_HAND = 2
+
 export async function promptWorlds(
   product: Product,
   n: number,
@@ -487,39 +522,52 @@ export async function promptWorlds(
     const fromMock = (out?.worlds ?? []).map(madeWorld).filter((w) => w.name)
     return fromMock.length >= 2 ? fromMock : WORLDS
   }
-  // A world is complete long before the reply is, and the page for it can start then. Half of
-  // the fifty seconds this call takes is the model thinking before it writes anything, so
-  // reading the rest as it arrives is what turns one long wait into eight overlapping ones.
-  let buf = ''
-  let cursor = 0
+  // A world is complete long before the reply is, and the page for it can start then, which is
+  // what turns one long wait into eight overlapping ones.
+  const brief = `Product: ${product.name}. ${product.oneLiner}\n${product.what}\nAudience: ${product.audience}`
+  // the index is shared, so a world takes the next free page whichever call finished it
   let seen = 0
-  const feed = onWorld
-    ? (delta: string) => {
-        // an empty delta is a beat rather than words: the call is alive and has written nothing
-        if (!delta) return onThinking?.()
-        buf += delta
-        if (!delta.includes('}')) return
-        const scan = scanSections(buf, cursor, '"worlds"')
-        cursor = scan.cursor
-        for (const raw of scan.out) {
-          onWorld(madeWorld(raw as unknown as Record<string, unknown>, seen), seen)
-          seen += 1
+
+  const hand = async (count: number, ground: string[]) => {
+    let buf = ''
+    let cursor = 0
+    const feed = onWorld
+      ? (delta: string) => {
+          // an empty delta is a beat rather than words: the call is alive and has written nothing
+          if (!delta) return onThinking?.()
+          buf += delta
+          if (!delta.includes('}')) return
+          const scan = scanSections(buf, cursor, '"worlds"')
+          cursor = scan.cursor
+          for (const raw of scan.out) {
+            // the wall has n places and every world that lands takes one, so a call that answers
+            // with more than it was asked for cannot start a ninth page
+            if (seen >= n) return
+            onWorld(madeWorld(raw as unknown as Record<string, unknown>, seen), seen)
+            seen += 1
+          }
         }
-      }
-    : undefined
-  const text = await ask(
-    provider,
-    WORLDS_SYSTEM,
-    `Product: ${product.name}. ${product.oneLiner}\n${product.what}\nAudience: ${product.audience}\n\nDesign ${n} worlds for it.`,
-    feed,
-    { maxTokens: 24000, kind: 'design' },
-  ).catch(() => null)
-  // A world carries CSS now, so eight of them is a long reply and a cut one used to yield
-  // nothing at all. The same walk that recovers half-arrived sections recovers half-arrived
-  // worlds, so a truncated design still gives whatever finished.
-  const json = text ? (grabJson(text) as { worlds?: Record<string, unknown>[] } | null) : null
-  const raw = json?.worlds ?? (text ? (scanSections(text, 0, '"worlds"').out as unknown as Record<string, unknown>[]) : [])
-  const made = raw.map(madeWorld).filter((w) => w.name)
+      : undefined
+    const text = await ask(
+      provider,
+      // the territory goes last so the long shared prompt in front of it still caches
+      `${WORLDS_SYSTEM}\n\nBuild these particular ones from ${ground.join(', or ')}. One object each.`,
+      `${brief}\n\nDesign ${count} worlds for it.`,
+      feed,
+      { maxTokens: 8000, kind: 'design' },
+    ).catch(() => null)
+    // A world carries CSS, so a cut reply used to yield nothing at all. The same walk that
+    // recovers half-arrived sections recovers half-arrived worlds.
+    const json = text ? (grabJson(text) as { worlds?: Record<string, unknown>[] } | null) : null
+    return json?.worlds ?? (text ? (scanSections(text, 0, '"worlds"').out as unknown as Record<string, unknown>[]) : [])
+  }
+
+  const hands = Array.from({ length: Math.ceil(n / PER_HAND) }, (_, k) => {
+    const count = Math.min(PER_HAND, n - k * PER_HAND)
+    return hand(count, TERRITORIES.slice(k * PER_HAND, k * PER_HAND + count))
+  })
+  const raw = (await Promise.all(hands)).flat()
+  const made = raw.map(madeWorld).filter((w) => w.name).slice(0, n)
   return made.length >= 2 ? made : WORLDS
 }
 
