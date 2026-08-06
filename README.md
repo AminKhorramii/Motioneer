@@ -1,6 +1,6 @@
 # Wall
 
-**Twelve landing pages, then one.**
+**Choose the feeling you like.**
 
 [![npm](https://img.shields.io/npm/v/wall-mcp?logo=npm&color=cb3837)](https://www.npmjs.com/package/wall-mcp)
 [![MCP](https://img.shields.io/badge/MCP-server-111?logo=claude&logoColor=D97757)](https://modelcontextprotocol.io)
