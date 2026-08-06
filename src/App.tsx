@@ -6,7 +6,7 @@ import { renderPage } from '@/render'
 import { pageBrief } from '@/brief'
 import { slop } from '@/slop'
 import {
-  EMPTY_PRODUCT, addSection, alternatives, arrange, readBrief, canDraw, canWrite, choose, chosen, promptWorlds, setDesigned, cycleForm, cycleWorld, dropSection, writeOne, illustrate, loadHeldKeys, loadKeys, promptPage, sectionAlternatives, seeded, setMock, type Product,
+  EMPTY_PRODUCT, addSection, alternatives, arrangeIn, readBrief, canDraw, canWrite, choose, chosen, promptWorlds, setDesigned, cycleForm, cycleWorld, dropSection, writeOne, illustrate, loadHeldKeys, loadKeys, promptPage, sectionAlternatives, seeded, setMock, type Product,
 } from '@/compose'
 import { Onboarding } from '@/Onboarding'
 import { BriefRail } from '@/BriefRail'
@@ -30,6 +30,18 @@ export default function App() {
   const [busy, setBusy] = useState('')
   /** null when nothing is being built, otherwise how far along the wall is */
   const [building, setBuilding] = useState<{ arrived: number | null; landed: string[]; thoughts: number } | null>(null)
+  /**
+   * Which papers are still the locally arranged stand-in rather than a written page.
+   *
+   * The wall used to be empty for the whole design call, which is about a minute of a skeleton
+   * before the first paper, because a page nobody had written looked finished until you read it.
+   * The answer to that is to say so rather than to show nothing: eight real pages are up
+   * immediately, each one marked, and each is replaced where it stands as its design and then
+   * its words arrive.
+   */
+  const [drafts, setDrafts] = useState<ReadonlySet<string>>(new Set())
+  /** which paper holds each of the eight places, so a slot can be upgraded rather than appended */
+  const slots = useRef<string[]>([])
   const [toast, setToast] = useState('')
   const [view, setView] = useState<'studio' | 'wall'>('studio')
   const [briefOpen, setBriefOpen] = useState(false)
@@ -103,16 +115,24 @@ export default function App() {
     // a new wall is a new triage
     graveyard.current = []
     buried.current.clear()
-    // the base page is kept so there is something to compare against, but it is not shown
-    // while the wall is being made: an unwritten page looks like a finished one until you read
-    // it, and the skeleton says plainly that nothing has arrived
-    setPages([arrange(base, 0)])
+    // The wall is real before the model has answered anything. These eight are arranged from
+    // the built-in worlds against the copy the brief already seeded, so there is something to
+    // compare, scroll and open from the first frame, and each one is marked as a draft so it
+    // is not mistaken for a written page. Every place it takes is a place a written page will
+    // land in, so the wall improves where it stands instead of appearing all at once.
+    // nine: the page as it was given, which stays as the thing to compare against, and eight
+    // places that each hold a draft until the written page for that place arrives
+    const first = alternatives(base, 9)
+    slots.current = first.slice(1).map((x) => x.id)
+    setPages(first)
+    setDrafts(new Set(slots.current))
     setAt(0)
     // a served deployment answers which keys it holds asynchronously, and someone clicking
     // straight through setup can arrive here before that answer does
     if (!canWrite()) await loadHeldKeys()
     if (!canWrite()) {
-      setPages(alternatives(base, 8))
+      // nothing more is coming, so these are the finished pages rather than stand-ins
+      setDrafts(new Set())
       return
     }
     // Each page starts the moment its own world is finished, rather than when the whole design
@@ -123,10 +143,32 @@ export default function App() {
     const jobs: Promise<{ ok: number; error?: string }>[] = []
     const started: World[] = []
 
-    const arrived = (page: Page) => {
+    /**
+     * Put a paper in its own place on the wall.
+     *
+     * A written page arrives with an id of its own, so the first time one lands for a slot it
+     * takes over from the draft standing there rather than being appended beside it. That is
+     * what makes the wall improve in front of you instead of growing to sixteen papers.
+     */
+    const land = (page: Page, i: number) => {
       if (run.current !== mine) return
-      // step onto the first written page, so the wall is never showing the unwritten one
-      setAt((v) => (v === 0 ? 1 : v))
+      const held = slots.current[i]
+      if (held && held !== page.id) {
+        // a draft turned away during triage turns away the page that was being written for it,
+        // or the wall would grow back the one place the reader just took off it
+        if (buried.current.has(held)) {
+          buried.current.add(page.id)
+          return
+        }
+        slots.current[i] = page.id
+        setPages((all) => all.map((x) => (x.id === held ? page : x)))
+        setDrafts((d) => {
+          const next = new Set(d)
+          next.delete(held)
+          return next
+        })
+        return
+      }
       upsertPage(page)
     }
 
@@ -134,9 +176,15 @@ export default function App() {
       if (run.current !== mine || started[i]) return
       started[i] = world
       registerWorlds([world])
+      // The design is worth showing before the words are. A world is finished several seconds
+      // before the page written in it, and restyling the draft in place the moment it lands
+      // means the wall visibly turns into the designed one while the copy is still being
+      // written, rather than staying still until a whole page is ready.
+      const held = slots.current[i]
+      if (held) upsertPage({ ...arrangeIn(base, i + 1, world), id: held })
       setBuilding((b) => ({ arrived: jobs.length + 1, landed: started.filter(Boolean).map((w) => w.name), thoughts: b?.thoughts ?? 0 }))
       setBusy('writing')
-      jobs.push(writeOne(base, p, world, i, arrived))
+      jobs.push(writeOne(base, p, world, i, (page) => land(page, i)))
     }
 
     // every beat is the model proving it is still thinking, which is the only thing there is to
@@ -159,8 +207,9 @@ export default function App() {
     if (run.current !== mine) return
     setBusy('')
     setBuilding(null)
+    // nothing else is coming, so whatever is still standing is the finished page
+    setDrafts(new Set())
     if (!written) {
-      setPages(alternatives(base, 8))
       flash(error ? `The model call failed: ${error}` : 'No copy came back, so the wall is arranged locally instead.')
     } else {
       flash(
@@ -440,7 +489,16 @@ export default function App() {
         </div>
       </header>
 
-      {busy && !building && <p className="busy">{busy}</p>}
+      {/* the wall is up from the first frame, so the progress is a line rather than a screen.
+          It still has to prove the model is alive: the design call spends about fifty seconds
+          thinking before it writes a character, and a minute of silence reads as a hang */}
+      {busy && (
+        <p className="busy">
+          {building
+            ? `${busy}, ${building.landed.length} of 8 designed${building.thoughts ? `, ${building.thoughts} beats` : ''}`
+            : busy}
+        </p>
+      )}
 
       <div className="body">
         {briefOpen && (
@@ -523,6 +581,7 @@ export default function App() {
           <main className="grid">
             {pages.map((p, i) => (
               <Cell key={p.id} page={p} title={product.name} current={i === at}
+                draft={drafts.has(p.id)}
                 canCull={!p.pinned && pages.length > 1}
                 onOpen={() => { setAt(i); setView('studio') }}
                 onCull={() => kill(i)} />
@@ -569,8 +628,8 @@ const Aside = memo(function Aside({ page, title }: { page: Page; title: string }
 })
 
 /** One grid cell: still page, frozen backdrop, verdict computed once per page object. */
-const Cell = memo(function Cell({ page, title, current, canCull, onOpen, onCull }: {
-  page: Page; title: string; current: boolean; canCull: boolean
+const Cell = memo(function Cell({ page, title, current, draft, canCull, onOpen, onCull }: {
+  page: Page; title: string; current: boolean; draft: boolean; canCull: boolean
   onOpen: () => void; onCull: () => void
 }) {
   const cellHtml = useMemo(() => renderPage(page, { title, still: true }), [page, title])
@@ -590,17 +649,22 @@ const Cell = memo(function Cell({ page, title, current, canCull, onOpen, onCull 
       <div className="cellbar">
         <span className="arch">{page.sections.filter((s) => s.on).length} sections</span>
         <span className="tname">{page.taste.name}</span>
-        <span className={verdict.length ? 'flags' : 'flags ok'}
+        {/* a page nobody has written yet looks finished until you read it, so it says which
+            it is rather than borrowing the confidence of a written one */}
+        {draft
+          ? <span className="flags" title="arranged here from a built-in world while the model designs and writes this one. It will be replaced in place.">drafting</span>
+          : <span className={verdict.length ? 'flags' : 'flags ok'}
           title={verdict.length
             ? verdict.map((f) => `${f.label}. ${f.why}`).join('\n')
             : 'none of the catalogued generic patterns'}>
           {verdict.length ? `${verdict.length} generic` : 'clean'}
-        </span>
+        </span>}
         {page.pinned && <span className="kept">pinned</span>}
       </div>
     </div>
   )
-}, (a, b) => a.page === b.page && a.title === b.title && a.current === b.current && a.canCull === b.canCull)
+}, (a, b) => a.page === b.page && a.title === b.title && a.current === b.current
+  && a.canCull === b.canCull && a.draft === b.draft)
 
 function Preview({ html }: { html: string }) {
   const box = useRef<HTMLDivElement>(null)
