@@ -22,14 +22,11 @@ interface Props {
   /** null while designing, otherwise how many pages have arrived */
   arrived: number | null
   total: number
-  /** the worlds that have landed so far, newest last */
-  landed: string[]
   /** beats from the model while it thinks, before it has written anything anyone can read */
   thoughts: number
-  model: string
 }
 
-export function Building({ arrived, total, landed, thoughts, model }: Props) {
+export function Building({ arrived, total, thoughts }: Props) {
   // the timer still runs, but only to count seconds: nothing on screen moves without a reason
   const [, setTick] = useState(0)
   /**
@@ -50,15 +47,6 @@ export function Building({ arrived, total, landed, thoughts, model }: Props) {
   }, [since])
 
   const designing = arrived === null
-  const line = designing
-    ? thoughts
-      // it is deciding all eight together, and which part it is on is not something the stream
-      // says, so this says the true general thing rather than a specific invented one
-      ? `${model} is working out eight different ways to build this.`
-      : 'Reading your brief.'
-    : landed.length
-      ? `${landed[landed.length - 1]}, and ${total - (arrived ?? 0)} still coming.`
-      : `${model} is writing the first page.`
 
   return (
     <div className="building">
@@ -77,7 +65,6 @@ export function Building({ arrived, total, landed, thoughts, model }: Props) {
             <span key={i} className={i < (arrived ?? 0) ? 'slot on' : 'slot'} />
           ))}
         </div>
-        <p className="line">{line}</p>
         <p className="elapsed">
           {/* one mark that moves only when the call moves. It is the difference between a page
               that is waiting and a page that has stopped, and nothing else on screen can say it. */}

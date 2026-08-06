@@ -524,8 +524,7 @@ export default function App() {
 
         {view === 'studio' && building && pages.length < 2 && (
           <main className="stage">
-            <Building arrived={building.arrived} total={8} landed={building.landed} thoughts={building.thoughts}
-              model={chosen().label} />
+            <Building arrived={building.arrived} total={8} thoughts={building.thoughts} />
           </main>
         )}
 
