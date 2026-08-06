@@ -5,7 +5,7 @@
     "type": "git",
     "url": "git+https://github.com/AminKhorramii/Wall.git"
   },
-  "version": "0.1.0",
+  "version": "0.1.1",
   "scripts": {
     "build": "tsc -b && vite build && vite build --ssr src/core.ts --outDir dist-core",
     "app": "PATH=\"$HOME/.cargo/bin:$PATH\" tauri dev",
