@@ -8,17 +8,17 @@
  * declared and then never answered.
  *
  * All three are text, so none of them needs a window. What a window would prove is covered
- * elsewhere: the app itself by verify.mjs in a real browser against the same dist this shell
+ * elsewhere: the app itself by verify/app.mjs in a real browser against the same dist this shell
  * loads, and the commands only a desktop can answer by the Rust suite in src-tauri.
  *
- * Run: node verify-tauri.mjs
+ * Run: node verify/tauri.mjs
  */
 
 import { readFileSync, existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const ROOT = path.dirname(fileURLToPath(import.meta.url))
+const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 const read = (p) => readFileSync(path.join(ROOT, p), 'utf8')
 
 let failed = 0

@@ -15,7 +15,7 @@ import { spawn } from 'node:child_process'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 
-const ROOT = path.dirname(new URL(import.meta.url).pathname)
+const ROOT = path.join(path.dirname(new URL(import.meta.url).pathname), '..')
 const dir = process.env.WALL_TRY_DIR ?? path.join(ROOT, '.try')
 const at = path.join(dir, '.wall')
 const brief =

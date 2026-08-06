@@ -40,7 +40,7 @@ process.stdin.resume()
 )
 chmodSync(bin, 0o755)
 
-const server = spawn('node', [path.join(import.meta.dirname, 'server', 'index.mjs')], {
+const server = spawn('node', [path.join(import.meta.dirname, '..', 'server', 'index.mjs')], {
   env: { ...process.env, PORT: '0', PATH: `${dir}:${process.env.PATH}` },
   stdio: ['ignore', 'pipe', 'inherit'],
 })

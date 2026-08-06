@@ -6,9 +6,9 @@
  * point: once captured, `npm run verify:stream` replays it forever without a key and without
  * spending tokens, so the streaming path stays covered on every change.
  *
- * Run: WALL_KEY=$(cat ~/.wall-test-key) node capture.mjs
+ * Run: WALL_KEY=$(cat ~/.wall-test-key) node tools/capture.mjs
  */
-import { openApp } from './harness.mjs'
+import { openApp } from '../verify/harness.mjs'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'

@@ -4,10 +4,11 @@
  * It used to launch Electron, which made the one shell that could be driven also the only shell
  * under test. It now opens the built dist the way any visitor does, so the suite proves the app
  * rather than a shell, and the desktop shells are checked for agreement with it separately:
- * verify-tauri.mjs statically, and the Rust suite for the commands only a desktop can answer.
+ * verify/tauri.mjs statically, and the Rust suite for the commands only a desktop can answer.
  */
 import { readFile } from 'node:fs/promises'
 import { openApp, useMock } from './harness.mjs'
+import { checkLayout } from './layout.mjs'
 
 const OUT = process.env.OUT ?? '/tmp'
 const REAL = (process.env.WALL_KEY ?? '').trim()
@@ -17,7 +18,7 @@ const REAL = (process.env.WALL_KEY ?? '').trim()
 // detector polices model output everywhere else, so the pages Wall itself designs must pass
 // it, or the suite fails before a browser opens. This is the only intervention shown to
 // reduce slop: written guidance increases it, mechanical gates reverse it.
-const core = await import('./dist-core/core.js')
+const core = await import('../dist-core/core.js')
 const houseFlags = []
 for (const w of core.WORLDS) {
   for (const look of core.PRESETS) {
@@ -40,6 +41,11 @@ for (const w of core.WORLDS) {
 }
 console.log('house pages:', JSON.stringify(houseFlags.length ? houseFlags.slice(0, 8) : 'clean, every world on every look'))
 if (houseFlags.length) throw new Error(`the house trips its own detector on ${houseFlags.length} pages`)
+
+// ——— 0a. the block library reaches the page, and the geometry holds ———
+// Both gates live in verify/layout.mjs, because they measure rendered pages rather than drive
+// the app, and they are worth running alone while a block is being changed.
+await checkLayout(core)
 
 const { page, errors, close } = await openApp()
 
@@ -101,11 +107,11 @@ await page.waitForFunction(() => /of 9$/.test(document.querySelector('.filmbar s
 clearInterval(watch)
 // A mock answers faster than this can sample, so an empty result here means the sampler missed
 // rather than that nothing arrived progressively. Say which, because a check that reports
-// nothing and reads as a pass is worse than no check. verify-stream.mjs proves arrival properly,
+// nothing and reads as a pass is worse than no check. verify/stream.mjs proves arrival properly,
 // against a real stream replayed at its recorded pace.
 const samples = [...new Set(growth.filter(Boolean))]
 console.log('streamed in:', JSON.stringify(
-  samples.length ? { samples } : { samples: [], note: 'too fast to sample under the mock, see verify-stream' },
+  samples.length ? { samples } : { samples: [], note: 'too fast to sample under the mock, see verify/stream' },
 ))
 // every paper must be its own written page, so headlines have to differ across the wall
 const wall = await page.evaluate(async () => {

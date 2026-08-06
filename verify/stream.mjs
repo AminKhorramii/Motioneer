@@ -19,7 +19,7 @@ const { server, url, fixtures } = await fakeAnthropic(corpus)
 // both wire formats, before anything else: the anthropic frames and the openai frames differ
 // in shape and in how they end, and every open weight vendor speaks the second one
 globalThis.WALL_API_BASE = url
-const { streamText } = await import('./shared/providers.mjs')
+const { streamText } = await import('../shared/providers.mjs')
 const shapes = {}
 for (const provider of ['anthropic', 'openai']) {
   let deltas = 0
@@ -43,14 +43,22 @@ await page.evaluate(() => [...document.querySelectorAll('.onboard .pick')]
   .find((b) => b.getAttribute('aria-label') === 'Claude')?.click())
 await page.click('.onboard .primary')
 await page.waitForSelector('.sample', { timeout: 10000 })
+const asked = Date.now()
 await page.click('.sample')
 await page.waitForSelector('.paper.here', { timeout: 20000 })
+// the wall is arranged locally the instant it is asked for, so this is milliseconds rather
+// than the minute the design call takes, and it is the number worth watching for regressions
+const firstPaperMs = Date.now() - asked
 
-// the claim under test: papers arrive during the run, not all at the end
+// The claim under test: the wall arrives during the run rather than all at the end. It used
+// to be measured by counting papers, which stopped meaning anything once the wall is real from
+// the first frame and improves in place: the count is nine immediately and stays there. What
+// still has to grow is how much of it has been designed and written, which the progress line
+// reports, so that is what is sampled.
 const seen = []
 const watch = setInterval(async () => {
   try {
-    seen.push(await page.evaluate(() => document.querySelectorAll('.paper').length))
+    seen.push(await page.evaluate(() => document.querySelector('.busy')?.textContent ?? ''))
   } catch (e) { if (!errors.length) errors.push('sampler: ' + String(e).slice(0, 160)) }
 }, 25)
 // wait for the fan-out itself to finish rather than for a paper count, because a truncated
@@ -60,11 +68,13 @@ clearInterval(watch)
 // let the last papers commit before walking them, or the walk reads one paper nine times
 await page.waitForTimeout(600)
 
-const counts = [...new Set(seen)].sort((a, b) => a - b)
+const states = [...new Set(seen.filter(Boolean))]
+const designed = states.map((x) => Number(/(\d+) of 8 designed/.exec(x)?.[1] ?? -1)).filter((n) => n >= 0)
 console.log('wall filled progressively:', JSON.stringify({
-  distinctPaperCounts: counts,
-  grewOverTime: counts.length > 1,
-  neverExceededNine: Math.max(...seen) <= 9,
+  // there is a wall to look at before the model has answered anything
+  papersFromTheFirstFrame: firstPaperMs,
+  progressStates: states.length,
+  reachedAllEight: designed.includes(8),
 }))
 
 const wall = await page.evaluate(async () => {

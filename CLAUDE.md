@@ -19,12 +19,12 @@ carries it, and `docs/architecture.md` for the module map.
   reason. The suite asserts this against the onboarding card.
 - Code: keep logic in the file that owns the data it reads, keep every file far from 1k
   lines, and prefer deleting complexity to rearranging it.
-- The house obeys its own detector: `verify.mjs` renders every built-in world on every look
+- The house obeys its own detector: `verify/app.mjs` renders every built-in world on every look
   and fails if Wall's own output trips the slop catalogue.
 
 ## Before pushing
 
-Run `npm run build && node verify.mjs` at minimum; run `verify:stream` when the model path
+Run `npm run build && node verify/app.mjs` at minimum; run `verify:stream` when the model path
 or renderer changed, and `verify:oneline` when the handoff format changed. Commit straight
 to master with a one-line sentence subject that says why, not what. No pull requests.
 

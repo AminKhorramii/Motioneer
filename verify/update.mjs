@@ -8,7 +8,7 @@
  * that strands the README's one line, a directory the files list forgot, a hardcoded version
  * nobody bumps, or a cached index.html pointing at assets a redeploy removed.
  *
- * Run: node verify-update.mjs   (the server checks read the built dist)
+ * Run: node verify/update.mjs   (the server checks read the built dist)
  */
 
 import { spawn, execFileSync } from 'node:child_process'
@@ -16,7 +16,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const ROOT = path.dirname(fileURLToPath(import.meta.url))
+const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 const pkg = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8'))
 
 let failed = 0

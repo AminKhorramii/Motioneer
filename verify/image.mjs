@@ -5,7 +5,7 @@
  * and what a fresh clone has. The input is built here with zlib rather than loaded from a
  * fixture, so the suite has nothing to keep in sync and no binary to explain.
  *
- * Run: node verify-image.mjs
+ * Run: node verify/image.mjs
  */
 
 import { deflateSync } from 'node:zlib'
@@ -96,7 +96,7 @@ function jpegSize(buf) {
 
 // ——— the pipeline, loaded the way the app loads it ———
 
-const source = readFileSync(new URL('./src/imagewasm.ts', import.meta.url), 'utf8')
+const source = readFileSync(new URL('../src/imagewasm.ts', import.meta.url), 'utf8')
 const b64 = [...source.matchAll(/^\s*'([A-Za-z0-9+/=]+)',$/gm)].map((m) => m[1]).join('')
 ok(b64.length > 1000, 'the committed wasm is present', `${b64.length.toLocaleString()} base64 chars`)
 

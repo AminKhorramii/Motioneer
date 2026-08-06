@@ -1,5 +1,5 @@
 /** Screenshots into shots/, driven the same way every suite is driven. */
-import { openApp } from './harness.mjs'
+import { openApp } from '../verify/harness.mjs'
 const { page, close } = await openApp()
 await page.waitForSelector('.onboard .card')
 await page.waitForTimeout(700)

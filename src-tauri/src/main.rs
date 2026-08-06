@@ -11,8 +11,8 @@
 //! implementation in Rust would be the one thing the host boundary exists to prevent.
 //!
 //! Tauri has no WebDriver on macOS, so this shell cannot be driven by a suite. The app it loads
-//! is driven instead, by verify.mjs in a real browser against the same dist, and the commands
-//! only a desktop can answer are tested below. verify-tauri.mjs joins the two by checking
+//! is driven instead, by verify/app.mjs in a real browser against the same dist, and the commands
+//! only a desktop can answer are tested below. verify/tauri.mjs joins the two by checking
 //! statically that every command the page calls exists and is registered here.
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
@@ -260,7 +260,7 @@ fn handoff(dir: String, files: BTreeMap<String, String>) -> Handed {
 
 /// The commands a browser cannot answer, tested where they live.
 ///
-/// The UI half of the agent handoff is covered by verify-mcp.mjs, which drives the served build
+/// The UI half of the agent handoff is covered by verify/mcp.mjs, which drives the served build
 /// where the same flow runs over /api. This is the half that only exists here, and writing files
 /// is not a thing a window has to be open to do.
 #[cfg(test)]
