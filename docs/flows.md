@@ -199,7 +199,7 @@ taste never touches machinery and machinery never hides taste:
 The split rule for the slop catalogue: a tell that is a pattern lives in the data file; a
 tell that has to count or compare lives as code in the detector, because a counting
 mini-language would be harder to read than the count. Add a tell, add a world, add an angle,
-sharpen a prompt: each is one edit in one file, and the gate in `verify.mjs` re-judges the
+sharpen a prompt: each is one edit in one file, and the gate in `verify/app.mjs` re-judges the
 house on the next run.
 
 ---
@@ -297,7 +297,12 @@ injects a flag into the page it serves, and neither means the visitor brings the
 **Why Tauri, and what it does not change.** Electron shipped a whole browser, so the download was
 150 to 250MB; the Tauri build is a 5.9MB app and a 3.0MB dmg, which is 46 times smaller. Nothing
 got faster: the wall is model latency, and the compute path was already a hundredth of a frame. It
-is a distribution change, and it is worth it because the product's own pitch is a download.
+is a distribution change, and it matters for the day the desktop app ships, because a 200MB
+download is a decision and a 6MB one is not.
+
+What ships today asks for neither. An agent run opens the browser, since `npx` needs no toolchain
+and gives the operating system nothing to refuse to open, which is why Windows and Linux work
+without a build and why a run is never stale.
 
 The one thing it could have cost is the rule that `shared/providers.mjs` is the only model path.
 A Rust main process would mean the request shapes, the SSE splitting and the delta extraction
@@ -332,9 +337,9 @@ the picker.
 ## 9. Development flows
 
 ```
-npm run app            # the desktop app
-npm run app:bundle     # a real .app and dmg
-npm run web            # the Vite dev server
+npm run web            # the Vite dev server, what an agent run opens
+npm run app            # the desktop shell, not released yet
+npm run app:bundle     # a real .app and dmg, for when it is
 npm run serve          # the built app behind the server, with its own keys
 npm run build:core     # the headless core, for a shell with no DOM
 npm run build:wasm     # rebuild the image crate and inline it, needs Rust
@@ -394,7 +399,7 @@ suite runs on a fresh clone.
 ### Screenshots
 
 ```
-node shots.mjs         # into shots/, which is not committed
+node tools/shots.mjs   # into shots/, which is not committed
 ```
 
 `shots/` is generated output and stays out of the repo. The two images in `docs/images/` are

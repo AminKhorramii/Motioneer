@@ -1,10 +1,9 @@
-# WALL
+# Wall
 
 **Twelve landing pages, then one.**
 
 [![npm](https://img.shields.io/npm/v/wall-mcp?logo=npm&color=cb3837)](https://www.npmjs.com/package/wall-mcp)
 [![MCP](https://img.shields.io/badge/MCP-server-111?logo=claude&logoColor=D97757)](https://modelcontextprotocol.io)
-[![Tauri](https://img.shields.io/badge/desktop-Tauri-24C8D8?logo=tauri&logoColor=fff)](https://tauri.app)
 [![Node](https://img.shields.io/node/v/wall-mcp?logo=nodedotjs&logoColor=fff&color=5FA04E)](package.json)
 [![License](https://img.shields.io/npm/l/wall-mcp?color=blue)](LICENSE)
 
@@ -19,9 +18,12 @@ One line, nothing else to install:
 claude mcp add --scope user wall -- npx -y wall-mcp
 ```
 
-Ask for a landing page. Wall opens, you browse a wall of real pages, pick one, and the
-choice returns to your project as a **spec your agent implements in your own stack** —
-design tokens, structure, and copy, not a static file to port.
+Ask for a landing page. Wall opens in your browser, you browse a wall of real pages, pick
+one, and the choice returns to your project as a **spec your agent implements in your own
+stack** — design tokens, structure, and copy, not a static file to port.
+
+Nothing else to download: `npx` resolves the latest version on every run, so Windows and
+Linux work without a build and a run is never stale. A desktop app is coming.
 
 Three tools: `design` opens Wall and waits · `collect` reads a choice made after it
 stopped waiting · `check` names the patterns that make a page look generated.
@@ -30,9 +32,9 @@ stopped waiting · `check` names the patterns that make a page look generated.
 
 ```
 npm install
-npm run app     # desktop
-npm run web     # browser — same code, not a reduced copy
+npm run web     # browser — the same code the MCP server opens
 npm run serve   # self-hosted; ANTHROPIC_API_KEY stays on the server
+npm run app     # the desktop shell, not released yet
 ```
 
 Model keys are optional. Layouts, variants, and export all run locally with no key;
@@ -55,7 +57,8 @@ a key is used only for model-written copy, and it never leaves your machine.
   detection, design worlds, server deployment
 - [Flows](docs/flows.md) — every path through the app, and the code that carries it
 - [Architecture](docs/architecture.md) — the module map and the boundaries
-- [DESIGN.md](DESIGN.md) — the visual language
+- [Landing page prompt](docs/landing-page-prompt.md) — the brief for Wall's own page
+- [Original design doc](docs/design-original.md) — the first sketch, kept as a record
 
 Verify everything with `npm run verify:all` — real browsers, recorded streams, no key
 and no tokens spent.

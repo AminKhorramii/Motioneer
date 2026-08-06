@@ -30,11 +30,32 @@ src/
   imagewasm.ts  generated: the crate, inlined as base64
 
 shared/providers.mjs   one model path for every shell
-src-tauri/             the desktop app: a download, not a bundled browser
-harness.mjs            one way to open the app for a suite
+mcp/index.mjs          the three tools an agent calls, and how Wall is opened
+src-tauri/             the desktop shell, built but not released yet
 crates/wall-image/     decode, fit, flatten, re-encode. compiled to wasm
 server/index.mjs       serves dist and holds the keys
 fixtures/              recorded upstream streams, response bodies only
+
+verify/                the suites, in order of how much they prove
+  harness.mjs          one way to open the app for a suite
+  fake-upstream.mjs    a local vendor, replaying fixtures at their recorded pace
+  app.mjs              the app, mock model, and the house gate first
+  stream.mjs           the real streaming path, no mock anywhere
+  hard.mjs             an overgrown page, copy written to break the parser
+  beat.mjs             the heartbeat the server sends so a wait is not a hang
+  image.mjs            the image pipeline
+  mcp.mjs              the agent path end to end, protocol to handoff
+  server.mjs           the self hosted server, key never reaches the visitor
+  tauri.mjs            the desktop shell, checked without a window
+  oneline.mjs          the handoff format, and its format number
+  update.mjs           the update channel: publishable, complete, never stranded
+
+tools/                 run by hand or at author time, never at run time
+  try.mjs              the loop for working on Wall itself
+  capture.mjs          record real streams into fixtures/
+  shots.mjs            screenshots into shots/
+  fonts.mjs            generates src/typefaces.ts, committed
+  wasm.mjs             generates src/imagewasm.ts from the crate, committed
 ```
 
 ## The data model

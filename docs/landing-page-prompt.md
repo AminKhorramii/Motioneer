@@ -11,26 +11,36 @@ The older wording of twelve predates the code.
 
 ---
 
-# Build a landing page for WALL
+# Build a landing page for Wall
 
-You are designing and building a single page marketing site for a desktop app called WALL.
-Read every section below before writing code. The product facts are not negotiable; the design
-direction is, within the constraints given.
+You are designing and building a single page marketing site for Wall, a tool your coding agent
+calls. Read every section below before writing code. The product facts are not negotiable; the
+design direction is, within the constraints given.
 
 ## 1. What the product actually is
 
-WALL is a desktop app (Electron, also a plain web build and a self hosted server) for solo
-founders and builders who need a landing page.
+Wall is an MCP server. Your coding agent calls it, Wall opens in your browser, and the page you
+choose comes back to your project as a spec your agent implements. It installs in one line and
+there is nothing else to download:
+
+```
+claude mcp add --scope user wall -- npx -y wall-mcp
+```
+
+That one line is the product's entire install story, and the page should treat it as the primary
+action rather than burying it. A desktop app is coming, but it is not what ships today, so the
+page must not promise a download.
 
 **The one act: compare and choose.** Generating a landing page is solved. What nobody gives you
 is many pages at once, live, side by side. Design decisions are comparative. Art directors work
-from contact sheets. Founders get a chat window. WALL gives them the contact sheet.
+from contact sheets. Founders get a chat window. Wall gives them the contact sheet.
 
-You describe your product once. WALL writes eight complete landing pages in parallel, each
-arguing a different case for the product, each built in a different visual world, all of them
-real scrollable DOM rather than screenshots. They appear while the models are still writing. You
-scroll sideways through them, pick one, refine it, and export a single self contained
-`index.html` that you own.
+You ask your agent for a landing page. Wall writes eight complete pages in parallel, each arguing
+a different case for the product, each built in a different visual world, all of them real
+scrollable DOM rather than screenshots. They appear while the models are still writing. You
+scroll sideways through them and pick one. The choice returns to your project as design tokens,
+structure and copy, so your agent builds the page in your own stack rather than handing you a
+static file to port. You can also export a self contained `index.html` you own.
 
 ### The loop
 
@@ -70,7 +80,7 @@ scroll sideways through them, pick one, refine it, and export a single self cont
   grain, seeded from your palette so the art changes when the colours do. About 2KB inside the
   page. A generated hero image is the fastest way to look like every other page, and one image as
   a data URI outweighs the entire document.
-- **The taste sheet.** Pick a look, or drop a screenshot of a page you love and WALL reads the
+- **The taste sheet.** Pick a look, or drop a screenshot of a page you love and Wall reads the
   system out of it: background, ink, accents, contrast, turned into an editable contract with
   density, scale and radius knobs. "More like Linear, less like a template" becomes a spec
   instead of a wish.
@@ -79,9 +89,14 @@ scroll sideways through them, pick one, refine it, and export a single self cont
 - **Your choice of model.** Claude, Claude Haiku, GPT, Gemini Flash, GLM, DeepSeek, Qwen, Kimi,
   MiniMax, or any OpenAI compatible endpoint you point it at. The task is short JSON copy rather
   than code, so a small model does it well and cheaply.
-- **Three shells, one codebase.** Desktop over IPC, browser with localStorage and a Blob
-  download, or a self hosted server that holds the keys so they never reach a visitor's browser.
-  One file decides which. The web version is the desktop version, not a reduced copy.
+- **Nothing to install past the one line.** `npx` resolves the latest version on every run, so a
+  run is never stale and there is no toolchain and nothing for the operating system to refuse to
+  open. Windows and Linux work without a build.
+- **The spec is what travels, not the file.** The choice returns as tokens, structure and copy,
+  so the page is implemented in your stack rather than ported out of ours.
+- **One codebase behind it.** A browser today, a self hosted server that holds the keys so they
+  never reach a visitor, and a desktop app to come. One file decides which, so the shells are
+  three answers rather than three implementations.
 - **Cost, measured rather than estimated.** One wall is about 14,000 input and 16,000 output
   tokens and takes around 28 seconds.
 - **Copy a brief.** Any section or the whole page exports a markdown spec with the copy and the
@@ -97,9 +112,10 @@ sheet.
 
 Minimal. Long scroll, few sections, a lot of air. Every section earns its place.
 
-1. **Hero.** The full viewport. A single large headline, one supporting line, one primary
-   action, one secondary. Animated line field behind or through the type. Nothing else. No
-   eyebrow chip, no logo strip, no badge.
+1. **Hero.** The full viewport. A single large headline, one supporting line, and the install
+   line as the primary action: a copyable command, not a button that goes somewhere. One
+   secondary action at most. Animated line field behind or through the type. Nothing else. No
+   eyebrow chip, no logo strip, no badge. There is no download, so there is no download button.
 2. **The problem, in one line.** A single centred statement about comparison being how design
    decisions are made, and how everyone hands you a chat window instead. Type only, set large,
    with a lot of space around it.
@@ -110,13 +126,15 @@ Minimal. Long scroll, few sections, a lot of air. Every section earns its place.
    "the pain / swiss grid" or "the craft / terminal". Make the eight visibly different in type,
    density and colour, because the whole claim of the product is that they disagree.
 4. **How it works.** Three or four steps, set as a numbered sequence with hairline rules rather
-   than cards. Describe, compare, refine, ship.
+   than cards. Install the one line, ask your agent for a landing page, compare the eight and
+   pick one, your agent builds it in your stack.
 5. **Under the hood.** Four to six short items for the reader who is suspicious of AI tools:
    streaming that shows you pages while they are written, slop detection that runs before the
    prompt and not after, drawn backdrops instead of stock imagery, keys that stay on your
    machine, export as one file you own, works with no key at all.
-6. **Ship.** Show the export as a fact rather than a promise: one file, inlined CSS, no
-   framework, no runtime. A small code shaped block is allowed here.
+6. **The handoff.** Show what comes back as a fact rather than a promise: the spec your agent
+   receives, with tokens, structure and copy, and the self contained `index.html` underneath it,
+   inlined CSS, no framework, no runtime. A small code shaped block is allowed here.
 7. **Close.** One line, one action, a footer of two or three links. Nothing more.
 
 ## 3. Art direction
@@ -208,7 +226,7 @@ Follow the product's own house rules, because the page is a demonstration of the
   game changing.
 - No generic calls to action. "Get started" and "Learn more" are banned. Say what the button does.
 - No vague headlines. The headline should be falsifiable.
-- The page must pass the app's own slop detector. If you would flag it in WALL, do not ship it
+- The page must pass the app's own slop detector. If you would flag it in Wall, do not ship it
   here.
 
 Headline candidates, to steer voice rather than to be copied:

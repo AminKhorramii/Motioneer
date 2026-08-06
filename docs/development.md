@@ -3,6 +3,12 @@
 Everything here used to live in the README. It is the long-form record of how Wall is
 built, verified, and run; the README stays minimal on purpose.
 
+What ships today is the MCP server: an agent calls `design`, Wall opens in the browser, and
+the chosen page returns as a spec. The desktop shell is built and verified in this repo but
+is not released yet, so where these notes describe it, read them as how it works rather than
+as how anyone reaches it. The studio below is the same code either way, which is the point of
+the `host.ts` boundary.
+
 ## The look
 
 Linear/Framer discipline: **Inter Variable** bundled (offline, no CDN), hairlines instead
@@ -60,7 +66,7 @@ app's storage.
 ## House rules
 
 Copy follows the prompt-engineering skill: no all-caps, no em-dashes, no decorative
-symbols, and every instruction states its reason. `verify.mjs` asserts this against the
+symbols, and every instruction states its reason. `verify/app.mjs` asserts this against the
 onboarding card, so a regression fails the suite rather than shipping.
 
 Code follows the thermo-nuclear review skill. The model lives in `sections.ts`, HTML
@@ -79,8 +85,8 @@ above that boundary is the same code, so the web version is the desktop version 
 reduced copy.
 
 ```
-npm run app          # desktop
-npm run web          # web, at the Vite dev server
+npm run web          # web, at the Vite dev server, what an agent run opens
+npm run app          # the desktop shell, not released yet
 npm run verify       # the app, driven in a real browser
 npm run verify:tauri # the desktop shell, checked without a window
 ```
@@ -111,10 +117,10 @@ npm run verify:image   # the image pipeline
 npm run verify:mcp     # the MCP tools against the real server and desktop
 npm run verify:server  # the self-hosted server, key never reaches the visitor
 npm run verify:all     # everything
-node shots.mjs         # screenshots into shots/
+node tools/shots.mjs   # screenshots into shots/
 ```
 
-What `verify.mjs` (headless Chromium) asserts: the house gate first, every built-in world
+What `verify/app.mjs` (headless Chromium) asserts: the house gate first, every built-in world
 on every preset look rendered and failed if Wall's own output trips the slop catalogue ·
 onboarding, intake and the required-field gate · a nine paper wall with distinct headlines ·
 triage: pin survives x, remove, restore · slop chips with reasons on every grid cell · direct

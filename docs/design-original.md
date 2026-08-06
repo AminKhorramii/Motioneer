@@ -1,4 +1,11 @@
-# WALL — see twelve landing pages, pick one. Design document.
+# Wall — see twelve landing pages, pick one. Design document.
+
+> Superseded, kept as a record of what was thought on the day. Wall ships as an MCP server
+> your agent calls, the shell is Tauri rather than Electron, a wall is eight pages rather
+> than twelve, and the desktop app is still to come. For what is true now, read
+> [architecture](architecture.md), [flows](flows.md) and [development](development.md).
+> Nothing below has been edited, because a dated document that gets quietly corrected stops
+> being a record.
 
 *2026-08-03. Desktop (Electron). For solo founders shipping fast.*
 
@@ -8,7 +15,7 @@
 What nobody gives you is *many at once*, side by side, live — because design decisions are
 comparative. Art directors work from contact sheets; founders get a chat window.
 
-WALL's act: brief → **a wall of live variants** → pin, breed, refine → ship.
+Wall's act: brief → **a wall of live variants** → pin, breed, refine → ship.
 
 ## Load-bearing test
 
@@ -19,7 +26,7 @@ Remove the function → a wall of pages is meaningless. Passes.
 
 1. **The brief** — one paragraph about the product. (Or point at a repo/README and it
    drafts one you correct.)
-2. **The taste sheet** — drop screenshots or URLs of pages you love. WALL extracts a real,
+2. **The taste sheet** — drop screenshots or URLs of pages you love. Wall extracts a real,
    *editable* system: palette, type scale, spacing rhythm, density, radius, motion
    character. This is the contract everything is generated against — the GROND dictionary
    move applied to design. "More like Linear, less like a template" becomes a spec.
