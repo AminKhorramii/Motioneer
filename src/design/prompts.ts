@@ -28,7 +28,7 @@ name: two or three words, lowercase, naming the feeling rather than the techniqu
 note: one sentence on what it is, for a person choosing between them.
 voice: one sentence telling the writer how to write for it. A poster wants six words where a catalogue wants forty, and the copy is written from this line, so make it specific about length and register.
 display and body: one of sans, grotesk, serif, mono, fraunces, archivo. Only these six, because the page ships as a single file and anything else would fall back to something you did not choose. The first four are platform stacks and cost nothing. fraunces is a warm expressive serif and archivo a sturdy display grotesque, each carried inside the page at about 50KB, so spend one only where the type is the design.
-scale: 1.1 to 1.7. The ratio between heading sizes. Above 1.5 the headline dominates everything.
+scale: 1.1 to 1.7. The ratio between heading sizes, and the loudest difference between two pages seen side by side. At 1.1 the headline sits barely above the body and the page reads as a document; at 1.7 it fills the screen and everything else is a whisper. Both are right for the right idea. Six of eight worlds in a measured run came back between 1.15 and 1.3, which is a wall of one page wearing eight palettes, so put the two you are designing at least 0.3 apart and use the top of the range when the idea calls for it.
 weight: 300 to 800. 300 is thin and editorial, 800 is a poster shouting.
 radius: 0 to 24 pixels. 0 is architectural, 24 is friendly software.
 density: 0.25 to 0.9, where 0.25 is airy and 0.9 is packed.

@@ -4,6 +4,7 @@ import { PRESETS } from '@/design/presets'
 import type { Taste } from '@/taste'
 import { giveKey, host, isDesktop, isServed, servedProviders } from '@/host'
 import { slop, slopBrief } from '@/slop'
+import { dealDirections, directionSeed } from '@/design/directions'
 import { ANGLES } from '@/design/angles'
 import { INTAKE_SYSTEM, PAGE_SYSTEM, WORLDS_SYSTEM } from '@/design/prompts'
 import { MODELS, modelById } from '@/models'
@@ -68,9 +69,16 @@ export function arrange(base: Page, i: number, worlds: World[] = WORLDS): Page {
  * advances by a stride so the pairs do not move in lockstep, which is what makes a wall of
  * eight look like eight rather than like three repeated.
  */
+const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a)
+
 export function arrangeIn(base: Page, i: number, world: World): Page {
   const looks = [base.taste, ...PRESETS.filter((p) => p.name !== base.taste.name)]
-  const look = looks[((i - 1) * 3) % looks.length]
+  // The stride has to be coprime with the deck or the wall repeats. Three is coprime with the
+  // eight looks left after a preset is filtered out, but a taste read from a screenshot is not
+  // a preset name, nothing gets filtered, and three into nine visits only three of them: the
+  // wall came out as three looks repeated rather than eight.
+  const stride = [3, 4, 5, 2, 1].find((k) => gcd(k, looks.length) === 1) ?? 1
+  const look = looks[((i - 1) * stride) % looks.length]
   return { ...inWorld({ ...base, taste: look }, world), id: uid(), pinned: undefined }
 }
 
@@ -482,16 +490,17 @@ export async function promptPage(
  * enough to keep them apart, and it costs nothing, because the prompt was already listing
  * examples and these are the same kind of thing.
  */
-const TERRITORIES = [
-  'a receipt, a cloakroom ticket or a parking stub',
-  'a betting slip, a form guide or a lottery ticket',
-  'a departures board, a platform indicator or a bus timetable',
-  'a tide table, a fire exit plan or a weather chart',
-  'a hospital chart, a lab notebook or a prescription',
-  'a ledger, an inventory card or a library index drawer',
-  'a concert poster, a theatre programme or a banner over a street',
-  'a museum wall label, a vitrine card or a broadsheet front page',
-]
+/**
+ * The deck, dealt fresh each wall.
+ *
+ * These used to be eight strings written here and consumed in index order, so every wall for
+ * every product started from the same eight grounds, forever, and two runs of Wall produced two
+ * versions of the same eight worlds. The direction library has fifty of them, each carrying its
+ * chain of correlated decisions and the cliche it is prone to, and it was written for exactly
+ * this and then never wired up. Fifty shuffled beats eight fixed: a call handed a seed packet
+ * and a call handed a fire exit plan cannot converge, and the next wall draws different ones.
+ */
+const territories = (n: number) => dealDirections(n).map(directionSeed)
 
 /**
  * How many worlds one call designs.
@@ -562,9 +571,11 @@ export async function promptWorlds(
     return json?.worlds ?? (text ? (scanSections(text, 0, '"worlds"').out as unknown as Record<string, unknown>[]) : [])
   }
 
+  // one deal for the whole wall, so no two hands are handed the same ground
+  const deck = territories(n)
   const hands = Array.from({ length: Math.ceil(n / PER_HAND) }, (_, k) => {
     const count = Math.min(PER_HAND, n - k * PER_HAND)
-    return hand(count, TERRITORIES.slice(k * PER_HAND, k * PER_HAND + count))
+    return hand(count, deck.slice(k * PER_HAND, k * PER_HAND + count))
   })
   const raw = (await Promise.all(hands)).flat()
   const made = raw.map(madeWorld).filter((w) => w.name).slice(0, n)

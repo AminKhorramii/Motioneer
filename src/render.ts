@@ -28,12 +28,27 @@ function tokens(t: Taste) {
     surface: dark ? shift(t.bg, 10) : shift(t.bg, -6),
     line: alpha(t.ink, dark ? 0.13 : 0.11),
     s: (n: number) => `${(t.scale ** n).toFixed(2)}rem`,
+    /**
+     * A fluid size that answers to the taste sheet's scale.
+     *
+     * Display type used to be set as clamp(floor, <fixed>vw, scale^n). At the wall's 1280px the
+     * middle term is a constant, and it won for every scale at or above 1.30, so the headline,
+     * which is the loudest thing in a thumbnail, came out at exactly 77px for the whole top two
+     * thirds of the range the model was told it had. Eight worlds asking for eight different
+     * type scales rendered three sizes between them.
+     *
+     * The preferred term carries the scale now, and the ceiling bounds the exponent rather than
+     * doing the work. `at13` is the size this had at scale 1.30, so nothing renders differently
+     * for a world that was already sitting in the dead band.
+     */
+    fluid: (at13: number, capRem: number, floorRem: number) =>
+      `clamp(${floorRem}rem,${((at13 / 12.8) * (t.scale ** 3 / 1.3 ** 3)).toFixed(2)}vw,${capRem}rem)`,
     ease: t.motion === 'lively' ? 'cubic-bezier(.2,.9,.3,1.3)' : 'cubic-bezier(.25,.8,.3,1)',
   }
 }
 
 function head(t: Taste, title: string, editable: boolean, w: World, still: boolean) {
-  const { gap, surface, line, s, ease } = tokens(t)
+  const { gap, surface, line, s, fluid, ease } = tokens(t)
   // a bundled face rides inside the page, but only when this page actually wears it
   const faces = TYPEFACES.filter((f) => t.display.includes(f.family) || t.body.includes(f.family))
     .map((f) => `@font-face{font-family:'${f.family}';src:url(${f.dataUrl}) format('woff2-variations');font-weight:100 900;font-display:swap}`)
@@ -56,7 +71,7 @@ body{background:var(--bg);color:var(--ink);font-family:${t.body};font-size:16.5p
 line-height:${(1.45 + gap * 0.28).toFixed(2)};-webkit-font-smoothing:antialiased}
 a{color:inherit;text-decoration:none}
 h1,h2,h3{font-family:${t.display};font-weight:${t.weight};line-height:1.07;letter-spacing:-.022em}
-h1{font-size:clamp(2.3rem,6vw,${s(6)})}h2{font-size:clamp(1.5rem,3.2vw,${s(4)})}h3{font-size:${s(1)}}
+h1{font-size:${fluid(77, 11, 2.3)}}h2{font-size:${fluid(41, 6, 1.4)}}h3{font-size:${s(1)}}
 ${/* Type of two sizes cannot share one column. A measure right for 16px body is 11 characters
    of a 48px headline, which is where the headline stacked into a column of two-word lines: it
    was not the headline that was wrong, it was the column it had been given. Each register is
@@ -71,10 +86,10 @@ ${/* The frame and the blocks, from the library. Layout lives there as data so a
 ${blockCss()}
 ${/* what the taste sheet does to the blocks: the sizes and faces this page is set in */ ''}
 .lead{font-size:1.14rem}
-.display{font-size:clamp(2.6rem,7.4vw,5.2rem)}
-.mid{font-size:clamp(1.9rem,4.4vw,2.9rem)}
-.quote{font-size:clamp(1.7rem,3.8vw,2.7rem);line-height:1.22;color:var(--ink)}
-.quoted{font-size:clamp(1.5rem,3.4vw,2.2rem);color:var(--ink);font-family:${t.display};line-height:1.35}
+.display{font-size:${fluid(83, 13, 2.6)}}
+.mid{font-size:${fluid(46, 7, 1.9)}}
+.quote{font-size:${fluid(43, 6.5, 1.7)};line-height:1.22;color:var(--ink)}
+.quoted{font-size:${fluid(38, 5.5, 1.5)};color:var(--ink);font-family:${t.display};line-height:1.35}
 .price{font-family:${t.display};font-weight:${t.weight};color:var(--ink);
 font-size:clamp(2.6rem,6.6vw,4.4rem);font-variant-numeric:tabular-nums}
 .name{font-family:${t.display};font-weight:${t.weight};opacity:.65;font-size:1.05rem}
