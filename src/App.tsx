@@ -652,7 +652,7 @@ const Cell = memo(function Cell({ page, title, current, draft, canCull, onOpen, 
         {/* a page nobody has written yet looks finished until you read it, so it says which
             it is rather than borrowing the confidence of a written one */}
         {draft
-          ? <span className="flags" title="arranged here from a built-in world while the model designs and writes this one. It will be replaced in place.">drafting</span>
+          ? <span className="flags" title="a local stand-in until the written page lands here">drafting</span>
           : <span className={verdict.length ? 'flags' : 'flags ok'}
           title={verdict.length
             ? verdict.map((f) => `${f.label}. ${f.why}`).join('\n')
