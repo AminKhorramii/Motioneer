@@ -6,6 +6,7 @@
  */
 
 import { craftBrief } from '@/design/craft'
+import { blockContract } from '@/design/blocks'
 
 export const PAGE_SYSTEM = `You write copy for a whole landing page. You receive the page as JSON: an array of sections, each with an id, a role it plays in the argument, the form it is set in, and content. You also receive an instruction describing what to change.
 
@@ -40,21 +41,15 @@ structure.measure: 44 to 82 characters per line. This is the single biggest leve
 structure.figure: framed, bleed or plain.
 structure.rhythm: 4 to 8 padding multipliers between 0.4 and 3, cycled down the page, like [2.4, 0.8, 1.6, 0.6]. Adjacent sections must not breathe the same: a page with equal air everywhere reads as one treatment applied to all content, where a sparse beat against a dense one reads as paced.
 backdrop: none, contours, grain or ridge. Drawn behind the page from the palette.
-wear: which form each role of the argument takes, as {"claim":"statement","proof":"quote","substance":"list","offer":"table","objections":"prose","invitation":"band"}. The forms each role can wear: claim takes prose, marginalia, statement or transcript. proof takes quote, list or statement. substance takes list, figure, prose or table. offer takes table, statement, prose or transcript. objections takes list or prose. invitation takes band or statement. This is where a world speaks: a receipt prices in a table where a poster prices in one sentence, and the same argument comes out looking like a different page.
-sections: the argument of the page in order, as a list from claim, proof, substance, offer, objections, invitation, credits. Four to nine of them, repeats allowed, and a repeated role will be set in a different form the second time. This is the shape of the page and it is yours to decide: a receipt is substance and an offer, not proof and a pricing grid; a poster is a claim and an invitation; a field manual is mostly substance and objections. Leave out anything the idea does not need.
+wear: which form each role of the argument takes, as {"claim":"statement","proof":"quote","substance":"list","offer":"table","objections":"prose","invitation":"band"}. The forms each role can wear: claim takes prose, marginalia, statement or transcript. proof takes quote, list or statement. substance takes list, figure, prose or table. offer takes table, statement, prose or transcript. objections takes list or prose. invitation takes band or statement. This is where a world speaks: a receipt prices in a table where a poster prices in one sentence, and the same argument comes out looking like a different page. A role you argue twice may take a list of two forms, as "substance":["list","table"], and both are kept, so decide the second one rather than leaving it to be picked for you.
+sections: the argument of the page in order, as a list from claim, proof, substance, offer, objections, invitation, credits. Four to nine of them, repeats allowed. This is the shape of the page and it is yours to decide: a receipt is substance and an offer, not proof and a pricing grid; a poster is a claim and an invitation; a field manual is mostly substance and objections. Leave out anything the idea does not need.
 css: the part that matters most. Thirty to sixty lines of CSS that make the idea real, because the fields above can only change size and spacing, and no arrangement of them will make a page look like a receipt or a departures board. This is where you draw.
 
-The page you are styling is plain HTML with these hooks, and nothing else:
-  section[data-section] wraps every section and carries id="claim", "substance", "offer" and so on by role, plus data-form="statement", "table", "transcript" and so on, so you can style an argument or a form
-  .wrap is the column inside each section
-  h1 and h2 are the headings, p is body copy
-  .eyebrow is the small label above a headline
-  .ctas holds the actions, .btn-primary is the one real button and .link is the quiet one beside it
-  .card is a bordered block, .grid is a row of them
-  img sits inside a bordered figure
-These custom properties are already set from the palette and are the colours you should use: --bg, --ink, --dim, --accent, --accent2, --surface, --line, --r for radius, --gap for rhythm.
+${blockContract()}
 
-Write CSS that commits to the idea. A receipt has a narrow column, dashed rules, tabular figures and a torn edge. A departures board has slabs of solid colour, tight uppercase rows and hard shadows. A gallery card has enormous margins, one hairline and nothing else. Use borders, background gradients, pseudo elements, counters, transforms, grid and mix-blend-mode. Change the shape of things, not only their size.
+Write CSS that commits to the idea. A receipt has a narrow column, dashed rules and tabular figures. A departures board has slabs of solid colour, tight uppercase rows and hard shadows. A gallery card has enormous margins, one hairline and nothing else. Use borders, background gradients, pseudo elements, counters, transforms and mix-blend-mode. Change the shape of things, not only their size.
+
+Two habits to drop, because both cost you the page. Do not write a width on anything: set --measure or --page and every section moves together, where a width on one block leaves it standing alone in the middle of a page that no longer lines up. Do not use !important: the blocks are classes, so a rule of yours already outranks them, and !important only means you have stopped being able to tell what is winning.
 
 Avoid the patterns that make a page look generated rather than designed, and the reasons matter more than the list: frosted glass panels, because they read as a period effect and cost contrast; default drop shadows under everything, because when every block floats nothing is above anything; cards inside cards, because two borders around the same content divide attention without adding structure; gradient filled headlines, because that is the decoration a page reaches for when the words are not carrying it; more than three typefaces, because two is a system and four is an accident; body text under fifteen pixels, because it looks refined on your screen and is unreadable on everyone else's; and small labels blinking forever, because they take attention they never give back.
 

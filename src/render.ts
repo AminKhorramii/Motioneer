@@ -8,6 +8,7 @@ import { alpha, luminance, mix, shift, type Taste } from '@/taste'
 import { type Page, type Section } from '@/sections'
 import { backdropHtml } from '@/backdrop'
 import { worldById, type World } from '@/worlds'
+import { blockCss } from '@/design/blocks'
 import { TYPEFACES } from '@/typefaces'
 
 const esc = (s: unknown) =>
@@ -42,15 +43,41 @@ function head(t: Taste, title: string, editable: boolean, w: World, still: boole
 ${faces}
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--bg:${t.bg};--ink:${t.ink};--dim:${t.dim};--accent:${t.accent};--accent2:${t.accent2};
---surface:${surface};--line:${line};--r:${t.radius}px;--gap:${(gap * 2 + 1).toFixed(2)}rem}
+--surface:${surface};--line:${line};--r:${t.radius}px;--gap:${(gap * 2 + 1).toFixed(2)}rem;
+${/* Every measurement a block is allowed to have, in one place. A block reads these; it
+   never writes a width of its own, which is what keeps one page to one column. */ ''}
+--page:${w.structure.bleed ? 'none' : '1080px'};
+--edge:${w.structure.numbered ? 'clamp(2.8rem,5vw,4rem)' : w.structure.bleed ? '6vw' : 'clamp(1.2rem,4vw,2.4rem)'};
+--measure:${w.structure.measure}ch;--split:1.05fr .95fr;--tile:15rem;
+--rowsplit:minmax(9rem,15rem) 1fr;--rule:1px;--stack:1.05rem;--beat:1}
 body{background:var(--bg);color:var(--ink);font-family:${t.body};font-size:16.5px;
 line-height:${(1.45 + gap * 0.28).toFixed(2)};-webkit-font-smoothing:antialiased}
 a{color:inherit;text-decoration:none}
 h1,h2,h3{font-family:${t.display};font-weight:${t.weight};line-height:1.07;letter-spacing:-.022em}
 h1{font-size:clamp(2.3rem,6vw,${s(6)})}h2{font-size:clamp(1.5rem,3.2vw,${s(4)})}h3{font-size:${s(1)}}
-p{color:var(--dim);hyphens:auto;text-wrap:pretty}
-.wrap{max-width:1080px;margin:0 auto;padding:0 clamp(1.2rem,4vw,2.4rem)}
+p{color:var(--dim);hyphens:auto;text-wrap:pretty;max-width:var(--measure)}
 h1,h2{text-wrap:balance}
+${/* The frame and the blocks, from the library. Layout lives there as data so a world can
+   restyle a page by naming a block, and so the design prompt can be generated from the same
+   list rather than describing hooks that have drifted from the ones that exist. */ ''}
+${blockCss()}
+${/* what the taste sheet does to the blocks: the sizes and faces this page is set in */ ''}
+.lead{font-size:1.14rem}
+.display{font-size:clamp(2.6rem,7.4vw,5.2rem);max-width:16ch}
+.mid{font-size:clamp(1.9rem,4.4vw,2.9rem)}
+.quote{font-size:clamp(1.7rem,3.8vw,2.7rem);line-height:1.22;color:var(--ink)}
+.quoted{font-size:clamp(1.5rem,3.4vw,2.2rem);color:var(--ink);font-family:${t.display};line-height:1.35}
+.price{font-family:${t.display};font-weight:${t.weight};color:var(--ink);
+font-size:clamp(2.6rem,6.6vw,4.4rem);font-variant-numeric:tabular-nums}
+.name{font-family:${t.display};font-weight:${t.weight};opacity:.65;font-size:1.05rem}
+.num{color:var(--accent);font-family:${t.display}}
+.foot{color:var(--dim);font-size:.85rem}
+.prompt{color:var(--accent)}
+.feature{font-size:.94rem;color:var(--dim)}
+.smallhead{font-size:${s(3)}}
+.plan .planprice{font-size:2rem;color:var(--ink);font-family:${t.display};font-variant-numeric:tabular-nums}
+.card.pick{background:${alpha(t.accent, 0.09)}}
+.ctas{display:flex;gap:.7rem;flex-wrap:wrap;margin-top:calc(var(--gap)*.5)}
 .eyebrow{font-size:.8rem;letter-spacing:.08em;color:var(--dim);font-weight:500;
 ${t.caps ? 'text-transform:uppercase;' : ''}font-family:${t.body}}
 .btn{display:inline-block;padding:.82em 1.5em;border-radius:var(--r);font-weight:600;font-size:.95rem;
@@ -59,10 +86,6 @@ font-family:${t.body};transition:transform .18s ${ease},filter .18s ease}
 .btn-primary{background:var(--accent);color:${luminance(t.accent) > 0.6 ? '#101216' : '#fff'}}
 .link{color:var(--dim);font-size:.95rem;text-decoration:underline;text-underline-offset:4px;align-self:center}
 .link:hover{color:var(--ink)}
-section{padding:calc(var(--gap)*2.2) 0}
-.card{background:var(--surface);border-radius:var(--r);padding:calc(var(--gap)*.95)}
-.grid{display:grid;gap:calc(var(--gap)*.8)}
-.ctas{display:flex;gap:.7rem;flex-wrap:wrap;margin-top:calc(var(--gap)*.9)}
 ${/* the entrance belongs to the finished page: the editable paper repaints per streamed
    section and per keystroke, and a page that settles on every repaint reads as flicker */ ''}
 ${!editable && !still && t.motion !== 'still' ? `@media (prefers-reduced-motion:no-preference){
@@ -70,15 +93,13 @@ ${!editable && !still && t.motion !== 'still' ? `@media (prefers-reduced-motion:
 section{animation:settle ${t.motion === 'lively' ? '.55s' : '.75s'} ${ease} both}
 ${Array.from({ length: 12 }, (_, i) => `section:nth-of-type(${i + 1}){animation-delay:${i * (t.motion === 'lively' ? 60 : 85)}ms}`).join('')}
 }` : ''}
-${w.structure.rules ? 'section+section{border-top:1px solid var(--line)}' : ''}
+${w.structure.rules ? 'section+section{border-top:var(--rule) solid var(--line)}' : ''}
 ${w.structure.numbered ? `body{counter-reset:sec}
 section{counter-increment:sec}
 section>.wrap{position:relative}
-section>.wrap::before{content:counter(sec,decimal-leading-zero);position:absolute;left:-2.6rem;top:.2rem;
+section>.wrap::before{content:counter(sec,decimal-leading-zero);position:absolute;left:0;top:.2rem;
 font-size:.72rem;letter-spacing:.14em;color:var(--dim);font-variant-numeric:tabular-nums}
-@media(max-width:1100px){section>.wrap::before{display:none}}` : ''}
-${w.structure.bleed ? '.wrap{max-width:none;padding-left:6vw;padding-right:6vw}' : ''}
-p{max-width:${w.structure.measure}ch}
+@container wrap (max-width:30rem){section>.wrap::before{display:none}}` : ''}
 ${w.css ? `\n/* world */\n${w.css}\n` : ''}
 ${editable ? `[data-edit]{outline:0;transition:box-shadow .15s ease;border-radius:3px}
 [data-edit]:hover{box-shadow:0 0 0 1px ${alpha(t.accent, 0.45)}}
@@ -190,13 +211,27 @@ ${rows}
 <div style="position:absolute;left:8%;bottom:14%;width:${(18 + r(3) * 10).toFixed(0)}%;height:32px;background:${alpha(t.accent, 0.9)};border-radius:2px"></div></div>`
 }
 
-export function renderSection(sec: Section, t: Taste, seed: number, w: World, pad = 1): string {
+export function renderSection(
+  sec: Section, t: Taste, seed: number, w: World,
+  { beat = 1, first = true }: { beat?: number; first?: boolean } = {},
+): string {
   const c = sec.content as Record<string, string>
   // a generated image replaces the drawn placeholder wherever a section shows a figure
   const img = typeof c.image === 'string' && c.image.startsWith('data:') ? c.image : undefined
-  // the world's rhythm paces the page: uniform air on every section is the deepest tell of
-  // one treatment applied to all content, so adjacent sections never breathe the same
-  const open = `<section data-section="${sec.id}" data-form="${sec.form}" id="${sec.role}"${pad === 1 ? '' : ` style="padding:calc(var(--gap)*${(2.2 * pad).toFixed(2)}) 0"`}>`
+  // The world's rhythm paces the page: uniform air on every section is the deepest tell of one
+  // treatment applied to all content, so adjacent sections never breathe the same. It arrives
+  // as a custom property rather than a padding, so a world that wants to repace the whole page
+  // can still write one rule for section and have it win.
+  //
+  // A role names the section, but a world may argue the same role twice, and two elements with
+  // one id is invalid html and paints a world's one committed move on both. The id marks the
+  // first of a role, so #substance still means what it always meant, and [data-role] reaches
+  // every one of them.
+  // a row of names is a strip rather than a section, so it takes a fraction of whatever air
+  // the world is giving, which keeps it tight without leaving the rhythm
+  const air = sec.role === 'proof' && sec.form === 'list' ? beat * 0.45 : beat
+  const open = `<section data-section="${sec.id}" data-form="${sec.form}" data-role="${sec.role}"${
+    first ? ` id="${sec.role}"` : ''}${air === 1 ? '' : ` style="--beat:${air.toFixed(2)}"`}>`
   // one primary action and one quiet link. Two buttons of equal weight is the formula every
   // generated hero wears, and it makes the page argue with itself about what happens next
   const ctas = `<div class="ctas"><a class="btn btn-primary" ${ed(sec.id, 'cta')}>${esc(c.cta)}</a>
@@ -210,143 +245,143 @@ export function renderSection(sec: Section, t: Taste, seed: number, w: World, pa
       switch (sec.form) {
         // set off axis on purpose: the centered stack with a badge on top is the opening move
         // of every generated page, so the plain claim leads from the left and leaves air
-        case 'prose': return `${open}<div class="wrap"><div style="max-width:58%;min-width:min(34rem,100%)">
-<h1 style="margin:0 0 1.1rem;max-width:16ch" ${ed(sec.id, 'headline')}>${esc(c.headline)}</h1>
-<p style="font-size:1.16rem;max-width:52ch" ${ed(sec.id, 'sub')}>${esc(c.sub)}</p>${ctas}</div>
-<div style="margin-top:calc(var(--gap)*1.6)">${figure(t, seed, '21/9', img, w.structure.figure)}</div></div></section>`
-        case 'marginalia': return `${open}<div class="wrap" style="display:grid;grid-template-columns:1.05fr .95fr;gap:calc(var(--gap)*1.4);align-items:center">
-<div><h1 style="margin:0 0 1rem" ${ed(sec.id, 'headline')}>${esc(c.headline)}</h1>
-<p style="font-size:1.1rem;max-width:46ch" ${ed(sec.id, 'sub')}>${esc(c.sub)}</p>${ctas}</div>
-<div>${figure(t, seed, '4/5', img, w.structure.figure)}</div></div></section>`
-        case 'statement': return `${open}<div class="wrap" style="max-width:900px">
-<h1 style="font-size:clamp(2.6rem,7.4vw,5.2rem);max-width:16ch" ${ed(sec.id, 'headline')}>${esc(c.headline)}</h1>
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:calc(var(--gap)*1.2);margin-top:calc(var(--gap)*1.2);
-border-top:1px solid var(--line);padding-top:calc(var(--gap)*.9)">
-<p style="font-size:1.12rem" ${ed(sec.id, 'sub')}>${esc(c.sub)}</p>
-<div><p style="color:var(--ink)" ${ed(sec.id, 'eyebrow')}>${esc(c.eyebrow)}</p>${ctas}</div></div>
-${img ? `<div style="margin-top:calc(var(--gap)*1.2)">${figure(t, seed, '16/10', img, w.structure.figure)}</div>` : ''}</div></section>`
+        case 'prose': return `${open}<div class="wrap"><div class="stack">
+<h1 ${ed(sec.id, 'headline')}>${esc(c.headline)}</h1>
+<p class="lead" ${ed(sec.id, 'sub')}>${esc(c.sub)}</p>${ctas}</div>
+<div class="figure wide">${figure(t, seed, '21/9', img, w.structure.figure)}</div></div></section>`
+        case 'marginalia': return `${open}<div class="wrap"><div class="split wide">
+<div class="stack"><h1 ${ed(sec.id, 'headline')}>${esc(c.headline)}</h1>
+<p class="lead" ${ed(sec.id, 'sub')}>${esc(c.sub)}</p>${ctas}</div>
+<div class="figure">${figure(t, seed, '4/5', img, w.structure.figure)}</div></div></div></section>`
+        case 'statement': return `${open}<div class="wrap">
+<h1 class="display wide" ${ed(sec.id, 'headline')}>${esc(c.headline)}</h1>
+<div class="split halves ruled wide">
+<p class="lead" ${ed(sec.id, 'sub')}>${esc(c.sub)}</p>
+<div class="stack"><p class="ink" ${ed(sec.id, 'eyebrow')}>${esc(c.eyebrow)}</p>${ctas}</div></div>
+${img ? `<div class="figure wide">${figure(t, seed, '16/10', img, w.structure.figure)}</div>` : ''}</div></section>`
         // a transcript, not a drawing of a window: the traffic light dots promise a real
         // window and deliver a prop
-        default: return `${open}<div class="wrap" style="max-width:900px"><div class="card" style="font-family:ui-monospace,Menlo,monospace">
-<p style="color:var(--dim);font-size:.92rem"><span style="color:var(--accent)">$</span> <span ${ed(sec.id, 'eyebrow')}>${esc(c.eyebrow)}</span></p>
-<h1 style="font-size:clamp(1.9rem,4.4vw,2.9rem);margin:1rem 0" ${ed(sec.id, 'headline')}>${esc(c.headline)}</h1>
-<p style="max-width:58ch" ${ed(sec.id, 'sub')}>${esc(c.sub)}</p>${ctas}</div>
-<div style="margin-top:calc(var(--gap)*1.2)">${figure(t, seed, '16/10', img, w.structure.figure)}</div></div></section>`
+        default: return `${open}<div class="wrap"><div class="card mono wide"><div class="stack">
+<p class="small"><span class="prompt">$</span> <span ${ed(sec.id, 'eyebrow')}>${esc(c.eyebrow)}</span></p>
+<h1 class="mid" ${ed(sec.id, 'headline')}>${esc(c.headline)}</h1>
+<p ${ed(sec.id, 'sub')}>${esc(c.sub)}</p>${ctas}</div></div>
+<div class="figure wide">${figure(t, seed, '16/10', img, w.structure.figure)}</div></div></section>`
       }
     }
 
     case 'proof': {
       if (sec.form === 'list') {
         const names = (sec.content.names as string[]) ?? []
-        return `${open}<div class="wrap" style="text-align:center;padding:calc(var(--gap)*.4) 0">
-<p class="eyebrow" style="margin-bottom:1.1rem" ${ed(sec.id, 'label')}>${esc(c.label)}</p>
-<div style="display:flex;gap:calc(var(--gap)*1.3);justify-content:center;flex-wrap:wrap;align-items:center">${names
-          .map((n, i) => `<span ${ed(sec.id, `names.${i}`)} style="font-family:${t.display};font-weight:${t.weight};opacity:.65;font-size:1.05rem">${esc(n)}</span>`)
-          .join('')}</div></div></section>`
+        return `${open}<div class="wrap"><div class="stack wide center">
+<p class="eyebrow" ${ed(sec.id, 'label')}>${esc(c.label)}</p>
+<div class="names">${names
+          .map((n, i) => `<span class="name" ${ed(sec.id, `names.${i}`)}>${esc(n)}</span>`)
+          .join('')}</div></div></div></section>`
       }
       if (sec.form === 'statement') {
-        return `${open}<div class="wrap" style="max-width:880px">
-<h2 style="font-size:clamp(1.7rem,3.8vw,2.7rem);line-height:1.22;color:var(--ink)" ${ed(sec.id, 'quote')}>${esc(c.quote)}</h2>
-<p style="margin-top:1.2rem"><b ${ed(sec.id, 'name')}>${esc(c.name)}</b>, <span ${ed(sec.id, 'role')}>${esc(c.role)}</span></p></div></section>`
+        return `${open}<div class="wrap"><div class="stack">
+<h2 class="quote" ${ed(sec.id, 'quote')}>${esc(c.quote)}</h2>
+<p><b ${ed(sec.id, 'name')}>${esc(c.name)}</b>, <span ${ed(sec.id, 'role')}>${esc(c.role)}</span></p></div></div></section>`
       }
-      return `${open}<div class="wrap" style="max-width:860px;text-align:center">
-<p style="font-size:clamp(1.5rem,3.4vw,2.2rem);color:var(--ink);font-family:${t.display};line-height:1.35" ${ed(sec.id, 'quote')}>\u201C${esc(c.quote)}\u201D</p>
-<p style="margin-top:1.2rem"><span ${ed(sec.id, 'name')}>${esc(c.name)}</span>, <span ${ed(sec.id, 'role')}>${esc(c.role)}</span></p>
-</div></section>`
+      return `${open}<div class="wrap"><div class="stack center">
+<p class="quoted" ${ed(sec.id, 'quote')}>\u201C${esc(c.quote)}\u201D</p>
+<p><span ${ed(sec.id, 'name')}>${esc(c.name)}</span>, <span ${ed(sec.id, 'role')}>${esc(c.role)}</span></p>
+</div></div></section>`
     }
 
     case 'substance': {
       if (sec.form === 'figure') {
-        return `${open}<div class="wrap" style="display:grid;grid-template-columns:.8fr 1.2fr;gap:calc(var(--gap)*1.2);align-items:center">
-<div><h2 ${ed(sec.id, 'title')}>${esc(c.title)}</h2>
-<p style="margin-top:.6rem;max-width:48ch" ${ed(sec.id, 'caption')}>${esc(c.caption)}</p></div>
-<div>${figure(t, seed + 3, '4/3', img, w.structure.figure)}</div></div></section>`
+        return `${open}<div class="wrap"><div class="split figside wide">
+<div class="stack"><h2 ${ed(sec.id, 'title')}>${esc(c.title)}</h2>
+<p ${ed(sec.id, 'caption')}>${esc(c.caption)}</p></div>
+<div class="figure">${figure(t, seed + 3, '4/3', img, w.structure.figure)}</div></div></div></section>`
       }
       if (sec.form === 'prose') {
-        return `${open}<div class="wrap" style="max-width:${Math.min(w.structure.measure + 10, 84)}ch">
+        return `${open}<div class="wrap"><div class="stack">
 <h2 ${ed(sec.id, 'title')}>${esc(c.title)}</h2>
-${items.map((f, i) => `<p style="margin-top:${i ? '1.1rem' : '1.5rem'};font-size:1.06rem">
-<b style="color:var(--ink)" ${ed(sec.id, `items.${i}.title`)}>${esc(f.title)}.</b> <span ${ed(sec.id, `items.${i}.body`)}>${esc(f.body)}</span></p>`).join('')}
-</div></section>`
+${items.map((f, i) => `<p>
+<b class="ink" ${ed(sec.id, `items.${i}.title`)}>${esc(f.title)}.</b> <span ${ed(sec.id, `items.${i}.body`)}>${esc(f.body)}</span></p>`).join('')}
+</div></div></section>`
       }
       if (sec.form === 'table') {
-        return `${open}<div class="wrap"><h2 ${ed(sec.id, 'title')}>${esc(c.title)}</h2>
-<div style="margin-top:calc(var(--gap)*.8)">${items.map((f, i) => `<div style="display:grid;grid-template-columns:minmax(9rem,15rem) 1fr;gap:1.3rem;padding:.75rem 0;border-top:1px solid var(--line);${i === items.length - 1 ? 'border-bottom:1px solid var(--line)' : ''}">
-<h3 style="font-size:1rem" ${ed(sec.id, `items.${i}.title`)}>${esc(f.title)}</h3>
-<p ${ed(sec.id, `items.${i}.body`)}>${esc(f.body)}</p></div>`).join('')}</div></div></section>`
+        return `${open}<div class="wrap"><div class="stack wide"><h2 ${ed(sec.id, 'title')}>${esc(c.title)}</h2>
+<div class="rows closed">${items.map((f, i) => `<div class="row">
+<h3 ${ed(sec.id, `items.${i}.title`)}>${esc(f.title)}</h3>
+<p ${ed(sec.id, `items.${i}.body`)}>${esc(f.body)}</p></div>`).join('')}</div></div></div></section>`
       }
-      return `${open}<div class="wrap">
+      return `${open}<div class="wrap"><div class="stack wide">
 <h2 ${ed(sec.id, 'title')}>${esc(c.title)}</h2>
-<div style="margin-top:calc(var(--gap)*.9)">${items
-        .map((f, i) => `<div style="display:grid;grid-template-columns:3.4rem 1fr;gap:1.3rem;padding:calc(var(--gap)*.7) 0;${i ? 'border-top:1px solid var(--line)' : ''}">
-<span style="color:var(--accent);font-family:${t.display}">${String(i + 1).padStart(2, '0')}</span>
-<div><h3 ${ed(sec.id, `items.${i}.title`)}>${esc(f.title)}</h3>
-<p style="margin-top:.35rem;max-width:60ch" ${ed(sec.id, `items.${i}.body`)}>${esc(f.body)}</p></div></div>`)
-        .join('')}</div></div></section>`
+<div class="rows open numbered">${items
+        .map((f, i) => `<div class="row">
+<span class="num">${String(i + 1).padStart(2, '0')}</span>
+<div class="stack"><h3 ${ed(sec.id, `items.${i}.title`)}>${esc(f.title)}</h3>
+<p ${ed(sec.id, `items.${i}.body`)}>${esc(f.body)}</p></div></div>`)
+        .join('')}</div></div></div></section>`
     }
 
     case 'offer': {
       if (sec.form === 'statement') {
         const p1 = plans[1] ?? plans[0] ?? { name: 'Pro', price: '', line: '', features: [] }
         const idx = plans[1] ? 1 : 0
-        return `${open}<div class="wrap" style="max-width:760px">
+        return `${open}<div class="wrap"><div class="stack">
 <p class="eyebrow" ${ed(sec.id, 'title')}>${esc(c.title)}</p>
-<p style="font-family:${t.display};font-weight:${t.weight};color:var(--ink);font-size:clamp(2.6rem,6.6vw,4.4rem);margin:.9rem 0 .4rem;font-variant-numeric:tabular-nums" ${ed(sec.id, `plans.${idx}.price`)}>${esc(p1.price)}</p>
-<p style="font-size:1.1rem"><b style="color:var(--ink)" ${ed(sec.id, `plans.${idx}.name`)}>${esc(p1.name)}</b>, <span ${ed(sec.id, `plans.${idx}.line`)}>${esc(p1.line)}</span>. ${(p1.features ?? [])
+<p class="price" ${ed(sec.id, `plans.${idx}.price`)}>${esc(p1.price)}</p>
+<p class="lead"><b class="ink" ${ed(sec.id, `plans.${idx}.name`)}>${esc(p1.name)}</b>, <span ${ed(sec.id, `plans.${idx}.line`)}>${esc(p1.line)}</span>. ${(p1.features ?? [])
           .map((f, j) => `<span ${ed(sec.id, `plans.${idx}.features.${j}`)}>${esc(f)}</span>`)
           .join(' \u00B7 ')}</p>
-<div class="ctas"><a class="btn btn-primary">Choose ${esc(p1.name)}</a></div></div></section>`
+<div class="ctas"><a class="btn btn-primary">Choose ${esc(p1.name)}</a></div></div></div></section>`
       }
       if (sec.form === 'prose') {
-        return `${open}<div class="wrap" style="max-width:${Math.min(w.structure.measure + 6, 80)}ch">
+        return `${open}<div class="wrap"><div class="stack">
 <h2 ${ed(sec.id, 'title')}>${esc(c.title)}</h2>
-${plans.map((p, i) => `<p style="margin-top:${i ? '1rem' : '1.4rem'};font-size:1.05rem">
-<b style="color:var(--ink)" ${ed(sec.id, `plans.${i}.name`)}>${esc(p.name)}</b> is <span style="font-variant-numeric:tabular-nums" ${ed(sec.id, `plans.${i}.price`)}>${esc(p.price)}</span> <span ${ed(sec.id, `plans.${i}.line`)}>${esc(p.line)}</span>: ${(p.features ?? []).map((f, j) => `<span ${ed(sec.id, `plans.${i}.features.${j}`)}>${esc(f)}</span>`).join(', ')}.</p>`).join('')}
-<div class="ctas"><a class="btn btn-primary">Choose ${esc((plans[1] ?? plans[0])?.name ?? '')}</a></div></div></section>`
-      }
-      if (sec.form === 'transcript') {
-        return `${open}<div class="wrap" style="max-width:820px"><div class="card" style="font-family:ui-monospace,Menlo,monospace">
-<p class="eyebrow" style="margin-bottom:.9rem" ${ed(sec.id, 'title')}>${esc(c.title)}</p>
-${plans.map((p, i) => `<p style="margin-top:.45rem;font-variant-numeric:tabular-nums"><span style="color:var(--accent)">$</span> <b style="color:var(--ink)" ${ed(sec.id, `plans.${i}.name`)}>${esc(p.name.toLowerCase())}</b> \u00B7 <span ${ed(sec.id, `plans.${i}.price`)}>${esc(p.price)}</span> <span ${ed(sec.id, `plans.${i}.line`)}>${esc(p.line)}</span></p>`).join('')}
+${plans.map((p, i) => `<p>
+<b class="ink" ${ed(sec.id, `plans.${i}.name`)}>${esc(p.name)}</b> is <span class="tabular" ${ed(sec.id, `plans.${i}.price`)}>${esc(p.price)}</span> <span ${ed(sec.id, `plans.${i}.line`)}>${esc(p.line)}</span>: ${(p.features ?? []).map((f, j) => `<span ${ed(sec.id, `plans.${i}.features.${j}`)}>${esc(f)}</span>`).join(', ')}.</p>`).join('')}
 <div class="ctas"><a class="btn btn-primary">Choose ${esc((plans[1] ?? plans[0])?.name ?? '')}</a></div></div></div></section>`
       }
-      return `${open}<div class="wrap"><h2 style="text-align:center" ${ed(sec.id, 'title')}>${esc(c.title)}</h2>
-<div class="grid" style="grid-template-columns:repeat(${plans.length || 1},minmax(0,1fr));margin-top:calc(var(--gap)*1)">
+      if (sec.form === 'transcript') {
+        return `${open}<div class="wrap"><div class="card mono wide"><div class="stack">
+<p class="eyebrow" ${ed(sec.id, 'title')}>${esc(c.title)}</p>
+${plans.map((p, i) => `<p class="tabular"><span class="prompt">$</span> <b class="ink" ${ed(sec.id, `plans.${i}.name`)}>${esc(p.name.toLowerCase())}</b> \u00B7 <span ${ed(sec.id, `plans.${i}.price`)}>${esc(p.price)}</span> <span ${ed(sec.id, `plans.${i}.line`)}>${esc(p.line)}</span></p>`).join('')}
+<div class="ctas"><a class="btn btn-primary">Choose ${esc((plans[1] ?? plans[0])?.name ?? '')}</a></div></div></div></div></section>`
+      }
+      return `${open}<div class="wrap"><h2 class="center wide" ${ed(sec.id, 'title')}>${esc(c.title)}</h2>
+<div class="grid wide">
 ${plans
-        .map((p, i) => `<div class="card"${i === 1 ? ` style="background:${alpha(t.accent, 0.09)}"` : ''}>
+        .map((p, i) => `<div class="card plan${i === 1 ? ' pick' : ''}">
 <h3 ${ed(sec.id, `plans.${i}.name`)}>${esc(p.name)}</h3>
-<p style="font-size:2rem;color:var(--ink);font-family:${t.display};margin:.5rem 0 .2rem;font-variant-numeric:tabular-nums" ${ed(sec.id, `plans.${i}.price`)}>${esc(p.price)}</p>
+<p class="planprice" ${ed(sec.id, `plans.${i}.price`)}>${esc(p.price)}</p>
 <p ${ed(sec.id, `plans.${i}.line`)}>${esc(p.line)}</p>
-<div style="margin:1rem 0 1.2rem;display:flex;flex-direction:column;gap:.4rem">
-${(p.features ?? []).map((f, j) => `<span style="font-size:.94rem;color:var(--dim)" ${ed(sec.id, `plans.${i}.features.${j}`)}>${esc(f)}</span>`).join('')}</div>
+<div class="features">
+${(p.features ?? []).map((f, j) => `<span class="feature" ${ed(sec.id, `plans.${i}.features.${j}`)}>${esc(f)}</span>`).join('')}</div>
 ${i === 1 ? `<a class="btn btn-primary">Choose ${esc(p.name)}</a>` : `<a class="link">Choose ${esc(p.name)}</a>`}</div>`)
         .join('')}</div></div></section>`
     }
 
     case 'objections': {
-      const cols = sec.form === 'prose' ? 1 : 2
-      return `${open}<div class="wrap"${cols === 1 ? ` style="max-width:${Math.min(w.structure.measure + 6, 80)}ch"` : ''}><h2 ${ed(sec.id, 'title')}>${esc(c.title)}</h2>
-<div class="grid" style="grid-template-columns:repeat(${cols},minmax(0,1fr));margin-top:calc(var(--gap)*.9)">
-${qa
-        .map(
-          (f, i) => `<div style="border-top:1px solid var(--line);padding-top:.9rem">
-<h3 style="font-size:1.05rem" ${ed(sec.id, `items.${i}.q`)}>${esc(f.q)}</h3>
-<p style="margin-top:.4rem" ${ed(sec.id, `items.${i}.a`)}>${esc(f.a)}</p></div>`,
-        )
-        .join('')}</div></div></section>`
+      // one column reads as a conversation and two as a reference, so the form decides which
+      const pairs = qa
+        .map((f, i) => `<div class="qa">
+<h3 ${ed(sec.id, `items.${i}.q`)}>${esc(f.q)}</h3>
+<p ${ed(sec.id, `items.${i}.a`)}>${esc(f.a)}</p></div>`)
+        .join('')
+      return sec.form === 'prose'
+        ? `${open}<div class="wrap"><div class="stack">
+<h2 ${ed(sec.id, 'title')}>${esc(c.title)}</h2>${pairs}</div></div></section>`
+        : `${open}<div class="wrap"><div class="stack wide">
+<h2 ${ed(sec.id, 'title')}>${esc(c.title)}</h2>
+<div class="grid pairs">${pairs}</div></div></div></section>`
     }
 
     case 'invitation':
       return sec.form === 'statement'
-        ? `${open}<div class="wrap" style="text-align:center;max-width:720px">
+        ? `${open}<div class="wrap"><div class="stack center">
 <h2 ${ed(sec.id, 'headline')}>${esc(c.headline)}</h2>
-<p style="margin-top:.7rem" ${ed(sec.id, 'sub')}>${esc(c.sub)}</p>
-<div class="ctas" style="justify-content:center"><a class="btn btn-primary" ${ed(sec.id, 'cta')}>${esc(c.cta)}</a></div>
-</div></section>`
-        : `${open}<div class="wrap"><div style="border-top:1px solid var(--line);padding-top:calc(var(--gap)*1.1);
-display:flex;justify-content:space-between;align-items:flex-end;gap:1.4rem;flex-wrap:wrap">
-<div><h2 style="font-size:${tokens(t).s(3)}" ${ed(sec.id, 'headline')}>${esc(c.headline)}</h2>
-<p style="margin-top:.4rem" ${ed(sec.id, 'sub')}>${esc(c.sub)}</p></div>
+<p ${ed(sec.id, 'sub')}>${esc(c.sub)}</p>
+<div class="ctas"><a class="btn btn-primary" ${ed(sec.id, 'cta')}>${esc(c.cta)}</a></div>
+</div></div></section>`
+        : `${open}<div class="wrap"><div class="band wide">
+<div class="stack"><h2 class="smallhead" ${ed(sec.id, 'headline')}>${esc(c.headline)}</h2>
+<p ${ed(sec.id, 'sub')}>${esc(c.sub)}</p></div>
 <a class="btn btn-primary" ${ed(sec.id, 'cta')}>${esc(c.cta)}</a></div></div></section>`
 
     case 'credits': {
@@ -354,8 +389,7 @@ display:flex;justify-content:space-between;align-items:flex-end;gap:1.4rem;flex-
       // hands, because generators never credit their own typography
       const face = (stack: string) => stack.split(',')[0].replace(/['"]/g, '').trim()
       const note = c.note || `Set in ${face(t.display)}${face(t.body) !== face(t.display) ? ` and ${face(t.body)}` : ''}.`
-      return `${open}<div class="wrap"><div style="border-top:1px solid var(--line);padding:2rem 0;display:flex;
-justify-content:space-between;gap:1rem;flex-wrap:wrap;color:var(--dim);font-size:.85rem">
+      return `${open}<div class="wrap"><div class="band foot wide">
 <span ${ed(sec.id, 'product')}>\u00A9 ${new Date().getFullYear()} ${esc(c.product)}</span>
 <span ${ed(sec.id, 'note')}>${esc(note)}</span></div></div></section>`
     }
@@ -372,9 +406,17 @@ export function renderPage(page: Page, opts: { editable?: boolean; title?: strin
   const world = worldById(page.world)
   const seed = page.sections.length * 17 + page.taste.radius
   const beat = world.structure.rhythm
+  const seen = new Set<string>()
   const body = page.sections
     .filter((s) => s.on)
-    .map((s, i) => renderSection(s, page.taste, seed + i * 11, world, beat?.length ? beat[i % beat.length] : 1))
+    .map((s, i) => {
+      const first = !seen.has(s.role)
+      seen.add(s.role)
+      return renderSection(s, page.taste, seed + i * 11, world, {
+        beat: beat?.length ? beat[i % beat.length] : 1,
+        first,
+      })
+    })
     .join('\n')
   // the backdrop goes first so it sits behind the content without needing a stacking hack
   const art = backdropHtml(page.taste, page.backdrop ?? 'none', !!opts.still)

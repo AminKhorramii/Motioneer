@@ -24,8 +24,9 @@ export const WORLDS: World[] = [
     taste: (t) => ({ ...mono(contrast(t)), display: GROTESK, body: SANS, scale: 1.26, radius: 0, density: 0.7, weight: 700, caps: false }),
     structure: { rules: true, numbered: true, bleed: false, measure: 62, figure: 'framed', rhythm: [1, 0.55, 1.5, 0.8, 1.9, 0.7] },
     backdrop: 'none',
-    // a numbered list is more swiss than a row of cards, and the grid has no closing band
-    wear: { claim: 'statement', substance: 'list', offer: 'table', objections: 'list' },
+    // a numbered list is more swiss than a row of cards, and the grid has no closing band.
+    // Substance is argued twice: listed, then tabulated, because a grid states and then indexes
+    wear: { claim: 'statement', substance: ['list', 'table'], offer: 'table', objections: 'list' },
     compose: ['claim', 'substance', 'substance', 'offer', 'objections', 'credits'],
     // the one move: the folio of the opening section set enormous and almost gone.
     // One committed move per world, because restraint plus commitment is what reads as
@@ -40,7 +41,8 @@ export const WORLDS: World[] = [
     taste: (t) => ({ ...tinted(t), display: FRAUNCES, body: SERIF, scale: 1.44, radius: 2, density: 0.35, weight: 560, caps: true }),
     structure: { rules: false, numbered: false, bleed: true, measure: 74, figure: 'bleed', rhythm: [1.7, 0.6, 1.3, 0.75, 2, 0.9] },
     backdrop: 'grain',
-    wear: { claim: 'statement', proof: 'quote', substance: 'prose', offer: 'statement', objections: 'prose', invitation: 'statement' },
+    // an essay argues in prose and then shows one plate, which is what a bleeding figure is for
+    wear: { claim: 'statement', proof: 'quote', substance: ['prose', 'figure'], offer: 'statement', objections: 'prose', invitation: 'statement' },
     // a read: the argument, one witness, the substance twice over, the terms, a quiet close
     compose: ['claim', 'proof', 'substance', 'substance', 'offer', 'objections', 'invitation', 'credits'],
     // the one move: a masthead slug above the headline, the way a periodical opens
@@ -54,10 +56,13 @@ export const WORLDS: World[] = [
     taste: (t) => ({ ...mono(t), display: MONO, body: MONO, scale: 1.2, radius: 0, density: 0.8, weight: 500, caps: true }),
     structure: { rules: true, numbered: false, bleed: false, measure: 68, figure: 'plain', rhythm: [0.9, 0.5, 1.3, 0.6, 1.6, 0.7] },
     backdrop: 'contours',
-    // documentation does not testimonial: everything is a listing or a transcript
-    wear: { claim: 'transcript', substance: 'list', offer: 'transcript', objections: 'list' },
+    // documentation does not testimonial: everything is a listing or a transcript, and it
+    // lists before it tabulates the way a manual states then indexes
+    wear: { claim: 'transcript', substance: ['list', 'table'], offer: 'transcript', objections: 'list' },
     compose: ['claim', 'substance', 'substance', 'objections', 'offer', 'credits'],
-    // the one move: the substance prints inverted, a band of light in a dark page
+    // the one move: the first substance prints inverted, a band of light in a dark page. It is
+    // keyed on the id rather than the role, because the id marks the first of a repeated role
+    // and a band that happens twice is a background rather than a move
     css: `#substance{background:var(--ink);color:var(--bg)}
 #substance h2,#substance h3{color:var(--bg)}
 #substance p{color:color-mix(in srgb,var(--bg) 72%,var(--ink))}`,
@@ -73,8 +78,10 @@ export const WORLDS: World[] = [
     wear: { claim: 'statement', substance: 'figure', proof: 'quote', invitation: 'statement' },
     // five sections. A poster is what it leaves out, and the whitespace is the design
     compose: ['claim', 'substance', 'proof', 'invitation', 'credits'],
-    // the one move: the headline at the size of the wall, tighter than body type ever sits
-    css: `#claim h1{font-size:clamp(3.6rem,11.5vw,9.5rem)!important;line-height:.94!important;letter-spacing:-.045em;max-width:none!important;margin-left:-.05em}`,
+    // the one move: the headline at the size of the wall, tighter than body type ever sits.
+    // It needed !important on every line when the renderer wrote sizes inline; the blocks
+    // carry their sizes as classes now, so a world outranks them by saying it once
+    css: `#claim h1{font-size:clamp(3.6rem,11.5vw,9.5rem);line-height:.94;letter-spacing:-.045em;max-width:none;margin-left:-.05em}`,
   },
   {
     id: 'catalogue',
@@ -84,11 +91,12 @@ export const WORLDS: World[] = [
     taste: (t) => ({ ...mono(t), display: SANS, body: SANS, scale: 1.16, radius: 3, density: 0.85, weight: 600, caps: true }),
     structure: { rules: true, numbered: true, bleed: false, measure: 58, figure: 'plain', rhythm: [0.7, 0.45, 1.1, 0.5, 1.4, 0.6] },
     backdrop: 'none',
-    // everything, listed: the fullest argument, set dense, priced in a table
-    wear: { claim: 'prose', proof: 'list', substance: 'table', offer: 'table', objections: 'list', invitation: 'band' },
+    // everything, listed: the fullest argument, set dense, priced in a table. The second
+    // substance is a numbered list and the second witness speaks, so the density has a seam
+    wear: { claim: 'prose', proof: ['list', 'quote'], substance: ['table', 'list'], offer: 'table', objections: 'list', invitation: 'band' },
     compose: ['claim', 'proof', 'substance', 'substance', 'proof', 'offer', 'objections', 'invitation', 'credits'],
     // the one move: double rules between sections, the way a ledger separates its entries
-    css: `section+section{border-top:4px double var(--line)!important}`,
+    css: `section+section{border-top:4px double var(--line)}`,
   },
   {
     id: 'soft',
@@ -98,7 +106,8 @@ export const WORLDS: World[] = [
     taste: (t) => ({ ...tinted(t), display: SANS, body: SANS, scale: 1.3, radius: 16, density: 0.45, weight: 600, caps: false }),
     structure: { rules: false, numbered: false, bleed: false, measure: 66, figure: 'framed', rhythm: [1.5, 0.7, 1.2, 0.6, 1.8, 0.8] },
     backdrop: 'grain',
-    wear: { claim: 'prose', proof: 'list', substance: 'figure', offer: 'table', invitation: 'band' },
+    // a product page shows the thing, then says what is in it, and lets one customer speak
+    wear: { claim: 'prose', proof: ['list', 'quote'], substance: ['figure', 'list'], offer: 'table', invitation: 'band' },
     compose: ['claim', 'proof', 'substance', 'substance', 'proof', 'offer', 'invitation', 'credits'],
     // the one move: the opening sits on its own tinted band, so the page has a shoreline
     css: `#claim{background:var(--surface)}`,

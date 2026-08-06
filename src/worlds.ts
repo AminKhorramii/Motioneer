@@ -52,8 +52,11 @@ export interface World {
   /**
    * The form each role takes here. This is where a world speaks: the same offer is a table
    * in a catalogue, one sentence on a poster, and a transcript line in a terminal.
+   *
+   * A list is the forms a repeated role wears in order, because a world that argues substance
+   * twice has an opinion about both, and the second one used to be picked by the machinery.
    */
-  wear: Partial<Record<Role, Form>>
+  wear: Partial<Record<Role, Form | Form[]>>
   /**
    * CSS the world brings with it, written against the page's own classes and tokens.
    *
@@ -105,11 +108,17 @@ export function madeWorld(raw: Record<string, unknown>, i: number): World {
   const face = (k: unknown, fallback: string) => FACES[String(k)] ?? fallback
   const palette = PALETTES[String(raw.palette)] ?? PALETTES['as-is']
   const asRole = (k: string): Role | null => (k in ROLE_FORMS ? (k as Role) : legacyRole(k))
-  const wear: Partial<Record<Role, Form>> = {}
+  const wear: Partial<Record<Role, Form | Form[]>> = {}
   for (const [k, v] of Object.entries((raw.wear ?? {}) as Record<string, unknown>)) {
     const role = asRole(k)
-    const form = String(v) as Form
-    if (role && ROLE_FORMS[role].includes(form)) wear[role] = form
+    if (!role) continue
+    // a role may be named once or once per appearance, and anything the role cannot wear is
+    // dropped rather than corrected, because a wrong form is a decision nobody made
+    const forms = (Array.isArray(v) ? v : [v])
+      .map((f) => String(f) as Form)
+      .filter((f) => ROLE_FORMS[role].includes(f))
+      .slice(0, 4)
+    if (forms.length) wear[role] = forms.length === 1 ? forms[0] : forms
   }
   // worlds recorded before forms said prefer as {kind: layout number}; the numbers still
   // index into the role's forms, so an old design keeps meaning something
@@ -170,27 +179,41 @@ export const register = (list: World[]) => list.forEach((w) => made.set(w.id, w)
 export const worldById = (id?: WorldId) => made.get(String(id)) ?? WORLDS.find((w) => w.id === id) ?? WORLDS[0]
 
 /**
- * Dress sections in a world's forms, under two rules a template system cannot state:
- * adjacent sections never share a form, because the repeat is what reads as one treatment
- * applied to all content, and a repeated role never repeats its form, because saying the
- * same thing twice deserves a second register. The advance is deterministic, so the same
- * world dresses the same page the same way every time.
+ * Dress sections in a world's forms.
+ *
+ * Two rules a template system cannot state: adjacent sections never share a form, because the
+ * repeat is what reads as one treatment applied to all content, and a repeated role never
+ * repeats its form, because saying the same thing twice deserves a second register. The
+ * advance is deterministic, so the same world dresses the same page the same way every time.
+ *
+ * Both rules are a fallback and never an override. They used to outrank the world, so a
+ * terminal that asked for a list of substance was handed a drawn figure and an editorial that
+ * asked for prose was handed a table: the most identity-bearing decision a world makes was
+ * being spent to avoid a repeat. A form the world named for this position is now kept, and the
+ * rotation only settles what the world left open.
  */
 export function dressSections(sections: Section[], world: World): Section[] {
   const taken = new Map<Role, Set<Form>>()
+  const nth = new Map<Role, number>()
   let prev: Form | null = null
   return sections.map((s) => {
     const allowed = ROLE_FORMS[s.role]
-    const wanted = world.wear[s.role]
-    let form = wanted && allowed.includes(wanted) ? wanted : allowed.includes(s.form) ? s.form : allowed[0]
-    let i = allowed.indexOf(form)
-    const used = taken.get(s.role) ?? new Set<Form>()
-    for (let guard = 0; guard < allowed.length && (form === prev || used.has(form)); guard++) {
-      i = (i + 1) % allowed.length
-      form = allowed[i]
+    const at = nth.get(s.role) ?? 0
+    nth.set(s.role, at + 1)
+    const said = world.wear[s.role]
+    // a world names one form for a role, or one per time the role appears
+    const asked = Array.isArray(said) ? said[Math.min(at, said.length - 1)] : at === 0 ? said : undefined
+    const declared = asked !== undefined && allowed.includes(asked)
+    let form = declared ? asked : allowed.includes(s.form) ? s.form : allowed[0]
+    if (!declared) {
+      let i = allowed.indexOf(form)
+      const used = taken.get(s.role) ?? new Set<Form>()
+      for (let guard = 0; guard < allowed.length && (form === prev || used.has(form)); guard++) {
+        i = (i + 1) % allowed.length
+        form = allowed[i]
+      }
     }
-    used.add(form)
-    taken.set(s.role, used)
+    taken.set(s.role, (taken.get(s.role) ?? new Set<Form>()).add(form))
     prev = form
     return { ...s, form }
   })
