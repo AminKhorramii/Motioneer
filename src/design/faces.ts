@@ -11,6 +11,10 @@ export const SANS = "'Inter Variable', 'Inter', -apple-system, sans-serif"
 // carried inside the page by render.ts, so these exist on every machine the file reaches
 export const FRAUNCES = "'Fraunces Variable', 'Charter', 'Iowan Old Style', Georgia, serif"
 export const ARCHIVO = "'Archivo Variable', 'Helvetica Neue', Arial, sans-serif"
+// the faces the named design systems ship with. Neither is certain to be installed, so each
+// falls back to the closest platform grotesque rather than to a default nobody chose
+export const ROBOTO = "'Roboto', 'Helvetica Neue', Arial, sans-serif"
+export const PLEX = "'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif"
 
 /**
  * The faces a world may wear. Four are platform stacks certain to be on the machine; two are
@@ -20,4 +24,5 @@ export const ARCHIVO = "'Archivo Variable', 'Helvetica Neue', Arial, sans-serif"
  */
 export const FACES: Record<string, string> = {
   sans: SANS, grotesk: GROTESK, serif: SERIF, mono: MONO, fraunces: FRAUNCES, archivo: ARCHIVO,
+  roboto: ROBOTO, plex: PLEX,
 }

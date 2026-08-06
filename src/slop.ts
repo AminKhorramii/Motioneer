@@ -13,6 +13,7 @@
  */
 
 import type { Page } from '@/sections'
+import { worldById } from '@/worlds'
 import { COPY_TELLS, MARKUP_TELLS } from '@/design/slop'
 
 export interface Flag {
@@ -39,7 +40,11 @@ const text = (page: Page) =>
  */
 export function slop(page: Page, html?: string): Flag[] {
   const flags: Flag[] = []
+  // a world built in a named system wears some of these on purpose, and calling a correct
+  // Material elevation slop would be the detector marking the system down for existing
+  const claimed = new Set(page.world ? worldById(page.world).claims ?? [] : [])
   const add = (id: string, label: string, why: string, section?: string) => {
+    if (claimed.has(id)) return
     if (!flags.some((f) => f.id === id && f.section === section)) flags.push({ id, label, why, section })
   }
 

@@ -7,7 +7,7 @@
 
 import { mix, shift, type Taste } from '@/taste'
 import type { World } from '@/worlds'
-import { ARCHIVO, FRAUNCES, GROTESK, MONO, SANS, SERIF } from '@/design/faces'
+import { ARCHIVO, FRAUNCES, GROTESK, MONO, PLEX, ROBOTO, SANS, SERIF } from '@/design/faces'
 
 
 /** palette moves, each a relationship rather than a random shift */
@@ -27,7 +27,7 @@ export const WORLDS: World[] = [
     // a numbered list is more swiss than a row of cards, and the grid has no closing band.
     // Substance is argued twice: listed, then tabulated, because a grid states and then indexes
     wear: { claim: 'statement', substance: ['list', 'table'], offer: 'table', objections: 'list' },
-    compose: ['claim', 'substance', 'substance', 'offer', 'objections', 'credits'],
+    compose: ['masthead', 'claim', 'substance', 'substance', 'offer', 'objections', 'credits'],
     // the one move: the folio of the opening section set enormous and almost gone.
     // One committed move per world, because restraint plus commitment is what reads as
     // designed, where several small flourishes read as generated.
@@ -44,7 +44,7 @@ export const WORLDS: World[] = [
     // an essay argues in prose and then shows one plate, which is what a bleeding figure is for
     wear: { claim: 'statement', proof: 'quote', substance: ['prose', 'figure'], offer: 'statement', objections: 'prose', invitation: 'statement' },
     // a read: the argument, one witness, the substance twice over, the terms, a quiet close
-    compose: ['claim', 'proof', 'substance', 'substance', 'offer', 'objections', 'invitation', 'credits'],
+    compose: ['masthead', 'claim', 'proof', 'substance', 'substance', 'offer', 'objections', 'invitation', 'credits'],
     // the one move: a masthead slug above the headline, the way a periodical opens
     css: `#claim h1::before{content:'';display:block;width:2.4ch;height:4px;background:var(--accent);margin-bottom:1.6rem}`,
   },
@@ -59,7 +59,7 @@ export const WORLDS: World[] = [
     // documentation does not testimonial: everything is a listing or a transcript, and it
     // lists before it tabulates the way a manual states then indexes
     wear: { claim: 'transcript', substance: ['list', 'table'], offer: 'transcript', objections: 'list' },
-    compose: ['claim', 'substance', 'substance', 'objections', 'offer', 'credits'],
+    compose: ['masthead', 'claim', 'substance', 'substance', 'objections', 'offer', 'credits'],
     // the one move: the first substance prints inverted, a band of light in a dark page. It is
     // keyed on the id rather than the role, because the id marks the first of a repeated role
     // and a band that happens twice is a background rather than a move
@@ -77,7 +77,7 @@ export const WORLDS: World[] = [
     backdrop: 'ridge',
     wear: { claim: 'statement', substance: 'figure', proof: 'quote', invitation: 'statement' },
     // five sections. A poster is what it leaves out, and the whitespace is the design
-    compose: ['claim', 'substance', 'proof', 'invitation', 'credits'],
+    compose: ['masthead', 'claim', 'substance', 'proof', 'invitation', 'credits'],
     // the one move: the headline at the size of the wall, tighter than body type ever sits.
     // It needed !important on every line when the renderer wrote sizes inline; the blocks
     // carry their sizes as classes now, so a world outranks them by saying it once
@@ -96,24 +96,91 @@ export const WORLDS: World[] = [
     backdrop: 'none',
     // everything, listed: the fullest argument, set dense, priced in a table. The second
     // substance is a numbered list and the second witness speaks, so the density has a seam
-    wear: { claim: 'prose', proof: ['list', 'quote'], substance: ['table', 'list'], offer: 'table', objections: 'list', invitation: 'band' },
-    compose: ['claim', 'proof', 'substance', 'substance', 'proof', 'offer', 'objections', 'invitation', 'credits'],
+    wear: { masthead: 'band', claim: 'prose', proof: ['list', 'quote'], substance: ['table', 'list'], offer: 'table', objections: 'list', invitation: 'band', credits: 'table' },
+    compose: ['masthead', 'claim', 'proof', 'substance', 'substance', 'proof', 'offer', 'objections', 'invitation', 'credits'],
     // the one move: double rules between sections, the way a ledger separates its entries
     css: `section+section{border-top:4px double var(--line)}`,
   },
   {
-    id: 'soft',
-    name: 'soft product',
-    note: 'rounded, roomy and framed, the register most software pages are written in.',
-    voice: 'Write warmly and directly, the way a good product page speaks to a stranger who is in a hurry.',
-    taste: (t) => ({ ...tinted(t), display: SANS, body: SANS, scale: 1.3, radius: 16, density: 0.45, weight: 600, caps: false }),
-    structure: { rules: false, numbered: false, bleed: false, measure: 66, figure: 'framed', rhythm: [1.5, 0.7, 1.2, 0.6, 1.8, 0.8] },
-    backdrop: 'grain',
-    // a product page shows the thing, then says what is in it, and lets one customer speak
-    wear: { claim: 'prose', proof: ['list', 'quote'], substance: ['figure', 'list'], offer: 'table', invitation: 'band' },
-    compose: ['claim', 'proof', 'substance', 'substance', 'proof', 'offer', 'invitation', 'credits'],
-    // the one move: the opening sits on its own tinted band, so the page has a shoreline
-    css: `#claim{background:var(--surface)}`,
+    id: 'shadcn',
+    name: 'shadcn',
+    library: 'shadcn/ui',
+    note: 'zinc neutrals, an eight pixel radius and hairline borders. What most software ships in now.',
+    voice: 'Write the way good product documentation speaks: direct, second person, and free of any adjective that could be deleted without loss.',
+    // The register the old "soft product" world was gesturing at, named and made exact. A page
+    // you can hand to an engineer saying "this one, in shadcn" is worth more than a page you can
+    // only describe, and it is the register a reader recognises fastest.
+    taste: (t) => ({
+      ...t, bg: '#ffffff', ink: '#09090b', dim: '#71717a', accent2: mix(t.accent, '#ffffff', 0.72),
+      display: SANS, body: SANS, scale: 1.24, radius: 8, density: 0.55, weight: 600, caps: false,
+    }),
+    structure: { rules: false, numbered: false, bleed: false, measure: 66, figure: 'framed', rhythm: [1.3, 0.7, 1.15, 0.65, 1.5, 0.8] },
+    backdrop: 'none',
+    wear: { masthead: 'band', claim: 'prose', proof: 'list', substance: ['list', 'figure'], offer: 'table', objections: 'prose', invitation: 'band', credits: 'table' },
+    compose: ['masthead', 'claim', 'proof', 'substance', 'substance', 'offer', 'objections', 'invitation', 'credits'],
+    // the one move: everything is a hairline. No elevation anywhere, which is the whole tell
+    css: `:root{--line:#e4e4e7;--rule:1px}
+.card{border:1px solid #e4e4e7;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.btn{font-size:.875rem;font-weight:500;padding:.62em 1.05em;border-radius:6px}
+.btn-primary{box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.link{text-decoration:none;font-weight:500;color:var(--ink)}
+.masthead{border-bottom:1px solid #e4e4e7;padding-bottom:calc(var(--gap)*.8)}
+.eyebrow{text-transform:none;letter-spacing:0;font-weight:500;color:#71717a}
+.row{border-color:#e4e4e7}
+h1,h2,h3{letter-spacing:-.03em}`,
+  },
+  {
+    id: 'material',
+    name: 'material 3',
+    library: 'Material 3',
+    note: 'tonal surfaces, pill actions and real elevation, the way an Android product is built.',
+    voice: 'Write plainly and a little warmly, in short sentences, the way system copy speaks to someone mid-task.',
+    taste: (t) => ({
+      ...t, bg: mix('#ffffff', t.accent, 0.04), ink: '#1c1b1f', dim: '#49454f',
+      accent2: mix(t.accent, '#ffffff', 0.82),
+      display: ROBOTO, body: ROBOTO, scale: 1.32, radius: 16, density: 0.42, weight: 500, caps: false,
+    }),
+    structure: { rules: false, numbered: false, bleed: false, measure: 62, figure: 'framed', rhythm: [1.5, 0.8, 1.25, 0.7, 1.7, 0.9] },
+    backdrop: 'none',
+    wear: { masthead: 'band', claim: 'marginalia', proof: 'quote', substance: ['figure', 'list'], offer: 'table', objections: 'list', invitation: 'statement', credits: 'table' },
+    compose: ['masthead', 'claim', 'proof', 'substance', 'substance', 'offer', 'objections', 'invitation', 'credits'],
+    // elevation and a fully rounded action are the system, not decoration, which is why this
+    // world claims the two tells the detector would otherwise raise against it
+    claims: ['generic-shadow', 'shadow-stack', 'over-rounding'],
+    css: `.btn{border-radius:100px;padding:.72em 1.5em;font-weight:500;letter-spacing:.01em}
+.btn-primary{box-shadow:0 1px 3px 1px rgba(0,0,0,.15),0 1px 2px rgba(0,0,0,.3)}
+.card{border:0;border-radius:12px;background:var(--accent2);box-shadow:0 1px 3px 1px rgba(0,0,0,.15)}
+.figure>div{border-radius:12px}
+.link{text-decoration:none;font-weight:500;color:var(--accent)}
+.masthead{padding-bottom:calc(var(--gap)*.7)}
+.qa{border-top:0;background:var(--accent2);border-radius:12px;padding:1rem 1.2rem}
+.eyebrow{text-transform:uppercase;letter-spacing:.09em}`,
+  },
+  {
+    id: 'carbon',
+    name: 'carbon',
+    library: 'IBM Carbon',
+    note: 'no radius at all, a strict grid and one blue. The register of software that runs a business.',
+    voice: 'Write like an operator writing for another operator. Nouns, numbers, no persuasion, and never a joke.',
+    taste: (t) => ({
+      ...t, bg: '#161616', ink: '#f4f4f4', dim: '#8d8d8d', accent: '#4589ff', accent2: '#78a9ff',
+      display: PLEX, body: PLEX, scale: 1.2, radius: 0, density: 0.72, weight: 600, caps: false,
+    }),
+    structure: { rules: true, numbered: false, bleed: false, measure: 60, figure: 'plain', rhythm: [1.1, 0.6, 1.35, 0.65, 1.6, 0.75] },
+    backdrop: 'none',
+    wear: { masthead: 'band', claim: 'statement', proof: 'statement', substance: ['table', 'list'], offer: 'table', objections: 'list', invitation: 'band', credits: 'table' },
+    compose: ['masthead', 'claim', 'substance', 'substance', 'proof', 'offer', 'objections', 'credits'],
+    // the one move: the action is a rectangle with the label pushed left and the right third
+    // left empty, which is the shape of every button in the system
+    css: `:root{--line:#393939;--rule:1px}
+.btn{border-radius:0;padding:.95em 4rem .95em 1rem;font-weight:400;font-size:.875rem}
+.card{border:0;border-radius:0;background:#262626}
+.link{color:#78a9ff;text-underline-offset:3px}
+.masthead{border-bottom:1px solid #393939;padding-bottom:calc(var(--gap)*.7)}
+.mark{font-weight:600;letter-spacing:0}
+.eyebrow{text-transform:none;letter-spacing:.02em;color:#8d8d8d}
+.row{border-color:#393939}
+h1,h2,h3{letter-spacing:0}`,
   },
 ]
 

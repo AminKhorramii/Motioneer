@@ -135,7 +135,12 @@ await page.evaluate(async () => {
     await new Promise((r) => setTimeout(r, 90))
   }
 })
-await page.evaluate(() => document.querySelectorAll('.sec')[0].click())
+// the claim rather than the first row: a masthead opens the page now and cannot hold a figure,
+// so the section that can be drawn on has to be found by what it is rather than by where it sits
+await page.evaluate(() => {
+  const rows = [...document.querySelectorAll('.sec')]
+  ;(rows.find((r) => r.textContent.includes('the claim')) ?? rows[0]).click()
+})
 await page.waitForTimeout(300)
 await page.evaluate(() => [...document.querySelectorAll('.srow button')].find((b) => b.textContent.includes('draw'))?.click())
 await page.waitForFunction(

@@ -47,6 +47,7 @@ export function pageBrief(page: Page, product: string): string {
     `bg ${t.bg} · ink ${t.ink} · dim ${t.dim} · accent ${t.accent} · accent2 ${t.accent2}`,
     `display ${t.display.split(',')[0]} · body ${t.body.split(',')[0]} · scale ${t.scale.toFixed(2)} · weight ${t.weight}`,
     `radius ${t.radius}px · density ${t.density.toFixed(2)} · motion ${t.motion}`,
+    ...(w.library ? [`Built in ${w.library}. Use its own components and tokens rather than reproducing the CSS below; the values here are what this page set them to.`] : []),
     `${w.name}: ${s.rules ? 'ruled' : 'unruled'} · ${s.numbered ? 'numbered' : 'unnumbered'} · ${s.bleed ? 'full bleed' : 'contained'} · measure ${s.measure}ch · figures ${s.figure}`,
     '',
     '## Sections',
@@ -56,6 +57,8 @@ export function pageBrief(page: Page, product: string): string {
       ...lines(sec.content, ''),
     ]),
     '',
-    'Build one self-contained HTML file. Keep the copy. Honour the tokens.',
+    w.library
+      ? `Build this with ${w.library}. Keep the copy. Honour the tokens where the system allows it.`
+      : 'Build one self-contained HTML file. Keep the copy. Honour the tokens.',
   ].join('\n')
 }

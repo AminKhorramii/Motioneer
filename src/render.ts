@@ -106,6 +106,7 @@ ${t.caps ? 'text-transform:uppercase;' : ''}font-family:${t.body}}
 .btn{display:inline-block;padding:.82em 1.5em;border-radius:var(--r);font-weight:600;font-size:.95rem;
 font-family:${t.body};transition:transform .18s ${ease},filter .18s ease}
 .btn:hover{transform:translateY(-2px);filter:brightness(1.08)}
+.btn-small{padding:.58em 1.1em;font-size:.88rem}
 ${/* the fill and its ink move together. A world that wanted the action to be a text link set
    only the colour, the fill it did not know about stayed, and the page shipped a button of
    accent on accent with nothing readable in it. One property carries both. */ ''}
@@ -123,7 +124,9 @@ ${w.structure.rules ? 'section+section{border-top:var(--rule) solid var(--line)}
 ${/* a world that counts its own sections gets to keep its counter, because two numbering
    systems on one page is not a design, it is two designs arguing */ ''}
 ${w.structure.numbered && !/counter-increment|counter\(/.test(w.css ?? '') ? `body{counter-reset:sec}
-section{counter-increment:sec}
+${/* the masthead orients rather than argues, so the argument's numbering starts under it */ ''}
+section:not([data-role="masthead"]){counter-increment:sec}
+section[data-role="masthead"]>.wrap::before{content:none}
 section>.wrap{position:relative}
 section>.wrap::before{content:counter(sec,decimal-leading-zero);position:absolute;left:0;top:.2rem;
 font-size:.72rem;letter-spacing:.14em;color:var(--dim);font-variant-numeric:tabular-nums}
@@ -277,7 +280,8 @@ export function renderSection(
   // every one of them.
   // a row of names is a strip rather than a section, so it takes a fraction of whatever air
   // the world is giving, which keeps it tight without leaving the rhythm
-  const air = sec.role === 'proof' && sec.form === 'list' ? beat * 0.45 : beat
+  const strip = (sec.role === 'proof' && sec.form === 'list') || sec.role === 'masthead'
+  const air = strip ? beat * 0.45 : beat
   const open = `<section data-section="${sec.id}" data-form="${sec.form}" data-role="${sec.role}"${
     first ? ` id="${sec.role}"` : ''}${air === 1 ? '' : ` style="--beat:${air.toFixed(2)}"`}>`
   // one primary action and one quiet link. Two buttons of equal weight is the formula every
@@ -289,6 +293,20 @@ export function renderSection(
   const plans = (sec.content.plans as { name: string; price: string; line: string; features: string[] }[]) ?? []
 
   switch (sec.role) {
+    case 'masthead': {
+      const links = (sec.content.links as string[]) ?? []
+      const nav = links.map((n, i) => `<a class="navlink" ${ed(sec.id, `links.${i}`)}>${esc(n)}</a>`).join('')
+      // the masthead sits on the wide column, so the mark lines up with the headline under it
+      return sec.form === 'statement'
+        ? `${open}<div class="wrap"><div class="masthead wide center">
+<a class="mark" ${ed(sec.id, 'product')}>${esc(c.product)}</a>
+<nav class="nav">${nav}</nav></div></div></section>`
+        : `${open}<div class="wrap"><div class="masthead wide">
+<a class="mark" ${ed(sec.id, 'product')}>${esc(c.product)}</a>
+<nav class="nav">${nav}</nav>
+<a class="btn btn-primary btn-small" ${ed(sec.id, 'cta')}>${esc(c.cta)}</a></div></div></section>`
+    }
+
     case 'claim': {
       switch (sec.form) {
         // set off axis on purpose: the centered stack with a badge on top is the opening move
@@ -437,6 +455,18 @@ ${i === 1 ? `<a class="btn btn-primary">Choose ${esc(p.name)}</a>` : `<a class="
       // hands, because generators never credit their own typography
       const face = (stack: string) => stack.split(',')[0].replace(/['"]/g, '').trim()
       const note = c.note || `Set in ${face(t.display)}${face(t.body) !== face(t.display) ? ` and ${face(t.body)}` : ''}.`
+      const groups = (sec.content.groups as { title: string; links: string[] }[]) ?? []
+      if (sec.form === 'table' && groups.length) {
+        return `${open}<div class="wrap"><div class="stack wide">
+<div class="grid cols">${groups
+          .map((g, i) => `<div class="stack colgroup">
+<h3 class="colhead" ${ed(sec.id, `groups.${i}.title`)}>${esc(g.title)}</h3>
+${(g.links ?? []).map((l, j) => `<a class="navlink" ${ed(sec.id, `groups.${i}.links.${j}`)}>${esc(l)}</a>`).join('')}</div>`)
+          .join('')}</div>
+<div class="band foot">
+<span ${ed(sec.id, 'product')}>\u00A9 ${new Date().getFullYear()} ${esc(c.product)}</span>
+<span ${ed(sec.id, 'note')}>${esc(note)}</span></div></div></div></section>`
+      }
       return `${open}<div class="wrap"><div class="band foot wide">
 <span ${ed(sec.id, 'product')}>\u00A9 ${new Date().getFullYear()} ${esc(c.product)}</span>
 <span ${ed(sec.id, 'note')}>${esc(note)}</span></div></div></section>`

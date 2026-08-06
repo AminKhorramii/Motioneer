@@ -112,6 +112,27 @@ border-top:var(--rule) solid var(--line);padding-top:calc(var(--gap)*1.1)}`,
     collapse: '.band{align-items:flex-start}',
   },
   {
+    name: 'masthead',
+    note: 'the strip at the top: the mark, where else to go, and at most one action.',
+    knobs: ['--rule'],
+    css: `.masthead{display:flex;align-items:center;gap:calc(var(--gap)*.9);flex-wrap:wrap}
+.masthead .nav{display:flex;gap:calc(var(--gap)*.7);flex-wrap:wrap;margin-inline-end:auto}
+.masthead.center{justify-content:center}
+.masthead.center .nav{margin-inline-end:0}
+.mark{font-weight:700;letter-spacing:-.02em}
+.navlink{color:var(--dim);font-size:.95rem}
+.navlink:hover{color:var(--ink)}`,
+    collapse: '.masthead .nav{width:100%;order:3}',
+  },
+  {
+    name: 'cols',
+    note: 'the columns of a footer: a heading over a short list of places, repeated.',
+    knobs: ['--tile'],
+    css: `.cols{--tile:11rem}
+.colgroup{--stack:.45rem}
+.colhead{font-size:.82rem;letter-spacing:.06em;color:var(--dim)}`,
+  },
+  {
     name: 'names',
     note: 'a row of names that wraps, for the one strip of a page that is a list of who.',
     knobs: [],

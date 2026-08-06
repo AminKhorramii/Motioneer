@@ -14,26 +14,32 @@ import type { Taste } from '@/taste'
 import type { Backdrop } from '@/backdrop'
 import type { WorldId } from '@/worlds'
 
-export type Role = 'claim' | 'proof' | 'substance' | 'offer' | 'objections' | 'invitation' | 'credits'
+/**
+ * A masthead does not argue, it orients: whose page this is and where else you can go. It was
+ * missing entirely, so every page opened straight onto its headline with nothing above it, which
+ * is the one thing no shipped site does and the reason a finished page still read as a mock.
+ */
+export type Role = 'masthead' | 'claim' | 'proof' | 'substance' | 'offer' | 'objections' | 'invitation' | 'credits'
 export type Form =
   | 'statement' | 'prose' | 'marginalia' | 'transcript'
   | 'quote' | 'list' | 'table' | 'figure' | 'band'
 
 /** the forms each role can wear. Fewer, better set forms beat many templates each okay */
 export const ROLE_FORMS: Record<Role, Form[]> = {
+  masthead: ['band', 'statement'],
   claim: ['prose', 'marginalia', 'statement', 'transcript'],
   proof: ['quote', 'list', 'statement'],
   substance: ['list', 'figure', 'prose', 'table'],
   offer: ['table', 'statement', 'prose', 'transcript'],
   objections: ['list', 'prose'],
   invitation: ['band', 'statement'],
-  credits: ['prose'],
+  credits: ['prose', 'table'],
 }
 
-export const ROLES: Role[] = ['claim', 'proof', 'substance', 'offer', 'objections', 'invitation', 'credits']
+export const ROLES: Role[] = ['masthead', 'claim', 'proof', 'substance', 'offer', 'objections', 'invitation', 'credits']
 
 export const ROLE_LABEL: Record<Role, string> = {
-  claim: 'the claim', proof: 'proof', substance: 'substance', offer: 'the offer',
+  masthead: 'the masthead', claim: 'the claim', proof: 'proof', substance: 'substance', offer: 'the offer',
   objections: 'questions', invitation: 'the invitation', credits: 'credits',
 }
 
@@ -72,6 +78,10 @@ export const uid = () => Math.random().toString(36).slice(2, 9)
  */
 export function defaultContent(role: Role, product = 'Product'): Record<string, unknown> {
   switch (role) {
+    case 'masthead':
+      // the links name places rather than actions, because a nav that shouts competes with the
+      // one button the page is actually asking you to press
+      return { product, links: ['What it does', 'Pricing', 'Questions'], cta: 'Start' }
     case 'claim':
       return {
         eyebrow: 'One plain line that earns the claim.',
@@ -119,13 +129,20 @@ export function defaultContent(role: Role, product = 'Product'): Record<string, 
     case 'invitation':
       return { headline: 'Start in under a minute.', sub: 'No account needed to try it.', cta: 'Download' }
     case 'credits':
-      return { product, note: '' }
+      return {
+        product, note: '',
+        groups: [
+          { title: 'Product', links: ['What it does', 'Pricing', 'Changelog'] },
+          { title: 'Company', links: ['About', 'Contact'] },
+          { title: 'Legal', links: ['Privacy', 'Terms'] },
+        ],
+      }
   }
 }
 
 export function starterPage(taste: Taste, product = 'Product'): Page {
   const argue: [Role, Form][] = [
-    ['claim', 'prose'], ['proof', 'list'], ['substance', 'list'], ['substance', 'figure'],
+    ['masthead', 'band'], ['claim', 'prose'], ['proof', 'list'], ['substance', 'list'], ['substance', 'figure'],
     ['proof', 'quote'], ['offer', 'table'], ['objections', 'list'], ['invitation', 'band'],
     ['credits', 'prose'],
   ]
@@ -146,6 +163,8 @@ export function starterPage(taste: Taste, product = 'Product'): Page {
 
 /** what each old kind argued, and which form each of its numbered layouts wore */
 const LEGACY: Record<string, { role: Role; forms: Form[] }> = {
+  nav: { role: 'masthead', forms: ['band', 'statement'] },
+  header: { role: 'masthead', forms: ['band', 'statement'] },
   hero: { role: 'claim', forms: ['prose', 'marginalia', 'statement', 'transcript'] },
   logos: { role: 'proof', forms: ['list', 'list'] },
   quote: { role: 'proof', forms: ['quote', 'quote'] },

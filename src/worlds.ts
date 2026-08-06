@@ -58,6 +58,24 @@ export interface World {
    */
   wear: Partial<Record<Role, Form | Form[]>>
   /**
+   * The design system this world is built in, when it is built in one.
+   *
+   * Named so the page can say which, and so the brief handed back can say "build this with
+   * shadcn/ui" rather than describing tokens and hoping. A world grounded in an object rather
+   * than a library leaves this alone.
+   */
+  library?: string
+  /**
+   * The tells this world wears on purpose.
+   *
+   * The slop catalogue encodes what the median generated page looks like, and the median
+   * generated page looks like soft rounded product software, so a faithful Material page trips
+   * three of its entries for doing Material correctly. A world that has named a system it is
+   * built in gets to claim the tells that system genuinely owns; anything it has not claimed is
+   * still flagged, so the detector keeps its teeth against a page that merely drifted there.
+   */
+  claims?: string[]
+  /**
    * CSS the world brings with it, written against the page's own classes and tokens.
    *
    * Parameters alone could not express what the model was designing: a world called thermal
