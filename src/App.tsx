@@ -365,25 +365,31 @@ export default function App() {
       return
     }
     setBusy(`Rewriting this page with ${chosen().label}.`)
-    // streamed pages land at the end of the wall, so remember where the new run starts
-    const firstNew = pages.length
-    const made = await Promise.all(
-      [0].map(() =>
-        promptPage(page, instruction, product, 'model', upsertPage)
-          .catch((e: unknown) => String(e instanceof Error ? e.message : e).slice(0, 160)),
-      ),
-    )
-    const good = made.filter((m) => m && typeof m !== 'string') as Page[]
+    /**
+     * The rewrite lands on the paper you asked from.
+     *
+     * A rewritten page comes back with an id of its own, and it used to be added at the end of
+     * the wall, so asking for a punchier headline grew the wall to ten and moved you to a paper
+     * you had not been reading. The bar says what to change about this page, so this page is
+     * what changes: the reply keeps the place, the pin and the position it was asked from, and
+     * the wall stays the size the reader left it.
+     */
+    const here = page.id
+    // rewriting in place means a call that dies halfway leaves the paper halfway, so the page
+    // as it stands is held until there is a whole one to put in its place
+    const was = page
+    const onto = (p: Page) => upsertPage({ ...p, id: here, pinned: was.pinned })
+    const made = await promptPage(page, instruction, product, 'model', onto)
+      .catch((e: unknown) => String(e instanceof Error ? e.message : e).slice(0, 160))
     setBusy('')
-    if (!good.length) {
-      const why = made.find((m) => typeof m === 'string') as string | undefined
-      flash(why ? `The model call failed: ${why}` : 'No usable copy came back. A plainer instruction usually works.')
+    if (!made || typeof made === 'string') {
+      upsertPage(was)
+      flash(made ? `The model call failed: ${made}` : 'No usable copy came back. A plainer instruction usually works.')
       return
     }
-    good.forEach(upsertPage)
-    setAt(firstNew)
+    onto(made)
     setBar('')
-    flash('A new page is waiting to the right.')
+    flash('This page has been rewritten.')
   }
 
   /** Draw the image for one section. It lands in the page content, so it ships with the file. */
