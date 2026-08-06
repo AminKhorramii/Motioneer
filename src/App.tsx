@@ -307,6 +307,8 @@ export default function App() {
       if (e.key === 'ArrowLeft') setAt((v) => Math.max(v - 1, 0))
       // triage: narrowing eight to one is a keyboard pass, not a mouse deliberation
       if (e.key === 'p') pin()
+      // the dock no longer names the world, so this is the way to move a page to the next one
+      if (e.key === 'w') setPage(cycleWorld)
       if (e.key === 'x') kill(at)
       if (e.key === 'z') revive()
     }
@@ -546,13 +548,11 @@ export default function App() {
                 })}
               </div>
               <Dock
-                at={at} count={pages.length} angle={page.angle} world={page.world} bar={bar} busy={!!busy}
-                pinned={!!page.pinned} flags={flags}
+                at={at} count={pages.length} angle={page.angle} bar={bar} busy={!!busy}
+                flags={flags}
                 onBar={setBar} onRun={runBar}
                 onModel={() => setOnboarding('first')}
                 onGo={(i) => setAt(Math.max(0, Math.min(i, pages.length - 1)))}
-                onWorld={() => setPage(cycleWorld)}
-                onPin={pin}
                 onKill={() => kill(at)}
                 onSend={askedFrom ? sendBack : undefined}
                 onOpen={() => void host.preview(renderPage(page, { title: product.name })).then(() => flash('Opened in your browser.'))}
@@ -654,7 +654,6 @@ const Cell = memo(function Cell({ page, title, current, draft, canCull, onOpen, 
       )}
       <div className="cellbar">
         <span className="arch">{page.sections.filter((s) => s.on).length} sections</span>
-        <span className="tname">{page.taste.name}</span>
         {/* a page nobody has written yet looks finished until you read it, so it says which
             it is rather than borrowing the confidence of a written one */}
         {draft
@@ -665,7 +664,6 @@ const Cell = memo(function Cell({ page, title, current, draft, canCull, onOpen, 
             : 'none of the catalogued generic patterns'}>
           {verdict.length ? `${verdict.length} generic` : 'clean'}
         </span>}
-        {page.pinned && <span className="kept">pinned</span>}
       </div>
     </div>
   )
