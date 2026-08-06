@@ -54,6 +54,7 @@ tools/                 run by hand or at author time, never at run time
   try.mjs              the loop for working on Wall itself
   capture.mjs          record real streams into fixtures/
   shots.mjs            screenshots into shots/
+  wallclock.mjs        how long a whole wall takes, measured through the real app
   fonts.mjs            generates src/typefaces.ts, committed
   wasm.mjs             generates src/imagewasm.ts from the crate, committed
 ```

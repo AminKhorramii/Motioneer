@@ -3,13 +3,37 @@
  *
  * Every other measurement here has been of one call. This drives the browser the way a person
  * does and watches the pages land, because the number that matters is the one someone waits.
+ *
+ * It picks Claude Code as the model, so it needs no key and spends no tokens of yours. It is a
+ * measurement rather than a check: it prints times and asserts nothing, which is why it lives in
+ * tools/ and not in verify/.
+ *
+ *   npm run wallclock
  */
 import { spawn } from 'node:child_process'
 import { chromium } from 'playwright'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-const server = spawn('node', ['/Users/developer/Documents/code/side/wall/server/index.mjs'], {
+const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
+
+const server = spawn('node', [path.join(ROOT, 'server', 'index.mjs')], {
   env: { ...process.env, PORT: '0' },
   stdio: ['ignore', 'pipe', 'inherit'],
+})
+
+// a run that throws part way through used to leave a browser and a server behind, and the next
+// run then measured a machine already busy with the last one
+let browser = null
+const shutdown = () => {
+  browser?.close().catch(() => {})
+  server.kill()
+}
+process.on('exit', shutdown)
+process.on('SIGINT', () => process.exit(130))
+process.on('uncaughtException', (e) => {
+  console.error(e)
+  process.exit(1)
 })
 const url = await new Promise((resolve) => {
   let out = ''
@@ -20,7 +44,7 @@ const url = await new Promise((resolve) => {
   })
 })
 
-const browser = await chromium.launch()
+browser = await chromium.launch()
 const page = await browser.newPage()
 await page.goto(url)
 await page.evaluate(() => localStorage.setItem('wall-model', 'claude-code'))
@@ -91,5 +115,4 @@ for (;;) {
 }
 
 console.log('toast:', await page.evaluate(() => document.querySelector('.toast')?.textContent ?? null))
-await browser.close()
-server.kill()
+shutdown()

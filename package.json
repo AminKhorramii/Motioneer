@@ -30,6 +30,7 @@
     "prepublishOnly": "npm run build",
     "watch": "vite build --watch",
     "try": "node tools/try.mjs",
+    "wallclock": "npm run build && node tools/wallclock.mjs",
     "verify:beat": "node verify/beat.mjs"
   },
   "devDependencies": {
