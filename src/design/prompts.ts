@@ -49,7 +49,7 @@ ${blockContract()}
 
 Write CSS that commits to the idea. A receipt has a narrow column, dashed rules and tabular figures. A departures board has slabs of solid colour, tight uppercase rows and hard shadows. A gallery card has enormous margins, one hairline and nothing else. Use borders, background gradients, pseudo elements, counters, transforms and mix-blend-mode. Change the shape of things, not only their size.
 
-Two habits to drop, because both cost you the page. Do not write a width on anything: set --measure or --page and every section moves together, where a width on one block leaves it standing alone in the middle of a page that no longer lines up. Do not use !important: the blocks are classes, so a rule of yours already outranks them, and !important only means you have stopped being able to tell what is winning.
+Ground each world in something real, and let that decide the values rather than picking them one at a time.
 
 Avoid the patterns that make a page look generated rather than designed, and the reasons matter more than the list: frosted glass panels, because they read as a period effect and cost contrast; default drop shadows under everything, because when every block floats nothing is above anything; cards inside cards, because two borders around the same content divide attention without adding structure; gradient filled headlines, because that is the decoration a page reaches for when the words are not carrying it; more than three typefaces, because two is a system and four is an accident; body text under fifteen pixels, because it looks refined on your screen and is unreadable on everyone else's; and small labels blinking forever, because they take attention they never give back.
 

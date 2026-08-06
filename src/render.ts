@@ -48,14 +48,22 @@ ${/* Every measurement a block is allowed to have, in one place. A block reads t
    never writes a width of its own, which is what keeps one page to one column. */ ''}
 --page:${w.structure.bleed ? 'none' : '1080px'};
 --edge:${w.structure.numbered ? 'clamp(2.8rem,5vw,4rem)' : w.structure.bleed ? '6vw' : 'clamp(1.2rem,4vw,2.4rem)'};
---measure:${w.structure.measure}ch;--split:1.05fr .95fr;--tile:15rem;
---rowsplit:minmax(9rem,15rem) 1fr;--rule:1px;--stack:1.05rem;--beat:1}
+--measure:${w.structure.measure}ch;--headline:20ch;--subhead:24ch;
+--split:1.05fr .95fr;--tile:15rem;
+--rowsplit:minmax(9rem,15rem) 1fr;--rule:1px;--stack:1.05rem;--beat:1;
+--btn-fill:var(--accent);--btn-ink:${luminance(t.accent) > 0.6 ? '#101216' : '#fff'}}
 body{background:var(--bg);color:var(--ink);font-family:${t.body};font-size:16.5px;
 line-height:${(1.45 + gap * 0.28).toFixed(2)};-webkit-font-smoothing:antialiased}
 a{color:inherit;text-decoration:none}
 h1,h2,h3{font-family:${t.display};font-weight:${t.weight};line-height:1.07;letter-spacing:-.022em}
 h1{font-size:clamp(2.3rem,6vw,${s(6)})}h2{font-size:clamp(1.5rem,3.2vw,${s(4)})}h3{font-size:${s(1)}}
+${/* Type of two sizes cannot share one column. A measure right for 16px body is 11 characters
+   of a 48px headline, which is where the headline stacked into a column of two-word lines: it
+   was not the headline that was wrong, it was the column it had been given. Each register is
+   measured in its own type, so a heading gets its characters per line and body copy gets its
+   own, and both still begin on the same edge. */ ''}
 p{color:var(--dim);hyphens:auto;text-wrap:pretty;max-width:var(--measure)}
+h1{max-width:var(--headline)}h2{max-width:var(--subhead)}
 h1,h2{text-wrap:balance}
 ${/* The frame and the blocks, from the library. Layout lives there as data so a world can
    restyle a page by naming a block, and so the design prompt can be generated from the same
@@ -63,7 +71,7 @@ ${/* The frame and the blocks, from the library. Layout lives there as data so a
 ${blockCss()}
 ${/* what the taste sheet does to the blocks: the sizes and faces this page is set in */ ''}
 .lead{font-size:1.14rem}
-.display{font-size:clamp(2.6rem,7.4vw,5.2rem);max-width:16ch}
+.display{font-size:clamp(2.6rem,7.4vw,5.2rem)}
 .mid{font-size:clamp(1.9rem,4.4vw,2.9rem)}
 .quote{font-size:clamp(1.7rem,3.8vw,2.7rem);line-height:1.22;color:var(--ink)}
 .quoted{font-size:clamp(1.5rem,3.4vw,2.2rem);color:var(--ink);font-family:${t.display};line-height:1.35}
@@ -83,7 +91,10 @@ ${t.caps ? 'text-transform:uppercase;' : ''}font-family:${t.body}}
 .btn{display:inline-block;padding:.82em 1.5em;border-radius:var(--r);font-weight:600;font-size:.95rem;
 font-family:${t.body};transition:transform .18s ${ease},filter .18s ease}
 .btn:hover{transform:translateY(-2px);filter:brightness(1.08)}
-.btn-primary{background:var(--accent);color:${luminance(t.accent) > 0.6 ? '#101216' : '#fff'}}
+${/* the fill and its ink move together. A world that wanted the action to be a text link set
+   only the colour, the fill it did not know about stayed, and the page shipped a button of
+   accent on accent with nothing readable in it. One property carries both. */ ''}
+.btn-primary{background:var(--btn-fill);color:var(--btn-ink)}
 .link{color:var(--dim);font-size:.95rem;text-decoration:underline;text-underline-offset:4px;align-self:center}
 .link:hover{color:var(--ink)}
 ${/* the entrance belongs to the finished page: the editable paper repaints per streamed
@@ -94,7 +105,9 @@ section{animation:settle ${t.motion === 'lively' ? '.55s' : '.75s'} ${ease} both
 ${Array.from({ length: 12 }, (_, i) => `section:nth-of-type(${i + 1}){animation-delay:${i * (t.motion === 'lively' ? 60 : 85)}ms}`).join('')}
 }` : ''}
 ${w.structure.rules ? 'section+section{border-top:var(--rule) solid var(--line)}' : ''}
-${w.structure.numbered ? `body{counter-reset:sec}
+${/* a world that counts its own sections gets to keep its counter, because two numbering
+   systems on one page is not a design, it is two designs arguing */ ''}
+${w.structure.numbered && !/counter-increment|counter\(/.test(w.css ?? '') ? `body{counter-reset:sec}
 section{counter-increment:sec}
 section>.wrap{position:relative}
 section>.wrap::before{content:counter(sec,decimal-leading-zero);position:absolute;left:0;top:.2rem;
@@ -186,29 +199,49 @@ document.addEventListener('click',function(e){
 </script>`
 
 function figure(t: Taste, seed: number, ratio = '16/10', img?: string, treatment: World['structure']['figure'] = 'framed') {
+  // the frame is drawn against the ink rather than the hairline token, because a figure that
+  // has to hold an image needs an edge a reader can find, where a rule between sections does not
+  const edge = `1px solid ${alpha(t.ink, 0.2)}`
   const frame = treatment === 'plain'
-    ? 'border:1px solid var(--line)'
+    ? `border:${edge}`
     : treatment === 'bleed'
       ? 'border:0;border-radius:0'
-      : 'border:1px solid var(--line);border-radius:var(--r)'
+      : `border:${edge};border-radius:var(--r)`
   if (img) {
     return `<div style="overflow:hidden;${frame};aspect-ratio:${ratio}">
 <img src="${img}" alt="" style="width:100%;height:100%;object-fit:cover;display:block"></div>`
   }
   // A wireframe of a product screen rather than abstract art. Orbs and stripe textures are
   // the decoration a generator reaches for; a sketched interface could only belong to a product.
+  //
+  // It used to be drawn at four to nine percent off the background, which on a dark ground made
+  // the largest block on the page a rectangle of nothing, and a page whose biggest element says
+  // nothing reads as broken rather than as restrained. It is drawn at strengths a reader can
+  // actually see now, and it has a chrome, a rail and a content column, so it resolves into an
+  // interface at a glance instead of into faint marks.
   const r = (n: number) => Math.abs(Math.sin(seed * 3301 + n * 7919)) % 1
   const dark = luminance(t.bg) < 0.5
+  const ink = (a: number) => alpha(t.ink, a)
+  const bar = (x: string, y: string, w: string, h: number, a: number) =>
+    `<div style="position:absolute;${x};top:${y};width:${w};height:${h}px;background:${ink(a)};border-radius:1px"></div>`
+  const chrome = (9 + r(7) * 4).toFixed(0)
+  // the rail: what a product has and a poster does not
+  const rail = Array.from({ length: 4 }, (_, i) =>
+    bar('left:5%', `${(Number(chrome) + 9 + i * 9).toFixed(0)}%`, `${(9 + r(i + 9) * 7).toFixed(0)}%`, 6, i === 0 ? 0.3 : 0.15)).join('')
   const rows = Array.from({ length: 3 + Math.round(r(1) * 2) }, (_, i) =>
-    `<div style="position:absolute;left:52%;right:8%;top:${(24 + i * 11).toFixed(0)}%;height:1px;background:${alpha(t.ink, 0.1)}"></div>
-<div style="position:absolute;right:8%;top:${(20 + i * 11).toFixed(0)}%;width:${(6 + r(i + 4) * 8).toFixed(0)}%;height:7px;background:${alpha(t.ink, 0.12)}"></div>`).join('')
+    `<div style="position:absolute;left:47%;right:7%;top:${(30 + i * 12).toFixed(0)}%;height:1px;background:${ink(0.16)}"></div>
+${bar('right:7%', `${(26 + i * 12).toFixed(0)}%`, `${(6 + r(i + 4) * 8).toFixed(0)}%`, 7, 0.24)}`).join('')
   return `<div style="position:relative;overflow:hidden;${frame};
-aspect-ratio:${ratio};background:${mix(t.bg, dark ? '#fff' : '#000', 0.04)}">
-<div style="position:absolute;left:0;top:0;right:0;height:${(9 + r(7) * 4).toFixed(0)}%;border-bottom:1px solid ${alpha(t.ink, 0.09)}"></div>
-<div style="position:absolute;left:8%;top:24%;width:34%;height:10px;background:${alpha(t.ink, 0.16)}"></div>
-<div style="position:absolute;left:8%;top:33%;width:${(20 + r(2) * 14).toFixed(0)}%;height:10px;background:${alpha(t.ink, 0.09)}"></div>
+aspect-ratio:${ratio};background:${mix(t.bg, dark ? '#fff' : '#000', 0.07)}">
+<div style="position:absolute;left:0;top:0;right:0;height:${chrome}%;
+background:${ink(0.06)};border-bottom:1px solid ${ink(0.2)}"></div>
+<div style="position:absolute;left:0;top:${chrome}%;bottom:0;width:26%;border-right:1px solid ${ink(0.14)}"></div>
+${rail}
+${bar('left:31%', '26%', '30%', 11, 0.34)}
+${bar('left:31%', `${(34).toFixed(0)}%`, `${(16 + r(2) * 12).toFixed(0)}%`, 9, 0.18)}
 ${rows}
-<div style="position:absolute;left:8%;bottom:14%;width:${(18 + r(3) * 10).toFixed(0)}%;height:32px;background:${alpha(t.accent, 0.9)};border-radius:2px"></div></div>`
+<div style="position:absolute;left:31%;bottom:13%;width:${(16 + r(3) * 9).toFixed(0)}%;height:30px;
+background:${alpha(t.accent, 0.92)};border-radius:2px"></div></div>`
 }
 
 export function renderSection(
@@ -245,11 +278,11 @@ export function renderSection(
       switch (sec.form) {
         // set off axis on purpose: the centered stack with a badge on top is the opening move
         // of every generated page, so the plain claim leads from the left and leaves air
-        case 'prose': return `${open}<div class="wrap"><div class="stack">
+        case 'prose': return `${open}<div class="wrap"><div class="stack wide">
 <h1 ${ed(sec.id, 'headline')}>${esc(c.headline)}</h1>
 <p class="lead" ${ed(sec.id, 'sub')}>${esc(c.sub)}</p>${ctas}</div>
 <div class="figure wide">${figure(t, seed, '21/9', img, w.structure.figure)}</div></div></section>`
-        case 'marginalia': return `${open}<div class="wrap"><div class="split wide">
+        case 'marginalia': return `${open}<div class="wrap"><div class="split leadside wide">
 <div class="stack"><h1 ${ed(sec.id, 'headline')}>${esc(c.headline)}</h1>
 <p class="lead" ${ed(sec.id, 'sub')}>${esc(c.sub)}</p>${ctas}</div>
 <div class="figure">${figure(t, seed, '4/5', img, w.structure.figure)}</div></div></div></section>`
@@ -283,7 +316,7 @@ ${img ? `<div class="figure wide">${figure(t, seed, '16/10', img, w.structure.fi
 <h2 class="quote" ${ed(sec.id, 'quote')}>${esc(c.quote)}</h2>
 <p><b ${ed(sec.id, 'name')}>${esc(c.name)}</b>, <span ${ed(sec.id, 'role')}>${esc(c.role)}</span></p></div></div></section>`
       }
-      return `${open}<div class="wrap"><div class="stack center">
+      return `${open}<div class="wrap"><div class="stack wide center">
 <p class="quoted" ${ed(sec.id, 'quote')}>\u201C${esc(c.quote)}\u201D</p>
 <p><span ${ed(sec.id, 'name')}>${esc(c.name)}</span>, <span ${ed(sec.id, 'role')}>${esc(c.role)}</span></p>
 </div></div></section>`
@@ -374,7 +407,7 @@ ${i === 1 ? `<a class="btn btn-primary">Choose ${esc(p.name)}</a>` : `<a class="
 
     case 'invitation':
       return sec.form === 'statement'
-        ? `${open}<div class="wrap"><div class="stack center">
+        ? `${open}<div class="wrap"><div class="stack wide center">
 <h2 ${ed(sec.id, 'headline')}>${esc(c.headline)}</h2>
 <p ${ed(sec.id, 'sub')}>${esc(c.sub)}</p>
 <div class="ctas"><a class="btn btn-primary" ${ed(sec.id, 'cta')}>${esc(c.cta)}</a></div>

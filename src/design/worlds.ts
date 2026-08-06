@@ -81,7 +81,10 @@ export const WORLDS: World[] = [
     // the one move: the headline at the size of the wall, tighter than body type ever sits.
     // It needed !important on every line when the renderer wrote sizes inline; the blocks
     // carry their sizes as classes now, so a world outranks them by saying it once
-    css: `#claim h1{font-size:clamp(3.6rem,11.5vw,9.5rem);line-height:.94;letter-spacing:-.045em;max-width:none;margin-left:-.05em}`,
+    // the floor is low because a poster is big type relative to its page, not big in absolute
+    // terms: a 3.6rem floor on a phone put nine characters on a line, which is a column of
+    // words rather than a poster
+    css: `#claim h1{font-size:clamp(2rem,11.5vw,9.5rem);line-height:.94;letter-spacing:-.045em;max-width:none;margin-left:-.05em}`,
   },
   {
     id: 'catalogue',

@@ -88,19 +88,43 @@ const clamp = (v: unknown, lo: number, hi: number, fallback: number) => {
   return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : fallback
 }
 
+/** the properties that belong to the frame, which a block may read and no world may write */
+const FRAME_OWNED = /^(max-width|min-width|width|display|grid-template-columns|grid-template|padding|padding-(inline|left|right)(-\w+)?|margin-(inline|left|right)(-\w+)?)$/i
+
 /**
- * Keep model authored CSS to CSS. It is rendered inside an iframe that holds nothing but the
- * page, so it cannot reach the app, but it can still break the promise that a shipped page is
- * one file with no requests. Imports and remote urls go, and the whole thing is capped.
+ * Keep model authored CSS to CSS, and keep it out of the frame.
+ *
+ * It is rendered inside an iframe that holds nothing but the page, so it cannot reach the app,
+ * but it can still break the promise that a shipped page is one file with no requests. Imports
+ * and remote urls go, and the whole thing is capped.
+ *
+ * It can also break the page. Four of eight recorded worlds set a width on .wrap, which is the
+ * grid every section shares, so the reading column a world asked for at 46 characters arrived
+ * at 32 and every wide block was stranded in the middle of a page it no longer filled. The
+ * intent was never wrong: a receipt is a narrow column. The lever was. Those declarations are
+ * dropped and the world says the same thing with --measure, which moves the whole page at once
+ * and cannot leave one block behind. This is the clamp madeWorld already applies to every
+ * number, extended to the one surface that had none.
  */
 function safeCss(raw: unknown): string {
   const css = String(raw ?? '')
   if (!css.trim() || css.includes('</')) return ''
-  return css
+  const clean = css
     .replace(/@import[^;]*;?/gi, '')
     .replace(/url\(\s*['"]?\s*(https?:|\/\/)[^)]*\)/gi, 'none')
     .replace(/expression\s*\(/gi, '(')
-    .slice(0, 4000)
+    // !important is never needed against a library of classes, and it only hides what is winning
+    .replace(/!\s*important/gi, '')
+    // the frame's own properties, on the frame's own selector
+    .replace(/([^{}]+)\{([^{}]*)\}/g, (whole, selector: string, body: string) => {
+      if (!/(^|[\s,>+~])\.wrap\b/.test(selector)) return whole
+      const kept = body
+        .split(';')
+        .filter((d) => !FRAME_OWNED.test(d.split(':')[0]?.trim() ?? ''))
+        .join(';')
+      return kept.trim() ? `${selector}{${kept}}` : ''
+    })
+  return clean.slice(0, 4000)
 }
 
 export function madeWorld(raw: Record<string, unknown>, i: number): World {

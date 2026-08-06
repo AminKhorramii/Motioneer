@@ -27,6 +27,8 @@ export interface Token {
 
 export const TOKENS: Token[] = [
   { name: '--measure', note: 'the reading column, and the single biggest lever on how a page reads', range: '44ch to 82ch' },
+  { name: '--headline', note: 'characters per line of an h1, counted in the headline own size and not the body one', range: '12ch to 30ch' },
+  { name: '--subhead', note: 'the same for an h2', range: '16ch to 36ch' },
   { name: '--page', note: 'the outer column everything is centred in', range: '720px to 1400px, or none for edge to edge' },
   { name: '--edge', note: 'the gutter between the page and its content', range: '1rem to 8vw' },
   { name: '--split', note: 'the two tracks of a split block', range: 'two fr values, like 1fr 1fr or .6fr 1.4fr' },
@@ -35,6 +37,8 @@ export const TOKENS: Token[] = [
   { name: '--rule', note: 'the weight of every hairline on the page at once', range: '0 to 4px' },
   { name: '--stack', note: 'the air between things stacked on each other', range: '.3rem to 2rem' },
   { name: '--beat', note: 'set per section from the rhythm, multiplying that section, air', range: '.4 to 3' },
+  { name: '--btn-fill', note: 'what the one real button is filled with. Set it with --btn-ink or not at all', range: 'a colour, or transparent for a text link' },
+  { name: '--btn-ink', note: 'the text on that fill, which has to be legible against whatever you filled it with', range: 'a colour' },
 ]
 
 /**
@@ -76,7 +80,9 @@ export const BLOCKS: Block[] = [
     name: 'split',
     note: 'two columns that hold something beside something else, words and a figure most often.',
     knobs: ['--split'],
-    css: '.split{display:grid;grid-template-columns:var(--split);gap:calc(var(--gap)*1.3);align-items:center}',
+    // both columns begin at the top: centring floated a short heading against a tall figure,
+    // level with nothing, which reads as two things placed rather than one thing composed
+    css: '.split{display:grid;grid-template-columns:var(--split);gap:calc(var(--gap)*1.3);align-items:start}',
     collapse: '.split{grid-template-columns:1fr;gap:calc(var(--gap)*.9)}',
   },
   {
@@ -136,6 +142,9 @@ border-top:var(--rule) solid var(--line);padding-top:calc(var(--gap)*1.1)}`,
 /** the shapes a block wears, each a value rather than a second layout */
 export const SHAPES = `.halves{--split:1fr 1fr}
 .figside{--split:.8fr 1.2fr}
+${/* the opening gives the words the larger share, because a headline set beside a picture in
+   half a page breaks into two-word lines and stops being a headline */ ''}
+.leadside{--split:1.3fr .7fr}
 .numbered{--rowsplit:3.4rem 1fr}
 .pairs{--tile:20rem}
 .ruled{border-top:var(--rule) solid var(--line);padding-top:calc(var(--gap)*.9)}
@@ -186,6 +195,10 @@ export function blockContract(): string {
     ...TOKENS.map((t) => `  ${t.name}: ${t.note}. ${t.range}.`),
     '',
     'The rest of the markup: section carries data-role, which is claim, proof, substance, offer, objections, invitation or credits, and data-form, which is how that role is set. The first section of each role also carries id of the same name, so #claim styles the opening and [data-role="substance"] reaches every substance section. .wrap is the frame inside each section. h1, h2 and h3 are headings and p is body copy. .eyebrow is the small label above a headline. .ctas holds the actions, .btn-primary is the one real button and .link is the quiet one beside it. .figure wraps a drawn or generated image. .num is the figure beside a numbered row. There is no figure element, no figcaption and no second button style.',
+    '',
+    'What the blocks already set, so you are changing something rather than assuming nothing is there. .btn-primary is already filled with --btn-fill and its text is already --btn-ink, chosen to be legible on that fill, so to make the action a text link set both together and never only the colour: a world that set colour alone shipped a button of accent on accent with nothing readable in it. p is already limited to --measure and h1 to --headline, each counted in its own type. .card already has a background and a radius. Every hairline on the page is already --rule.',
+    '',
+    'Two rules about the frame. Do not write width, max-width, padding or display on .wrap: it is the grid every section shares, and a width there shrinks the reading column and the wide blocks together, which strands the page in the middle of itself. Say the same thing with --measure or --page and the whole page moves at once. Do not use !important: the blocks are classes, so a rule of yours already outranks them. Both are dropped from your CSS if you write them anyway, and you will have spent the lines for nothing.',
     '',
     'These custom properties carry the palette: --bg, --ink, --dim, --accent, --accent2, --surface, --line, --r for radius, --gap for rhythm.',
   ].join('\n')
