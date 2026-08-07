@@ -1,5 +1,6 @@
 import { chosen } from '@/compose'
 import { Icon } from '@/icons'
+import { worldById, type WorldId } from '@/worlds'
 import { MARKS } from '@/models'
 import type { Flag } from '@/slop'
 
@@ -15,6 +16,7 @@ interface Props {
   at: number
   count: number
   angle?: string
+  world?: WorldId
   bar: string
   busy: boolean
   /** what the slop detector found on this page, so the verdict travels with the paper */
@@ -31,7 +33,7 @@ interface Props {
 }
 
 export function Dock({
-  at, count, angle, bar, busy, flags,
+  at, count, angle, world, bar, busy, flags,
   onBar, onRun, onGo, onModel, onKill, onSend, onOpen, onShip,
 }: Props) {
   return (
@@ -75,6 +77,11 @@ export function Dock({
             were the two things in the bar that named a state rather than doing something, so they
             are keys now: p pins, w moves the page to the next world. */}
         {angle && <span className="angle">{angle}</span>}
+        {/* a badge rather than a control: it says what this page is built in, which is the one
+            thing you need before handing it back, and the brief carries the same name */}
+        <span className="angle" title={worldById(world).note}>
+          {worldById(world).library ?? worldById(world).name}
+        </span>
         <span className="spacer" />
         {/* the verdict sits beside ship, because it is the last thing worth checking before a
             page goes out, and the reasons ride in the tooltip rather than taking a panel */}

@@ -14,7 +14,7 @@ import { SectionsRail } from '@/SectionsRail'
 import { Dock } from '@/Dock'
 import { Building } from '@/Building'
 import { Icon } from '@/icons'
-import { register as registerWorlds, type World } from '@/worlds'
+import { WORLDS, register as registerWorlds, type World } from '@/worlds'
 
 import { host, isTauri } from '@/host'
 
@@ -173,7 +173,9 @@ export default function App() {
     }
 
     const startPage = (world: World, i: number) => {
-      if (run.current !== mine || started[i]) return
+      // the wall has as many places as it has drafts, and a call that answers with more worlds
+      // than it was asked for cannot be allowed to grow one
+      if (run.current !== mine || started[i] || i >= slots.current.length) return
       started[i] = world
       registerWorlds([world])
       // The design is worth showing before the words are. A world is finished several seconds
@@ -187,9 +189,22 @@ export default function App() {
       jobs.push(writeOne(base, p, world, i, (page) => land(page, i)))
     }
 
+    /**
+     * The named systems cost nothing to design, so their pages start writing at once.
+     *
+     * Every slot used to wait on the design call, and that call spends about fifty seconds
+     * thinking before it writes a character, so the first written page could not arrive before
+     * about seventy. shadcn, material 3 and carbon are hand written here: there is nothing to
+     * design, only copy to write, so three of the nine start at the first frame and the model
+     * is asked for five worlds rather than eight, which is three design calls rather than four.
+     */
+    const SYSTEMS = ['shadcn', 'material', 'carbon']
+    const seeded = WORLDS.filter((w) => SYSTEMS.includes(w.id))
+    seeded.forEach((w, k) => startPage(w, k))
+
     // every beat is the model proving it is still thinking, which is the only thing there is to
-    // report during the minute before the first world
-    const worlds = await promptWorlds(p, 8, startPage, 'model', () => {
+    // report during the wait before the first designed world
+    const worlds = await promptWorlds(p, 8 - seeded.length, (w, i) => startPage(w, i + seeded.length), 'model', () => {
       if (run.current === mine) setBuilding((b) => (b ? { ...b, thoughts: b.thoughts + 1 } : b))
     })
     if (run.current !== mine) return
@@ -199,7 +214,7 @@ export default function App() {
 
     // a provider that does not stream hands the worlds over at the end, so anything that did
     // not arrive as it was written starts here
-    worlds.forEach(startPage)
+    worlds.forEach((w, i) => startPage(w, i + seeded.length))
     const results = await Promise.all(jobs)
     const written = results.reduce((x, r) => x + r.ok, 0)
     const error = results.find((r) => r.error)?.error
@@ -547,7 +562,7 @@ export default function App() {
                 })}
               </div>
               <Dock
-                at={at} count={pages.length} angle={page.angle} bar={bar} busy={!!busy}
+                at={at} count={pages.length} angle={page.angle} world={page.world} bar={bar} busy={!!busy}
                 flags={flags}
                 onBar={setBar} onRun={runBar}
                 onModel={() => setOnboarding('first')}
