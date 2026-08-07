@@ -280,6 +280,12 @@ export function renderSection(
   // every one of them.
   // a row of names is a strip rather than a section, so it takes a fraction of whatever air
   // the world is giving, which keeps it tight without leaving the rhythm
+  // how this world lets a figure leave the column, decided once for every form that draws one
+  const out = w.structure.breakout ?? 'none'
+  const figClass = out === 'bleed' ? 'figure full bleedfig'
+    : out === 'overlap' ? 'figure wide overlapfig'
+    : 'figure wide'
+  const tiles = out === 'stagger' ? 'grid stagger' : 'grid'
   const strip = (sec.role === 'proof' && sec.form === 'list') || sec.role === 'masthead'
   const air = strip ? beat * 0.45 : beat
   const open = `<section data-section="${sec.id}" data-form="${sec.form}" data-role="${sec.role}"${
@@ -314,7 +320,7 @@ export function renderSection(
         case 'prose': return `${open}<div class="wrap"><div class="stack wide">
 <h1 ${ed(sec.id, 'headline')}>${esc(c.headline)}</h1>
 <p class="lead" ${ed(sec.id, 'sub')}>${esc(c.sub)}</p>${ctas}</div>
-<div class="figure wide">${figure(t, seed, '21/9', img, w.structure.figure)}</div></div></section>`
+<div class="${figClass}">${figure(t, seed, '21/9', img, w.structure.figure)}</div></div></section>`
         case 'marginalia': return `${open}<div class="wrap"><div class="split leadside wide">
 <div class="stack"><h1 ${ed(sec.id, 'headline')}>${esc(c.headline)}</h1>
 <p class="lead" ${ed(sec.id, 'sub')}>${esc(c.sub)}</p>${ctas}</div>
@@ -324,14 +330,14 @@ export function renderSection(
 <div class="split halves ruled wide">
 <p class="lead" ${ed(sec.id, 'sub')}>${esc(c.sub)}</p>
 <div class="stack"><p class="ink" ${ed(sec.id, 'eyebrow')}>${esc(c.eyebrow)}</p>${ctas}</div></div>
-${img ? `<div class="figure wide">${figure(t, seed, '16/10', img, w.structure.figure)}</div>` : ''}</div></section>`
+${img ? `<div class="${figClass}">${figure(t, seed, '16/10', img, w.structure.figure)}</div>` : ''}</div></section>`
         // a transcript, not a drawing of a window: the traffic light dots promise a real
         // window and deliver a prop
         default: return `${open}<div class="wrap"><div class="card mono wide"><div class="stack">
 <p class="small"><span class="prompt">$</span> <span ${ed(sec.id, 'eyebrow')}>${esc(c.eyebrow)}</span></p>
 <h1 class="mid" ${ed(sec.id, 'headline')}>${esc(c.headline)}</h1>
 <p ${ed(sec.id, 'sub')}>${esc(c.sub)}</p>${ctas}</div></div>
-<div class="figure wide">${figure(t, seed, '16/10', img, w.structure.figure)}</div></div></section>`
+<div class="${figClass}">${figure(t, seed, '16/10', img, w.structure.figure)}</div></div></section>`
       }
     }
 
@@ -411,7 +417,7 @@ ${plans.map((p, i) => `<p class="tabular"><span class="prompt">$</span> <b class
 <div class="ctas"><a class="btn btn-primary">Choose ${esc((plans[1] ?? plans[0])?.name ?? '')}</a></div></div></div></div></section>`
       }
       return `${open}<div class="wrap"><h2 class="center wide" ${ed(sec.id, 'title')}>${esc(c.title)}</h2>
-<div class="grid wide">
+<div class="${tiles} wide">
 ${plans
         .map((p, i) => `<div class="card plan${i === 1 ? ' pick' : ''}">
 <h3 ${ed(sec.id, `plans.${i}.name`)}>${esc(p.name)}</h3>
@@ -435,7 +441,7 @@ ${i === 1 ? `<a class="btn btn-primary">Choose ${esc(p.name)}</a>` : `<a class="
 <h2 ${ed(sec.id, 'title')}>${esc(c.title)}</h2>${pairs}</div></div></section>`
         : `${open}<div class="wrap"><div class="stack wide">
 <h2 ${ed(sec.id, 'title')}>${esc(c.title)}</h2>
-<div class="grid pairs">${pairs}</div></div></div></section>`
+<div class="${tiles} pairs">${pairs}</div></div></div></section>`
     }
 
     case 'invitation':

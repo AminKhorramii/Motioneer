@@ -60,6 +60,14 @@ section{padding-block:calc(var(--gap)*2.2*var(--beat))}`
 export interface Block {
   /** the class, which is what a world names to restyle it */
   name: string
+  /**
+   * The classes this block actually puts on elements, when they are not just its name.
+   *
+   * A block is usually one class, but a few are a set of modifiers that belong to one idea and
+   * are chosen between rather than combined. Naming them here keeps the contract readable and
+   * still lets the gate check that every hook it promises is one a page really wears.
+   */
+  classes?: string[]
   /** what it is for, in the words someone choosing between them would use */
   note: string
   /** the tokens that retune this one */
@@ -131,6 +139,23 @@ border-top:var(--rule) solid var(--line);padding-top:calc(var(--gap)*1.1)}`,
     css: `.cols{--tile:11rem}
 .colgroup{--stack:.45rem}
 .colhead{font-size:.82rem;letter-spacing:.06em;color:var(--dim)}`,
+  },
+  {
+    name: 'breakout',
+    classes: ['bleedfig', 'overlapfig', 'stagger'],
+    note: 'the three ways a block may leave the reading column, each landing on a line the grid already has. bleedfig runs a figure the full width, overlapfig lifts it into the section above, stagger drops every second tile.',
+    knobs: [],
+    css: `${''}
+.bleedfig{grid-column:full}
+.bleedfig>div{border:0;border-radius:0}
+${''}
+.overlapfig{margin-top:calc(var(--gap)*-1.6);position:relative;z-index:1}
+${''}
+.grid.stagger>*:nth-child(even){margin-block-start:calc(var(--gap)*1.3)}`,
+    // a lift into the section above is a composition at full width and a collision at phone
+    // width, and a staggered tile that has become a single column is just a gap
+    collapse: `.overlapfig{margin-top:0}
+.grid.stagger>*:nth-child(even){margin-block-start:0}`,
   },
   {
     name: 'names',
@@ -208,7 +233,7 @@ export function blockCss(): string {
 export function blockContract(): string {
   return [
     'The page is built from these blocks, and only these. Each is a class on a real element, so a rule you write against one lands on every page that uses it:',
-    ...BLOCKS.map((b) => `  .${b.name} - ${b.note}${b.knobs.length ? ` Retuned by ${b.knobs.join(', ')}.` : ''}`),
+    ...BLOCKS.map((b) => `  ${(b.classes ?? [b.name]).map((c) => '.' + c).join(', ')} - ${b.note}${b.knobs.length ? ` Retuned by ${b.knobs.join(', ')}.` : ''}`),
     '',
     'A block sits on one of three columns and never states a width of its own. text is the reading column, wide is the page column, and full runs edge to edge. text and wide begin at the same line, so a section can be wide or narrow and still start where the last one started.',
     '',

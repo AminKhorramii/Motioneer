@@ -64,7 +64,7 @@ export function checkLibrary(core) {
       }
     }
   }
-  const named = [...core.BLOCKS.map((b) => b.name), 'wrap', 'wide', 'ctas', 'btn-primary', 'link', 'eyebrow', 'figure', 'num']
+  const named = [...core.BLOCKS.flatMap((b) => b.classes ?? [b.name]), 'wrap', 'wide', 'ctas', 'btn-primary', 'link', 'eyebrow', 'figure', 'num']
   const missing = named.filter((c) => !rendered.has(c))
   return { blocks: core.BLOCKS.length, tokens: core.TOKENS.length, classesRendered: rendered.size, missing }
 }

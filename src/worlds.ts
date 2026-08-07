@@ -50,6 +50,20 @@ export interface World {
     base?: number
     figure: 'framed' | 'bleed' | 'plain'
     /**
+     * How a page is allowed to leave its column.
+     *
+     * Everything used to stack in one column: heading, body, occasionally two tracks. That is
+     * what stopped pages looking wild, and it is also the silhouette of a generated page, which
+     * no amount of retuned type or colour escapes. These are the ways out, and each one lands on
+     * a line the grid already has rather than at an offset somebody picked, because breaking out
+     * of a column is a composition and breaking off a grid is the mess this replaced.
+     *
+     * bleed runs the figure the full width of the page. overlap lifts it into the section above
+     * so two sections share an edge. stagger drops every second tile, so a row of them reads as
+     * an arrangement rather than a table.
+     */
+    breakout?: 'none' | 'bleed' | 'overlap' | 'stagger'
+    /**
      * Per-section padding multipliers, cycled down the page. Uniform rhythm is the deepest
      * tell of a generated page: every section given equal air reads as one treatment applied
      * to all content. A sequence with a sparse beat and a dense beat reads as paced.
@@ -201,6 +215,9 @@ export function madeWorld(raw: Record<string, unknown>, i: number): World {
       measure: clamp(s.measure, 44, 82, 64),
       base: clamp(s.base, 14, 20, 16.5),
       figure: (['framed', 'bleed', 'plain'] as const).includes(s.figure as never) ? (s.figure as World['structure']['figure']) : 'framed',
+      breakout: (['none', 'bleed', 'overlap', 'stagger'] as const).includes(s.breakout as never)
+        ? (s.breakout as World['structure']['breakout'])
+        : 'none',
       rhythm: Array.isArray(s.rhythm)
         ? (s.rhythm as unknown[]).slice(0, 8).map((v) => clamp(v, 0.4, 3, 1))
         : undefined,
