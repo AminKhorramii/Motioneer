@@ -7,7 +7,7 @@
 
 import { mix, shift, type Taste } from '@/taste'
 import type { World } from '@/worlds'
-import { ARCHIVO, FRAUNCES, GROTESK, MONO, PLEX, ROBOTO, SANS, SERIF } from '@/design/faces'
+import { ARCHIVO, BRICOLAGE, FRAUNCES, MARTIAN, MONO, PLEX, ROBOTO, SANS, SERIF, SYNE } from '@/design/faces'
 
 
 /** palette moves, each a relationship rather than a random shift */
@@ -21,7 +21,7 @@ export const WORLDS: World[] = [
     name: 'swiss grid',
     note: 'hairlines, numbered sections and tight tracking. The grid does the talking.',
     voice: 'Write plainly and exactly. Short sentences, concrete nouns, no flourish, because the grid is doing the talking.',
-    taste: (t) => ({ ...mono(contrast(t)), display: GROTESK, body: SANS, scale: 1.26, radius: 0, density: 0.7, weight: 700, caps: false }),
+    taste: (t) => ({ ...mono(contrast(t)), display: BRICOLAGE, body: SANS, scale: 1.26, radius: 0, density: 0.7, weight: 700, caps: false }),
     structure: { rules: true, numbered: true, bleed: false, measure: 62, base: 16, figure: 'framed', breakout: 'overlap', rhythm: [1, 0.55, 1.5, 0.8, 1.9, 0.7] },
     backdrop: 'none',
     // a numbered list is more swiss than a row of cards, and the grid has no closing band.
@@ -53,7 +53,7 @@ export const WORLDS: World[] = [
     name: 'terminal',
     note: 'monospace throughout and no rounded corners, for a product that is a tool.',
     voice: 'Write like good documentation. Precise, unpersuasive, comfortable with technical nouns.',
-    taste: (t) => ({ ...mono(t), display: MONO, body: MONO, scale: 1.2, radius: 0, density: 0.8, weight: 500, caps: true }),
+    taste: (t) => ({ ...mono(t), display: MARTIAN, body: MONO, scale: 1.2, radius: 0, density: 0.8, weight: 500, caps: true }),
     structure: { rules: true, numbered: false, bleed: false, measure: 68, base: 15, figure: 'plain', breakout: 'none', rhythm: [0.9, 0.5, 1.3, 0.6, 1.6, 0.7] },
     backdrop: 'contours',
     // documentation does not testimonial: everything is a listing or a transcript, and it
@@ -91,7 +91,7 @@ export const WORLDS: World[] = [
     name: 'catalogue',
     note: 'small type set densely, the way a page looks when it has a lot to list.',
     voice: 'Write densely and specifically. Numbers, names and lists rather than claims, because there is room for detail here.',
-    taste: (t) => ({ ...mono(t), display: SANS, body: SANS, scale: 1.16, radius: 3, density: 0.85, weight: 600, caps: true }),
+    taste: (t) => ({ ...mono(t), display: SYNE, body: SANS, scale: 1.16, radius: 3, density: 0.85, weight: 600, caps: true }),
     structure: { rules: true, numbered: true, bleed: false, measure: 58, base: 14, figure: 'plain', breakout: 'stagger', rhythm: [0.7, 0.45, 1.1, 0.5, 1.4, 0.6] },
     backdrop: 'none',
     // everything, listed: the fullest argument, set dense, priced in a table. The second

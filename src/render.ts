@@ -62,7 +62,7 @@ ${faces}
 ${/* Every measurement a block is allowed to have, in one place. A block reads these; it
    never writes a width of its own, which is what keeps one page to one column. */ ''}
 --page:${w.structure.bleed ? 'none' : '1080px'};
---edge:${w.structure.numbered ? 'clamp(2.8rem,5vw,4rem)' : w.structure.bleed ? '6vw' : 'clamp(1.2rem,4vw,2.4rem)'};
+--edge:${w.structure.numbered ? 'clamp(1.2rem,5vw,4rem)' : w.structure.bleed ? '6vw' : 'clamp(1.2rem,4vw,2.4rem)'};
 --measure:${w.structure.measure}ch;--headline:20ch;--subhead:24ch;
 --split:1.05fr .95fr;--tile:15rem;
 --rowsplit:minmax(9rem,15rem) 1fr;--rule:1px;--stack:1.05rem;--beat:1;
@@ -71,7 +71,7 @@ body{background:var(--bg);color:var(--ink);font-family:${t.body};font-size:${(w.
 line-height:${(1.45 + gap * 0.28).toFixed(2)};-webkit-font-smoothing:antialiased}
 a{color:inherit;text-decoration:none}
 h1,h2,h3{font-family:${t.display};font-weight:${t.weight};line-height:1.07;letter-spacing:-.022em}
-h1{font-size:${fluid(77, 11, 2.3)}}h2{font-size:${fluid(41, 6, 1.4)}}h3{font-size:${s(1)}}
+h1{font-size:${fluid(77, 11, 2)}}h2{font-size:${fluid(41, 6, 1.4)}}h3{font-size:${s(1)}}
 ${/* Type of two sizes cannot share one column. A measure right for 16px body is 11 characters
    of a 48px headline, which is where the headline stacked into a column of two-word lines: it
    was not the headline that was wrong, it was the column it had been given. Each register is

@@ -11,6 +11,13 @@ export const SANS = "'Inter Variable', 'Inter', -apple-system, sans-serif"
 // carried inside the page by render.ts, so these exist on every machine the file reaches
 export const FRAUNCES = "'Fraunces Variable', 'Charter', 'Iowan Old Style', Georgia, serif"
 export const ARCHIVO = "'Archivo Variable', 'Helvetica Neue', Arial, sans-serif"
+// Registers the platform stacks cannot reach. Each falls back to the nearest platform face, so
+// a page that fails to load one still lands in the right family rather than on a default.
+export const BRICOLAGE = "'Bricolage Grotesque Variable', 'Helvetica Neue', Arial, sans-serif"
+export const SYNE = "'Syne Variable', 'Helvetica Neue', Arial, sans-serif"
+export const BODONI = "'Bodoni Moda Variable', 'Didot', 'Times New Roman', serif"
+export const MARTIAN = "'Martian Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace"
+export const DOTO = "'Doto Variable', ui-monospace, Menlo, monospace"
 // the faces the named design systems ship with. Neither is certain to be installed, so each
 // falls back to the closest platform grotesque rather than to a default nobody chose
 export const ROBOTO = "'Roboto', 'Helvetica Neue', Arial, sans-serif"
@@ -25,4 +32,5 @@ export const PLEX = "'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif"
 export const FACES: Record<string, string> = {
   sans: SANS, grotesk: GROTESK, serif: SERIF, mono: MONO, fraunces: FRAUNCES, archivo: ARCHIVO,
   roboto: ROBOTO, plex: PLEX,
+  bricolage: BRICOLAGE, syne: SYNE, bodoni: BODONI, martian: MARTIAN, doto: DOTO,
 }
