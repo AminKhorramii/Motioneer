@@ -510,12 +510,14 @@ const territories = (n: number) => dealDirections(n).map(directionSeed)
  * either way: one call took 166s to the first world and 232s to the last; four calls of two took
  * 57s and 118s; eight calls of one took 42s and 106s.
  *
- * Two rather than one, because splitting further stops paying. The gap between four calls and
- * eight is inside the run-to-run noise, and a call designing two is told to make its pair far
- * apart, where a call designing one has nothing to be far apart from. That instruction is worth
- * more than the seconds it costs.
+ * One, now that the deck deals a distinct ground to every call. Two was chosen because a call
+ * designing a pair can be told to make the pair far apart, and a call designing one has nothing
+ * to be far apart from. That reasoning held while every call saw the same eight territories in
+ * the same order; it does not hold now that each is handed its own direction out of fifty, which
+ * separates them before they start. So the instruction is no longer worth the fifteen seconds it
+ * was costing on the way to the first world.
  */
-const PER_HAND = 2
+const PER_HAND = 1
 
 export async function promptWorlds(
   product: Product,
@@ -561,7 +563,7 @@ export async function promptWorlds(
       provider,
       // the territory goes last so the long shared prompt in front of it still caches
       `${WORLDS_SYSTEM}\n\nBuild these particular ones from ${ground.join(', or ')}. One object each.`,
-      `${brief}\n\nDesign ${count} worlds for it.`,
+      `${brief}\n\nDesign ${count === 1 ? 'one world' : `${count} worlds`} for it.`,
       feed,
       { maxTokens: 8000, kind: 'design' },
     ).catch(() => null)

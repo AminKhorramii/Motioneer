@@ -79,7 +79,7 @@ export function Dock({
         {angle && <span className="angle">{angle}</span>}
         {/* a badge rather than a control: it says what this page is built in, which is the one
             thing you need before handing it back, and the brief carries the same name */}
-        <span className="angle" title={worldById(world).note}>
+        <span className="angle library" title={worldById(world).note}>
           {worldById(world).library ?? worldById(world).name}
         </span>
         <span className="spacer" />

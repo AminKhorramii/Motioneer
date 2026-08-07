@@ -91,7 +91,7 @@ const wall = await page.evaluate(async () => {
     heads.add(doc?.querySelector('h1, h2')?.innerText ?? `missing-${i}`)
     const a = document.querySelector('.filmbar .angle')?.textContent
     if (a) angles.push(a)
-    worlds.add(document.querySelector('.filmbar .world')?.textContent ?? '')
+    worlds.add(document.querySelector('.filmbar .library')?.textContent ?? '')
     shapes.add(document.querySelectorAll('.sec').length + ':' + [...document.querySelectorAll('.sec b')].map((b) => b.textContent).join(','))
     // a page's look is its type, its scale and its ground: if two papers share all three
     // they are the same design wearing different words
@@ -111,6 +111,15 @@ const wall = await page.evaluate(async () => {
   }
 })
 console.log('written wall:', JSON.stringify(wall))
+// The corpus is a recording of replies to a page of a particular shape, and the replay maps a
+// recorded section onto a requested one by position. Add a role to the page and every reply
+// lands one section out, which shows up as pages that render with no headline at all while
+// every assertion here still passes. Say so rather than reporting a blank wall as a clean one.
+if (wall.distinctHeadlines <= 1 && wall.headlines.every((h) => !h.trim())) {
+  console.log('  corpus note:', JSON.stringify(
+    'every paper rendered without a headline, which means the recorded replies no longer line up '
+    + 'with the page shape being asked for. Recapture with tools/capture.mjs and a key.'))
+}
 
 // a world brings CSS with it, and that CSS must not be able to make the page fetch anything
 const worldCss = await page.evaluate(async () => {

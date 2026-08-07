@@ -116,7 +116,14 @@ export async function runClaude(system, user, { model = CLI_MODEL(), bin = 'clau
         //
         // So it is offered rather than taken. Turning it on is for the iteration loop, where
         // waiting three minutes to see whether a prompt change landed is its own kind of expensive.
-        env: process.env.WALL_FAST ? { ...process.env, MAX_THINKING_TOKENS: '0' } : process.env,
+        // Thinking is a dial and was wired as a switch. The two measurements above are its ends,
+        // and nothing in between had been tried: WALL_THINKING sets the budget directly, so a
+        // run can buy back most of the speed without giving up the whole of the design. Unset
+        // leaves the model's own budget alone, which is what every measurement above was taken
+        // with, and WALL_FAST still means none at all.
+        env: process.env.WALL_THINKING || process.env.WALL_FAST
+          ? { ...process.env, MAX_THINKING_TOKENS: process.env.WALL_FAST ? '0' : String(process.env.WALL_THINKING) }
+          : process.env,
       },
     )
     // whichever way this ends, the next call in the queue gets the slot

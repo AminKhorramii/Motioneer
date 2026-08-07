@@ -20,6 +20,14 @@ import { host, isTauri } from '@/host'
 
 const PAGE_W = 1280
 
+/**
+ * A beat is the model proving it is still thinking, and the stream emits at most one a second,
+ * so the count of them is an elapsed clock wearing the wrong name. Nobody reads "170 beats" as
+ * "you have been waiting nearly three minutes", which is the only thing it was ever saying.
+ */
+const clock = (beats: number) =>
+  beats < 60 ? `${beats}s` : `${Math.floor(beats / 60)}m ${String(beats % 60).padStart(2, '0')}s`
+
 export default function App() {
   const [product, setProduct] = useState<Product>(EMPTY_PRODUCT)
   const [taste, setTaste] = useState<Taste>(PRESETS[0])
@@ -200,13 +208,20 @@ export default function App() {
      */
     const SYSTEMS = ['shadcn', 'material', 'carbon']
     const seeded = WORLDS.filter((w) => SYSTEMS.includes(w.id))
-    seeded.forEach((w, k) => startPage(w, k))
 
-    // every beat is the model proving it is still thinking, which is the only thing there is to
-    // report during the wait before the first designed world
-    const worlds = await promptWorlds(p, 8 - seeded.length, (w, i) => startPage(w, i + seeded.length), 'model', () => {
+    /**
+     * The design calls are dispatched before the seeded pages start writing.
+     *
+     * Every call is a whole session and only five run at once, so the order they are asked in is
+     * the order they get the machine. Seeding first put three copy calls in front of the design
+     * calls, which are the long pole and the thing the reader is actually waiting on, and the
+     * copy for a page whose design is already on screen can wait its turn.
+     */
+    const designing = promptWorlds(p, 8 - seeded.length, (w, i) => startPage(w, i + seeded.length), 'model', () => {
       if (run.current === mine) setBuilding((b) => (b ? { ...b, thoughts: b.thoughts + 1 } : b))
     })
+    seeded.forEach((w, k) => startPage(w, k))
+    const worlds = await designing
     if (run.current !== mine) return
     setDesigned(worlds)
     registerWorlds(worlds)
@@ -518,7 +533,7 @@ export default function App() {
       {busy && (
         <p className="busy">
           {building
-            ? `${busy}, ${building.landed.length} of 8 designed${building.thoughts ? `, ${building.thoughts} beats` : ''}`
+            ? `${busy}, ${building.landed.length} of 8 designed${building.thoughts ? `, ${clock(building.thoughts)}` : ''}`
             : busy}
         </p>
       )}

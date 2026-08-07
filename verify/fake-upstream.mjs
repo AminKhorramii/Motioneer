@@ -213,6 +213,16 @@ export async function fakeAnthropic(dir = FIXTURES) {
   // 'hard' skips the captured corpus and serves copy built to break the parser
   const hard = dir === 'hard'
   const fixtures = hard ? [] : await loadFixtures(dir)
+  /**
+   * A design call needs a design reply.
+   *
+   * Fixtures used to be handed out by a single counter, which was faithful while the wall was
+   * designed by one call: fixture zero was the design and the rest were pages. It stopped being
+   * faithful the moment the design was split across several calls, because the later ones were
+   * served page-shaped replies, produced no worlds, and quietly fell back to the built-in
+   * worlds while the suite still reported no errors. Routing by what the call is asking for
+   * keeps the replay honest however many calls the design is split into.
+   */
   let seq = 0
 
   const server = createServer(async (req, res) => {
@@ -311,6 +321,21 @@ export async function fakeAnthropic(dir = FIXTURES) {
       }) + '\n```'
       res.writeHead(200, { ...CORS, 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
       for (const { text } of chunkUp(intakeStream(reply))) res.write(text)
+      return res.end()
+    }
+
+    /**
+     * A design call must not spend a page fixture.
+     *
+     * loadFixtures drops the design capture on purpose, so a design call has nothing to replay
+     * and the app falls back to its built-in worlds, which is the intent. What it must not do is
+     * take the next page fixture on its way past: the corpus is a queue, and how many calls the
+     * design happens to be split into would then decide which copy each paper is written from.
+     * That is how splitting the design further turned this wall's headlines blank while the
+     * suite still reported no errors.
+     */
+    if (/Design (?:one world|\d+ worlds) for it/.test(body)) {
+      res.writeHead(200, { ...CORS, 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
       return res.end()
     }
 
