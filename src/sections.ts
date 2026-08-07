@@ -79,9 +79,9 @@ export const uid = () => Math.random().toString(36).slice(2, 9)
 export function defaultContent(role: Role, product = 'Product'): Record<string, unknown> {
   switch (role) {
     case 'masthead':
-      // the links name places rather than actions, because a nav that shouts competes with the
-      // one button the page is actually asking you to press
-      return { product, links: ['What it does', 'Pricing', 'Questions'], cta: 'Start' }
+      // One word a link. Nav is read peripherally, on the way to something else, and a phrase
+      // up there spends a fixation the headline needed. These were three words, one and one.
+      return { product, links: ['Product', 'Pricing', 'Docs'], cta: `Get ${product}` }
     case 'claim':
       return {
         eyebrow: 'One plain line that earns the claim.',

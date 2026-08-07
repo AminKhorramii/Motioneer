@@ -95,6 +95,26 @@ export function slop(page: Page, html?: string): Flag[] {
       hero?.id)
   }
 
+  // The opening is read in about a second. Measured over a recorded run, a quarter of the heros
+  // ran past twenty-five words and one reached thirty-nine, which is a paragraph in the place a
+  // reader has not yet decided to read anything.
+  const heroSub = typeof hero?.content.sub === 'string' ? hero.content.sub.trim() : ''
+  const heroWords = heroSub ? heroSub.split(/\s+/).length : 0
+  if (heroWords > 28) {
+    add('chatty-opening', `${heroWords} words under the headline`,
+      'The line under a headline is read before the reader has decided to read anything, so a paragraph there is spent rather than saved.',
+      hero?.id)
+  }
+
+  const nav = page.sections.find((s) => s.role === 'masthead' && s.on)
+  const wordy = ((nav?.content.links as unknown[]) ?? [])
+    .filter((l) => typeof l === 'string' && l.trim().split(/\s+/).length > 2)
+  if (wordy.length) {
+    add('chatty-nav', `${wordy.length} nav links of three words or more`,
+      'Nav is read peripherally on the way to something else, so a phrase there takes a fixation the headline needed.',
+      nav?.id)
+  }
+
   if (typeof page.taste?.bg === 'string' && AI_BEIGE.test(page.taste.bg)) {
     add('ai-beige', 'ai beige background',
       'It is the off-white a model picks when no palette was chosen, and it dates a page immediately.')

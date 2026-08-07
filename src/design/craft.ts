@@ -67,6 +67,16 @@ export const CRAFT: Rule[] = [
     why: 'These are the marks a writer leans on for energy the words did not earn, and they read as borrowed.',
   },
   {
+    id: 'opening-is-short',
+    rule: 'The opening carries one thought: a headline under ten words, and at most two sentences under it. Everything else earns its place further down the page.',
+    why: 'A reader decides whether to keep reading in about a second, and a paragraph spent in that second is a paragraph nobody read.',
+  },
+  {
+    id: 'nav-names-places',
+    rule: 'A masthead link is one word naming a place, never a phrase describing it.',
+    why: 'Nav is read peripherally on the way somewhere else, so a phrase there costs the attention the headline was owed.',
+  },
+  {
     id: 'cut-not-fill',
     rule: 'A section with nothing specific to say is cut, never padded.',
     why: 'Filler spends the trust the specific sections earned, because the reader cannot tell which kind they are in next.',
