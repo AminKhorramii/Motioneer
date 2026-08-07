@@ -67,7 +67,7 @@ ${/* Every measurement a block is allowed to have, in one place. A block reads t
 --split:1.05fr .95fr;--tile:15rem;
 --rowsplit:minmax(9rem,15rem) 1fr;--rule:1px;--stack:1.05rem;--beat:1;
 --btn-fill:var(--accent);--btn-ink:${luminance(t.accent) > 0.6 ? '#101216' : '#fff'}}
-body{background:var(--bg);color:var(--ink);font-family:${t.body};font-size:16.5px;
+body{background:var(--bg);color:var(--ink);font-family:${t.body};font-size:${(w.structure.base ?? 16.5).toFixed(2)}px;
 line-height:${(1.45 + gap * 0.28).toFixed(2)};-webkit-font-smoothing:antialiased}
 a{color:inherit;text-decoration:none}
 h1,h2,h3{font-family:${t.display};font-weight:${t.weight};line-height:1.07;letter-spacing:-.022em}

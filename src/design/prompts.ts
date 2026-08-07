@@ -38,6 +38,7 @@ structure.rules: hairlines between sections, which is what makes a grid read as 
 structure.numbered: numbers in the margin beside each section.
 structure.bleed: sections run edge to edge rather than sitting in a column.
 structure.measure: 44 to 82 characters per line. This is the single biggest lever on how a page reads.
+structure.base: 14 to 20, the pixel size body copy is set at. Every system has an opinion here and it is the one most often left unmade: 14 is dense administrative software, 16 is ordinary product copy, 19 is a page that expects to be read slowly.
 structure.figure: framed, bleed or plain.
 structure.rhythm: 4 to 8 padding multipliers between 0.4 and 3, cycled down the page, like [2.4, 0.8, 1.6, 0.6]. Adjacent sections must not breathe the same: a page with equal air everywhere reads as one treatment applied to all content, where a sparse beat against a dense one reads as paced.
 backdrop: none, contours, grain or ridge. Drawn behind the page from the palette.

@@ -22,7 +22,7 @@ export const WORLDS: World[] = [
     note: 'hairlines, numbered sections and tight tracking. The grid does the talking.',
     voice: 'Write plainly and exactly. Short sentences, concrete nouns, no flourish, because the grid is doing the talking.',
     taste: (t) => ({ ...mono(contrast(t)), display: GROTESK, body: SANS, scale: 1.26, radius: 0, density: 0.7, weight: 700, caps: false }),
-    structure: { rules: true, numbered: true, bleed: false, measure: 62, figure: 'framed', rhythm: [1, 0.55, 1.5, 0.8, 1.9, 0.7] },
+    structure: { rules: true, numbered: true, bleed: false, measure: 62, base: 16, figure: 'framed', rhythm: [1, 0.55, 1.5, 0.8, 1.9, 0.7] },
     backdrop: 'none',
     // a numbered list is more swiss than a row of cards, and the grid has no closing band.
     // Substance is argued twice: listed, then tabulated, because a grid states and then indexes
@@ -39,7 +39,7 @@ export const WORLDS: World[] = [
     note: 'a large serif and long lines, set like a page that expects to be read.',
     voice: 'Write in full sentences with rhythm. The measure is long and the type is large, so the copy can breathe and should.',
     taste: (t) => ({ ...tinted(t), display: FRAUNCES, body: SERIF, scale: 1.44, radius: 2, density: 0.35, weight: 560, caps: true }),
-    structure: { rules: false, numbered: false, bleed: true, measure: 74, figure: 'bleed', rhythm: [1.7, 0.6, 1.3, 0.75, 2, 0.9] },
+    structure: { rules: false, numbered: false, bleed: true, measure: 74, base: 19, figure: 'bleed', rhythm: [1.7, 0.6, 1.3, 0.75, 2, 0.9] },
     backdrop: 'grain',
     // an essay argues in prose and then shows one plate, which is what a bleeding figure is for
     wear: { claim: 'statement', proof: 'quote', substance: ['prose', 'figure'], offer: 'statement', objections: 'prose', invitation: 'statement' },
@@ -54,7 +54,7 @@ export const WORLDS: World[] = [
     note: 'monospace throughout and no rounded corners, for a product that is a tool.',
     voice: 'Write like good documentation. Precise, unpersuasive, comfortable with technical nouns.',
     taste: (t) => ({ ...mono(t), display: MONO, body: MONO, scale: 1.2, radius: 0, density: 0.8, weight: 500, caps: true }),
-    structure: { rules: true, numbered: false, bleed: false, measure: 68, figure: 'plain', rhythm: [0.9, 0.5, 1.3, 0.6, 1.6, 0.7] },
+    structure: { rules: true, numbered: false, bleed: false, measure: 68, base: 15, figure: 'plain', rhythm: [0.9, 0.5, 1.3, 0.6, 1.6, 0.7] },
     backdrop: 'contours',
     // documentation does not testimonial: everything is a listing or a transcript, and it
     // lists before it tabulates the way a manual states then indexes
@@ -73,7 +73,7 @@ export const WORLDS: World[] = [
     note: 'one headline at the size of a wall, and very little else competing with it.',
     voice: 'Write six words where you would write twenty. The headline carries the page alone and everything else is a whisper.',
     taste: (t) => ({ ...contrast(t), display: ARCHIVO, body: SANS, scale: 1.62, radius: 0, density: 0.3, weight: 880, caps: false }),
-    structure: { rules: false, numbered: false, bleed: true, measure: 52, figure: 'bleed', rhythm: [2.6, 0.9, 2.2, 1.2, 0.6] },
+    structure: { rules: false, numbered: false, bleed: true, measure: 52, base: 17.5, figure: 'bleed', rhythm: [2.6, 0.9, 2.2, 1.2, 0.6] },
     backdrop: 'ridge',
     wear: { claim: 'statement', substance: 'figure', proof: 'quote', invitation: 'statement' },
     // five sections. A poster is what it leaves out, and the whitespace is the design
@@ -92,7 +92,7 @@ export const WORLDS: World[] = [
     note: 'small type set densely, the way a page looks when it has a lot to list.',
     voice: 'Write densely and specifically. Numbers, names and lists rather than claims, because there is room for detail here.',
     taste: (t) => ({ ...mono(t), display: SANS, body: SANS, scale: 1.16, radius: 3, density: 0.85, weight: 600, caps: true }),
-    structure: { rules: true, numbered: true, bleed: false, measure: 58, figure: 'plain', rhythm: [0.7, 0.45, 1.1, 0.5, 1.4, 0.6] },
+    structure: { rules: true, numbered: true, bleed: false, measure: 58, base: 14, figure: 'plain', rhythm: [0.7, 0.45, 1.1, 0.5, 1.4, 0.6] },
     backdrop: 'none',
     // everything, listed: the fullest argument, set dense, priced in a table. The second
     // substance is a numbered list and the second witness speaks, so the density has a seam
@@ -114,7 +114,7 @@ export const WORLDS: World[] = [
       ...t, bg: '#ffffff', ink: '#09090b', dim: '#71717a', accent2: mix(t.accent, '#ffffff', 0.72),
       display: SANS, body: SANS, scale: 1.24, radius: 8, density: 0.55, weight: 600, caps: false,
     }),
-    structure: { rules: false, numbered: false, bleed: false, measure: 66, figure: 'framed', rhythm: [1.3, 0.7, 1.15, 0.65, 1.5, 0.8] },
+    structure: { rules: false, numbered: false, bleed: false, measure: 66, base: 15, figure: 'framed', rhythm: [1.3, 0.7, 1.15, 0.65, 1.5, 0.8] },
     backdrop: 'none',
     wear: { masthead: 'band', claim: 'prose', proof: 'list', substance: ['list', 'figure'], offer: 'table', objections: 'prose', invitation: 'band', credits: 'table' },
     compose: ['masthead', 'claim', 'proof', 'substance', 'substance', 'offer', 'objections', 'invitation', 'credits'],
@@ -140,7 +140,7 @@ h1,h2,h3{letter-spacing:-.03em}`,
       accent2: mix(t.accent, '#ffffff', 0.82),
       display: ROBOTO, body: ROBOTO, scale: 1.32, radius: 16, density: 0.42, weight: 500, caps: false,
     }),
-    structure: { rules: false, numbered: false, bleed: false, measure: 62, figure: 'framed', rhythm: [1.5, 0.8, 1.25, 0.7, 1.7, 0.9] },
+    structure: { rules: false, numbered: false, bleed: false, measure: 62, base: 16, figure: 'framed', rhythm: [1.5, 0.8, 1.25, 0.7, 1.7, 0.9] },
     backdrop: 'none',
     wear: { masthead: 'band', claim: 'marginalia', proof: 'quote', substance: ['figure', 'list'], offer: 'table', objections: 'list', invitation: 'statement', credits: 'table' },
     compose: ['masthead', 'claim', 'proof', 'substance', 'substance', 'offer', 'objections', 'invitation', 'credits'],
@@ -166,7 +166,7 @@ h1,h2,h3{letter-spacing:-.03em}`,
       ...t, bg: '#161616', ink: '#f4f4f4', dim: '#8d8d8d', accent: '#4589ff', accent2: '#78a9ff',
       display: PLEX, body: PLEX, scale: 1.2, radius: 0, density: 0.72, weight: 600, caps: false,
     }),
-    structure: { rules: true, numbered: false, bleed: false, measure: 60, figure: 'plain', rhythm: [1.1, 0.6, 1.35, 0.65, 1.6, 0.75] },
+    structure: { rules: true, numbered: false, bleed: false, measure: 60, base: 14, figure: 'plain', rhythm: [1.1, 0.6, 1.35, 0.65, 1.6, 0.75] },
     backdrop: 'none',
     wear: { masthead: 'band', claim: 'statement', proof: 'statement', substance: ['table', 'list'], offer: 'table', objections: 'list', invitation: 'band', credits: 'table' },
     compose: ['masthead', 'claim', 'substance', 'substance', 'proof', 'offer', 'objections', 'credits'],

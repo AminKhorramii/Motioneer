@@ -40,6 +40,14 @@ export interface World {
     bleed: boolean
     /** characters per line, the single biggest lever on how a page reads */
     measure: number
+    /**
+     * The size body copy is set at.
+     *
+     * Every page on the wall was 16.5px, which is the one measurement a real system always has
+     * an opinion about: Carbon sets 14, Material 16, a page that expects to be read sets 19. It
+     * was the last axis with a spread of exactly zero.
+     */
+    base?: number
     figure: 'framed' | 'bleed' | 'plain'
     /**
      * Per-section padding multipliers, cycled down the page. Uniform rhythm is the deepest
@@ -191,6 +199,7 @@ export function madeWorld(raw: Record<string, unknown>, i: number): World {
       numbered: Boolean(s.numbered),
       bleed: Boolean(s.bleed),
       measure: clamp(s.measure, 44, 82, 64),
+      base: clamp(s.base, 14, 20, 16.5),
       figure: (['framed', 'bleed', 'plain'] as const).includes(s.figure as never) ? (s.figure as World['structure']['figure']) : 'framed',
       rhythm: Array.isArray(s.rhythm)
         ? (s.rhythm as unknown[]).slice(0, 8).map((v) => clamp(v, 0.4, 3, 1))
