@@ -212,7 +212,10 @@ function openInBrowser(request, at) {
           : process.platform === 'win32'
             ? ['cmd', ['/c', 'start', '', url]]
             : ['xdg-open', [url]]
-      spawn(cmd, args, { stdio: 'ignore', detached: true }).unref()
+      // A machine with no opener is not a failure, it is a machine with no opener: the URL has
+      // just been written down and the reply names it. Without a listener the failure to spawn
+      // arrives as an unhandled error event, which takes this whole server down with it.
+      spawn(cmd, args, { stdio: 'ignore', detached: true }).on('error', () => {}).unref()
       resolve({ child, url })
     }
     child.stdout.on('data', (d) => {

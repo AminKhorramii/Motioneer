@@ -1,9 +1,8 @@
 import { useState } from 'react'
 import type { Taste } from '@/taste'
-import { CUSTOM, IMAGE_KEY_NAME, canWrite, choose, keyHome, readBrief, setKey, type Intake } from '@/compose'
+import { CUSTOM, IMAGE_KEY_NAME, canUseCli, canWrite, choose, keyHome, readBrief, setKey, type Intake } from '@/compose'
 import type { Product } from '@/compose'
 import { MARKS, MODELS, modelById } from '@/models'
-import { host } from '@/host'
 
 
 /**
@@ -46,9 +45,9 @@ export function Onboarding({ product, taste, explainOnly, onProduct, onBuild, on
       [IMAGE_KEY_NAME, localStorage.getItem(IMAGE_KEY_NAME) ?? ''],
     ]),
   )
-  // a shell that cannot start a process cannot ask the local Claude, and offering a choice that
+  // a machine with no claude on it cannot ask the local Claude, and offering a choice that
   // cannot work is worse than offering one fewer
-  const offered = MODELS.filter((m) => m.wire !== 'cli' || Boolean(host.cli))
+  const offered = MODELS.filter((m) => m.wire !== 'cli' || canUseCli())
   const model = modelById(pick)
   const picked = Boolean(pick)
   const shown = hover || pick ? modelById(hover || pick) : null

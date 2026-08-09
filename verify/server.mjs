@@ -8,6 +8,7 @@
 import { chromium } from 'playwright'
 import { spawn } from 'node:child_process'
 import { fakeAnthropic } from './fake-upstream.mjs'
+import { hasClaude } from '../shared/cli.mjs'
 
 const { server: upstream, url: upstreamUrl } = await fakeAnthropic()
 
@@ -35,6 +36,46 @@ const PORT = await new Promise((resolve, reject) => {
 
 const config = await (await fetch(`http://127.0.0.1:${PORT}/api/config`)).json()
 console.log('config:', JSON.stringify(config))
+// this used to be the word true whatever the machine held, which is how somewhere with no key
+// and no claude showed a wall of arranged stand-ins and said nothing about it
+if (config.cli !== hasClaude()) throw new Error('the server misreports whether it can run claude')
+
+/** Start another one for a single question, and stop it again. */
+async function ask(env, path, init) {
+  // named by its full path, because one of these runs with a PATH that has nothing on it
+  const child = spawn(process.execPath, ['server/index.mjs'], {
+    env: { ...process.env, PORT: '0', ...env },
+    stdio: ['ignore', 'pipe', 'ignore'],
+  })
+  const port = await new Promise((resolve) => {
+    child.stdout.on('data', (d) => {
+      const m = String(d).match(/localhost:(\d+)/)
+      if (m) resolve(Number(m[1]))
+    })
+  })
+  const res = await fetch(`http://127.0.0.1:${port}${path}`, init)
+  const body = await res.text()
+  child.kill()
+  return { status: res.status, body }
+}
+
+// the same server on a machine with nothing to run has to answer differently, or the flag is
+// still a constant wearing a question's name
+const noClaude = await ask({ PATH: '/nonexistent' }, '/api/config')
+console.log('config where no claude exists:', noClaude.body)
+if (JSON.parse(noClaude.body).cli) throw new Error('a machine with no claude on it claimed to have one')
+
+// A wire it does not speak must be refused, not quietly turned into anthropic. It held the
+// anthropic key while doing that, so the old behaviour handed one vendor another vendor's
+// credential in a request nobody asked it to make.
+const post = { method: 'POST', headers: { 'content-type': 'application/json' } }
+const stranger = await ask({ ANTHROPIC_API_KEY: 'server-held-key' }, '/api/stream', {
+  ...post,
+  body: JSON.stringify({ provider: 'mystery', system: 'x', user: 'y' }),
+})
+console.log('an unknown provider:', JSON.stringify(stranger))
+if (stranger.status !== 400) throw new Error(`an unknown provider was answered with ${stranger.status}`)
+if (stranger.body.includes('server-held-key')) throw new Error('the refusal quoted the key back')
 
 const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })

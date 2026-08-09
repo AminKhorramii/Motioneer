@@ -17,6 +17,31 @@
  */
 
 import { spawn } from 'node:child_process'
+import { existsSync } from 'node:fs'
+import path from 'node:path'
+
+/**
+ * Is there a claude on this machine to run.
+ *
+ * The server used to answer this question with the word true, which is the one answer it is
+ * never allowed to guess: a machine with no key and no CLI then showed eight arranged drafts
+ * that look like finished pages until you read them, and said nothing. The search is the same
+ * one spawn does with a bare command name, so what this reports and what a call would find
+ * cannot disagree.
+ */
+export function hasClaude(bin = 'claude') {
+  const env = (typeof process !== 'undefined' ? process.env : null) ?? {}
+  // a name with a separator in it is a path, and spawn looks there rather than along PATH
+  if (bin.includes('/') || bin.includes('\\')) return existsSync(bin)
+  const suffixes =
+    process.platform === 'win32'
+      ? (env.PATHEXT ?? '.COM;.EXE;.BAT;.CMD').split(';').filter(Boolean)
+      : ['']
+  return (env.PATH ?? '')
+    .split(path.delimiter)
+    .filter(Boolean)
+    .some((dir) => suffixes.some((ext) => existsSync(path.join(dir, bin + ext))))
+}
 
 /** good enough to write with, and named here so a deployment can say otherwise */
 export const CLI_MODEL = () =>

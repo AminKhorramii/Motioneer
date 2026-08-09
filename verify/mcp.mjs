@@ -21,7 +21,7 @@
 import { spawn } from 'node:child_process'
 import { mkdtempSync, existsSync, readFileSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { chromium } from 'playwright'
 import { fakeAnthropic } from './fake-upstream.mjs'
 import { listening } from './harness.mjs'
@@ -226,6 +226,46 @@ console.log('stopped itself once the tab closed:', JSON.stringify({
 if (alive) throw new Error('the server it started is still running with nobody using it')
 
 console.log('errors:', errors.length ? errors.slice(0, 3) : 'none')
-
 mcp.kill()
+
+// ——— 6. a machine with nothing to write with says so ———
+// PATH holds node and nothing else, so there is no claude to run and no opener to launch, which
+// is also the shape that used to take this server down with an unhandled spawn error.
+const bareWork = mkdtempSync(join(tmpdir(), 'wall-bare-'))
+const bare = spawn(process.execPath, ['mcp/index.mjs'], {
+  env: {
+    ...process.env,
+    WALL_NO_DESKTOP: '1',
+    WALL_WAIT_MS: '1000',
+    WALL_IDLE_MS: '4000',
+    PATH: dirname(process.execPath),
+    HOME: bareWork,
+  },
+  stdio: ['pipe', 'pipe', 'pipe'],
+})
+let bareBuf = ''
+const bareReplies = []
+bare.stdout.on('data', (d) => {
+  bareBuf += d
+  const lines = bareBuf.split('\n')
+  bareBuf = lines.pop() ?? ''
+  for (const l of lines) if (l.trim()) bareReplies.push(JSON.parse(l))
+})
+bare.stdin.write(JSON.stringify({
+  jsonrpc: '2.0', id: 1, method: 'tools/call',
+  params: { name: 'design', arguments: { brief: 'a thing', name: 'Thing', oneLiner: 'It is a thing.', dir: bareWork } },
+}) + '\n')
+const bareUntil = Date.now() + 30_000
+while (!bareReplies.length && Date.now() < bareUntil) await new Promise((r) => setTimeout(r, 200))
+const bareText = bareReplies[0]?.result?.content?.[0]?.text ?? ''
+console.log('with no key and no claude:', JSON.stringify({
+  answered: Boolean(bareText),
+  saysTheyAreArranged: /arranged from the built in designs/.test(bareText),
+}))
+if (!bareText) throw new Error('design answered nothing on a machine with no opener, so it died opening one')
+if (!/arranged from the built in designs/.test(bareText)) {
+  throw new Error('a wall nothing can write was handed over as though it had been written')
+}
+bare.kill()
+
 server.close()

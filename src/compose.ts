@@ -2,7 +2,7 @@
 
 import { PRESETS } from '@/design/presets'
 import type { Taste } from '@/taste'
-import { giveKey, host, isDesktop, isServed, servedProviders } from '@/host'
+import { giveKey, host, isDesktop, isServed, servedConfig } from '@/host'
 import { slop, slopBrief } from '@/slop'
 import { dealDirections, directionSeed } from '@/design/directions'
 import { ANGLES } from '@/design/angles'
@@ -291,14 +291,29 @@ export const keyFor = (_p?: Provider) =>
  * question as "is there a key in this browser". Everything that gates on writing asks this.
  */
 let held: string[] = []
-let asking: Promise<string[]> | null = null
+let heldCli = false
+let asking: Promise<{ providers: string[]; cli: boolean }> | null = null
 export async function loadHeldKeys() {
-  asking ??= servedProviders()
-  held = await asking
+  asking ??= servedConfig()
+  const got = await asking
+  held = got.providers
+  heldCli = got.cli
 }
-/** A model the person already has needs no key, only a shell that can start a process. */
+
+/**
+ * Can the model the person already has be reached from here.
+ *
+ * Being able to start a process is necessary and not enough. The desktop starts it itself, so it
+ * answers for itself. A served page starts it on the server's machine, and only the server knows
+ * whether there is a claude there to start, so it is asked and no is the honest answer until it
+ * has replied. Assuming yes was how a machine with neither a key nor a CLI showed a wall of
+ * unwritten drafts and said nothing about it.
+ */
+export const canUseCli = () => (isServed ? heldCli : Boolean(host.cli))
+
+/** A model the person already has needs no key, only somewhere to run it. */
 export const canWrite = (_p?: Provider) =>
-  (chosen().wire === 'cli' ? Boolean(host.cli) : Boolean(keyFor())) || held.includes(chosen().wire)
+  (chosen().wire === 'cli' ? canUseCli() : Boolean(keyFor())) || held.includes(chosen().wire)
 export const canDraw = () => Boolean(imageKey()) || held.includes('gemini')
 
 // One delta listener for the whole app, fanned out by request id, because several pages

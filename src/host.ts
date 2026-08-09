@@ -206,6 +206,8 @@ const served: Host = {
 const win = window as unknown as {
   __wallServed?: number
   __wallProviders?: string[]
+  /** whether the server found a claude to run, which the page cannot find out for itself */
+  __wallCli?: boolean
   __TAURI_INTERNALS__?: unknown
 }
 
@@ -278,16 +280,21 @@ export async function giveKey(provider: string, key: string): Promise<string[]> 
   return win.__wallProviders
 }
 
-/** Providers the server already holds a key for, so the app can stop asking for one. */
-export const servedProviders = async (): Promise<string[]> => {
-  if (!isServed) return []
-  if (win.__wallProviders) return win.__wallProviders
+/**
+ * What the server can write with: the providers it holds a key for, and whether there is a
+ * claude on its machine to run. Both are things only that side knows, and both decide whether
+ * the app offers to write or quietly arranges eight stand-ins instead.
+ */
+export const servedConfig = async (): Promise<{ providers: string[]; cli: boolean }> => {
+  if (!isServed) return { providers: [], cli: false }
+  if (win.__wallProviders) return { providers: win.__wallProviders, cli: Boolean(win.__wallCli) }
   try {
-    const r = await fetch('/api/config')
-    const list = ((await r.json()) as { providers?: string[] }).providers ?? []
-    win.__wallProviders = list
-    return list
+    const got = (await (await fetch('/api/config')).json()) as { providers?: string[]; cli?: boolean }
+    win.__wallProviders = got.providers ?? []
+    win.__wallCli = Boolean(got.cli)
+    return { providers: win.__wallProviders, cli: win.__wallCli }
   } catch {
-    return []
+    // an unreachable server is not a server that said no, so nothing is remembered from it
+    return { providers: [], cli: false }
   }
 }

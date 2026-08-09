@@ -24,8 +24,8 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
-import { generateImage, streamText } from '../shared/providers.mjs'
-import { DESIGN_MODEL, runClaude } from '../shared/cli.mjs'
+import { REQUESTS, generateImage, streamText } from '../shared/providers.mjs'
+import { DESIGN_MODEL, hasClaude, runClaude } from '../shared/cli.mjs'
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 const DIST = path.join(ROOT, 'dist')
@@ -61,6 +61,8 @@ const KEYS = {
 
 /** Only ever the directory this server was started for, never one a page asks for. */
 const HANDOFF = process.env.WALL_HANDOFF_DIR ?? ''
+/** asked once: PATH does not change under a running process, and every page load would ask */
+const CLI = hasClaude()
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -166,11 +168,12 @@ const server = createServer(async (req, res) => {
   }
 
   if (url.pathname === '/api/config') {
-    // the app hides its key fields when the server already holds one
+    // the app hides its key fields when the server already holds one, and offers the local
+    // Claude only where there is one, which is a question only this side can answer
     return json(res, 200, {
       providers: Object.keys(KEYS).filter((k) => KEYS[k]),
       handoff: Boolean(HANDOFF),
-      cli: true,
+      cli: CLI,
     })
   }
 
@@ -219,7 +222,13 @@ const server = createServer(async (req, res) => {
 
   if (url.pathname === '/api/stream' && req.method === 'POST') {
     const { provider, system, user } = await readBody(req)
-    const key = KEYS[provider === 'openai' ? 'openai' : 'anthropic']
+    // A wire this endpoint does not speak is refused rather than quietly turned into one it
+    // does. Everything that was not openai used to go to the anthropic endpoint carrying the
+    // anthropic key, so a typo, an older page or a new wire name would hand one vendor another
+    // vendor's credential in a request that vendor never agreed to receive. There are two wires
+    // here and gemini is not one of them: its key is for images, and /api/image is where it goes.
+    if (!(provider in REQUESTS)) return json(res, 400, { error: `this server does not speak ${provider}` })
+    const key = KEYS[provider]
     if (!key) return json(res, 501, { error: `this server holds no ${provider} key` })
     const denied = overLimit(address)
     if (denied) return json(res, 429, { error: denied })
@@ -279,6 +288,14 @@ server.listen(PORT, HOST, () => {
   const held = Object.keys(KEYS).filter((k) => KEYS[k])
   console.log(`wall on http://localhost:${server.address().port}`)
   console.log(held.length ? `holding keys for ${held.join(', ')}` : 'holding no keys, so visitors bring their own')
+  // said out loud, because the alternative to a model is a wall of stand-ins that reads as real
+  console.log(
+    CLI
+      ? 'the claude command is here, so a visitor with no key can still write'
+      : held.length
+        ? 'no claude command here, so writing goes through the keys above'
+        : 'no claude command and no key, so a wall here is arranged rather than written',
+  )
   if (PER_HOUR) console.log(`limit ${PER_HOUR} walls per address per hour`)
   if (DAILY_TOKENS) console.log(`limit ${DAILY_TOKENS} output tokens per day`)
   if (IDLE_MS) console.log(`stopping after ${Math.round(IDLE_MS / 1000)}s with nobody asking`)

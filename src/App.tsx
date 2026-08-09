@@ -259,9 +259,16 @@ export default function App() {
     void fill(seeded(starterPage(t, p.name || 'Product'), p), p)
   }, [fill])
 
-  // ask the deployment which keys it holds before anything gates on having one
+  /**
+   * Ask the deployment what it can write with, before anything gates on having a model.
+   *
+   * The answer arrives after the first render and every gate reads it synchronously, so it is
+   * counted here: without a state change nothing renders again, and the setup screen would go
+   * on offering the local Claude on a machine that has none, or hiding it on one that has it.
+   */
+  const [, knewKeys] = useState(false)
   useEffect(() => {
-    void loadHeldKeys()
+    void loadHeldKeys().then(() => knewKeys(true))
     void loadKeys()
   }, [])
 
@@ -289,6 +296,12 @@ export default function App() {
       // message for someone who never described anything.
       setBuilding({ arrived: null, landed: [], thoughts: 0 })
       await loadHeldKeys()
+      // A wall with nothing to write it is still eight arranged pages, and they look finished
+      // until you read them. Someone who arrived here from their agent never chose a model and
+      // has no reason to suspect it, so the app is the one that has to say so.
+      if (!canWrite()) {
+        flash('No model can write here: there is no key and no claude command on this machine, so these pages are arranged rather than written.')
+      }
       // The agent that asked already knew what this is, so if it said so there is nothing to
       // work out. Reading the brief back through a model cost about forty seconds to recover
       // what the caller had already written down.
