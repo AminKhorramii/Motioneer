@@ -50,19 +50,21 @@ sequenceDiagram
   participant U as you
   participant A as App.fill
   participant W as promptWorlds
-  participant F as fanOut
+  participant P as writeOne
   participant M as the model
   U->>A: build, or "write a new wall"
-  A->>A: starterPage + seeded(product)
-  A->>W: design 8 worlds for this product
-  W->>M: one call, JSON of visual systems
-  M-->>W: names, type, scale, density, CSS, section order
-  W-->>A: registered as made-0 ... made-7
-  A->>F: 8 angles crossed with 8 worlds
-  loop per angle, in parallel
-    F->>M: stream one page
-    M-->>F: sections arrive one at a time
-    F-->>A: upsertPage on every finished section
+  A->>A: scaffold: alternatives(base, 9), eight places marked drafting
+  Note over A: the wall is on screen here, before anything has been asked
+  A->>W: design 5 worlds, one call each
+  A->>P: shadcn, material 3 and carbon start writing at once
+  loop per world, as it finishes
+    W->>M: one call, JSON of one visual system
+    M-->>W: name, type, scale, density, CSS, section order
+    W-->>A: restyle that place in its new world
+    A->>P: write the page for it, on its own angle
+    P->>M: stream one page
+    M-->>P: sections arrive one at a time
+    P-->>A: the written page replaces the draft in its place
   end
 ```
 
@@ -87,23 +89,45 @@ scale of 9 or a measure of 200 does not produce a daring page, it produces an un
 `safeCss()` strips imports and remote urls and caps the length, because a shipped page is one
 file with no requests and model written CSS must not break that promise.
 
+**The wall is up before the model is asked.** `scaffold()` arranges nine papers from the
+built in worlds against the copy the brief already seeded: the page as it arrived, kept to
+compare against, and eight places each holding a stand-in marked `drafting`. Every place is a
+place a written page will land in, so the wall improves where it stands rather than appearing
+all at once, and nothing on it is ever mistaken for finished. Three of the eight are named
+systems, shadcn, material 3 and carbon, which cost nothing to design and so start writing at the
+first frame; the model is asked for the other five.
+
 **Streaming.** A page keeps one id for its whole stream, so `upsertPage()` replaces it in place
-and a paper appears on its first finished section, then fills in. `streamedSections()` walks a
+and a paper appears on its first finished section, then fills in. `scanSections()` walks a
 partial reply tracking strings and brace depth, so a closing brace inside a headline does not
-end an object early. Papers repaint per completed section rather than per delta, because a real
-stream delivers a few characters at a time and repainting per delta would re-serialize eight
-pages hundreds of times for the same content.
+end an object early, and it resumes from a cursor rather than re-reading the buffer, because
+copy full of braces would otherwise make one page quadratic work. The same walk recovers the
+sections of a reply that was cut off, so a truncated page costs its tail rather than all of it.
+Papers repaint per completed section rather than per delta, because a real stream delivers a few
+characters at a time and repainting per delta would re-serialize eight pages hundreds of times
+for the same content.
 
 **Runs carry a token.** Writing a wall takes about half a minute and starting another must not
 be blocked, so `run.current` is bumped per fan out and late pages from an abandoned run are
 dropped rather than mixed into the new wall.
 
-**Without a key** nothing above runs. `alternatives(base, 8)` arranges the same copy eight ways
-locally, instantly, and the rest of the app behaves identically. Layouts, worlds, backdrops,
-editing and export never need a key.
+**Without a model** nothing above runs, and the wall says so rather than looking finished. The
+scaffold is already up, the drafts stay marked, and the app flashes that these pages are arranged
+rather than written, because eight arranged pages read as eight real ones until you read them.
+`canUseCli()` is how it knows: the desktop can answer for itself, and a served page asks its
+server, which is the only side that can see whether there is a claude on the machine. Layouts,
+worlds, backdrops, editing and export never need a model at all.
 
 **What one wall costs**, measured from real captures: about 14,000 input and 16,000 output
 tokens, and around 28 seconds.
+
+**The speed knob is which model designs.** Thinking is priced in seconds and the design calls do
+most of it, so `WALL_DESIGN_MODEL=haiku` is the one setting that moves the whole wall: measured
+on the same brief, haiku reached the first world in 10.7s against sonnet's 23.3 and finished all
+eight in 45s against 74. Both returned eight valid worlds, and sonnet reached for the more
+particular object, so this is offered rather than taken. `WALL_THINKING` sets the budget directly
+for anything in between, and `WALL_FAST` turns it off entirely, which is for the iteration loop
+rather than for a wall you mean to keep.
 
 ---
 
@@ -280,6 +304,69 @@ No accounts, no hosting of ours, no lock-in. The file is yours and it opens on i
 
 ---
 
+## 7b. Handing back to the agent
+
+The flow Wall exists for. You ask Claude Code for a landing page, it calls `design`, a wall opens
+with your brief already in it, you pick one, and the choice comes back as a spec your agent
+implements in your own codebase. Choosing happens where choosing is easy and building happens
+where the code lives. `mcp/index.mjs` is the whole of it, in three tools: `design`, `collect`
+and `check`.
+
+```mermaid
+sequenceDiagram
+  participant C as your agent
+  participant D as design
+  participant S as the server it starts
+  participant U as you
+  C->>D: brief, name, oneLiner, what, audience, cta, dir
+  D->>D: write dir/.wall/request.json, stamped format 1
+  D->>S: start it, open a browser at it
+  D-->>C: the wall is open at this url, call collect when they have chosen
+  Note over C,U: seconds, not minutes. The agent is free and you are still reading.
+  U->>S: pick a page, press "to Claude"
+  S->>S: write chosen.html, chosen.json, chosen.md, in that order
+  C->>D: collect dir
+  D-->>C: the spec, plus paths to the render and the structured page
+```
+
+**Returning without a choice is the normal answer, not an error.** `design` used to hold the call
+for fifteen minutes, which is longer than any MCP client waits, so the usual outcome of a working
+wall was a tool error, and an agent that reads an error tries again, which replaces the wall you
+are halfway through reading. It now waits `WALL_WAIT_MS`, 25 seconds by default, in case the
+choice is instant, and otherwise answers that the wall is open and that `collect` is the pickup.
+The tool descriptions teach that two step, because they are the only place an agent can learn it.
+
+**Everything the caller knows travels.** The agent has already read your project, so `design` asks
+it for the one liner, the audience and the button label, and writes all of them into
+`request.json`. When the one liner is there the app skips intake entirely, which is a model call
+and about forty seconds. When it is not, the wall is arranged from the brief as it stands and put
+on screen first, and the reading happens behind it under a line saying so.
+
+**Both files carry a version.** `npx` keeps the writer current while whatever reads the directory
+can be any age, so `request.json` is stamped `format: 1` and `chosen.json` is stamped `format: 2`,
+and each reader refuses a shape it does not know rather than half reading it into a wrong answer.
+
+**The order of the handoff is load bearing.** `chosen.md` is both the spec and the marker the
+agent watches for, so it is written last: the desktop shell takes a `BTreeMap` and gets that for
+free, and the server sorts by name for the same reason. Finding it means the render and the
+structured page are already there.
+
+**The server outlives the call and then stops on its own.** It holds API keys, so leaving it
+running until logout is not acceptable, and killing it when `design` returns would close the
+window mid-choice. So `WALL_IDLE_MS` is set to ten minutes by the spawner: any request resets the
+clock, an open tab beats every twenty seconds by asking `/api/config`, and silence for that long
+means the tab is gone and there is nobody left to serve. Unset means run forever, so `npm run
+serve` and any deployment are untouched.
+
+**Nothing to write with is said out loud.** After opening, `design` asks `/api/config` what the
+machine holds, and if there is no key and no claude the reply says the eight pages are arranged
+rather than written, so your agent can tell you before you spend time choosing between them.
+
+`verify/mcp.mjs` drives this whole path over the real protocol, and `verify/oneline.mjs` drives
+the first run version of it where nothing at all is installed.
+
+---
+
 ## 8. One app, three shells
 
 `src/host.ts` is the only file that knows where Wall is running. Everything above it is the same
@@ -324,9 +411,12 @@ an instance paying with its own key does not need protecting from itself:
 ```
 WALL_WALLS_PER_HOUR=5             # per address
 WALL_DAILY_OUTPUT_TOKENS=500000   # whole deployment
+WALL_IDLE_MS=600000               # stop after this much silence, unset means never
 ```
 
-The unit is the wall rather than the request, because one click is eight calls.
+The unit is the wall rather than the request, because one click is eight calls. `WALL_IDLE_MS` is
+for the copy an agent starts, which nothing else is in a position to end; a deployment leaves it
+unset and runs until it is stopped.
 
 `shared/providers.mjs` is the single model path for every shell: request shapes, SSE splitting,
 and delta extraction for the Anthropic and OpenAI wire formats. Two shapes cover every vendor in
@@ -359,8 +449,16 @@ npm run verify:web     # the same assertions in plain Chromium
 npm run verify:server  # the real server against a recorded upstream, asserting the visitor holds no key
 npm run verify:stream  # the real streaming path, no mock anywhere
 npm run verify:image   # the image pipeline, no browser and no Rust needed
+npm run verify:mcp     # the agent path over the real protocol, brief to spec
+npm run verify:oneline # the same path on a machine with nothing installed
 npm run verify:all     # all of them
 ```
+
+The two agent suites stand in for the local Claude with `verify/fakebin/claude`, which they put
+on PATH along with a do-nothing `open`. Both are in the repository rather than in a temporary
+directory, because a fixture a reboot can take away does not fail loudly when it goes: the suite
+starts calling the real model instead, which is slow, costs money, and on a machine with no
+session fails fast enough that a wall of unwritten drafts reads as a pass.
 
 `verify:image` reads the committed wasm rather than the crate's build output, because that is
 what ships, and builds its own input with zlib rather than loading a fixture, because a suite

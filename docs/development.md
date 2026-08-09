@@ -96,7 +96,7 @@ The web build is a static `dist/`, with `base: './'`, so it hosts anywhere.
 ## Streaming
 
 `shared/providers.mjs` holds one model path for both builds: request shapes, SSE splitting,
-and delta extraction for Anthropic and OpenAI. `streamedSections()` in `compose.ts` walks a
+and delta extraction for Anthropic and OpenAI. `scanSections()` in `compose.ts` walks a
 partial reply and yields each section object as it finishes arriving, tracking strings and
 brace depth so a closing brace inside a headline does not end an object early. A page keeps
 one id for its whole stream, so a paper appears on its first finished section and then fills
