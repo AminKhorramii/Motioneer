@@ -11,7 +11,7 @@
 
 import type { Taste } from '@/taste'
 import { ROLE_FORMS, legacyRole, type Form, type Role, type Section } from '@/sections'
-import type { Backdrop } from '@/backdrop'
+import { BACKDROPS, type Backdrop } from '@/backdrop'
 import { PALETTES, WORLDS } from '@/design/worlds'
 import { FACES } from '@/design/faces'
 
@@ -222,9 +222,9 @@ export function madeWorld(raw: Record<string, unknown>, i: number): World {
         ? (s.rhythm as unknown[]).slice(0, 8).map((v) => clamp(v, 0.4, 3, 1))
         : undefined,
     },
-    backdrop: (['none', 'contours', 'grain', 'ridge'] as const).includes(raw.backdrop as never)
-      ? (raw.backdrop as Backdrop)
-      : 'none',
+    // read from the list rather than a copy of it, so a backdrop added to the vocabulary is one
+    // a world may actually choose instead of silently falling to none
+    backdrop: BACKDROPS.includes(raw.backdrop as Backdrop) ? (raw.backdrop as Backdrop) : 'none',
     wear,
     css: safeCss(raw.css),
     compose: Array.isArray(raw.sections)

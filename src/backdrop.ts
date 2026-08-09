@@ -11,16 +11,20 @@
  */
 
 import type { Taste } from '@/taste'
+import { luminance } from '@/taste'
+import { TEXTURES } from '@/textures'
 
-export type Backdrop = 'none' | 'contours' | 'grain' | 'ridge'
+export type Backdrop = 'none' | 'contours' | 'grain' | 'ridge' | 'dither' | 'dots'
 
-export const BACKDROPS: Backdrop[] = ['none', 'contours', 'grain', 'ridge']
+export const BACKDROPS: Backdrop[] = ['none', 'contours', 'grain', 'ridge', 'dither', 'dots']
 
 export const BACKDROP_NOTE: Record<Backdrop, string> = {
   none: 'flat colour',
   contours: 'drifting topographic lines',
   grain: 'still film grain and vignette',
   ridge: 'a slow ridged field',
+  dither: 'an ordered dither, printed rather than drawn',
+  dots: 'an even dot grid, tiled',
 }
 
 /** a stable number from the taste sheet, so the same taste always draws the same field */
@@ -68,6 +72,26 @@ void main(){
 export function backdropHtml(t: Taste, kind: Backdrop, frozen = false): string {
   if (kind === 'none') return ''
   const seed = seedOf(t)
+
+  /**
+   * The baked textures are an image rather than a loop.
+   *
+   * They cost no shader context, so nine of them on a wall is nine pictures rather than nine
+   * render loops, and they are the same picture in a preview cell, in the studio and in the
+   * file a stranger downloads. Each is monochrome and tinted here by the page: multiply on a
+   * light ground darkens, screen on a dark one lifts, so one baked tile serves every look.
+   */
+  if (kind === 'dither' || kind === 'dots') {
+    const dark = luminance(t.bg) < 0.5
+    const tex = TEXTURES[kind]
+    return `<style>#bd{position:fixed;inset:0;z-index:0;pointer-events:none;
+background:url(${tex.url}) ${tex.tile ? 'top left/auto repeat' : 'center/cover no-repeat'};
+mix-blend-mode:${dark ? 'screen' : 'multiply'};opacity:${dark ? 0.13 : 0.11};
+${kind === 'dither' ? 'image-rendering:pixelated;' : ''}
+-webkit-mask-image:linear-gradient(#000 45%,transparent 100%);mask-image:linear-gradient(#000 45%,transparent 100%)}
+body>*:not(#bd){position:relative;z-index:1}</style><div id="bd"></div>`
+  }
+
   const style = `<style>#bd{position:fixed;inset:0;width:100%;height:100vh;z-index:0;
 -webkit-mask-image:linear-gradient(#000 45%,transparent 100%);mask-image:linear-gradient(#000 45%,transparent 100%)}
 body>*:not(#bd){position:relative;z-index:1}</style>`

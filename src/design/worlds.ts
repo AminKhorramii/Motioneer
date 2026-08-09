@@ -40,7 +40,7 @@ export const WORLDS: World[] = [
     voice: 'Write in full sentences with rhythm. The measure is long and the type is large, so the copy can breathe and should.',
     taste: (t) => ({ ...tinted(t), display: FRAUNCES, body: SERIF, scale: 1.44, radius: 2, density: 0.35, weight: 560, caps: true }),
     structure: { rules: false, numbered: false, bleed: true, measure: 74, base: 19, figure: 'bleed', breakout: 'bleed', rhythm: [1.7, 0.6, 1.3, 0.75, 2, 0.9] },
-    backdrop: 'grain',
+    backdrop: 'dither',
     // an essay argues in prose and then shows one plate, which is what a bleeding figure is for
     wear: { claim: 'statement', proof: 'quote', substance: ['prose', 'figure'], offer: 'statement', objections: 'prose', invitation: 'statement' },
     // a read: the argument, one witness, the substance twice over, the terms, a quiet close
@@ -93,7 +93,7 @@ export const WORLDS: World[] = [
     voice: 'Write densely and specifically. Numbers, names and lists rather than claims, because there is room for detail here.',
     taste: (t) => ({ ...mono(t), display: SYNE, body: SANS, scale: 1.16, radius: 3, density: 0.85, weight: 600, caps: true }),
     structure: { rules: true, numbered: true, bleed: false, measure: 58, base: 14, figure: 'plain', breakout: 'stagger', rhythm: [0.7, 0.45, 1.1, 0.5, 1.4, 0.6] },
-    backdrop: 'none',
+    backdrop: 'dots',
     // everything, listed: the fullest argument, set dense, priced in a table. The second
     // substance is a numbered list and the second witness speaks, so the density has a seam
     wear: { masthead: 'band', claim: 'prose', proof: ['list', 'quote'], substance: ['table', 'list'], offer: 'table', objections: 'list', invitation: 'band', credits: 'table' },
