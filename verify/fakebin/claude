@@ -1,0 +1,56 @@
+#!/usr/bin/env node
+// A stand-in for the local Claude. It answers the shapes Wall asks for, so the no-key route can
+// be driven end to end without spending a real session.
+//
+// It lives in the repository and is put on PATH by the suites that need it. It used to live in
+// /tmp, and a fixture a reboot can sweep away does not fail loudly when it goes: the suite
+// quietly starts calling the real claude on the machine, which is slow, costs money, and on a
+// machine without a session fails fast enough that a wall of unwritten drafts reads as a pass.
+let sys = ''
+const i = process.argv.indexOf('--system-prompt')
+if (i > -1) sys = process.argv[i + 1] ?? ''
+let body = ''
+process.stdin.on('data', (d) => (body += d)).on('end', () => {
+  const ids = [...body.matchAll(/"id":\s*"([a-z0-9]{5,})"/g)].map((m) => m[1])
+  // the whole wall in one reply: one entry per page, keeping the angle and every id
+  const wall = sys.includes('"pages"')
+    ? (() => {
+        const out = []
+        for (const block of body.split(/Page \d+, angle "/).slice(1)) {
+          const angle = block.slice(0, block.indexOf('"'))
+          const ids = [...block.matchAll(/"id":\s*"([a-z0-9]{5,})"/g)].map((m) => m[1])
+          out.push({ angle, sections: ids.map((id, n) => ({ id, content: { headline: `${angle} headline ${n}`, sub: `${angle} sub ${n}` } })) })
+        }
+        return JSON.stringify({ pages: out })
+      })()
+    : null
+  const reply = wall !== null ? wall : sys.includes('"worlds"')
+    ? JSON.stringify({ worlds: Array.from({ length: 8 }, (_, n) => ({
+        name: ['wall label','field manual','night edition','receipt','broadsheet','sign system','zine','gallery card'][n],
+        note: 'made by the local claude', voice: 'Write plainly.',
+        display: ['sans','grotesk','serif','mono'][n % 4], body: ['sans','serif'][n % 2],
+        scale: 1.15 + n * 0.05, weight: 400 + n * 40, radius: n * 2, density: 0.35 + n * 0.06,
+        caps: n % 2 === 0, palette: ['as-is','mono','tinted','contrast'][n % 4],
+        backdrop: ['none','contours','grain','ridge'][n % 4],
+        structure: { rules: n % 2 === 0, numbered: n % 3 === 0, bleed: n % 4 === 0, measure: 48 + n * 4, figure: 'framed' },
+        prefer: { hero: n % 4 }, sections: ['hero','features','cta','footer'],
+        css: 'section#hero .wrap{border-top:1px solid var(--line)}',
+      })) })
+    : sys.includes('"product"')
+      ? JSON.stringify({ product: { name: 'Wall', oneLiner: 'Eight pages, then one.', what: 'It writes your landing page eight ways.', audience: 'solo founders', cta: 'Download' }, questions: [] })
+      : (() => {
+          // key off the angle in the instruction, or every page comes back identical and the
+          // suite cannot tell a wall of eight from the same page eight times
+          const angle = (body.match(/as \\?"([^"\\]+)/) || [])[1] || 'plain'
+          return JSON.stringify({ sections: ids.map((id, n) => ({ id, content: { headline: `${angle} headline ${n}`, sub: `${angle} sub ${n}` } })) })
+        })()
+    // the caller may ask for the streamed shape, which is the vendor's frames wrapped one level
+  if (process.argv.includes('stream-json')) {
+    for (const [chunk] of reply.matchAll(/[\s\S]{1,160}/g)) {
+      process.stdout.write(JSON.stringify({ type: 'stream_event', event: { type: 'content_block_delta', delta: { type: 'text_delta', text: chunk } } }) + '\n')
+    }
+    process.stdout.write(JSON.stringify({ type: 'result', is_error: false, result: reply }) + '\n')
+    return
+  }
+  process.stdout.write(JSON.stringify({ is_error: false, result: reply }))
+})

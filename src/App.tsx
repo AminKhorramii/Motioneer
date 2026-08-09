@@ -51,6 +51,7 @@ export default function App() {
   /** which paper holds each of the eight places, so a slot can be upgraded rather than appended */
   const slots = useRef<string[]>([])
   const [toast, setToast] = useState('')
+  const toastTimer = useRef(0)
   const [view, setView] = useState<'studio' | 'wall'>('studio')
   const [briefOpen, setBriefOpen] = useState(false)
   const [onboarding, setOnboarding] = useState<'first' | 'explain' | null>(
@@ -94,7 +95,11 @@ export default function App() {
 
   const flash = (m: string) => {
     setToast(m)
-    setTimeout(() => setToast(''), 2600)
+    // The timer belongs to the message on screen, not to the one that set it. Without this a
+    // message arriving two seconds after another was taken away by the first one's timer a
+    // moment later, so "sent back" could appear and vanish inside the same second.
+    clearTimeout(toastTimer.current)
+    toastTimer.current = window.setTimeout(() => setToast(''), 2600)
   }
   const copy = async (text: string, what: string) => {
     await navigator.clipboard?.writeText(text)

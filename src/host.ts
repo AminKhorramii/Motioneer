@@ -249,6 +249,19 @@ export const isDesktop = onTauri
 export const isServed = Boolean(!onTauri && win.__wallServed)
 
 /**
+ * An open tab is a reason for the server to stay up.
+ *
+ * A server an agent started has nothing to tell it when the person is finished, so it counts
+ * silence and stops after ten minutes of it. Somebody reading eight pages is not silence, but a
+ * page that has finished loading makes no requests, so it says so on its own. Twenty seconds is
+ * far enough inside the ten minutes to survive a model call that holds the connection for
+ * several of them without the beat ever being the thing that is late.
+ */
+if (isServed) {
+  setInterval(() => void fetch('/api/config').catch(() => {}), 20_000)
+}
+
+/**
  * Hand a key to the server rather than keeping it in the page.
  *
  * localStorage is per origin, so a server on a different port every run would lose it and ask

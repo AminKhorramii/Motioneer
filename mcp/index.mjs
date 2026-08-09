@@ -8,8 +8,11 @@
  * is that choosing happens where choosing is easy, and building happens where the code lives.
  *
  * The handoff is files in a directory rather than a return value, because a person browsing
- * takes longer than any sensible tool timeout. `design` waits, and if it gives up the answer
- * is still written to disk for `collect` to pick up later, or for the agent to simply read.
+ * takes longer than any sensible tool timeout. So `design` opens the wall, waits a few seconds
+ * in case the choice is instant, and otherwise answers that the wall is open. That is not a
+ * failure and is not reported as one: it is what happens almost every time, and an agent told
+ * it failed will try again and throw away the wall the person is reading. `collect` is the
+ * pickup, and the files stay on disk for it however long choosing takes.
  *
  * JSON-RPC over stdio, spoken directly, so this stays dependency free like the rest.
  */
@@ -20,7 +23,23 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 
 const ROOT = path.join(path.dirname(new URL(import.meta.url).pathname), '..')
-const WAIT_MS = Number(process.env.WALL_WAIT_MS ?? 900_000)
+/**
+ * How long to hold the call open before answering that the wall is open.
+ *
+ * This used to be fifteen minutes, on the theory that a person might choose inside it. No MCP
+ * client waits that long, so the only thing the wait reliably produced was a tool error under a
+ * window that was working perfectly. Seconds are enough to catch a choice that was already made,
+ * and everything longer belongs to collect.
+ */
+const WAIT_MS = Number(process.env.WALL_WAIT_MS ?? 25_000)
+/**
+ * How long the server this process starts should outlive it.
+ *
+ * The call returns in seconds and the person browses for minutes, so the server cannot be killed
+ * on the way out. The open tab beats every twenty seconds, so ten minutes of silence means the
+ * tab is closed and there is nobody left to serve.
+ */
+const IDLE_MS = process.env.WALL_IDLE_MS ?? '600000'
 // the one version this package has, told to clients instead of a number nobody bumps
 const VERSION = await readFile(path.join(ROOT, 'package.json'), 'utf8')
   .then((raw) => JSON.parse(raw).version)
@@ -34,9 +53,13 @@ const TOOLS = [
   {
     name: 'design',
     description:
-      'Open Wall with a brief, let the person choose a landing page from eight, and return the ' +
-      'chosen design as a spec to implement. Blocks while they choose. Use this when someone ' +
-      'asks for a landing page, a marketing page, or a set of design directions to pick from.',
+      'Open Wall with a brief, so the person can compare eight complete landing pages and pick ' +
+      'one. Use this when someone asks for a landing page, a marketing page, or a set of design ' +
+      'directions to choose between. It returns as soon as the wall is open, usually in seconds, ' +
+      'and returning without a choice is the normal outcome rather than an error: reading eight ' +
+      'pages takes minutes. Tell them the wall is open, then call collect when they say they ' +
+      'have chosen. Do not call this twice for the same brief, because a second wall replaces ' +
+      'the one they are looking at.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -72,8 +95,10 @@ const TOOLS = [
   {
     name: 'collect',
     description:
-      'Read a design that was chosen after design() stopped waiting. Use this if design() timed ' +
-      'out and the person has since picked one.',
+      'Read the design the person chose in Wall, as a spec to implement. This is the pickup for ' +
+      'every design() call, because design returns while they are still looking. Call it when ' +
+      'they say they have chosen. Nothing chosen yet is not a dead end: the wall is still open, ' +
+      'so ask them and call this again rather than starting over.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -171,7 +196,9 @@ function findShell() {
 function openInBrowser(request, at) {
   return new Promise((resolve) => {
     const child = spawn('node', [path.join(ROOT, 'server', 'index.mjs')], {
-      env: { ...process.env, PORT: '0', WALL_REQUEST: request, WALL_HANDOFF_DIR: at },
+      // This process leaves long before the browsing does, so the server is told to watch its own
+      // traffic and stop when the tab stops beating. Nothing else is in a position to end it.
+      env: { ...process.env, PORT: '0', WALL_REQUEST: request, WALL_HANDOFF_DIR: at, WALL_IDLE_MS: IDLE_MS },
       stdio: ['ignore', 'pipe', 'ignore'],
     })
     let out = ''
@@ -198,7 +225,24 @@ function openInBrowser(request, at) {
   })
 }
 
-/** Launch the desktop app with the brief in hand, and wait for a design to appear on disk. */
+/**
+ * What the machine that just opened can write with.
+ *
+ * A wall with no key and no local claude still paints eight arranged drafts, and a draft looks
+ * finished until you read it. The person cannot tell, and the server can, so the agent asks and
+ * says so rather than letting them choose between eight unwritten pages.
+ */
+async function canWriteThere(url) {
+  try {
+    const cfg = await fetch(`${url}/api/config`).then((r) => r.json())
+    return Boolean(cfg.cli) || Boolean(cfg.providers?.length)
+  } catch {
+    // an unreachable server is a different problem, and guessing at this one would only add noise
+    return true
+  }
+}
+
+/** Open the wall with the brief in hand, and give a choice already made a few seconds to arrive. */
 async function design({ brief, name, oneLiner, what, audience, cta, dir }) {
   const at = handoffDir(dir)
   await mkdir(at, { recursive: true })
@@ -217,27 +261,32 @@ async function design({ brief, name, oneLiner, what, audience, cta, dir }) {
   )
 
   const found = findShell()
-  let server = null
   let where = 'the Wall window'
+  let drafting = false
   if (found) {
     spawn(found.cmd, found.args, { env: { ...process.env, WALL_REQUEST: request }, stdio: 'ignore', detached: true }).unref()
   } else {
     const opened = await openInBrowser(request, at)
-    server = opened.child
-    if (!opened.url) return { noShell: true, at }
+    if (!opened.url) {
+      // it holds the keys and answers to nobody, so a server that never said where it is has to
+      // be stopped here rather than left running for the rest of the session
+      opened.child?.kill()
+      return { noShell: true, at }
+    }
     where = opened.url
+    drafting = !(await canWriteThere(opened.url))
   }
 
+  // The server is deliberately not killed on the way out of either branch: the window is the
+  // thing being used, and it outlives this call. Its own idle timer decides when it is over.
   const until = Date.now() + WAIT_MS
   while (Date.now() < until) {
     const got = await readChosen(dir)
-    if (got) {
-      server?.kill()
-      return got
-    }
-    await new Promise((r) => setTimeout(r, 700))
+    if (got) return got
+    // often enough that a choice made during the short wait is answered rather than missed
+    await new Promise((r) => setTimeout(r, 250))
   }
-  return { waiting: true, at, where }
+  return { waiting: true, at, where, drafting }
 }
 
 async function check(html) {
@@ -255,20 +304,26 @@ async function call(name, args, id) {
     if (got?.noShell) {
       return fail(id, `Wall could not open a window or a browser. The brief is written to ${got.at}.`)
     }
+    // Not an error. The wall is open and eight pages are being written on it, which is exactly
+    // what was asked for, and an agent told this failed will call design again and replace the
+    // wall the person is halfway through reading.
     if (got?.waiting) {
-      return fail(
+      return ok(
         id,
-        `Wall is open at ${got.where} and waiting for a choice. Nothing has been picked yet.\n` +
-          `Call collect with dir "${args?.dir ?? process.cwd()}" once they have, or read ` +
-          `${path.join(got.at, 'chosen.md')} directly.`,
-      )
-    }
-    if (!got) {
-      return fail(
-        id,
-        `Wall is open and waiting for a choice. Nothing has been picked yet.\n` +
-          `Call collect with dir "${args?.dir ?? process.cwd()}" once they have, or read ` +
-          `${path.join(handoffDir(args?.dir), 'chosen.md')} directly.`,
+        [
+          `Wall is open at ${got.where}, writing eight pages to choose between.`,
+          got.drafting &&
+            'It found no API key and no claude command on this machine, so those eight are ' +
+              'arranged from the built in designs rather than written. Say so: they are worth ' +
+              'choosing between, but the words on them are placeholders.',
+          `Nothing has been chosen yet, which is normal: reading eight pages takes minutes and ` +
+            `this call returns in seconds so you are not left waiting. Tell them the wall is ` +
+            `open, then call collect with dir "${args?.dir ?? process.cwd()}" when they say they ` +
+            `have picked one. The choice is written to ${path.join(got.at, 'chosen.md')} and ` +
+            `stays there, so there is no hurry and nothing to poll.`,
+        ]
+          .filter(Boolean)
+          .join('\n\n'),
       )
     }
     return ok(id, chosenText(got))

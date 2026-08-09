@@ -1,0 +1,9 @@
+#!/usr/bin/env node
+// A stand-in for the command that hands a URL to whatever browser the person already uses.
+//
+// A suite drives its own browser and writes down where the wall is, so launching a second real
+// one steals the screen from whoever is running the suite. It also breaks what the suite is
+// measuring: a real tab beats every twenty seconds to say somebody is still reading, so a server
+// under test for stopping when nobody is left never stops.
+//
+// xdg-open is the same file under the name Linux uses.

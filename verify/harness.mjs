@@ -13,6 +13,7 @@
 
 import { chromium } from 'playwright'
 import { createServer } from 'node:http'
+import { connect } from 'node:net'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 
@@ -81,6 +82,28 @@ export async function openApp({ env = {}, viewport = { width: 1440, height: 900 
       server.close()
     },
   }
+}
+
+/**
+ * Is a server still there, asked without asking it for anything.
+ *
+ * A server started by the MCP tool ends itself after a stretch with no requests, so a suite that
+ * watched for that with fetch would be the traffic keeping it alive, and would report that it
+ * refuses to stop. Opening a socket and closing it never reaches the request handler, so this
+ * observes the thing without taking part in it.
+ */
+export function listening(url) {
+  const port = Number(new URL(url).port)
+  return new Promise((resolve) => {
+    const socket = connect({ port, host: '127.0.0.1' })
+    const done = (answer) => {
+      socket.destroy()
+      resolve(answer)
+    }
+    socket.on('connect', () => done(true))
+    socket.on('error', () => done(false))
+    socket.setTimeout(2000, () => done(false))
+  })
 }
 
 /**

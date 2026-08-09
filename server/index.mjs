@@ -16,6 +16,7 @@
  *   WALL_HOST                                             default 127.0.0.1, loopback only
  *   WALL_WALLS_PER_HOUR                                   per address ceiling, unset means none
  *   WALL_DAILY_OUTPUT_TOKENS                              whole deployment ceiling, unset means none
+ *   WALL_IDLE_MS                                          stop after this much silence, unset means never
  */
 
 import { createServer } from 'node:http'
@@ -75,6 +76,18 @@ const TYPES = {
  * rather than either. Both are off unless configured, because a self-hosted instance paying
  * with its own key does not need protecting from itself.
  */
+/**
+ * When to stop, for the copy of this server an agent started.
+ *
+ * That one is nobody's to kill. The tool call that spawned it returns in seconds while the person
+ * browses for minutes, so killing it on the way out would close the window mid-choice, and not
+ * killing it leaves a process holding API keys for the rest of the login session. So it watches
+ * its own traffic: an open tab says so every twenty seconds, and silence for this long means the
+ * tab is gone. Unset means run forever, which is what `npm run serve` and any deployment want.
+ */
+const IDLE_MS = Number(process.env.WALL_IDLE_MS ?? 0)
+let lastSeen = Date.now()
+
 const PER_HOUR = Number(process.env.WALL_WALLS_PER_HOUR ?? 0)
 const DAILY_TOKENS = Number(process.env.WALL_DAILY_OUTPUT_TOKENS ?? 0)
 const CALLS_PER_WALL = 8
@@ -140,6 +153,9 @@ async function serveFile(res, file, injectFlag) {
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost')
   const address = req.socket.remoteAddress ?? 'unknown'
+  // anything at all counts, including the heartbeat, because the question is whether a tab is
+  // still there rather than whether it is doing anything interesting
+  lastSeen = Date.now()
 
   // A name that resolves to this machine is not the same as this machine. Rejecting any other
   // Host closes rebinding, where a page a person visits is pointed at their own loopback and
@@ -265,4 +281,15 @@ server.listen(PORT, HOST, () => {
   console.log(held.length ? `holding keys for ${held.join(', ')}` : 'holding no keys, so visitors bring their own')
   if (PER_HOUR) console.log(`limit ${PER_HOUR} walls per address per hour`)
   if (DAILY_TOKENS) console.log(`limit ${DAILY_TOKENS} output tokens per day`)
+  if (IDLE_MS) console.log(`stopping after ${Math.round(IDLE_MS / 1000)}s with nobody asking`)
 })
+
+if (IDLE_MS) {
+  // unref'd, so this timer is never the reason the process is still up: it only gets to speak
+  // while the server itself is holding the loop open
+  setInterval(() => {
+    if (Date.now() - lastSeen < IDLE_MS) return
+    console.log('nobody has asked for anything, so this server is done')
+    process.exit(0)
+  }, Math.min(IDLE_MS, 5_000)).unref()
+}
