@@ -73,12 +73,6 @@ const TYPES = {
 }
 
 /**
- * Ceilings. A wall is eight calls and about sixteen thousand output tokens, so the unit that
- * matters is the wall rather than the request, and the cost that matters is output tokens
- * rather than either. Both are off unless configured, because a self-hosted instance paying
- * with its own key does not need protecting from itself.
- */
-/**
  * When to stop, for the copy of this server an agent started.
  *
  * That one is nobody's to kill. The tool call that spawned it returns in seconds while the person
@@ -90,6 +84,12 @@ const TYPES = {
 const IDLE_MS = Number(process.env.WALL_IDLE_MS ?? 0)
 let lastSeen = Date.now()
 
+/**
+ * Ceilings. A wall is eight calls and about sixteen thousand output tokens, so the unit that
+ * matters is the wall rather than the request, and the cost that matters is output tokens
+ * rather than either. Both are off unless configured, because a self-hosted instance paying
+ * with its own key does not need protecting from itself.
+ */
 const PER_HOUR = Number(process.env.WALL_WALLS_PER_HOUR ?? 0)
 const DAILY_TOKENS = Number(process.env.WALL_DAILY_OUTPUT_TOKENS ?? 0)
 const CALLS_PER_WALL = 8

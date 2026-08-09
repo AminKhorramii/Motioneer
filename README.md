@@ -25,8 +25,9 @@ stack** — design tokens, structure, and copy, not a static file to port.
 Nothing else to download: `npx` resolves the latest version on every run, so Windows and
 Linux work without a build and a run is never stale. A desktop app is coming.
 
-Three tools: `design` opens Wall and waits · `collect` reads a choice made after it
-stopped waiting · `check` names the patterns that make a page look generated.
+Three tools: `design` opens Wall and answers within seconds, so your agent is free while you
+read · `collect` hands it the page you chose, whenever you choose it · `check` names the
+patterns that make a page look generated.
 
 ## From a clone
 
