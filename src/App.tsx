@@ -268,6 +268,12 @@ export default function App() {
   useEffect(() => {
     void host.request().then(async (req) => {
       if (!req?.brief || !req.dir) return
+      // The writer of this file is kept current by npx while the reader can be any age, so a
+      // shape this build does not know is refused rather than half read into a wrong brief.
+      if (req.format !== 1) {
+        flash(`This brief says format ${req.format ?? 'nothing'}, and this build reads format 1. Update whichever is older.`)
+        return
+      }
       // an agent opened this window, so the Claude that opened it is right there. Nothing to
       // configure is a better first run than a good default.
       if (!localStorage.getItem('wall-model')) choose('claude-code')

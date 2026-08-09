@@ -172,8 +172,15 @@ async function design({ brief, name, oneLiner, what, audience, cta, dir }) {
   await rm(path.join(at, 'chosen.md'), { force: true })
   const request = path.join(at, 'request.json')
   // this file crosses versions: npx keeps this writer current while an installed reader can be
-  // any age, so the shape carries its own number for a reader to refuse rather than misread
-  await writeFile(request, JSON.stringify({ format: 1, brief, name }, null, 2), 'utf8')
+  // any age, so the shape carries its own number for a reader to refuse rather than misread.
+  // Every field the schema asks for travels: the caller has already read the project and said
+  // what this is, and dropping those here made the app spend a model call re-reading the brief
+  // to work out what it had just been told. JSON.stringify leaves out whatever was not supplied.
+  await writeFile(
+    request,
+    JSON.stringify({ format: 1, brief, name, oneLiner, what, audience, cta }, null, 2),
+    'utf8',
+  )
 
   const found = findShell()
   let server = null

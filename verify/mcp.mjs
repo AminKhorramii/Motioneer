@@ -56,7 +56,7 @@ console.log('collect before choosing:', JSON.stringify({ isError: !!(await waitF
 
 // ——— 2. the desktop, launched the way the server launches it ———
 const request = join(at, 'request.json')
-writeFileSync(request, JSON.stringify({ brief: 'Spoor makes every AI session searchable, locally.', name: 'Spoor' }), 'utf8')
+writeFileSync(request, JSON.stringify({ format: 1, brief: 'Spoor makes every AI session searchable, locally.', name: 'Spoor' }), 'utf8')
 
 const wall = spawn('node', ['server/index.mjs'], {
   env: { ...process.env, PORT: '0', ANTHROPIC_API_KEY: 'server-held-key', WALL_API_BASE: url, WALL_REQUEST: request, WALL_HANDOFF_DIR: at },

@@ -24,7 +24,8 @@ const brief =
 
 mkdirSync(at, { recursive: true })
 const request = path.join(at, 'request.json')
-writeFileSync(request, JSON.stringify({ brief, name: '' }, null, 2), 'utf8')
+// the same shape the MCP server writes, stamp and all, or the app refuses it the same way
+writeFileSync(request, JSON.stringify({ format: 1, brief, name: '' }, null, 2), 'utf8')
 
 const server = spawn('node', [path.join(ROOT, 'server', 'index.mjs')], {
   env: { ...process.env, PORT: process.env.PORT ?? '0', WALL_REQUEST: request, WALL_HANDOFF_DIR: at },

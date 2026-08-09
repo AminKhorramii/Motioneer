@@ -46,6 +46,8 @@ export interface Host {
     => Promise<{ text?: string; error?: string }>
   /** a brief handed in from outside, when something launched this window to ask for a design */
   request: () => Promise<{
+    /** which shape the writer spoke, so a reader of a different age refuses rather than misreads */
+    format?: number
     brief?: string
     name?: string
     oneLiner?: string
