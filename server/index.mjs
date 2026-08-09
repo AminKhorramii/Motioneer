@@ -186,7 +186,11 @@ const server = createServer(async (req, res) => {
     const { files } = await readBody(req)
     try {
       await mkdir(HANDOFF, { recursive: true })
-      for (const [name, body] of Object.entries(files ?? {})) {
+      // Sorted, which puts chosen.md last, and last is what matters: chosen.md is the file the
+      // agent polls for, so writing it before its neighbours hands back a design whose render
+      // and structured page are still empty or absent. The desktop shell takes a BTreeMap and
+      // gets this ordering for free, so sorting here makes both shells write the same way.
+      for (const [name, body] of Object.entries(files ?? {}).sort(([a], [b]) => (a < b ? -1 : 1))) {
         // a name is a name, never a path
         if (name.includes('/') || name.includes('\\') || name.includes('..')) continue
         await writeFile(path.join(HANDOFF, name), String(body), 'utf8')

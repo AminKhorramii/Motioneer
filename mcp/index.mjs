@@ -96,16 +96,50 @@ const TOOLS = [
 
 const handoffDir = (dir) => path.join(path.resolve(dir ?? process.cwd()), '.wall')
 
+/**
+ * The three files a choice leaves behind, read as one answer.
+ *
+ * chosen.md is the marker as well as the spec, because it is written last, so finding it means
+ * the other two are already there. The structured page is only offered once it parses and says
+ * which shape it is: a reader that hands an agent a half written file, or one from a version
+ * that meant something else by it, is worse than one that says nothing.
+ */
 async function readChosen(dir) {
   const at = handoffDir(dir)
   const spec = path.join(at, 'chosen.md')
   if (!existsSync(spec)) return null
+  const page = path.join(at, 'chosen.json')
+  const structured = await readFile(page, 'utf8')
+    .then((raw) => (JSON.parse(raw).format === 2 ? page : null))
+    .catch(() => null)
   return {
     at,
     spec: await readFile(spec, 'utf8'),
     html: existsSync(path.join(at, 'chosen.html')) ? path.join(at, 'chosen.html') : null,
+    structured,
   }
 }
+
+/**
+ * How a chosen design is told to an agent.
+ *
+ * The spec is the thing to implement, and the two files beside it are there to be read rather
+ * than copied: one is what the page looked like, the other is the page as data, for anything
+ * that would rather walk the sections than parse prose.
+ */
+const chosenText = (got) =>
+  [
+    `A design was chosen and written to ${got.at}. Implement it in this project's own stack ` +
+      `rather than copying the reference file: the spec below carries the tokens, the structure ` +
+      `and every word.`,
+    // a file that is not there is not named, so nothing sends a reader to a path that fails
+    [got.html && `Reference render: ${got.html}`, got.structured && `Structured page: ${got.structured}`]
+      .filter(Boolean)
+      .join('\n'),
+    got.spec,
+  ]
+    .filter(Boolean)
+    .join('\n\n')
 
 /**
  * Which desktop to open.
@@ -237,17 +271,12 @@ async function call(name, args, id) {
           `${path.join(handoffDir(args?.dir), 'chosen.md')} directly.`,
       )
     }
-    return ok(
-      id,
-      `A design was chosen and written to ${got.at}. Implement it in this project's own stack ` +
-        `rather than copying the reference file: the spec below carries the tokens, the ` +
-        `structure and every word.\n\nReference render: ${got.html}\n\n${got.spec}`,
-    )
+    return ok(id, chosenText(got))
   }
   if (name === 'collect') {
     const got = await readChosen(args?.dir)
     return got
-      ? ok(id, `Chosen design, from ${got.at}.\n\n${got.spec}`)
+      ? ok(id, chosenText(got))
       : fail(id, `Nothing has been chosen yet in ${handoffDir(args?.dir)}.`)
   }
   if (name === 'check') return ok(id, await check(String(args?.html ?? '')))
