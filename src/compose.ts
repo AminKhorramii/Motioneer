@@ -599,48 +599,6 @@ export async function promptWorlds(
   return made.length >= 2 ? made : WORLDS
 }
 
-/**
- * Distinct positions a landing page can take on the same product. A wall of variants is
- * only worth scanning if the pages disagree with each other, so each angle argues for a
- * different reason to care rather than rephrasing the same one.
- */
-
-/**
- * Write a full wall in parallel, one page per angle. Each page is handed back the moment its
- * own call returns, so papers land as they finish instead of after the slowest one. One
- * angle failing must not lose the other seven, so failures are caught per angle and the
- * first message is returned for the app to show.
- */
-export async function fanOut(
-  base: Page,
-  product: Product,
-  provider: Provider,
-  n: number,
-  onPage: (page: Page) => void,
-  worlds: World[] = WORLDS,
-): Promise<{ written: number; error?: string }> {
-  const done = await Promise.all(
-    ANGLES.slice(0, n).map(async (angle, i) => {
-      try {
-        const written = await promptPage(
-          arrange(base, i + 1, worlds), `Write this page as "${angle.name}". ${angle.instruction}`, product, provider,
-          (partial) => onPage({ ...partial, angle: angle.name }),
-        )
-        if (!written) return { ok: 0, error: 'the reply was not usable JSON' }
-        onPage({ ...written, angle: angle.name })
-        return { ok: 1 }
-      } catch (e) {
-        return { ok: 0, error: String(e instanceof Error ? e.message : e).slice(0, 160) }
-      }
-    }),
-  )
-  return {
-    written: done.reduce((a, b) => a + b.ok, 0),
-    error: done.find((d) => d.error)?.error,
-  }
-}
-
-
 export interface Intake {
   product: Product
   questions: { key: keyof Product; question: string; why: string }[]
@@ -656,7 +614,9 @@ export interface Intake {
 export async function readBrief(text: string, provider: Provider = 'claude'): Promise<Intake | null> {
   const raw = mockReply
     ? mockReply('intake', text)
-    : grabJson((await ask(provider, INTAKE_SYSTEM, text)) ?? '')
+    // this is field extraction rather than design or writing, and it is the whole wait between
+    // describing a product and seeing a wall, so it says so and gets the model that suits it
+    : grabJson((await ask(provider, INTAKE_SYSTEM, text, undefined, { kind: 'intake' })) ?? '')
   const j = raw as { product?: Partial<Product>; questions?: Intake['questions'] } | null
   if (!j?.product) return null
   return {

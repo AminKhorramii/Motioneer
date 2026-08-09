@@ -25,7 +25,7 @@ import os from 'node:os'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { REQUESTS, generateImage, streamText } from '../shared/providers.mjs'
-import { DESIGN_MODEL, hasClaude, runClaude } from '../shared/cli.mjs'
+import { DESIGN_MODEL, INTAKE_MODEL, hasClaude, runClaude } from '../shared/cli.mjs'
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 const DIST = path.join(ROOT, 'dist')
@@ -256,7 +256,16 @@ const server = createServer(async (req, res) => {
     // Once a second is plenty to prove life and few enough to ignore.
     let beat = 0
     const out = await runClaude(String(system ?? ''), String(user ?? ''), {
-      ...(kind === 'design' ? { model: DESIGN_MODEL() } : {}),
+      // Designing the worlds, reading a brief and writing the words are three jobs, and the
+      // caller says which one this is so each can be spent on separately. Reading a brief is
+      // pulling five fields out of a paragraph, which is the one of the three with nothing to
+      // weigh up, and it is the only call a person waits in front of before anything is on
+      // screen, so it is told not to think and takes about a third of the time.
+      ...(kind === 'design'
+        ? { model: DESIGN_MODEL() }
+        : kind === 'intake'
+          ? { model: INTAKE_MODEL(), thinking: 0 }
+          : {}),
       onDelta: (d) => res.write(d),
       onThink: () => {
         const now = Date.now()

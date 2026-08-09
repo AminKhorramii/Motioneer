@@ -132,13 +132,13 @@ fn claude_text(system: String, user: String, kind: Option<String>) -> serde_json
     use std::io::Write;
     use std::process::{Command, Stdio};
 
-    // designing the worlds and writing the words are different jobs, and a deployment may want a
-    // different model on each, so the caller says which one this is
+    // designing the worlds, reading a brief and writing the words are three different jobs, and
+    // a deployment may want a different model on each, so the caller says which one this is
     let writing = std::env::var("WALL_CLI_MODEL").unwrap_or_else(|_| "sonnet".into());
-    let model = if kind.as_deref() == Some("design") {
-        std::env::var("WALL_DESIGN_MODEL").unwrap_or(writing)
-    } else {
-        writing
+    let model = match kind.as_deref() {
+        Some("design") => std::env::var("WALL_DESIGN_MODEL").unwrap_or(writing.clone()),
+        Some("intake") => std::env::var("WALL_INTAKE_MODEL").unwrap_or(writing.clone()),
+        _ => writing,
     };
 
     let mut command = Command::new("claude");
@@ -162,8 +162,12 @@ fn claude_text(system: String, user: String, kind: Option<String>) -> serde_json
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
-    // thinking is most of the wait and also most of the design, so it goes only when asked
-    if std::env::var("WALL_FAST").is_ok() {
+    // Thinking is most of the wait and also most of the design, so it goes only when asked.
+    // Reading a brief is the exception: it pulls five fields out of a paragraph, there is
+    // nothing there to weigh up, and it is the one call somebody waits in front of with nothing
+    // yet on screen. Measured on the same brief it takes about 5.6 seconds this way and 14.8
+    // with the model's own budget left alone.
+    if std::env::var("WALL_FAST").is_ok() || kind.as_deref() == Some("intake") {
         command.env("MAX_THINKING_TOKENS", "0");
     }
     let spawned = command.spawn();

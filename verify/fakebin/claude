@@ -44,13 +44,21 @@ process.stdin.on('data', (d) => (body += d)).on('end', () => {
           const angle = (body.match(/as \\?"([^"\\]+)/) || [])[1] || 'plain'
           return JSON.stringify({ sections: ids.map((id, n) => ({ id, content: { headline: `${angle} headline ${n}`, sub: `${angle} sub ${n}` } })) })
         })()
+  const say = () => {
     // the caller may ask for the streamed shape, which is the vendor's frames wrapped one level
-  if (process.argv.includes('stream-json')) {
-    for (const [chunk] of reply.matchAll(/[\s\S]{1,160}/g)) {
-      process.stdout.write(JSON.stringify({ type: 'stream_event', event: { type: 'content_block_delta', delta: { type: 'text_delta', text: chunk } } }) + '\n')
+    if (process.argv.includes('stream-json')) {
+      for (const [chunk] of reply.matchAll(/[\s\S]{1,160}/g)) {
+        process.stdout.write(JSON.stringify({ type: 'stream_event', event: { type: 'content_block_delta', delta: { type: 'text_delta', text: chunk } } }) + '\n')
+      }
+      process.stdout.write(JSON.stringify({ type: 'result', is_error: false, result: reply }) + '\n')
+      return
     }
-    process.stdout.write(JSON.stringify({ type: 'result', is_error: false, result: reply }) + '\n')
-    return
+    process.stdout.write(JSON.stringify({ is_error: false, result: reply }))
   }
-  process.stdout.write(JSON.stringify({ is_error: false, result: reply }))
+  // Reading a brief is the one call a person waits in front of with nothing else on screen, so a
+  // suite that wants to look at what they are shown during it can ask for the wait to be real.
+  // Everything else answers at once, or the suite spends its life asleep.
+  const linger = sys.includes('"product"') ? Number(process.env.WALL_FAKE_INTAKE_MS || 0) : 0
+  if (linger) setTimeout(say, linger)
+  else say()
 })

@@ -59,6 +59,23 @@ export const DESIGN_MODEL = () =>
   (typeof process !== 'undefined' ? process.env?.WALL_DESIGN_MODEL : '') || CLI_MODEL()
 
 /**
+ * The model that reads a brief into fields.
+ *
+ * This call is neither design nor writing. It pulls a name, a sentence, an audience and a button
+ * label out of a paragraph somebody already wrote, and it is the only thing standing between
+ * describing a product and seeing a wall, so what it costs is paid in the wait.
+ *
+ * The obvious saving was to send it to the small model, and measured on the same brief that is
+ * wrong by a wide margin: sonnet took 10.1, 17.3, 13.5 and 14.8 seconds, haiku took 70.1, 67.5,
+ * 86.3 and 64.6. Haiku is not slower at reading a brief, it is slower at deciding it has read
+ * one, and the same runs with thinking turned off finished in 5.6 and 5.3 seconds respectively.
+ * The wait was never the model. So this stays on the writing model, which also wrote the better
+ * one liner every time, and the saving is taken by not thinking about it: see runClaude.
+ */
+export const INTAKE_MODEL = () =>
+  (typeof process !== 'undefined' ? process.env?.WALL_INTAKE_MODEL : '') || CLI_MODEL()
+
+/**
  * How many of these may run at once.
  *
  * Every call is a whole CLI session, not a request, and a wall wants eleven or more of them
@@ -106,8 +123,24 @@ function give() {
  * ours to show, but the fact of it is, so it goes to a separate callback that never touches the
  * reply.
  */
-export async function runClaude(system, user, { model = CLI_MODEL(), bin = 'claude', onDelta, onThink } = {}) {
+export async function runClaude(system, user, { model = CLI_MODEL(), bin = 'claude', onDelta, onThink, thinking } = {}) {
   const streaming = typeof onDelta === 'function'
+  /**
+   * How much this call may think, in tokens, or null to leave the model's own budget alone.
+   *
+   * A caller that passes a number is describing the job rather than tuning the app: reading a
+   * brief into five fields has nothing to weigh up, and measured on the same brief, thinking
+   * about it anyway cost 14.8 seconds against 5.6. WALL_THINKING and WALL_FAST are the dials for
+   * everything that did not say, so a job that knows what it is wins over them.
+   */
+  const budget =
+    thinking !== undefined
+      ? String(thinking)
+      : process.env.WALL_FAST
+        ? '0'
+        : process.env.WALL_THINKING
+          ? String(process.env.WALL_THINKING)
+          : null
   await take()
   return new Promise((resolve) => {
     const child = spawn(
@@ -146,9 +179,7 @@ export async function runClaude(system, user, { model = CLI_MODEL(), bin = 'clau
         // run can buy back most of the speed without giving up the whole of the design. Unset
         // leaves the model's own budget alone, which is what every measurement above was taken
         // with, and WALL_FAST still means none at all.
-        env: process.env.WALL_THINKING || process.env.WALL_FAST
-          ? { ...process.env, MAX_THINKING_TOKENS: process.env.WALL_FAST ? '0' : String(process.env.WALL_THINKING) }
-          : process.env,
+        env: budget === null ? process.env : { ...process.env, MAX_THINKING_TOKENS: budget },
       },
     )
     // whichever way this ends, the next call in the queue gets the slot

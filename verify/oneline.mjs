@@ -41,6 +41,10 @@ const mcp = spawn('node', ['mcp/index.mjs'], {
     // one and reading its failures as a pass
     PATH: join(process.cwd(), 'verify', 'fakebin') + ':' + process.env.PATH,
     HOME: work,
+    // This run has no one liner, so the brief has to be read before anything can be written, and
+    // that read is the only moment where what the person is shown is in question. Making it take
+    // a few real seconds is what turns "is the wall up yet" from a race into a question.
+    WALL_FAKE_INTAKE_MS: '5000',
   },
   stdio: ['pipe', 'pipe', 'pipe'],
 })
@@ -86,11 +90,23 @@ page.on('pageerror', (e) => errors.push(String(e).slice(0, 200)))
 await page.goto(url)
 
 // a brief handed in from outside means no setup at all, even in a browser
-await page.waitForTimeout(1500)
+await page.waitForSelector('.paper.here', { timeout: 20000 })
 console.log('greeted with:', JSON.stringify(await page.evaluate(() => ({
   onboarding: !!document.querySelector('.onboard'),
   working: !!document.querySelector('.building') || !!document.querySelector('.paper.here'),
 }))))
+
+// The brief is still being read at this point, and what is on screen is a whole wall arranged
+// from it rather than a placeholder. The wait is the same length either way; this is the
+// difference between spending it looking at pages and spending it looking at a skeleton.
+const during = await page.evaluate(() => ({
+  papers: document.querySelectorAll('.paper').length,
+  line: document.querySelector('.busy')?.textContent,
+  placeholder: !!document.querySelector('.building'),
+}))
+console.log('while the brief is being read:', JSON.stringify(during))
+if (during.placeholder) throw new Error('the wait for the brief is still spent in front of a placeholder')
+if (during.line !== 'reading the brief') throw new Error(`the wait says "${during.line}" rather than what it is waiting for`)
 
 await page.waitForSelector('.paper.here', { timeout: 120000 })
 await page.waitForFunction(() => !document.querySelector('[data-busy]'), null, { timeout: 180000 })

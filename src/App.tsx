@@ -119,27 +119,38 @@ export default function App() {
   }, [])
 
   /**
+   * Put the wall up before anything has been asked of a model.
+   *
+   * These are arranged from the built-in worlds against the copy the brief already seeded, so
+   * there is something to compare, scroll and open from the first frame, and each is marked as
+   * a draft so it is not mistaken for a written page. Every place one takes is a place a written
+   * page will land in, so the wall improves where it stands instead of appearing all at once.
+   *
+   * It is separate from fill because the paint is worth having before the writing is possible:
+   * a run that has to read the brief first can put this up and read behind it.
+   *
+   * Nine: the page as it was given, which stays as the thing to compare against, and eight
+   * places that each hold a draft until the written page for that place arrives.
+   */
+  const scaffold = useCallback((base: Page) => {
+    // a new wall is a new triage
+    graveyard.current = []
+    buried.current.clear()
+    const first = alternatives(base, 9)
+    slots.current = first.slice(1).map((x) => x.id)
+    setPages(first)
+    setDrafts(new Set(slots.current))
+    setAt(0)
+  }, [])
+
+  /**
    * Fill the wall. With a key every paper is written from a different angle and lands as
    * soon as its own call returns, so the wall fills in front of you. With no key the same
    * copy is arranged eight ways, which still gives something to choose between.
    */
   const fill = useCallback(async (base: Page, p: Product) => {
     const mine = ++run.current
-    // a new wall is a new triage
-    graveyard.current = []
-    buried.current.clear()
-    // The wall is real before the model has answered anything. These eight are arranged from
-    // the built-in worlds against the copy the brief already seeded, so there is something to
-    // compare, scroll and open from the first frame, and each one is marked as a draft so it
-    // is not mistaken for a written page. Every place it takes is a place a written page will
-    // land in, so the wall improves where it stands instead of appearing all at once.
-    // nine: the page as it was given, which stays as the thing to compare against, and eight
-    // places that each hold a draft until the written page for that place arrives
-    const first = alternatives(base, 9)
-    slots.current = first.slice(1).map((x) => x.id)
-    setPages(first)
-    setDrafts(new Set(slots.current))
-    setAt(0)
+    scaffold(base)
     // a served deployment answers which keys it holds asynchronously, and someone clicking
     // straight through setup can arrive here before that answer does
     if (!canWrite()) await loadHeldKeys()
@@ -253,7 +264,7 @@ export default function App() {
           : `${written} written pages. Use the arrow keys to compare the angles.`,
       )
     }
-  }, [upsertPage])
+  }, [upsertPage, scaffold])
 
   const build = useCallback((p: Product, t: Taste) => {
     void fill(seeded(starterPage(t, p.name || 'Product'), p), p)
@@ -291,10 +302,32 @@ export default function App() {
       if (!localStorage.getItem('wall-model')) choose('claude-code')
       setAskedFrom(req.dir)
       setOnboarding(null)
-      // Reading the brief takes a model call of its own, and until now nothing said so: the
-      // setup screen had closed and the wall had not started, so the screen fell through to the
-      // message for someone who never described anything.
-      setBuilding({ arrived: null, landed: [], thoughts: 0 })
+      // The agent that asked already knew what this is, so if it said so there is nothing to
+      // work out. Reading the brief back through a model cost about forty seconds to recover
+      // what the caller had already written down.
+      const told = req.oneLiner?.trim()
+      // Everything the caller supplied, and the brief itself standing in for whatever it did
+      // not. This is enough to arrange a wall from, which is the point: it is either the brief
+      // in full or a usable guess at it, and neither needs waiting for.
+      const provisional: Product = {
+        ...EMPTY_PRODUCT,
+        name: req.name?.trim() || 'Product',
+        oneLiner: told || req.brief,
+        what: req.what?.trim() || req.brief,
+        audience: req.audience?.trim() || '',
+        cta: req.cta?.trim() || EMPTY_PRODUCT.cta,
+      }
+      if (told) {
+        // nothing to read, so the next thing on screen is the wall itself a moment later
+        setBuilding({ arrived: null, landed: [], thoughts: 0 })
+      } else {
+        // Reading the brief is a model call of its own, and the wait for it used to be spent
+        // looking at a placeholder. There is a whole wall to look at instead, arranged from the
+        // brief as it stands, so the reading happens behind something worth reading.
+        setProduct(provisional)
+        scaffold(seeded(starterPage(taste, provisional.name), provisional))
+        setBusy('reading the brief')
+      }
       await loadHeldKeys()
       // A wall with nothing to write it is still eight arranged pages, and they look finished
       // until you read them. Someone who arrived here from their agent never chose a model and
@@ -302,21 +335,9 @@ export default function App() {
       if (!canWrite()) {
         flash('No model can write here: there is no key and no claude command on this machine, so these pages are arranged rather than written.')
       }
-      // The agent that asked already knew what this is, so if it said so there is nothing to
-      // work out. Reading the brief back through a model cost about forty seconds to recover
-      // what the caller had already written down.
-      const told = req.oneLiner?.trim()
       const read = !told && canWrite() ? await readBrief(req.brief).catch(() => null) : null
-      const p: Product = told
-        ? {
-            ...EMPTY_PRODUCT,
-            name: req.name?.trim() || 'Product',
-            oneLiner: told,
-            what: req.what?.trim() || req.brief,
-            audience: req.audience?.trim() || '',
-            cta: req.cta?.trim() || EMPTY_PRODUCT.cta,
-          }
-        : read?.product ?? { ...EMPTY_PRODUCT, name: req.name ?? 'Product', oneLiner: req.brief }
+      setBusy('')
+      const p = told ? provisional : read?.product ?? provisional
       setProduct(p)
       build(p, taste)
     })
