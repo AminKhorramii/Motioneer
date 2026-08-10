@@ -244,7 +244,19 @@ export function madeWorld(raw: Record<string, unknown>, i: number): World {
 const made = new Map<string, World>()
 export const register = (list: World[]) => list.forEach((w) => made.set(w.id, w))
 
-export const worldById = (id?: WorldId) => made.get(String(id)) ?? WORLDS.find((w) => w.id === id) ?? WORLDS[0]
+/**
+ * The world a page falls back to when its own cannot be found.
+ *
+ * Named rather than positional. This was whichever world happened to be listed first, which tied
+ * the fallback to the order the wall deals its designs in: ordering that deck by taste would have
+ * changed what an unknown world falls back to as a side effect. A page whose world is missing
+ * should land somewhere that says nothing, and that is swiss.
+ */
+export const worldById = (id?: WorldId) =>
+  made.get(String(id))
+  ?? WORLDS.find((w) => w.id === id)
+  ?? WORLDS.find((w) => w.id === 'swiss')
+  ?? WORLDS[0]
 
 /**
  * Dress sections in a world's forms.

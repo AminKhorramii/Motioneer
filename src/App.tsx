@@ -214,15 +214,24 @@ export default function App() {
     }
 
     /**
-     * The named systems cost nothing to design, so their pages start writing at once.
+     * A world that is already written costs nothing to design, so its page starts writing at once.
      *
      * Every slot used to wait on the design call, and that call spends about fifty seconds
      * thinking before it writes a character, so the first written page could not arrive before
-     * about seventy. shadcn, material 3 and carbon are hand written here: there is nothing to
-     * design, only copy to write, so three of the nine start at the first frame and the model
-     * is asked for five worlds rather than eight, which is three design calls rather than four.
+     * about seventy. Three of the built-in worlds are seeded here instead: there is nothing to
+     * design, only copy to write, so three of the nine start at the first frame and the model is
+     * asked for five worlds rather than eight, which is three design calls rather than four.
+     *
+     * Which three is a taste decision rather than a speed one, and it used to be shadcn, material
+     * and carbon, which are faithful reproductions of other people's systems and therefore the
+     * three most restrained pages on the wall. They were chosen because they were free, and every
+     * built-in world is equally free, so the saving is kept and the three places now go to worlds
+     * that commit to something. The libraries remain in the deck and one press of w away.
+     *
+     * These are the same three the deck deals into those places, so the written page lands in the
+     * world its draft was already wearing and the wall gains words rather than changing shape.
      */
-    const SYSTEMS = ['shadcn', 'material', 'carbon']
+    const SYSTEMS = ['editorial', 'poster', 'terminal']
     const seeded = WORLDS.filter((w) => SYSTEMS.includes(w.id))
 
     /**

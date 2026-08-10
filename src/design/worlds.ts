@@ -15,7 +15,7 @@ const mono = (t: Taste): Taste => ({ ...t, accent2: mix(t.accent, t.bg, 0.45) })
 const tinted = (t: Taste): Taste => ({ ...t, bg: mix(t.bg, t.accent, 0.06) })
 const contrast = (t: Taste): Taste => ({ ...t, ink: shift(t.ink, 14), dim: mix(t.ink, t.bg, 0.45) })
 
-export const WORLDS: World[] = [
+const BUILT_IN: World[] = [
   {
     id: 'swiss',
     name: 'swiss grid',
@@ -184,6 +184,24 @@ h1,h2,h3{letter-spacing:0}`,
   },
 ]
 
+/**
+ * The order is the deck the wall deals from, so it is a decision about what someone sees first.
+ *
+ * A wall with no model behind it, and every wall for its first few seconds, is these eight dealt
+ * in order against the brief's own copy. Listed as they were written, that opened on swiss grid
+ * and put the three component libraries at the end, so the first two papers a reader landed on
+ * were the two most restrained on the wall and the pages that commit were buried at three, four
+ * and five. Nothing was wrong with any single world; the order was answering a question nobody
+ * asked, which was the order they happened to be typed in.
+ *
+ * So the ones that argue for themselves come first, and the three reproductions of real design
+ * systems come last. They are still here, still exact, and still one press of w away, because a
+ * page you can hand to an engineer saying "this one, in shadcn" is worth having. They are just
+ * no longer what a wall opens with.
+ */
+const DECK = ['editorial', 'poster', 'terminal', 'catalogue', 'swiss', 'shadcn', 'material', 'carbon']
+
+export const WORLDS: World[] = DECK.map((id) => BUILT_IN.find((w) => w.id === id)!)
 
 /** the palette moves a model-designed world may pick from, each a relationship */
 export const PALETTES: Record<string, (t: Taste) => Taste> = {
