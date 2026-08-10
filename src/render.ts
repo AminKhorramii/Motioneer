@@ -19,6 +19,48 @@ const esc = (s: unknown) =>
 /** an image drawn for a section: a mime type and base64, which is what both writers of it emit */
 const DATA_IMAGE = /^data:image\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/]+={0,2}$/i
 
+/**
+ * How the whole page is arranged, as opposed to how one section leaves its column.
+ *
+ * A stack of full width bands in reading order is the silhouette of a generated page, and it is
+ * what a reader registers before reading anything: two pages of the same length in the same
+ * typeface read as different designs when one is a column and one is a spread. Sections are
+ * wrapped in `.page` so this can be said once here rather than by every section.
+ *
+ * Both of the arrangements are one media query away from being a column again. A phone is a
+ * column, and the width where these collapse is the width where a side panel stops being a
+ * panel and starts being a squeeze, which is the fault the geometry gate exists to catch.
+ */
+const COLLAPSE = 900
+
+const LAYOUT_CSS: Record<'column' | 'split' | 'mosaic', string> = {
+  column: '',
+  // The opening section holds still in its own track while the rest of the argument travels
+  // past it. It spans every row rather than being positioned, so the grid decides the height
+  // and nothing has to know how tall the page turned out to be.
+  split: `@media (min-width:${COLLAPSE}px){
+${/* A gutter, not a half. The panel took a third, which left the argument in a column just
+     wide enough for its blocks to split again inside it: measured at 900px, a claim laid out
+     two tracks of 219px and the prose in them was four words to a line. A page may split once. */ ''}
+.page{display:grid;grid-template-columns:minmax(13rem,26%) minmax(0,1fr);align-items:start}
+${/* A panel is set a step down from the column it accompanies, the way a sidebar has always
+     been, and it is also what keeps a third of a narrow window from being a stack of two word
+     lines: measured at the studio's 900px, the panel's prose was 219px wide at 19px type. */ ''}
+.page>section:first-child{grid-column:1;grid-row:1/-1;position:sticky;top:0;align-self:start;
+min-height:100vh;display:flex;flex-direction:column;justify-content:center;font-size:.85em;--track:.26}
+.page>section:not(:first-child){grid-column:2;--track:.66}
+.page>section+section{border-top:0}
+}`,
+  // Two tracks, and every third section takes both. A page of many short parts then reads as an
+  // arrangement rather than a queue, and the full width ones are the beats between.
+  mosaic: `@media (min-width:${COLLAPSE}px){
+.page{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
+.page>section{grid-column:span 2}
+.page>section:nth-child(3n+2),.page>section:nth-child(3n+3){grid-column:span 1;--track:.5}
+.page>section+section{border-top:0}
+}`,
+}
+
 /** editable text: the preview turns these into contenteditable and reports changes */
 const ed = (sid: string, path: string) => `data-edit="${sid}.${path}"`
 
@@ -45,9 +87,15 @@ function tokens(t: Taste) {
      * The preferred term carries the scale now, and the ceiling bounds the exponent rather than
      * doing the work. `at13` is the size this had at scale 1.30, so nothing renders differently
      * for a world that was already sitting in the dead band.
+     *
+     * The window is not always the track. A page laid out as a spread or a mosaic sets its type
+     * in a column narrower than the viewport, and vw does not know that: measured, a headline in
+     * a 845px column was still sized for a 1280px window and came out at twelve characters a
+     * line, which is a column of words rather than a headline. `--track` is the fraction of the
+     * window this type is actually set across, and a column page leaves it at one.
      */
     fluid: (at13: number, capRem: number, floorRem: number) =>
-      `clamp(${floorRem}rem,${((at13 / 12.8) * (t.scale ** 3 / 1.3 ** 3)).toFixed(2)}vw,${capRem}rem)`,
+      `clamp(${floorRem}rem,calc(${((at13 / 12.8) * (t.scale ** 3 / 1.3 ** 3)).toFixed(2)}vw * var(--track,1)),${capRem}rem)`,
     ease: t.motion === 'lively' ? 'cubic-bezier(.2,.9,.3,1.3)' : 'cubic-bezier(.25,.8,.3,1)',
   }
 }
@@ -136,6 +184,7 @@ section>.wrap{position:relative}
 section>.wrap::before{content:counter(sec,decimal-leading-zero);position:absolute;left:0;top:.2rem;
 font-size:.72rem;letter-spacing:.14em;color:var(--dim);font-variant-numeric:tabular-nums}
 @container wrap (max-width:30rem){section>.wrap::before{display:none}}` : ''}
+${LAYOUT_CSS[w.layout ?? 'column']}
 ${w.css ? `\n/* world */\n${w.css}\n` : ''}
 ${editable ? `[data-edit]{outline:0;transition:box-shadow .15s ease;border-radius:3px}
 [data-edit]:hover{box-shadow:0 0 0 1px ${alpha(t.accent, 0.45)}}
@@ -517,6 +566,9 @@ export function renderPage(page: Page, opts: { editable?: boolean; title?: strin
     .join('\n')
   // the backdrop goes first so it sits behind the content without needing a stacking hack
   const art = backdropHtml(page.taste, page.backdrop ?? 'none', !!opts.still)
-  return `${head(page.taste, opts.title ?? 'Landing', !!opts.editable, world, !!opts.still)}${art}${body}${opts.editable ? EDIT_SCRIPT : ''}</body></html>`
+  // Wrapped, so the page's own arrangement is one rule rather than something every section has
+  // to agree about. The backdrop stays outside it, since it sits behind the whole page.
+  const shell = `<div class="page page-${world.layout ?? 'column'}">${body}</div>`
+  return `${head(page.taste, opts.title ?? 'Landing', !!opts.editable, world, !!opts.still)}${art}${shell}${opts.editable ? EDIT_SCRIPT : ''}</body></html>`
 }
 

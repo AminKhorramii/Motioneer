@@ -8,8 +8,16 @@
  * them did not exist.
  *
  * So this renders the real pages in a real browser at the three widths that actually occur, a
- * wall cell, the studio paper and a phone, and asserts what a designed page owes a reader: one
- * column, nothing off the edge, nothing too narrow to read, and no id used twice.
+ * wall cell, the studio paper and a phone, and asserts what a designed page owes a reader:
+ * nothing off the edge, nothing too narrow to read, no id used twice, and no more left edges
+ * than it meant to have.
+ *
+ * That last one is a count, not a rule against columns. A world lays its whole page out now, as
+ * a stack, a spread or a mosaic, so two tracks can be the design; what is still a fault is an
+ * edge nobody chose, and a track too narrow for the type set in it. Both arrived the day the
+ * layouts did, and this caught both: a headline sized from the window rather than from its own
+ * column came out at twelve characters a line, and a side panel taking a third of a narrow
+ * window left the argument just wide enough to split again inside itself.
  *
  * Run alone with `node verify/layout.mjs`, or from verify/app.mjs, which is where it gates.
  */

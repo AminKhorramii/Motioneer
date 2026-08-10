@@ -47,6 +47,8 @@ const BUILT_IN: World[] = [
     // An essay: the argument, said at length, with one witness and a colophon. No pricing table
     // and no list of objections, because an essay that stops to sell reverts to being a page.
     compose: ['masthead', 'claim', 'substance', 'proof', 'credits'],
+    // read as a spread: the masthead holds its own side while the essay travels past it
+    layout: 'split',
     // the one move: a masthead slug above the headline, the way a periodical opens
     css: `#claim h1::before{content:'';display:block;width:2.4ch;height:4px;background:var(--accent);margin-bottom:1.6rem}`,
   },
@@ -103,6 +105,8 @@ const BUILT_IN: World[] = [
     // substance is a numbered list and the second witness speaks, so the density has a seam
     wear: { masthead: 'band', claim: 'prose', proof: ['list', 'quote'], substance: ['table', 'list'], offer: 'table', objections: 'list', invitation: 'band', credits: 'table' },
     compose: ['masthead', 'claim', 'proof', 'substance', 'substance', 'proof', 'offer', 'objections', 'invitation', 'credits'],
+    // ten short parts stacked is a queue; on two tracks it is a page you scan rather than read
+    layout: 'mosaic',
     // the one move: double rules between sections, the way a ledger separates its entries
     css: `section+section{border-top:4px double var(--line)}`,
   },

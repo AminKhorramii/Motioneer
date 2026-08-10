@@ -70,6 +70,24 @@ export interface World {
      */
     rhythm?: number[]
   }
+  /**
+   * How the page is laid out as a whole, rather than how one section leaves its column.
+   *
+   * Every page here was a stack of full width bands in reading order. Varying what went in the
+   * stack and how tall it was made the wall better and left that untouched, and it is the thing
+   * a reader registers before a single word: two pages of the same length in the same typeface
+   * read as different designs when one is a column and one is a spread.
+   *
+   * column is the stack, and is right for most things: a poster, a receipt, a manual.
+   * split holds the opening section still in a side panel while the rest travels past it, which
+   * is how a spread works and how a page can be read as two things at once.
+   * mosaic places the sections on a two track grid, some spanning both, so a page of many short
+   * parts reads as an arrangement rather than a queue.
+   *
+   * Each is one media query away from being a column again, because a phone is a column and a
+   * layout that will not collapse is a layout that breaks rather than adapts.
+   */
+  layout?: 'column' | 'split' | 'mosaic'
   backdrop: Backdrop
   /**
    * The form each role takes here. This is where a world speaks: the same offer is a table
@@ -222,6 +240,11 @@ export function madeWorld(raw: Record<string, unknown>, i: number): World {
         ? (s.rhythm as unknown[]).slice(0, 8).map((v) => clamp(v, 0.4, 3, 1))
         : undefined,
     },
+    // a name this renderer does not lay out is a column, because the stack is the one
+    // arrangement that is always safe and a page it cannot draw is worse than a plain one
+    layout: (['column', 'split', 'mosaic'] as const).includes(raw.layout as never)
+      ? (raw.layout as World['layout'])
+      : 'column',
     // read from the list rather than a copy of it, so a backdrop added to the vocabulary is one
     // a world may actually choose instead of silently falling to none
     backdrop: BACKDROPS.includes(raw.backdrop as Backdrop) ? (raw.backdrop as Backdrop) : 'none',
