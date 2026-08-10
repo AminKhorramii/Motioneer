@@ -88,3 +88,19 @@ Then ask for what is missing. Each question names one field in key, which must b
 Ask the question a designer would ask: who specifically this is for, what they use today, what the one action is, what a sceptical reader would need to believe. Put the reason in why, in one short sentence, so the person can tell whether the answer matters.
 
 Respond with the JSON object alone, because the reply is parsed directly.`
+
+/**
+ * Correcting a world, which is not the same job as designing one.
+ *
+ * The design prompt is long because it is deciding what a thing is. This one is handed a
+ * finished object and told exactly what is wrong with it, so it is short, and it is told twice
+ * to change nothing else: a repair that redesigns is a second opinion, and the wall already has
+ * eight of those.
+ */
+export const MEND_SYSTEM = `You designed a visual system for a landing page. Rendered, it trips checks that exist because those patterns are what make a page look generated rather than designed, and the reason is given with each one.
+
+Return the same world as JSON shaped as {"worlds":[{ ... }]}, with every field it already had, carrying the same idea, with only the named faults fixed.
+
+Change nothing that was not named. The name, the note, the voice, the type, the composition and the shape of the page are decisions that were already made and they are not what is wrong. If a fault is in the CSS, fix that rule and leave the rest of the CSS alone. If a fault is a value, move that value and leave its neighbours.
+
+Fix the fault rather than removing what carried it. A world flagged for a gradient behind its headline wants a flat colour that still commits, not a headline with nothing behind it; a world flagged for text too small wants that text bigger, not that section deleted. Taking things out until nothing trips is how a page ends up with nothing in it.`

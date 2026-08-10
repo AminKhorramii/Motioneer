@@ -25,7 +25,7 @@ import os from 'node:os'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { REQUESTS, generateImage, streamText } from '../shared/providers.mjs'
-import { DESIGN_MODEL, INTAKE_MODEL, hasClaude, runClaude } from '../shared/cli.mjs'
+import { CLI_MODEL, DESIGN_MODEL, INTAKE_MODEL, hasClaude, runClaude } from '../shared/cli.mjs'
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 const DIST = path.join(ROOT, 'dist')
@@ -294,8 +294,8 @@ const server = createServer(async (req, res) => {
       // screen, so it is told not to think and takes about a third of the time.
       ...(kind === 'design'
         ? { model: DESIGN_MODEL() }
-        : kind === 'intake'
-          ? { model: INTAKE_MODEL(), thinking: 0 }
+        : kind === 'intake' || kind === 'repair'
+          ? { model: kind === 'intake' ? INTAKE_MODEL() : CLI_MODEL(), thinking: 0 }
           : {}),
       onDelta: (d) => res.write(d),
       onThink: () => {

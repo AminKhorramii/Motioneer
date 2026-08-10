@@ -6,12 +6,13 @@ import { giveKey, host, isDesktop, isServed, servedConfig } from '@/host'
 import { slop, slopBrief } from '@/slop'
 import { dealDirections, directionSeed } from '@/design/directions'
 import { ANGLES } from '@/design/angles'
-import { INTAKE_SYSTEM, PAGE_SYSTEM, WORLDS_SYSTEM } from '@/design/prompts'
+import { INTAKE_SYSTEM, MEND_SYSTEM, PAGE_SYSTEM, WORLDS_SYSTEM } from '@/design/prompts'
 import { MODELS, modelById } from '@/models'
 import { BACKDROPS, type Backdrop } from '@/backdrop'
 import { shrinkDataUrl } from '@/imagepipe'
-import { WORLDS, dressSections, madeWorld, worldById, type World } from '@/worlds'
-import { ROLE_FORMS, defaultContent, uid, type Form, type Page, type Role, type Section } from '@/sections'
+import { renderPage } from '@/render'
+import { WORLDS, dressSections, madeWorld, register as registerWorlds, worldById, type World } from '@/worlds'
+import { ROLE_FORMS, defaultContent, starterPage, uid, type Form, type Page, type Role, type Section } from '@/sections'
 
 export interface Product {
   name: string
@@ -534,6 +535,89 @@ const territories = (n: number) => dealDirections(n).map(directionSeed)
  */
 const PER_HAND = 1
 
+/**
+ * A page in one world, built the way the app builds one, for looking at rather than for reading.
+ *
+ * The copy is the defaults, because what is being asked about is the design and not the words.
+ */
+function probe(world: World): Page {
+  const t = world.taste(PRESETS[0])
+  const base = starterPage(t, 'Product')
+  const pool = new Map<Role, Section[]>()
+  for (const s of base.sections) pool.set(s.role, [...(pool.get(s.role) ?? []), s])
+  const ordered = world.compose?.length
+    ? world.compose.map((r) => pool.get(r)?.shift() ?? {
+        id: r, role: r, form: ROLE_FORMS[r][0], on: true, content: defaultContent(r, 'Product'),
+      })
+    : base.sections
+  return { ...base, world: world.id, backdrop: world.backdrop, taste: t, sections: dressSections(ordered, world) }
+}
+
+/**
+ * What a designed world trips that a neutral one does not.
+ *
+ * The detector has always run on model output, and has never done anything about it: twice to
+ * put a verdict on a chip, once to write an avoid note into the copy prompt. Measured on a real
+ * wall, every one of the five worlds the model designed tripped it, while the built-in worlds
+ * cannot ship unless they are clean on every preset. The house was held to a standard its own
+ * output was not.
+ *
+ * It is asked as a difference rather than a count, because the catalogue polices copy as well as
+ * design and this page is wearing placeholder copy on purpose. The same words in a world known
+ * to be clean produce the same copy flags, so subtracting one from the other leaves exactly what
+ * the design added, which is the only part a world can be asked to fix.
+ */
+const NEUTRAL = WORLDS.find((w) => w.id === 'swiss') ?? WORLDS[0]
+
+function flawsIn(world: World): string[] {
+  // renderPage resolves a world by id, so an unregistered one would be measured as the fallback
+  registerWorlds([world])
+  const said = (w: World) => slop(probe(w), renderPage(probe(w), { title: 'Product' })).map((f) => `${f.label}. ${f.why}`)
+  const baseline = new Set(said(NEUTRAL))
+  return said(world).filter((f) => !baseline.has(f))
+}
+
+/**
+ * Ask for the same world with its faults taken out.
+ *
+ * Correcting is not designing. The design call thinks for a minute or more because it is
+ * deciding what the thing is; this one is handed a finished object and a list of what is wrong
+ * with it, which is the shape of work that was measured taking 14.8 seconds with thinking and
+ * 5.6 without. So it says it is a repair and gets none, and a wall pays for this only on the
+ * worlds that failed.
+ */
+async function mend(
+  raw: Record<string, unknown>,
+  world: World,
+  flaws: string[],
+  at: number,
+  ground: string,
+  provider: Provider,
+  brief: string,
+): Promise<World> {
+  const text = await ask(
+    provider,
+    MEND_SYSTEM,
+    `${brief}\n\nThis is a world you designed, grounded in ${ground}:\n\n${JSON.stringify(raw)}\n\n` +
+      `Rendered, it trips ${flaws.length === 1 ? 'this check' : `these ${flaws.length} checks`}:\n` +
+      `${flaws.map((f) => `- ${f}`).join('\n')}\n\n` +
+      'Return it with those fixed and everything else left alone.',
+    undefined,
+    { maxTokens: 8000, kind: 'repair' },
+  ).catch(() => null)
+  const json = text ? (grabJson(text) as { worlds?: Record<string, unknown>[] } | null) : null
+  const back = json?.worlds?.[0]
+  if (!back) return world
+  const mended = madeWorld(back, at)
+  // kept only if it is actually better, because a repair that trades one fault for another is
+  // a second opinion rather than a fix, and the first one at least came from a call that thought
+  if (!mended.name || flawsIn(mended).length >= flaws.length) {
+    registerWorlds([world])
+    return world
+  }
+  return mended
+}
+
 export async function promptWorlds(
   product: Product,
   n: number,
@@ -555,23 +639,18 @@ export async function promptWorlds(
   let seen = 0
 
   const hand = async (count: number, ground: string[]) => {
-    let buf = ''
-    let cursor = 0
-    const feed = onWorld
+    /**
+     * The beat, and nothing else.
+     *
+     * This used to hand each world over the moment its closing brace arrived, which was worth
+     * doing when one call designed several: a page could start writing while the rest were still
+     * being drawn. A call designs one now, so its world parses as the reply ends and there is no
+     * head start left to lose. What the stream is still for is the empty delta, which is the
+     * model proving it is alive during the minute before it writes anything.
+     */
+    const feed = onThinking
       ? (delta: string) => {
-          // an empty delta is a beat rather than words: the call is alive and has written nothing
-          if (!delta) return onThinking?.()
-          buf += delta
-          if (!delta.includes('}')) return
-          const scan = scanSections(buf, cursor, '"worlds"')
-          cursor = scan.cursor
-          for (const raw of scan.out) {
-            // the wall has n places and every world that lands takes one, so a call that answers
-            // with more than it was asked for cannot start a ninth page
-            if (seen >= n) return
-            onWorld(madeWorld(raw as unknown as Record<string, unknown>, seen), seen)
-            seen += 1
-          }
+          if (!delta) onThinking()
         }
       : undefined
     const text = await ask(
@@ -585,7 +664,27 @@ export async function promptWorlds(
     // A world carries CSS, so a cut reply used to yield nothing at all. The same walk that
     // recovers half-arrived sections recovers half-arrived worlds.
     const json = text ? (grabJson(text) as { worlds?: Record<string, unknown>[] } | null) : null
-    return json?.worlds ?? (text ? (scanSections(text, 0, '"worlds"').out as unknown as Record<string, unknown>[]) : [])
+    const drawn = json?.worlds ?? (text ? (scanSections(text, 0, '"worlds"').out as unknown as Record<string, unknown>[]) : [])
+
+    // Checked before it is used, rather than after it has been chosen. A world that fails goes
+    // back once with its own faults named; a world that passes costs nothing extra.
+    const out: World[] = []
+    for (const raw of drawn) {
+      // the wall has n places and every world that lands takes one, so a call that answers with
+      // more than it was asked for cannot start a ninth page
+      if (seen >= n) break
+      const candidate = madeWorld(raw as unknown as Record<string, unknown>, seen)
+      if (!candidate.name) continue
+      const at = seen
+      seen += 1
+      const flaws = flawsIn(candidate)
+      const world = flaws.length
+        ? await mend(raw as unknown as Record<string, unknown>, candidate, flaws, at, ground[out.length] ?? ground[0], provider, brief)
+        : candidate
+      onWorld?.(world, at)
+      out.push(world)
+    }
+    return out
   }
 
   // one deal for the whole wall, so no two hands are handed the same ground
@@ -594,8 +693,7 @@ export async function promptWorlds(
     const count = Math.min(PER_HAND, n - k * PER_HAND)
     return hand(count, deck.slice(k * PER_HAND, k * PER_HAND + count))
   })
-  const raw = (await Promise.all(hands)).flat()
-  const made = raw.map(madeWorld).filter((w) => w.name).slice(0, n)
+  const made = (await Promise.all(hands)).flat()
   return made.length >= 2 ? made : WORLDS
 }
 

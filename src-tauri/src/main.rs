@@ -167,7 +167,7 @@ fn claude_text(system: String, user: String, kind: Option<String>) -> serde_json
     // nothing there to weigh up, and it is the one call somebody waits in front of with nothing
     // yet on screen. Measured on the same brief it takes about 5.6 seconds this way and 14.8
     // with the model's own budget left alone.
-    if std::env::var("WALL_FAST").is_ok() || kind.as_deref() == Some("intake") {
+    if std::env::var("WALL_FAST").is_ok() || matches!(kind.as_deref(), Some("intake") | Some("repair")) {
         command.env("MAX_THINKING_TOKENS", "0");
     }
     let spawned = command.spawn();
