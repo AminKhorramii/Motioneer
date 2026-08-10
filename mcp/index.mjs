@@ -20,7 +20,7 @@
 import { spawn } from 'node:child_process'
 import { mkdir, readFile, writeFile, rm } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import path from 'node:path'
 
 /**
@@ -198,6 +198,28 @@ function findShell() {
 }
 
 /**
+ * Start the desktop shell, and say whether it actually started.
+ *
+ * Node reports an exec failure asynchronously, so the answer is one tick away rather than
+ * immediate. Waiting for it is what lets a shell that will not run fall back to the browser
+ * instead of leaving somebody watching for a window that is never going to appear.
+ */
+function launchShell(found, request) {
+  return new Promise((resolve) => {
+    const child = spawn(found.cmd, found.args, {
+      env: { ...process.env, WALL_REQUEST: request },
+      stdio: 'ignore',
+      detached: true,
+    })
+    child.on('error', () => resolve(false))
+    child.on('spawn', () => {
+      child.unref()
+      resolve(true)
+    })
+  })
+}
+
+/**
  * The route that needs nothing installed.
  *
  * Starts the local server, which holds the keys and writes the handoff, then opens whatever
@@ -206,12 +228,24 @@ function findShell() {
  */
 function openInBrowser(request, at) {
   return new Promise((resolve) => {
-    const child = spawn('node', [path.join(ROOT, 'server', 'index.mjs')], {
+    // The node running this file, by its full path, rather than the word node. An MCP server is
+    // launched by whatever launched the client, and a client started from a desktop icon has the
+    // login shell's PATH rather than a terminal's, which on any machine using nvm or fnm or
+    // volta has no node on it at all. Asking for the interpreter that is already running this
+    // line cannot miss.
+    const child = spawn(process.execPath, [path.join(ROOT, 'server', 'index.mjs')], {
       // This process leaves long before the browsing does, so the server is told to watch its own
       // traffic and stop when the tab stops beating. Nothing else is in a position to end it.
       env: { ...process.env, PORT: '0', WALL_REQUEST: request, WALL_HANDOFF_DIR: at, WALL_IDLE_MS: IDLE_MS },
       stdio: ['ignore', 'pipe', 'ignore'],
+      // Its own process group, so that reaping this server reaps only this server. A client that
+      // ends a stdio server kills the group, and ctrl-C in a terminal does the same, which would
+      // take down the wall somebody is in the middle of choosing from.
+      detached: true,
     })
+    // a spawn that fails arrives as an error event, and an error event with no listener is an
+    // uncaught exception that ends this process without ever answering the call
+    child.on('error', () => resolve({ child: null, url: null }))
     let out = ''
     const give = async (url) => {
       // written down as well as opened, so a browser that did not launch is still reachable
@@ -227,6 +261,12 @@ function openInBrowser(request, at) {
       // just been written down and the reply names it. Without a listener the failure to spawn
       // arrives as an unhandled error event, which takes this whole server down with it.
       spawn(cmd, args, { stdio: 'ignore', detached: true }).on('error', () => {}).unref()
+      // Nothing here needs the server any more: it has said where it is. Holding its pipe and
+      // its handle would keep this process alive after its client had closed stdin, so an agent
+      // session would leave an MCP server behind for as long as somebody kept browsing.
+      child.stdout.destroy()
+      child.unref()
+      clearTimeout(giveUp)
       resolve({ child, url })
     }
     child.stdout.on('data', (d) => {
@@ -234,8 +274,10 @@ function openInBrowser(request, at) {
       const m = out.match(/http:\/\/localhost:(\d+)/)
       if (m) give(m[0])
     })
-    // if it never says where it is, there is nothing to open and nothing to wait for
-    setTimeout(() => resolve({ child, url: null }), 8000)
+    // If it never says where it is, there is nothing to open and nothing to wait for. Cleared on
+    // the way out rather than left to expire, because a pending timer is a reason for a process
+    // to stay up, and this one outlived everything it was waiting for by eight seconds.
+    const giveUp = setTimeout(() => resolve({ child, url: null }), 8000)
   })
 }
 
@@ -277,9 +319,12 @@ async function design({ brief, name, oneLiner, what, audience, cta, dir }) {
   const found = findShell()
   let where = 'the Wall window'
   let drafting = false
-  if (found) {
-    spawn(found.cmd, found.args, { env: { ...process.env, WALL_REQUEST: request }, stdio: 'ignore', detached: true }).unref()
-  } else {
+  // A binary that is there is not the same as a binary that runs: a build left half written, or
+  // one without its executable bit, passes the search and fails to exec. That arrives as an error
+  // event, which used to end this process, and the browser route is right there, so a shell that
+  // will not start is treated the same as one that is not installed.
+  const started = found ? await launchShell(found, request) : false
+  if (!started) {
     const opened = await openInBrowser(request, at)
     if (!opened.url) {
       // it holds the keys and answers to nobody, so a server that never said where it is has to
@@ -304,7 +349,10 @@ async function design({ brief, name, oneLiner, what, audience, cta, dir }) {
 }
 
 async function check(html) {
-  const { slop } = await import(path.join(ROOT, 'dist-core', 'core.js'))
+  // As a file URL, because an import specifier is a URL and not a path: a # starts a fragment,
+  // a ? starts a query, %xx decodes, and on Windows a drive letter reads as a scheme, which
+  // fails outright. Any of those in the install path broke this tool and nothing else.
+  const { slop } = await import(pathToFileURL(path.join(ROOT, 'dist-core', 'core.js')).href)
   // the checks that read markup and CSS need no page model, so an empty one is honest here
   const flags = slop({ id: '', taste: {}, sections: [] }, html)
   return flags.length
