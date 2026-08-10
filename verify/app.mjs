@@ -42,6 +42,29 @@ for (const w of core.WORLDS) {
 console.log('house pages:', JSON.stringify(houseFlags.length ? houseFlags.slice(0, 8) : 'clean, every world on every look'))
 if (houseFlags.length) throw new Error(`the house trips its own detector on ${houseFlags.length} pages`)
 
+// ——— 0b. nothing a model writes into a section can become markup ———
+// Copy lands in text nodes, where escaping covers it, and verify/hard.mjs drives that in a real
+// browser. One field does not: a section's image is an attribute value, and a model reply
+// replaces a section's content whole, so a string that closes the quote it sits in used to write
+// its own tag inside an iframe that shares this app's origin and its stored keys.
+{
+  const page = core.starterPage(core.PRESETS[0], 'Spoor')
+  const escapes = [
+    'data:image/gif;base64,R0lGODlhAQABAAAAACw=" onerror="alert(1)" x="',
+    'data:image/svg+xml,<svg onload="alert(1)">',
+    'data:image/png;base64,AAAA" onload="alert(1)',
+    "data:image/png;base64,AAAA' onload='alert(1)",
+  ]
+  const broke = []
+  for (const attempt of escapes) {
+    for (const s of page.sections) s.content = { ...s.content, image: attempt }
+    const html = core.renderPage(page, { title: 'Spoor' })
+    if (/<img[^>]*\son(error|load)\s*=/i.test(html) || /<svg/i.test(html)) broke.push(attempt.slice(0, 40))
+  }
+  console.log('a section cannot write its own markup:', JSON.stringify(broke.length ? broke : 'none of the four got out'))
+  if (broke.length) throw new Error(`${broke.length} of ${escapes.length} image strings escaped their attribute`)
+}
+
 // ——— 0a. the block library reaches the page, and the geometry holds ———
 // Both gates live in verify/layout.mjs, because they measure rendered pages rather than drive
 // the app, and they are worth running alone while a block is being changed.

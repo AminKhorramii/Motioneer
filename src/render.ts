@@ -11,8 +11,13 @@ import { worldById, type World } from '@/worlds'
 import { blockCss } from '@/design/blocks'
 import { TYPEFACES } from '@/typefaces'
 
+/** for text nodes, which is where all copy goes. It does not escape quotes, so it is not for
+ *  attributes: the one attribute carrying model written content is checked instead, at DATA_IMAGE */
 const esc = (s: unknown) =>
   String(s ?? '').replace(/[<>&]/g, (m) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' })[m]!)
+
+/** an image drawn for a section: a mime type and base64, which is what both writers of it emit */
+const DATA_IMAGE = /^data:image\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/]+={0,2}$/i
 
 /** editable text: the preview turns these into contenteditable and reports changes */
 const ed = (sid: string, path: string) => `data-edit="${sid}.${path}"`
@@ -267,8 +272,16 @@ export function renderSection(
   { beat = 1, first = true }: { beat?: number; first?: boolean } = {},
 ): string {
   const c = sec.content as Record<string, string>
-  // a generated image replaces the drawn placeholder wherever a section shows a figure
-  const img = typeof c.image === 'string' && c.image.startsWith('data:') ? c.image : undefined
+  // A generated image replaces the drawn placeholder wherever a section shows a figure.
+  //
+  // Matched whole rather than checked for a prefix, because this is the one piece of section
+  // content that lands inside an attribute rather than in a text node, and esc() below escapes
+  // for a text node: it leaves the quote alone. Anything a model writes into a section becomes
+  // that section's content whole, so `data:` followed by a quote used to close the src and
+  // write the rest of the string as markup, inside an iframe that shares this app's origin and
+  // its keys. Both writers of this field produce base64 of an image and nothing else, and the
+  // characters base64 is made of cannot end an attribute.
+  const img = typeof c.image === 'string' && DATA_IMAGE.test(c.image) ? c.image : undefined
   // The world's rhythm paces the page: uniform air on every section is the deepest tell of one
   // treatment applied to all content, so adjacent sections never breathe the same. It arrives
   // as a custom property rather than a padding, so a world that wants to repace the whole page
