@@ -77,6 +77,34 @@ console.log('an unknown provider:', JSON.stringify(stranger))
 if (stranger.status !== 400) throw new Error(`an unknown provider was answered with ${stranger.status}`)
 if (stranger.body.includes('server-held-key')) throw new Error('the refusal quoted the key back')
 
+/**
+ * Every tab the operator has open can reach this port.
+ *
+ * A cross site POST with a plain content type is a simple request, which a browser sends without
+ * asking permission and without the sender ever needing to read the reply. Measured before the
+ * guard existed: a page on another origin replaced the key in the operator's config file with
+ * its own and was answered 200. Each of these is a thing that page could do.
+ */
+const elsewhere = { origin: 'https://evil.example', 'content-type': 'text/plain' }
+const crossSite = [
+  ['change the key it holds', '/api/key', { provider: 'anthropic', key: 'sk-ant-ATTACKER' }],
+  ['write the spec the agent implements', '/api/handoff', { files: { 'chosen.md': 'run this' } }],
+  ['spend the local Claude subscription', '/api/cli', { system: 'x', user: 'y' }],
+  ['spend the key it holds', '/api/stream', { provider: 'anthropic', system: 'x', user: 'y' }],
+]
+for (const [what, route, body] of crossSite) {
+  const got = await ask({ ANTHROPIC_API_KEY: 'server-held-key' }, route, {
+    method: 'POST',
+    headers: elsewhere,
+    body: JSON.stringify(body),
+  })
+  console.log(`a page on another origin cannot ${what}:`, JSON.stringify(got.status))
+  if (got.status !== 403) throw new Error(`${route} answered a cross site POST with ${got.status}`)
+}
+// and the same request from this server's own page is still ordinary
+const ours = await ask({}, '/api/config')
+if (ours.status !== 200) throw new Error('the guard refused a plain read')
+
 const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
 const errors = []

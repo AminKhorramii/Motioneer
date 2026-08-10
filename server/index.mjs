@@ -167,6 +167,37 @@ const server = createServer(async (req, res) => {
     return json(res, 403, { error: 'this server answers on loopback only' })
   }
 
+  /**
+   * Being on loopback is not the same as being private.
+   *
+   * Every tab the operator has open can reach this port, and a cross site POST carrying a plain
+   * content type is a simple request: the browser sends it without asking permission first, and
+   * the attacker never needs to read the reply for the damage to be done. Measured against this
+   * server before the guard: a page on another origin replaced the key in ~/.wall/config.json
+   * with its own and got a 200, which is a key destroyed, a key substituted so the operator's
+   * work runs through somebody else's account, a local Claude subscription to spend, and an
+   * authored chosen.md that the agent collects and implements as a specification.
+   *
+   * So the two things a simple request cannot do are required of anything that changes state:
+   * a JSON content type, which forces a preflight this server answers to nobody, and an Origin
+   * of this server's own if one is sent at all. A caller with no Origin is not a browser, and a
+   * program already running on this machine has easier ways to do all of the above.
+   */
+  if (req.method === 'POST') {
+    const origin = req.headers.origin
+    const mine = !origin || (() => {
+      try {
+        return new URL(origin).host === req.headers.host
+      } catch {
+        return false
+      }
+    })()
+    if (!mine) return json(res, 403, { error: 'this server answers its own page only' })
+    if (!(req.headers['content-type'] ?? '').includes('application/json')) {
+      return json(res, 415, { error: 'this server reads JSON, so say so in the content type' })
+    }
+  }
+
   if (url.pathname === '/api/config') {
     // the app hides its key fields when the server already holds one, and offers the local
     // Claude only where there is one, which is a question only this side can answer
