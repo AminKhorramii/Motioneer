@@ -14,7 +14,7 @@
 
 import type { Page } from '@/sections'
 import { worldById } from '@/worlds'
-import { COPY_TELLS, MARKUP_TELLS } from '@/design/slop'
+import { COPY_TELLS, LIMITS, MARKUP_TELLS } from '@/design/slop'
 
 /**
  * Which half of the catalogue a flag came from.
@@ -71,14 +71,14 @@ export function slop(page: Page, html?: string): Flag[] {
   // an em dash is the punctuation a model leans on for energy it did not earn in the words,
   // and more than one on a page is a tell rather than a choice
   const dashes = text(page).reduce((n, f) => n + (f.value.match(/—/g)?.length ?? 0), 0)
-  if (dashes >= 2) {
+  if (dashes >= LIMITS.emDashes) {
     add('copy', 'em-dashes', `${dashes} em dashes`,
       'Chained asides read as generated writing now, where a full sentence would carry the point.')
   }
 
   // three bare figures make a stat banner, which asks to be admired rather than believed
   const bares = text(page).filter((f) => /^[\d,.]+\s*(?:%|[kKmMbB]\+?|x|×|\+)$/.test(f.value.trim())).length
-  if (bares >= 3) {
+  if (bares >= LIMITS.bareStats) {
     add('copy', 'stat-banner', 'a row of big statistics',
       'A number outside a sentence says nothing about what it cost or saved, so the row decorates rather than argues.')
   }
@@ -88,7 +88,7 @@ export function slop(page: Page, html?: string): Flag[] {
   if (headline) {
     const words = headline.trim().split(/\s+/)
     const specific = /\d/.test(headline) || words.some((w) => /^[A-Z]/.test(w.slice(0, 1)) && w.length > 2)
-    if (!specific && words.length > 7) {
+    if (!specific && words.length > LIMITS.vagueHeadlineWords) {
       add('copy', 'vague-headline', 'vague headline',
         'It carries no number, no name and no concrete noun, so it could sit on any product.',
         hero?.id)
@@ -111,7 +111,7 @@ export function slop(page: Page, html?: string): Flag[] {
   // reader has not yet decided to read anything.
   const heroSub = typeof hero?.content.sub === 'string' ? hero.content.sub.trim() : ''
   const heroWords = heroSub ? heroSub.split(/\s+/).length : 0
-  if (heroWords > 28) {
+  if (heroWords > LIMITS.heroSubWords) {
     add('copy', 'chatty-opening', `${heroWords} words under the headline`,
       'The line under a headline is read before the reader has decided to read anything, so a paragraph there is spent rather than saved.',
       hero?.id)
@@ -119,7 +119,7 @@ export function slop(page: Page, html?: string): Flag[] {
 
   const nav = page.sections.find((s) => s.role === 'masthead' && s.on)
   const wordy = ((nav?.content.links as unknown[]) ?? [])
-    .filter((l) => typeof l === 'string' && l.trim().split(/\s+/).length > 2)
+    .filter((l) => typeof l === 'string' && l.trim().split(/\s+/).length > LIMITS.navLinkWords)
   if (wordy.length) {
     add('copy', 'chatty-nav', `${wordy.length} nav links of three words or more`,
       'Nav is read peripherally on the way to something else, so a phrase there takes a fixation the headline needed.',

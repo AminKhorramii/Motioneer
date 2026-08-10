@@ -152,3 +152,37 @@ export const MARKUP_TELLS: MarkupTell[] = [
     why: 'A glow stands in for contrast the palette did not provide, and it costs the letterforms their edges.',
   },
 ]
+
+/**
+ * The numbers the detector counts to.
+ *
+ * They were literals inside the checks, which meant the page was measured against limits the
+ * writer was never told. Measured on a real wall, one of them accounted for five flags on nine
+ * papers: the line under the headline came back at thirty to thirty-five words every time, and
+ * the prompt said only "keep them short". A limit worth enforcing is worth stating, and stating
+ * it from here is what stops the two drifting apart.
+ */
+export const LIMITS = {
+  /** words in the line under the headline, which is read before anyone has decided to read */
+  heroSubWords: 28,
+  /** em dashes on a page, over which it reads as performed rather than said */
+  emDashes: 2,
+  /** bare figures in a row before it is a statistics banner rather than evidence */
+  bareStats: 3,
+  /** words in a headline that names nothing specific */
+  vagueHeadlineWords: 7,
+  /** words in a nav link, past which it is a description rather than a place */
+  navLinkWords: 2,
+}
+
+/** The same numbers, said to whoever is about to write the copy rather than only counted after. */
+export const copyLimits = () =>
+  `The page is checked against these after you write it, so writing to them costs less than being asked twice. ` +
+  `The line under the headline is at most ${LIMITS.heroSubWords} words, because it is read before the reader has ` +
+  `decided to read anything, so a paragraph there is spent rather than saved. A headline that names nothing ` +
+  `specific, no number and no proper noun, stays under ${LIMITS.vagueHeadlineWords + 1} words, because a long vague ` +
+  `line is a long way of saying nothing. Use at most one em dash on the page and never ${LIMITS.bareStats} or more ` +
+  `bare figures in a row, because both are the shape of a page performing rather than saying. Nav links are one or ` +
+  `${LIMITS.navLinkWords} words naming a place, because a phrase there takes a fixation the headline needed. And no ` +
+  `headline ends in a question mark or opens with "tired of", "struggling" or "ready to", because asking the reader ` +
+  `to supply the problem is what a page does when it cannot state one.`

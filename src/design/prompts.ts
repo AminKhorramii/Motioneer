@@ -6,6 +6,7 @@
  */
 
 import { craftBrief } from '@/design/craft'
+import { copyLimits } from '@/design/slop'
 import { blockContract } from '@/design/blocks'
 
 export const PAGE_SYSTEM = `You write copy for a whole landing page. You receive the page as JSON: an array of sections, each with an id, a role it plays in the argument, the form it is set in, and content. You also receive an instruction describing what to change.
@@ -17,6 +18,8 @@ Write concrete sentences a stranger could understand, and keep them short, becau
 This page sits beside seven others written from different angles, and the reader compares them side by side. Rewrite every headline so it differs from the one you were given in both wording and emphasis, because a page that matches its neighbour gives the reader nothing to choose between. Commit fully to the angle you are given, even where a safer line exists, since the safe version is already one of the other seven.
 
 ${craftBrief()}
+
+${copyLimits()}
 
 Respond with the JSON object alone, because the reply is parsed directly.`
 
