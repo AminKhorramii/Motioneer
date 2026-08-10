@@ -520,6 +520,29 @@ export async function promptPage(
 const territories = (n: number) => dealDirections(n).map(directionSeed)
 
 /**
+ * A layout for each hand, dealt rather than left to every call to work out for itself.
+ *
+ * Measured across two real walls, the model chose column four times in five, both times, and
+ * never once reached for mosaic or weave. That is not the prompt failing to describe them. Every
+ * call is handed one ground and cannot see the other four, so each independently picks the
+ * arrangement that best fits the object it was given, and for most objects that is a column.
+ * Variety across a wall cannot come out of independent calls each choosing the most natural
+ * answer, which is the same reason the directions are dealt from a deck instead of listed.
+ *
+ * So the three that never get chosen are dealt one each, and the rest are column, because column
+ * really is right for most things. It is a lean rather than an instruction: a ground that refuses
+ * it should win, since a spread forced onto a receipt is worse than another column.
+ */
+const shuffled = <T>(xs: T[]): T[] =>
+  xs.map((x) => [Math.random(), x] as const).sort((a, b) => a[0] - b[0]).map(([, x]) => x)
+
+function layoutDeck(n: number): string[] {
+  const deck = ['split', 'mosaic', 'weave'].slice(0, Math.max(0, n - 1))
+  while (deck.length < n) deck.push('column')
+  return shuffled(deck)
+}
+
+/**
  * How many worlds one call designs.
  *
  * Thinking is priced in seconds and scales with how much is being decided at once, so this is
@@ -555,7 +578,7 @@ function probe(world: World): Page {
 }
 
 /**
- * What a designed world trips that a neutral one does not.
+ * What a designed world trips, asked only about the design.
  *
  * The detector has always run on model output, and has never done anything about it: twice to
  * put a verdict on a chip, once to write an avoid note into the copy prompt. Measured on a real
@@ -563,19 +586,19 @@ function probe(world: World): Page {
  * cannot ship unless they are clean on every preset. The house was held to a standard its own
  * output was not.
  *
- * It is asked as a difference rather than a count, because the catalogue polices copy as well as
- * design and this page is wearing placeholder copy on purpose. The same words in a world known
- * to be clean produce the same copy flags, so subtracting one from the other leaves exactly what
- * the design added, which is the only part a world can be asked to fix.
+ * The catalogue polices copy as well as design, and this page is wearing placeholder copy on
+ * purpose, so the copy half would flag every world identically and none of it would be the
+ * world's to fix. Flags carry which half they came from, so this asks for one of them. That
+ * replaces an earlier trick of subtracting a known-clean world's flags from this one's, which
+ * got the same answer by arithmetic and could not say why.
  */
-const NEUTRAL = WORLDS.find((w) => w.id === 'swiss') ?? WORLDS[0]
-
 function flawsIn(world: World): string[] {
   // renderPage resolves a world by id, so an unregistered one would be measured as the fallback
   registerWorlds([world])
-  const said = (w: World) => slop(probe(w), renderPage(probe(w), { title: 'Product' })).map((f) => `${f.label}. ${f.why}`)
-  const baseline = new Set(said(NEUTRAL))
-  return said(world).filter((f) => !baseline.has(f))
+  const page = probe(world)
+  return slop(page, renderPage(page, { title: 'Product' }))
+    .filter((f) => f.kind === 'design')
+    .map((f) => `${f.label}. ${f.why}`)
 }
 
 /**
@@ -652,7 +675,7 @@ export async function promptWorlds(
   // the index is shared, so a world takes the next free page whichever call finished it
   let seen = 0
 
-  const hand = async (count: number, ground: string[]) => {
+  const hand = async (count: number, ground: string[], lean: string) => {
     /**
      * The beat, and nothing else.
      *
@@ -670,7 +693,8 @@ export async function promptWorlds(
     const text = await ask(
       provider,
       // the territory goes last so the long shared prompt in front of it still caches
-      `${WORLDS_SYSTEM}\n\nBuild these particular ones from ${ground.join(', or ')}. One object each.`,
+      `${WORLDS_SYSTEM}\n\nBuild these particular ones from ${ground.join(', or ')}. One object each.` +
+        `\n\nLay this one out as a ${lean}, unless the ground you were given genuinely refuses it.`,
       `${brief}\n\nDesign ${count === 1 ? 'one world' : `${count} worlds`} for it.`,
       feed,
       { maxTokens: 8000, kind: 'design' },
@@ -703,9 +727,10 @@ export async function promptWorlds(
 
   // one deal for the whole wall, so no two hands are handed the same ground
   const deck = territories(n)
+  const leans = layoutDeck(Math.ceil(n / PER_HAND))
   const hands = Array.from({ length: Math.ceil(n / PER_HAND) }, (_, k) => {
     const count = Math.min(PER_HAND, n - k * PER_HAND)
-    return hand(count, deck.slice(k * PER_HAND, k * PER_HAND + count))
+    return hand(count, deck.slice(k * PER_HAND, k * PER_HAND + count), leans[k])
   })
   const made = (await Promise.all(hands)).flat()
   return made.length >= 2 ? made : WORLDS

@@ -87,9 +87,16 @@ export function Dock({
             page goes out, and the reasons ride in the tooltip rather than taking a panel */}
         <span className={flags.length ? 'flags' : 'flags ok'}
           title={flags.length
-            ? flags.map((f) => `${f.label}. ${f.why}`).join('\n')
+            ? flags.map((f) => `${f.kind}: ${f.label}. ${f.why}`).join('\n')
             : 'none of the catalogued generic patterns'}>
-          {flags.length ? `${flags.length} generic` : 'clean'}
+          {/* design and copy counted apart, because they are fixed by different things: one is
+              the world this page is built in and the other is the words on it */}
+          {flags.length
+            ? [
+                flags.filter((f) => f.kind === 'design').length && `${flags.filter((f) => f.kind === 'design').length} design`,
+                flags.filter((f) => f.kind === 'copy').length && `${flags.filter((f) => f.kind === 'copy').length} copy`,
+              ].filter(Boolean).join(', ')
+            : 'clean'}
         </span>
         <button className="icon" aria-label="full view" title="open this page in your browser"
           onClick={onOpen}><Icon.open /></button>

@@ -743,9 +743,18 @@ const Cell = memo(function Cell({ page, title, current, draft, canCull, onOpen, 
           ? <span className="flags" title="a local stand-in until the written page lands here">drafting</span>
           : <span className={verdict.length ? 'flags' : 'flags ok'}
           title={verdict.length
-            ? verdict.map((f) => `${f.label}. ${f.why}`).join('\n')
+            ? verdict.map((f) => `${f.kind}: ${f.label}. ${f.why}`).join('\n')
             : 'none of the catalogued generic patterns'}>
-          {verdict.length ? `${verdict.length} generic` : 'clean'}
+          {/* Two counts rather than one, because they are two faults with two owners: the
+              design is the world's and the words are the writer's, and one number for both
+              is unreadable. A world the house proves is design-clean showed "1 generic" on a
+              real wall and the flag was in its copy, which cost a measurement to work out. */}
+          {verdict.length
+            ? [
+                verdict.filter((f) => f.kind === 'design').length && `${verdict.filter((f) => f.kind === 'design').length} design`,
+                verdict.filter((f) => f.kind === 'copy').length && `${verdict.filter((f) => f.kind === 'copy').length} copy`,
+              ].filter(Boolean).join(', ')
+            : 'clean'}
         </span>}
       </div>
     </div>

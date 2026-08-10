@@ -16,7 +16,18 @@ import type { Page } from '@/sections'
 import { worldById } from '@/worlds'
 import { COPY_TELLS, MARKUP_TELLS } from '@/design/slop'
 
+/**
+ * Which half of the catalogue a flag came from.
+ *
+ * The two are different faults with different owners, and reading one count for both is what
+ * made a real measurement unreadable: a world the house gate proves is design-clean showed one
+ * generic on the wall, and the flag was in its copy. A design flag belongs to whoever designed
+ * the world and can be handed back to be fixed; a copy flag belongs to whoever wrote the words.
+ */
+export type FlagKind = 'design' | 'copy'
+
 export interface Flag {
+  kind: FlagKind
   id: string
   /** the pattern, named the way a designer would name it */
   label: string
@@ -43,9 +54,9 @@ export function slop(page: Page, html?: string): Flag[] {
   // a world built in a named system wears some of these on purpose, and calling a correct
   // Material elevation slop would be the detector marking the system down for existing
   const claimed = new Set(page.world ? worldById(page.world).claims ?? [] : [])
-  const add = (id: string, label: string, why: string, section?: string) => {
+  const add = (kind: FlagKind, id: string, label: string, why: string, section?: string) => {
     if (claimed.has(id)) return
-    if (!flags.some((f) => f.id === id && f.section === section)) flags.push({ id, label, why, section })
+    if (!flags.some((f) => f.id === id && f.section === section)) flags.push({ kind, id, label, why, section })
   }
 
   for (const { section, key, value } of text(page)) {
@@ -53,7 +64,7 @@ export function slop(page: Page, html?: string): Flag[] {
     for (const tell of COPY_TELLS) {
       if (tell.key && tell.key !== key) continue
       const m = v.match(tell.find)
-      if (m) add(tell.id, tell.label(m[0]), tell.why, section)
+      if (m) add('copy', tell.id, tell.label(m[0]), tell.why, section)
     }
   }
 
@@ -61,14 +72,14 @@ export function slop(page: Page, html?: string): Flag[] {
   // and more than one on a page is a tell rather than a choice
   const dashes = text(page).reduce((n, f) => n + (f.value.match(/—/g)?.length ?? 0), 0)
   if (dashes >= 2) {
-    add('em-dashes', `${dashes} em dashes`,
+    add('copy', 'em-dashes', `${dashes} em dashes`,
       'Chained asides read as generated writing now, where a full sentence would carry the point.')
   }
 
   // three bare figures make a stat banner, which asks to be admired rather than believed
   const bares = text(page).filter((f) => /^[\d,.]+\s*(?:%|[kKmMbB]\+?|x|×|\+)$/.test(f.value.trim())).length
   if (bares >= 3) {
-    add('stat-banner', 'a row of big statistics',
+    add('copy', 'stat-banner', 'a row of big statistics',
       'A number outside a sentence says nothing about what it cost or saved, so the row decorates rather than argues.')
   }
 
@@ -78,19 +89,19 @@ export function slop(page: Page, html?: string): Flag[] {
     const words = headline.trim().split(/\s+/)
     const specific = /\d/.test(headline) || words.some((w) => /^[A-Z]/.test(w.slice(0, 1)) && w.length > 2)
     if (!specific && words.length > 7) {
-      add('vague-headline', 'vague headline',
+      add('copy', 'vague-headline', 'vague headline',
         'It carries no number, no name and no concrete noun, so it could sit on any product.',
         hero?.id)
     }
     if (/\?\s*$/.test(headline.trim()) || /^(?:tired of|struggling|still|ready to|what if|why settle)\b/i.test(headline.trim())) {
-      add('rhetorical-headline', 'a headline that asks',
+      add('copy', 'rhetorical-headline', 'a headline that asks',
         'A question the page answers itself spends the headline warming up, where the answer would have been the headline.',
         hero?.id)
     }
   }
   const eyebrow = typeof hero?.content.eyebrow === 'string' ? hero.content.eyebrow : ''
   if (eyebrow && eyebrow.length < 40 && /^(for|the|your|built for|made for)\b/i.test(eyebrow)) {
-    add('hero-eyebrow-chip', 'hero eyebrow chip',
+    add('design', 'hero-eyebrow-chip', 'hero eyebrow chip',
       'A small label above the headline is the most reached for hero decoration, and it usually repeats what the headline already says.',
       hero?.id)
   }
@@ -101,7 +112,7 @@ export function slop(page: Page, html?: string): Flag[] {
   const heroSub = typeof hero?.content.sub === 'string' ? hero.content.sub.trim() : ''
   const heroWords = heroSub ? heroSub.split(/\s+/).length : 0
   if (heroWords > 28) {
-    add('chatty-opening', `${heroWords} words under the headline`,
+    add('copy', 'chatty-opening', `${heroWords} words under the headline`,
       'The line under a headline is read before the reader has decided to read anything, so a paragraph there is spent rather than saved.',
       hero?.id)
   }
@@ -110,50 +121,50 @@ export function slop(page: Page, html?: string): Flag[] {
   const wordy = ((nav?.content.links as unknown[]) ?? [])
     .filter((l) => typeof l === 'string' && l.trim().split(/\s+/).length > 2)
   if (wordy.length) {
-    add('chatty-nav', `${wordy.length} nav links of three words or more`,
+    add('copy', 'chatty-nav', `${wordy.length} nav links of three words or more`,
       'Nav is read peripherally on the way to something else, so a phrase there takes a fixation the headline needed.',
       nav?.id)
   }
 
   if (typeof page.taste?.bg === 'string' && AI_BEIGE.test(page.taste.bg)) {
-    add('ai-beige', 'ai beige background',
+    add('design', 'ai-beige', 'ai beige background',
       'It is the off-white a model picks when no palette was chosen, and it dates a page immediately.')
   }
 
   if (html) {
     for (const tell of MARKUP_TELLS) {
-      if (tell.find.every((r) => r.test(html))) add(tell.id, tell.label, tell.why)
+      if (tell.find.every((r) => r.test(html))) add('design', tell.id, tell.label, tell.why)
     }
     // The counted checks. These exist because the model writes CSS: parameters could not
     // produce an unreadable page, but hand written CSS can, and these are the ways it does.
     const body = html.match(/font-size:\s*(\d+(?:\.\d+)?)px/g) ?? []
     if (body.some((d) => Number(d.replace(/\D+/g, '')) < 14)) {
-      add('tiny-text', 'text under 14px',
+      add('design', 'tiny-text', 'text under 14px',
         "It looks refined on a designer's screen and is unreadable on everyone else's.")
     }
     if ((html.match(/box-shadow:/g) ?? []).length > 8) {
-      add('shadow-stack', 'shadows on everything',
+      add('design', 'shadow-stack', 'shadows on everything',
         'When every block floats, nothing is above anything, and the depth stops meaning anything.')
     }
     const faces = new Set((html.match(/font-family:\s*([^;}]+)/g) ?? []).map((f) => f.split(',')[0]))
     if (faces.size > 3) {
-      add('face-soup', `${faces.size} typefaces`,
+      add('design', 'face-soup', `${faces.size} typefaces`,
         'Two faces is a system and four is an accident, since each one asks the reader to adjust.')
     }
     const cards = (html.match(/class="card/g) ?? []).length
     if (cards >= 6) {
-      add('card-soup', `${cards} cards on one page`,
+      add('design', 'card-soup', `${cards} cards on one page`,
         'When everything is boxed, nothing is emphasised, and the page reads as a list of tiles.')
     }
     // the macOS traffic lights, drawn rather than captured. Two of the three hexes together is
     // the signature of a mocked terminal, in either of the shades the mockups circulate in.
     const dots = ['ff5f5', 'ffbd2e', 'febc2e', '27c93f', '28c840'].filter((c) => html.toLowerCase().includes(c))
     if (dots.length >= 2) {
-      add('terminal-dots', 'a drawn terminal window',
+      add('design', 'terminal-dots', 'a drawn terminal window',
         'The three little circles promise a real window and deliver a picture of one, which is the gap between a screenshot and a prop.')
     }
     if ((html.match(/border-radius:\s*(?:2[89]|[3-9]\d)px/g) ?? []).length >= 3) {
-      add('over-rounding', 'over-rounded corners',
+      add('design', 'over-rounding', 'over-rounded corners',
         'Past a certain radius every element becomes a pill, and softness turns into the only voice the page has.')
     }
   }
