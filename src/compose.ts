@@ -643,7 +643,14 @@ async function mend(
     { maxTokens: 8000, kind: 'repair' },
   ).catch(() => null)
   const json = text ? (grabJson(text) as { worlds?: Record<string, unknown>[] } | null) : null
+  // The same walk the design call recovers with. A world carries thirty to sixty lines of CSS,
+  // and a reply that puts a literal newline inside that string is not JSON any more, which is
+  // why the design call has never trusted grabJson alone. The repair reads a reply of exactly
+  // the same shape and size and did trust it: measured across two real walls, three repairs came
+  // back at four and five thousand characters and were thrown away whole, two of them in one
+  // run. Nothing was wrong with the model's answer except the reader.
   const back = json?.worlds?.[0]
+    ?? (text ? (scanSections(text, 0, '"worlds"').out[0] as unknown as Record<string, unknown> | undefined) : undefined)
   if (!back) return world
   const mended = madeWorld(back, at)
   // kept only if it is actually better, because a repair that trades one fault for another is
