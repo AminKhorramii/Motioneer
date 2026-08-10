@@ -255,9 +255,14 @@ export const isServed = Boolean(!onTauri && win.__wallServed)
  *
  * A server an agent started has nothing to tell it when the person is finished, so it counts
  * silence and stops after ten minutes of it. Somebody reading eight pages is not silence, but a
- * page that has finished loading makes no requests, so it says so on its own. Twenty seconds is
- * far enough inside the ten minutes to survive a model call that holds the connection for
- * several of them without the beat ever being the thing that is late.
+ * page that has finished loading makes no requests, so it says so on its own.
+ *
+ * Twenty seconds is the interval, not the guarantee. A browser opens at most six connections to
+ * one origin, and on this path every model call is a long held connection to this same origin,
+ * so a beat fired while a wall is being written waits for a slot like everything else. Measured
+ * against a server whose calls take twelve seconds: 1ms on a quiet server, 11,970ms during a
+ * wall. What matters is the ceiling rather than the cadence, and the ceiling is one model call,
+ * which is tens of seconds against an idle window of ten minutes.
  */
 if (isServed) {
   setInterval(() => void fetch('/api/config').catch(() => {}), 20_000)
