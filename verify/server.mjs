@@ -105,6 +105,34 @@ for (const [what, route, body] of crossSite) {
 const ours = await ask({}, '/api/config')
 if (ours.status !== 200) throw new Error('the guard refused a plain read')
 
+/**
+ * A server nobody is asking anything stops on its own, watched without asking it anything.
+ *
+ * The agent suites watch the same timer by opening a socket every second, which is a fair test
+ * of the flow and a poor test of the timer, because opening a socket wakes the process and a
+ * timer only has to fire once something has. This one holds the child handle and waits, so
+ * nothing here is touching the thing it is measuring.
+ *
+ * It is worth being honest about its limits: it does not fail on the unref'd version of the
+ * timer, because spawning with a pipe is itself enough to keep waking the child. The case that
+ * went wrong in the wild, a server left behind by an agent run with nothing at all talking to
+ * it, is not one this harness can hold still enough to reproduce.
+ */
+const idle = spawn(process.execPath, ['server/index.mjs'], {
+  env: { ...process.env, PORT: '0', WALL_IDLE_MS: '6000' },
+  stdio: ['ignore', 'pipe', 'ignore'],
+})
+const stopped = await new Promise((resolve) => {
+  const started = Date.now()
+  idle.on('exit', () => resolve(Math.round((Date.now() - started) / 1000)))
+  setTimeout(() => resolve(null), 40000)
+})
+console.log('an untouched server stops itself:', JSON.stringify(stopped === null ? 'no' : `after ${stopped}s`))
+if (stopped === null) {
+  idle.kill()
+  throw new Error('a server with nobody asking it anything never stopped')
+}
+
 const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
 const errors = []

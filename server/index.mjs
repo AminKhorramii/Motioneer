@@ -342,11 +342,24 @@ server.listen(PORT, HOST, () => {
 })
 
 if (IDLE_MS) {
-  // unref'd, so this timer is never the reason the process is still up: it only gets to speak
-  // while the server itself is holding the loop open
+  /**
+   * Referenced, where this used to be unref'd.
+   *
+   * Two servers started by an agent run were found still listening eleven minutes in with a
+   * sixty second idle, and one of them was still there eighty seconds after a request I made to
+   * restart its clock, so the check was not running. I could not reproduce that in a harness:
+   * the unref'd version stops correctly every time I start one deliberately, which fits, because
+   * an unref'd timer does not get to set the event loop's poll timeout and only fires once
+   * something else has woken the process. Every harness wakes it; a server nobody is asking
+   * anything is the one case where nothing does.
+   *
+   * So this is the fix that matches the observation rather than a proven cause. Keeping the
+   * timer referenced costs nothing, because the listening socket holds this process open anyway,
+   * and it makes the one thing here that ever decides to stop independent of who else is awake.
+   */
   setInterval(() => {
     if (Date.now() - lastSeen < IDLE_MS) return
     console.log('nobody has asked for anything, so this server is done')
     process.exit(0)
-  }, Math.min(IDLE_MS, 5_000)).unref()
+  }, Math.min(IDLE_MS, 5_000))
 }
