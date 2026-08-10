@@ -33,7 +33,18 @@ const DATA_IMAGE = /^data:image\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/]+={0,2}$/i
  */
 const COLLAPSE = 900
 
-const LAYOUT_CSS: Record<'column' | 'split' | 'mosaic', string> = {
+/**
+ * One row each, said out loud.
+ *
+ * A grid places an item in the first row where its column is free, so two sections asking for
+ * opposite columns land beside each other rather than one after the other. That is the right
+ * answer for a mosaic, which wants them paired, and the wrong one for a weave, which wants a
+ * section to take a side and leave the other side empty. Numbering the rows is what makes the
+ * difference, and fourteen covers the longest argument a world is allowed to make.
+ */
+const OWN_ROW = Array.from({ length: 14 }, (_, i) => `.page>section:nth-child(${i + 1}){grid-row:${i + 1}}`).join('')
+
+const LAYOUT_CSS: Record<'column' | 'split' | 'mosaic' | 'weave', string> = {
   column: '',
   // The opening section holds still in its own track while the rest of the argument travels
   // past it. It spans every row rather than being positioned, so the grid decides the height
@@ -57,6 +68,24 @@ min-height:100vh;display:flex;flex-direction:column;justify-content:center;font-
 .page{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
 .page>section{grid-column:span 2}
 .page>section:nth-child(3n+2),.page>section:nth-child(3n+3){grid-column:span 1;--track:.5}
+.page>section+section{border-top:0}
+}`,
+  /**
+   * A section takes a side and leaves the other empty, so the argument comes down the page in
+   * steps rather than in bands.
+   *
+   * This is the one arrangement where the empty half is the point. A mosaic pairs its sections
+   * to get density; a weave refuses to, and what it buys is that no two consecutive things start
+   * at the same left edge, which is the single most reliable difference between a page that was
+   * composed and a page that was stacked. Every third still takes the full width, so the page has
+   * a beat to come back to rather than zig-zagging forever.
+   */
+  weave: `@media (min-width:${COLLAPSE}px){
+.page{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
+.page>section{grid-column:span 2}
+${OWN_ROW}
+.page>section:nth-child(3n+2){grid-column:1;--track:.5}
+.page>section:nth-child(3n+3){grid-column:2;--track:.5}
 .page>section+section{border-top:0}
 }`,
 }

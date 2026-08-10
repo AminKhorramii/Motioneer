@@ -83,11 +83,13 @@ export interface World {
    * is how a spread works and how a page can be read as two things at once.
    * mosaic places the sections on a two track grid, some spanning both, so a page of many short
    * parts reads as an arrangement rather than a queue.
+   * weave gives each section a side and leaves the other empty, so the argument steps down the
+   * page and no two consecutive things start at the same left edge.
    *
    * Each is one media query away from being a column again, because a phone is a column and a
    * layout that will not collapse is a layout that breaks rather than adapts.
    */
-  layout?: 'column' | 'split' | 'mosaic'
+  layout?: 'column' | 'split' | 'mosaic' | 'weave'
   backdrop: Backdrop
   /**
    * The form each role takes here. This is where a world speaks: the same offer is a table
@@ -242,7 +244,7 @@ export function madeWorld(raw: Record<string, unknown>, i: number): World {
     },
     // a name this renderer does not lay out is a column, because the stack is the one
     // arrangement that is always safe and a page it cannot draw is worse than a plain one
-    layout: (['column', 'split', 'mosaic'] as const).includes(raw.layout as never)
+    layout: (['column', 'split', 'mosaic', 'weave'] as const).includes(raw.layout as never)
       ? (raw.layout as World['layout'])
       : 'column',
     // read from the list rather than a copy of it, so a backdrop added to the vocabulary is one

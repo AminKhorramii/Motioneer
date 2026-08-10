@@ -29,6 +29,8 @@ const BUILT_IN: World[] = [
     wear: { claim: 'statement', substance: ['list', 'table'], offer: 'table', objections: 'list' },
     // a grid states once and prices once; arguing substance twice was padding wearing a system
     compose: ['masthead', 'claim', 'substance', 'offer', 'credits'],
+    // the grid does the talking, so let it: each part takes a side and the page steps down
+    layout: 'weave',
     // the one move: the folio of the opening section set enormous and almost gone.
     // One committed move per world, because restraint plus commitment is what reads as
     // designed, where several small flourishes read as generated.
