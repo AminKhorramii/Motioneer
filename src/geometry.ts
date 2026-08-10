@@ -108,22 +108,51 @@ export const MEASURE = (doc: Document = document): Measured => {
 /**
  * A measurement said as faults, in the words a designer of the page would need to fix it.
  *
- * Written once so the suite and the app agree about what counts as wrong. The reasons travel
- * with the fault because they are handed straight to whoever designed the page and asked for.
+ * Each one names the lever, and that is the whole difference between a fault and a complaint.
+ * Instrumented over a real wall, every repair asked only about the catalogue succeeded and every
+ * repair asked about geometry failed: a world told "2 columns too narrow to hold a line: 45px at
+ * 18px type" came back with the same four faults and was thrown away, because a rendered
+ * measurement is not something it set. It chooses a scale, a measure, a base size, a breakout
+ * and a layout, and nothing had ever told it which of those produced a 45px column.
+ *
+ * The measurement still leads, because it is the evidence. What follows it is where to reach.
  */
 export function faultsOf(m: Measured): string[] {
   const out: string[] = []
-  if (m.scrolls > 1) out.push(`the page scrolls ${m.scrolls}px sideways, so something is wider than the window`)
-  if (m.past.length) out.push(`${m.past.length} boxes sit past the edge of the page, starting with ${m.past[0]}`)
+  if (m.scrolls > 1) {
+    out.push(`the page scrolls ${m.scrolls}px sideways, so something is wider than the window. ` +
+      'A fixed width in the css you wrote is the usual cause, since every other width here is set by the frame.')
+  }
+  if (m.past.length) {
+    out.push(`${m.past.length} boxes sit past the edge of the page, starting with ${m.past[0]}. ` +
+      'Same cause: a width or a margin in your css that the frame did not choose.')
+  }
   // a page is allowed the column, a centred block and a bleed, and no more. Past that the
   // sections are not sharing a grid, which is what reads as wild rather than as designed
-  if (m.edges.length > 3) out.push(`${m.edges.length} different left edges (${m.edges.join(', ')}), so the sections are not sharing a grid`)
-  if (m.crushed.length) out.push(`${m.crushed.length} columns too narrow to hold a line: ${m.crushed[0]}`)
-  if (m.tiny.length) out.push(`body text at ${m.tiny[0]}, which is unreadable on a normal screen`)
-  if (m.wordColumn.length) out.push(`${m.wordColumn[0]}, which is a column of words rather than a headline`)
-  if (m.unreadable.length) out.push(`${m.unreadable[0]}, so the button has nothing readable in it`)
-  if (m.dup.length) out.push(`the id ${m.dup[0]} is used twice`)
-  if (m.empty) out.push(`${m.empty} sections render with no height at all`)
+  if (m.edges.length > 3) {
+    out.push(`${m.edges.length} different left edges (${m.edges.join(', ')}), so the sections are not sharing a grid. ` +
+      'structure.breakout and layout decide where a section is allowed to leave the column, and a page reads as ' +
+      'composed when it leaves from the same few places rather than from everywhere.')
+  }
+  if (m.crushed.length) {
+    out.push(`${m.crushed.length} columns too narrow to hold a line: ${m.crushed[0]}. ` +
+      'Widen structure.measure, lower structure.base, or give the page fewer sections standing side by side, ' +
+      'because a column narrower than about twelve characters of its own type is a list of words.')
+  }
+  if (m.tiny.length) {
+    out.push(`body text at ${m.tiny[0]}, which is unreadable on a normal screen. structure.base sets it.`)
+  }
+  if (m.wordColumn.length) {
+    out.push(`${m.wordColumn[0]}, which is a column of words rather than a headline. ` +
+      'Lower scale, widen structure.measure, or choose a layout that gives this section the full width, ' +
+      'because a heading is sized against the track it is set in and not against the window.')
+  }
+  if (m.unreadable.length) {
+    out.push(`${m.unreadable[0]}, so the button has nothing readable in it. palette decides how far the accent ` +
+      'sits from the background, and contrast pulls them apart.')
+  }
+  if (m.dup.length) out.push(`the id ${m.dup[0]} is used twice, which is a section asking for a role twice over.`)
+  if (m.empty) out.push(`${m.empty} sections render with no height at all, so something in your css is collapsing them.`)
   return out
 }
 
