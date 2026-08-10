@@ -101,7 +101,10 @@ export function slop(page: Page, html?: string): Flag[] {
   }
   const eyebrow = typeof hero?.content.eyebrow === 'string' ? hero.content.eyebrow : ''
   if (eyebrow && eyebrow.length < 40 && /^(for|the|your|built for|made for)\b/i.test(eyebrow)) {
-    add('design', 'hero-eyebrow-chip', 'hero eyebrow chip',
+    // copy, not design: it reads the eyebrow the writer wrote and matches it against a phrase.
+    // Tagged design it was handed to the world repair call, which has no say over that line and
+    // could only fail, which is the same trap the italic serif tell was in
+    add('copy', 'hero-eyebrow-chip', 'hero eyebrow chip',
       'A small label above the headline is the most reached for hero decoration, and it usually repeats what the headline already says.',
       hero?.id)
   }
