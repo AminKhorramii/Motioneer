@@ -27,7 +27,8 @@ const BUILT_IN: World[] = [
     // a numbered list is more swiss than a row of cards, and the grid has no closing band.
     // Substance is argued twice: listed, then tabulated, because a grid states and then indexes
     wear: { claim: 'statement', substance: ['list', 'table'], offer: 'table', objections: 'list' },
-    compose: ['masthead', 'claim', 'substance', 'substance', 'offer', 'objections', 'credits'],
+    // a grid states once and prices once; arguing substance twice was padding wearing a system
+    compose: ['masthead', 'claim', 'substance', 'offer', 'credits'],
     // the one move: the folio of the opening section set enormous and almost gone.
     // One committed move per world, because restraint plus commitment is what reads as
     // designed, where several small flourishes read as generated.
@@ -43,8 +44,9 @@ const BUILT_IN: World[] = [
     backdrop: 'dither',
     // an essay argues in prose and then shows one plate, which is what a bleeding figure is for
     wear: { claim: 'statement', proof: 'quote', substance: ['prose', 'figure'], offer: 'statement', objections: 'prose', invitation: 'statement' },
-    // a read: the argument, one witness, the substance twice over, the terms, a quiet close
-    compose: ['masthead', 'claim', 'proof', 'substance', 'substance', 'offer', 'objections', 'invitation', 'credits'],
+    // An essay: the argument, said at length, with one witness and a colophon. No pricing table
+    // and no list of objections, because an essay that stops to sell reverts to being a page.
+    compose: ['masthead', 'claim', 'substance', 'proof', 'credits'],
     // the one move: a masthead slug above the headline, the way a periodical opens
     css: `#claim h1::before{content:'';display:block;width:2.4ch;height:4px;background:var(--accent);margin-bottom:1.6rem}`,
   },
@@ -59,7 +61,8 @@ const BUILT_IN: World[] = [
     // documentation does not testimonial: everything is a listing or a transcript, and it
     // lists before it tabulates the way a manual states then indexes
     wear: { claim: 'transcript', substance: ['list', 'table'], offer: 'transcript', objections: 'list' },
-    compose: ['masthead', 'claim', 'substance', 'substance', 'objections', 'offer', 'credits'],
+    // A session opens on output, not on a navigation bar, so this one has no masthead at all.
+    compose: ['claim', 'substance', 'substance', 'objections', 'credits'],
     // the one move: the first substance prints inverted, a band of light in a dark page. It is
     // keyed on the id rather than the role, because the id marks the first of a repeated role
     // and a band that happens twice is a background rather than a move
@@ -76,8 +79,10 @@ const BUILT_IN: World[] = [
     structure: { rules: false, numbered: false, bleed: true, measure: 52, base: 17.5, figure: 'bleed', breakout: 'bleed', rhythm: [2.6, 0.9, 2.2, 1.2, 0.6] },
     backdrop: 'ridge',
     wear: { claim: 'statement', substance: 'figure', proof: 'quote', invitation: 'statement' },
-    // five sections. A poster is what it leaves out, and the whitespace is the design
-    compose: ['masthead', 'claim', 'substance', 'proof', 'invitation', 'credits'],
+    // Three. A poster is what it leaves out, and it said five while listing six, which is how
+    // the intent survived and the page did not. No nav, because nothing printed and pinned to a
+    // wall has one, and no substance, because a poster that explains itself is a leaflet.
+    compose: ['claim', 'invitation', 'credits'],
     // the one move: the headline at the size of the wall, tighter than body type ever sits.
     // It needed !important on every line when the renderer wrote sizes inline; the blocks
     // carry their sizes as classes now, so a world outranks them by saying it once
