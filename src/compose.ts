@@ -632,27 +632,41 @@ async function mend(
   provider: Provider,
   brief: string,
 ): Promise<World> {
-  const text = await ask(
-    provider,
-    MEND_SYSTEM,
-    `${brief}\n\nThis is a world you designed, grounded in ${ground}:\n\n${JSON.stringify(raw)}\n\n` +
-      `Rendered, it trips ${flaws.length === 1 ? 'this check' : `these ${flaws.length} checks`}:\n` +
-      `${flaws.map((f) => `- ${f}`).join('\n')}\n\n` +
-      'Return it with those fixed and everything else left alone.',
-    undefined,
-    { maxTokens: 8000, kind: 'repair' },
-  ).catch(() => null)
-  const json = text ? (grabJson(text) as { worlds?: Record<string, unknown>[] } | null) : null
-  const back = json?.worlds?.[0]
-  if (!back) return world
-  const mended = madeWorld(back, at)
-  // kept only if it is actually better, because a repair that trades one fault for another is
-  // a second opinion rather than a fix, and the first one at least came from a call that thought
-  if (!mended.name || (await faultsIn(mended)).length >= flaws.length) {
-    registerWorlds([world])
-    return world
+  let best = world
+  let left = flaws
+  let latest = raw
+  // Twice at most, and only while it is still getting better. One pass was measured clearing a
+  // world of four faults, and also accepting a pass that cleared three and left one, after which
+  // nothing ever mentioned the one again: a real wall ended with two worlds still carrying a
+  // flag that a second telling would have taken out in five seconds. It stops the moment a pass
+  // stops improving, so a world the model cannot fix costs one wasted call rather than two.
+  for (let attempt = 0; attempt < 2 && left.length; attempt++) {
+    const text = await ask(
+      provider,
+      MEND_SYSTEM,
+      `${brief}\n\nThis is a world you designed, grounded in ${ground}:\n\n${JSON.stringify(latest)}\n\n` +
+        `Rendered, it trips ${left.length === 1 ? 'this check' : `these ${left.length} checks`}:\n` +
+        `${left.map((f) => `- ${f}`).join('\n')}\n\n` +
+        'Return it with those fixed and everything else left alone.',
+      undefined,
+      { maxTokens: 8000, kind: 'repair' },
+    ).catch(() => null)
+    const json = text ? (grabJson(text) as { worlds?: Record<string, unknown>[] } | null) : null
+    const back = json?.worlds?.[0]
+    if (!back) break
+    const mended = madeWorld(back, at)
+    if (!mended.name) break
+    const now = await faultsIn(mended)
+    // kept only if it is actually better, because a repair that trades one fault for another is
+    // a second opinion rather than a fix, and the first one at least came from a call that thought
+    if (now.length >= left.length) break
+    best = mended
+    left = now
+    latest = back
   }
-  return mended
+  // whichever won, it is the one the renderer has to resolve by id
+  registerWorlds([best])
+  return best
 }
 
 export async function promptWorlds(
