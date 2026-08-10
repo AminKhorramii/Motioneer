@@ -132,6 +132,25 @@ export function slop(page: Page, html?: string): Flag[] {
   }
 
   if (html) {
+    /**
+     * Italic, on a page whose display face is actually a serif.
+     *
+     * This was two patterns in the catalogue, italic anywhere and the letters serif anywhere, and
+     * the second is satisfied by every sans stack ever written, because they all end in
+     * sans-serif. So it fired on any page carrying one italic blockquote and told the designer
+     * its serif display was the problem when the display was Inter. A world handed that back
+     * could not win: nothing it did about serifs could clear a flag that was really about the
+     * italic, and both of the worlds that survived repair on a real wall died here.
+     *
+     * Which face is the display is a comparison rather than a pattern, so it belongs in the
+     * detector rather than in the catalogue, which is the split that file already draws.
+     */
+    const display = String(page.taste?.display ?? '').replace(/sans-serif/gi, '')
+    if (/serif/i.test(display) && /font-style:\s*italic/.test(html)) {
+      add('design', 'italic-serif', 'italic serif display',
+        'It is the fastest way to look editorial, which is why it now reads as a template.')
+    }
+
     for (const tell of MARKUP_TELLS) {
       if (tell.find.every((r) => r.test(html))) add('design', tell.id, tell.label, tell.why)
     }

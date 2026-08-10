@@ -116,12 +116,6 @@ export const MARKUP_TELLS: MarkupTell[] = [
     why: 'It is the framework default, so it adds depth without saying anything about the product.',
   },
   {
-    id: 'italic-serif',
-    find: [/font-style:\s*italic/, /serif/],
-    label: 'italic serif display',
-    why: 'It is the fastest way to look editorial, which is why it now reads as a template.',
-  },
-  {
     id: 'pulsing-dot',
     find: [/border-radius:\s*50%/, /animation:[^;}]*infinite/],
     label: 'a pulsing dot',
