@@ -415,14 +415,59 @@ function scanSections(buf: string, from: number, key = '"sections"') {
   return { out, cursor: done }
 }
 
+/**
+ * The control characters a model leaves loose inside its own strings, escaped.
+ *
+ * A world carries thirty to sixty lines of CSS in one JSON string, and a reply that writes those
+ * lines as actual lines is not JSON any more. Neither reader here could take it: the parse fails
+ * outright and the brace walk, which finds the object boundaries correctly, then fails on the
+ * same slice for the same reason. Measured across the four shapes a reply arrives in, this is the
+ * one that lost the whole answer while nothing was wrong with the answer.
+ */
+const looseJson = (s: string) => {
+  let out = ''
+  let inString = false
+  let escaped = false
+  for (const ch of s) {
+    if (!inString) {
+      if (ch === '"') inString = true
+      out += ch
+      continue
+    }
+    if (escaped) {
+      escaped = false
+      out += ch
+      continue
+    }
+    if (ch === '\\') {
+      escaped = true
+      out += ch
+      continue
+    }
+    if (ch === '"') {
+      inString = false
+      out += ch
+      continue
+    }
+    out += ch === '\n' ? '\\n' : ch === '\r' ? '\\r' : ch === '\t' ? '\\t' : ch
+  }
+  return out
+}
+
 const grabJson = (text: string) => {
   const start = text.indexOf('{')
   const end = text.lastIndexOf('}')
   if (start < 0 || end <= start) return null
+  const cut = text.slice(start, end + 1)
   try {
-    return JSON.parse(text.slice(start, end + 1)) as Record<string, unknown>
+    return JSON.parse(cut) as Record<string, unknown>
   } catch {
-    return null
+    // a second reading, with the loose newlines inside its strings tied down
+    try {
+      return JSON.parse(looseJson(cut)) as Record<string, unknown>
+    } catch {
+      return null
+    }
   }
 }
 
