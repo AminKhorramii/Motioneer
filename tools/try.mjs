@@ -13,9 +13,12 @@
  */
 import { spawn } from 'node:child_process'
 import { mkdirSync, writeFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
-const ROOT = path.join(path.dirname(new URL(import.meta.url).pathname), '..')
+// a pathname is percent encoded and is not a path, so a clone under a directory with a space
+// in its name would look for the server somewhere that does not exist
+const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 const dir = process.env.WALL_TRY_DIR ?? path.join(ROOT, '.try')
 const at = path.join(dir, '.wall')
 const brief =

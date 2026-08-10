@@ -12,7 +12,8 @@
  */
 
 import { spawn, execFileSync } from 'node:child_process'
-import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -61,6 +62,38 @@ const version = await new Promise((resolve) => {
   setTimeout(() => (mcp.kill(), resolve(null)), 5000)
 })
 ok(version === pkg.version, 'the MCP server reports the package version', `${version} vs ${pkg.version}`)
+
+/**
+ * The same question again, from a directory with a space in its name.
+ *
+ * Where a package lands is not ours to choose, and a home folder with a space in it is ordinary.
+ * The entry point used to find its own root through the URL's pathname, which is percent encoded
+ * and therefore not a path, so it read %20 and looked for its own package.json and its own server
+ * in places that do not exist. The version falling back to 0.0.0 is the visible half of that; the
+ * invisible half was design reporting that it could not open a browser, on a machine where
+ * everything was installed and working. The version is asked here because it needs no browser.
+ */
+const spaced = path.join(tmpdir(), 'wall update check')
+rmSync(spaced, { recursive: true, force: true })
+mkdirSync(path.join(spaced, 'mcp'), { recursive: true })
+copyFileSync(path.join(ROOT, 'mcp/index.mjs'), path.join(spaced, 'mcp/index.mjs'))
+copyFileSync(path.join(ROOT, 'package.json'), path.join(spaced, 'package.json'))
+const spacedVersion = await new Promise((resolve) => {
+  const mcp = spawn('node', [path.join(spaced, 'mcp/index.mjs')], { stdio: ['pipe', 'pipe', 'ignore'] })
+  let out = ''
+  mcp.stdout.on('data', (d) => {
+    out += d
+    const line = out.split('\n').find((l) => l.includes('serverInfo'))
+    if (line) {
+      mcp.kill()
+      resolve(JSON.parse(line).result?.serverInfo?.version)
+    }
+  })
+  mcp.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} }) + '\n')
+  setTimeout(() => (mcp.kill(), resolve(null)), 5000)
+})
+ok(spacedVersion === pkg.version, 'it finds its own files where the path has a space in it', `${spacedVersion} vs ${pkg.version}`)
+rmSync(spaced, { recursive: true, force: true })
 
 // an updated deployment must not serve a cached index.html into purged hashed assets: the
 // page revalidates, the assets it names are immutable because their names carry their hash

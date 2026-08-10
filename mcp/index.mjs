@@ -20,9 +20,20 @@
 import { spawn } from 'node:child_process'
 import { mkdir, readFile, writeFile, rm } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
-const ROOT = path.join(path.dirname(new URL(import.meta.url).pathname), '..')
+/**
+ * Where this package was installed.
+ *
+ * Through fileURLToPath rather than the URL's own pathname, because a pathname is percent
+ * encoded and is not a path: installed under a directory with a space in it, the space came
+ * back as %20, so the package version read as 0.0.0 and the server this file spawns was looked
+ * for at a path that does not exist, which reported itself as "could not open a browser". On
+ * Windows the same pathname carries a leading slash before the drive letter and is not a path
+ * at all. Both are ordinary places to install something.
+ */
+const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 /**
  * How long to hold the call open before answering that the wall is open.
  *
