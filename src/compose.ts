@@ -11,6 +11,7 @@ import { MODELS, modelById } from '@/models'
 import { BACKDROPS, type Backdrop } from '@/backdrop'
 import { shrinkDataUrl } from '@/imagepipe'
 import { renderPage } from '@/render'
+import { strainsIn } from '@/geometry'
 import { WORLDS, dressSections, madeWorld, register as registerWorlds, worldById, type World } from '@/worlds'
 import { ROLE_FORMS, defaultContent, starterPage, uid, type Form, type Page, type Role, type Section } from '@/sections'
 
@@ -578,6 +579,19 @@ function flawsIn(world: World): string[] {
 }
 
 /**
+ * Everything wrong with a world: what it reads as, and what it measures.
+ *
+ * The detector reads the source of a page and cannot see a column that changed width; the ruler
+ * lays the page out at the three widths that occur and cannot see a gradient in a string. A real
+ * wall produced both kinds in one run, and only one of them was ever being asked about.
+ */
+async function faultsIn(world: World): Promise<string[]> {
+  const read = flawsIn(world)
+  const measured = await strainsIn(renderPage(probe(world), { title: 'Product', still: true })).catch(() => [])
+  return [...read, ...measured]
+}
+
+/**
  * Ask for the same world with its faults taken out.
  *
  * Correcting is not designing. The design call thinks for a minute or more because it is
@@ -611,7 +625,7 @@ async function mend(
   const mended = madeWorld(back, at)
   // kept only if it is actually better, because a repair that trades one fault for another is
   // a second opinion rather than a fix, and the first one at least came from a call that thought
-  if (!mended.name || flawsIn(mended).length >= flaws.length) {
+  if (!mended.name || (await faultsIn(mended)).length >= flaws.length) {
     registerWorlds([world])
     return world
   }
@@ -677,7 +691,7 @@ export async function promptWorlds(
       if (!candidate.name) continue
       const at = seen
       seen += 1
-      const flaws = flawsIn(candidate)
+      const flaws = await faultsIn(candidate)
       const world = flaws.length
         ? await mend(raw as unknown as Record<string, unknown>, candidate, flaws, at, ground[out.length] ?? ground[0], provider, brief)
         : candidate

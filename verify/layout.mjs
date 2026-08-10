@@ -26,6 +26,9 @@ import { chromium } from 'playwright'
 
 const WIDTHS = [{ name: 'cell', w: 1280 }, { name: 'studio', w: 900 }, { name: 'phone', w: 390 }]
 
+// the measurement itself lives in src/geometry.ts, because the app runs it too now: it checks
+// every world a model designs before that world is used, and two copies would be two rulers
+
 /** every built-in world on every look, composed the way the app composes them */
 function housePages(core) {
   const out = []
@@ -77,77 +80,6 @@ export function checkLibrary(core) {
   return { blocks: core.BLOCKS.length, tokens: core.TOKENS.length, classesRendered: rendered.size, missing }
 }
 
-/** What one page's geometry is, at one width. */
-const MEASURE = () => {
-  const vw = document.documentElement.clientWidth
-  const out = { scrolls: document.documentElement.scrollWidth - vw, past: [], crushed: [], tiny: [], dup: [], empty: 0, edges: [], wordColumn: [], unreadable: [] }
-  const seen = new Set()
-  for (const el of document.querySelectorAll('[id]')) {
-    if (seen.has(el.id)) out.dup.push(el.id)
-    seen.add(el.id)
-  }
-  for (const s of document.querySelectorAll('section')) {
-    if (s.getBoundingClientRect().height < 8) out.empty++
-    // the edge a reader's eye tracks down the page: where each block of a section begins
-    for (const block of s.querySelectorAll(':scope > .wrap > *')) {
-      const r = block.getBoundingClientRect()
-      if (r.width > 0) out.edges.push(Math.round(r.left))
-    }
-  }
-  out.edges = [...new Set(out.edges)]
-  for (const el of document.querySelectorAll('body *')) {
-    const r = el.getBoundingClientRect()
-    const cs = getComputedStyle(el)
-    if (cs.position === 'fixed' || cs.display === 'none' || (!r.width && !r.height)) continue
-    if (r.right > vw + 1 || r.left < -1) out.past.push(el.tagName.toLowerCase() + ' right=' + Math.round(r.right))
-  }
-  // a column too narrow to form a line, measured against the type actually set in it
-  for (const el of document.querySelectorAll('p')) {
-    const r = el.getBoundingClientRect()
-    const fs = parseFloat(getComputedStyle(el).fontSize)
-    const txt = (el.textContent ?? '').trim()
-    if (txt.length > 25 && r.width > 0 && r.width < fs * 12) out.crushed.push(Math.round(r.width) + 'px at ' + fs + 'px type')
-    if (txt.length > 25 && fs < 12.5) out.tiny.push(fs + 'px')
-  }
-
-  // how many characters of its own type a heading gets on a line. A heading measured in the
-  // body's column came out at eleven, which is a column of two-word lines rather than a
-  // headline, and it was the most visible thing wrong with the page
-  const chOf = (el) => {
-    const s = document.createElement('span')
-    s.style.cssText = 'position:absolute;visibility:hidden;white-space:pre'
-    s.style.font = getComputedStyle(el).font
-    s.textContent = '0'.repeat(50)
-    document.body.appendChild(s)
-    const w = s.getBoundingClientRect().width / 50
-    s.remove()
-    return w
-  }
-  for (const h of document.querySelectorAll('h1,h2')) {
-    const txt = (h.textContent ?? '').trim()
-    if (txt.length < 24) continue
-    const per = Math.round(h.getBoundingClientRect().width / chOf(h))
-    if (per < 12) out.wordColumn.push(h.tagName.toLowerCase() + ' at ' + per + ' characters a line')
-  }
-
-  // the one real button, against its own fill. A world that restyled only the colour shipped
-  // accent text on an accent ground, which is a button with nothing readable in it
-  const lum = (c) => {
-    const [r, g, b, a] = (c.match(/[\d.]+/g) ?? [0, 0, 0, 1]).map(Number)
-    return a === 0 ? null : (0.299 * r + 0.587 * g + 0.114 * b) / 255
-  }
-  for (const b of document.querySelectorAll('.btn-primary')) {
-    const cs = getComputedStyle(b)
-    const ink = lum(cs.color)
-    let ground = lum(cs.backgroundColor)
-    for (let el = b.parentElement; ground === null && el; el = el.parentElement) ground = lum(getComputedStyle(el).backgroundColor)
-    if (ink !== null && ground !== null && Math.abs(ink - ground) < 0.18) {
-      out.unreadable.push('button ink ' + cs.color + ' on ' + cs.backgroundColor)
-    }
-  }
-  return out
-}
-
 export async function checkGeometry(core) {
   const browser = await chromium.launch()
   const pages = housePages(core)
@@ -158,7 +90,7 @@ export async function checkGeometry(core) {
     const probe = await ctx.newPage()
     for (const { where, page } of pages) {
       await probe.setContent(core.renderPage(page, { title: 'Spoor', still: true }), { waitUntil: 'load' })
-      const m = await probe.evaluate(MEASURE)
+      const m = await probe.evaluate(core.MEASURE)
       mostEdges = Math.max(mostEdges, m.edges.length)
       const at = `${where} at ${name}`
       if (m.scrolls > 1) faults.push(`${at}: scrolls ${m.scrolls}px sideways`)
