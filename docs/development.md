@@ -114,7 +114,7 @@ Suites, in order of how much they prove:
 npm run verify         # the app, mock model
 npm run verify:stream  # the real streaming path, no mock anywhere
 npm run verify:image   # the image pipeline
-npm run verify:mcp     # the MCP tools against the real server and desktop
+npm run verify:mcp     # the MCP tools over the real protocol, brief to spec, nothing stubbed but the model
 npm run verify:server  # the self-hosted server, key never reaches the visitor
 npm run verify:all     # everything
 node tools/shots.mjs   # screenshots into shots/

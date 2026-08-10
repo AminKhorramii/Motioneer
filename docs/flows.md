@@ -431,9 +431,14 @@ npm run web            # the Vite dev server, what an agent run opens
 npm run app            # the desktop shell, not released yet
 npm run app:bundle     # a real .app and dmg, for when it is
 npm run serve          # the built app behind the server, with its own keys
-npm run build:core     # the headless core, for a shell with no DOM
+npm run try            # what an agent run does, without needing an agent: brief, server, browser
+npm run watch          # rebuild dist on every change, so try and the suites are never stale
+npm run wallclock      # how long a whole wall takes, measured through the real app
 npm run build:wasm     # rebuild the image crate and inline it, needs Rust
 ```
+
+`npm run build` already builds the headless core, since `dist-core/core.js` is what the `check`
+tool imports and a stale one would answer for a detector nobody is running.
 
 Only `build:wasm` needs the Rust toolchain, and only someone changing `crates/wall-image` needs
 to run it, because its output is committed. A fresh clone builds, runs and verifies without Rust
@@ -441,18 +446,26 @@ installed. Building the desktop app needs Rust; building and verifying the web a
 
 ### Verifying
 
-Three suites, in order of how much they prove:
+In order of how much they prove:
 
 ```
-npm run verify         # desktop, mock model
-npm run verify:web     # the same assertions in plain Chromium
+npm run verify         # the app in a real browser against a mock model, and the house gate
 npm run verify:server  # the real server against a recorded upstream, asserting the visitor holds no key
 npm run verify:stream  # the real streaming path, no mock anywhere
+npm run verify:hard    # copy that fights back: markup, braces, other scripts, other alphabets
+npm run verify:beat    # the thinking beat, and that none of it reaches the reply
 npm run verify:image   # the image pipeline, no browser and no Rust needed
+npm run verify:tauri   # the desktop shell's own commands, in Rust, with no window
 npm run verify:mcp     # the agent path over the real protocol, brief to spec
 npm run verify:oneline # the same path on a machine with nothing installed
+npm run verify:update  # what the published tarball carries, and how it is cached
 npm run verify:all     # all of them
 ```
+
+`npm run verify` is the house gate and runs `verify/layout.mjs` inside itself, which renders
+every built in world on every look at three widths and fails if Wall's own output trips its own
+slop catalogue. There is no separate command for it, because a geometry check nobody runs is a
+geometry check nobody has.
 
 The two agent suites stand in for the local Claude with `verify/fakebin/claude`, which they put
 on PATH along with a do-nothing `open`. Both are in the repository rather than in a temporary
