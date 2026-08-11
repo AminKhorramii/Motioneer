@@ -2,7 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { tasteFromImage, type Taste } from '@/taste'
 import { PRESETS } from '@/design/presets'
 import { ROLE_LABEL, applyEdit, migratePage, starterPage, type Page, type Role } from '@/sections'
-import { renderPage } from '@/render'
+import { renderBody, renderPage, shellOf } from '@/render'
 import { pageBrief } from '@/brief'
 import { slop } from '@/slop'
 import {
@@ -624,7 +624,7 @@ export default function App() {
                       style={{ transform: `translateX(${d * 76}%) scale(${d === 0 ? 1 : 0.85})`, opacity: d === 0 ? 1 : 0.32, zIndex: 10 - Math.abs(d) }}
                       onClick={() => d !== 0 && setAt(i)}>
                       {d === 0
-                        ? <iframe title={p.id} srcDoc={html} sandbox="allow-scripts allow-same-origin" />
+                        ? <Paper page={p} title={product.name} editable />
                         : <Aside page={p} title={product.name} />}
                     </div>
                   )
@@ -707,13 +707,52 @@ export default function App() {
 }
 
 /**
+ * One paper, written once and patched after.
+ *
+ * A page arrives a section at a time, and handing the iframe a new srcDoc for each of them threw
+ * the document away and built another: measured, one changed word cost two document loads, the
+ * inline faces decoded again, the backdrop restarted and the scroll went to the top. What a
+ * reader should see is a paper gaining a section, and what they saw was a paper reloading.
+ *
+ * So the document is written when its shell changes, which is when the world, the backdrop or
+ * the look changes, and at every other moment only the sections are posted in. That is the whole
+ * trick: the head is identical while the copy is being written, and the head is all the
+ * expensive part.
+ */
+function Paper({ page, title, editable, still }: {
+  page: Page; title: string; editable?: boolean; still?: boolean
+}) {
+  const frame = useRef<HTMLIFrameElement>(null)
+  const shell = shellOf(page)
+  const written = useRef('')
+  // the first write has to be the document, and it carries the sections it has at that moment
+  const doc = useMemo(() => renderPage(page, { title, editable, still, live: true }), [shell, title, editable, still])
+
+  useEffect(() => {
+    const el = frame.current
+    if (!el) return
+    if (written.current !== shell) {
+      // a new shell is a new document, because the faces and the world's css are in its head
+      written.current = shell
+      el.srcdoc = doc
+      return
+    }
+    const { html, layout } = renderBody(page)
+    el.contentWindow?.postMessage({ wall: 'body', html, layout }, '*')
+  }, [page, shell, doc])
+
+  return <iframe ref={frame} title={page.id} srcDoc={doc}
+    scrolling={still ? 'no' : undefined}
+    sandbox={editable ? 'allow-scripts allow-same-origin' : 'allow-scripts allow-same-origin'} />
+}
+
+/**
  * A paper beside the centre: still, frozen backdrop, and memoised on the page object, so
  * typing in the bar or a toast appearing never re-parses four documents. Handlers are not
  * compared because they are recreated every render on purpose; the page is the identity.
  */
 const Aside = memo(function Aside({ page, title }: { page: Page; title: string }) {
-  return <iframe title={page.id} srcDoc={renderPage(page, { title, still: true })}
-    sandbox="allow-scripts allow-same-origin" />
+  return <Paper page={page} title={title} still />
 })
 
 /** One grid cell: still page, frozen backdrop, verdict computed once per page object. */

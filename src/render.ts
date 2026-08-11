@@ -229,6 +229,26 @@ ${editable ? `[data-edit]{outline:0;transition:box-shadow .15s ease;border-radiu
  * the app, which owns the page: nothing here mutates state on its own, or the paper and the
  * model would drift apart.
  */
+/**
+ * The receiver that lets a paper gain a section without becoming a new document.
+ *
+ * A page is written a section at a time, and every one of them used to arrive as a whole new
+ * document: measured, changing a single word tore the window down and built another, so the
+ * inline faces decoded again, the backdrop restarted and the scroll went back to the top. The
+ * head is identical throughout, because the world and the taste do not change while the copy is
+ * being written, so only the sections need to travel.
+ *
+ * It goes into a page the app is holding, which includes the still ones, because the grid cells
+ * fill in too. It does not go into a page that is leaving: a file handed to a stranger carries
+ * no listener of ours, because the promise is one file with nothing of ours running in it.
+ */
+const PATCH_SCRIPT = `<script>addEventListener('message',function(e){
+var d=e.data;if(!d||d.wall!=='body')return;
+var p=document.querySelector('.page');if(!p)return;
+if(d.layout)p.className='page page-'+d.layout;
+p.innerHTML=d.html;
+},false)</script>`
+
 const EDIT_SCRIPT = `<style>
 [data-section]{position:relative}
 [data-section].wall-over{box-shadow:inset 0 3px 0 -1px currentColor}
@@ -579,12 +599,22 @@ ${(g.links ?? []).map((l, j) => `<a class="navlink" ${ed(sec.id, `groups.${i}.li
  * entrance on every streamed section reads as flicker, and nine preview cells each running
  * a shader loop is a heater, not a wall.
  */
-export function renderPage(page: Page, opts: { editable?: boolean; title?: string; still?: boolean } = {}): string {
+/**
+ * The sections of a page, and which arrangement they are in.
+ *
+ * Split out from renderPage because a page that gains a section of copy does not need a new
+ * document. Everything above this, the faces, the tokens, the world's CSS and the backdrop, is
+ * unchanged while the words arrive, and rebuilding it was costing the thing it was rebuilding
+ * for: measured, swapping the whole document to change one word tore the window down and put a
+ * new one up, so the fonts decoded again, the backdrop restarted and the scroll went back to the
+ * top. A paper that fills in is the point of the wall, and it was reloading instead.
+ */
+export function renderBody(page: Page): { html: string; layout: Layout } {
   const world = worldById(page.world)
   const seed = page.sections.length * 17 + page.taste.radius
   const beat = world.structure.rhythm
   const seen = new Set<string>()
-  const body = page.sections
+  const html = page.sections
     .filter((s) => s.on)
     .map((s, i) => {
       const first = !seen.has(s.role)
@@ -595,8 +625,7 @@ export function renderPage(page: Page, opts: { editable?: boolean; title?: strin
       })
     })
     .join('\n')
-  // the backdrop goes first so it sits behind the content without needing a stacking hack
-  const art = backdropHtml(page.taste, page.backdrop ?? 'none', !!opts.still)
+
   /**
    * A spread only works when the thing it pins is a spine.
    *
@@ -608,13 +637,29 @@ export function renderPage(page: Page, opts: { editable?: boolean; title?: strin
    * the fault was which section was in the panel and nothing said so. A page falls back to the
    * stack rather than doing that, since a column is always honest.
    */
-  const first = page.sections.find((s) => s.on)
+  const opening = page.sections.find((s) => s.on)
   const wanted: Layout = world.layout ?? 'column'
-  const layout: Layout = wanted === 'split' && first?.role !== 'masthead' ? 'column' : wanted
+  const layout: Layout = wanted === 'split' && opening?.role !== 'masthead' ? 'column' : wanted
+  return { html, layout }
+}
 
+/**
+ * Everything above the sections: what a paper can keep while its words are still arriving.
+ *
+ * Two pages share a shell when they are the same world on the same taste with the same backdrop,
+ * which is exactly the case while a page is being written, and never the case when a world lands
+ * or a look changes. It is a string rather than a hash because it is only ever compared.
+ */
+export const shellOf = (page: Page): string =>
+  `${page.world}|${page.backdrop ?? 'none'}|${page.taste.name}|${page.taste.bg}|${page.taste.ink}|${page.taste.accent}|${page.taste.display}|${page.taste.body}|${page.taste.scale}|${page.taste.weight}|${page.taste.radius}|${page.taste.density}|${page.taste.caps}`
+
+export function renderPage(page: Page, opts: { editable?: boolean; title?: string; still?: boolean; live?: boolean } = {}): string {
+  const world = worldById(page.world)
+  const { html: body, layout } = renderBody(page)
+  // the backdrop goes first so it sits behind the content without needing a stacking hack
+  const art = backdropHtml(page.taste, page.backdrop ?? 'none', !!opts.still)
   // Wrapped, so the page's own arrangement is one rule rather than something every section has
   // to agree about. The backdrop stays outside it, since it sits behind the whole page.
   const shell = `<div class="page page-${layout}">${body}</div>`
-  return `${head(page.taste, opts.title ?? 'Landing', !!opts.editable, world, !!opts.still, layout)}${art}${shell}${opts.editable ? EDIT_SCRIPT : ''}</body></html>`
+  return `${head(page.taste, opts.title ?? 'Landing', !!opts.editable, world, !!opts.still, layout)}${art}${shell}${opts.live ? PATCH_SCRIPT : ''}${opts.editable ? EDIT_SCRIPT : ''}</body></html>`
 }
-
