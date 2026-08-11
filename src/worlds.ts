@@ -25,6 +25,15 @@ export interface World {
   /** why it looks the way it does, so a choice between worlds is a choice you can reason about */
   note: string
   /**
+   * The direction this world grew from, by name, when a model designed it from one.
+   *
+   * A world's own name is whatever the model called it, so two walls that both started from the
+   * till roll produce a night ledger and a thermal audit and nothing can tell they are the same
+   * idea. The direction is the stable thing, and it is what a page kept or killed is remembered
+   * as. A built-in world grew from nobody's direction and leaves this alone.
+   */
+  ground?: string
+  /**
    * How to write for it. The copy used to be written blind to the design it landed in, so a
    * poster and a catalogue came out at the same length when one wants six words and the other
    * wants forty. This travels with the prompt.

@@ -4,7 +4,7 @@ import { PRESETS } from '@/design/presets'
 import type { Taste } from '@/taste'
 import { giveKey, host, isDesktop, isServed, servedConfig } from '@/host'
 import { slop, slopBrief } from '@/slop'
-import { dealDirections, directionSeed } from '@/design/directions'
+import { dealDirections, directionSeed, type Direction } from '@/design/directions'
 import { ANGLES } from '@/design/angles'
 import { INTAKE_SYSTEM, MEND_SYSTEM, PAGE_SYSTEM, WORLDS_SYSTEM } from '@/design/prompts'
 import { MODELS, modelById, type ModelChoice } from '@/models'
@@ -584,8 +584,12 @@ export async function promptPage(
  * chain of correlated decisions and the cliche it is prone to, and it was written for exactly
  * this and then never wired up. Fifty shuffled beats eight fixed: a call handed a seed packet
  * and a call handed a fire exit plan cannot converge, and the next wall draws different ones.
+ *
+ * Directions rather than the lines folded out of them, because the name on a direction is the
+ * only stable handle on what a page was: the world's own name is whatever the model called it,
+ * and two walls that both started from the till roll never call it the same thing twice.
  */
-const territories = (n: number) => dealDirections(n).map(directionSeed)
+const territories = (n: number): Direction[] => dealDirections(n)
 
 /**
  * A layout for each hand, dealt rather than left to every call to work out for itself.
@@ -750,7 +754,7 @@ export async function promptWorlds(
   // the index is shared, so a world takes the next free page whichever call finished it
   let seen = 0
 
-  const hand = async (count: number, ground: string[], lean: string) => {
+  const hand = async (count: number, ground: Direction[], lean: string) => {
     /**
      * The beat, and nothing else.
      *
@@ -768,7 +772,7 @@ export async function promptWorlds(
     const text = await ask(
       provider,
       // the territory goes last so the long shared prompt in front of it still caches
-      `${WORLDS_SYSTEM}\n\nBuild these particular ones from ${ground.join(', or ')}. One object each.` +
+      `${WORLDS_SYSTEM}\n\nBuild these particular ones from ${ground.map(directionSeed).join(', or ')}. One object each.` +
         `\n\nLay this one out as a ${lean}, unless the ground you were given genuinely refuses it.`,
       `${brief}\n\nDesign ${count === 1 ? 'one world' : `${count} worlds`} for it.`,
       feed,
@@ -790,10 +794,17 @@ export async function promptWorlds(
       if (!candidate.name) continue
       const at = seen
       seen += 1
+      const dealt = ground[out.length] ?? ground[0]
       const flaws = await faultsIn(candidate)
-      const world = flaws.length
-        ? await mend(raw as unknown as Record<string, unknown>, candidate, flaws, at, ground[out.length] ?? ground[0], provider, brief)
+      const built = flaws.length
+        ? await mend(raw as unknown as Record<string, unknown>, candidate, flaws, at, directionSeed(dealt), provider, brief)
         : candidate
+      // the direction it grew from travels with it, so a page kept or killed is remembered as
+      // the ground it stood on rather than as whatever the model called it that day
+      const world = dealt ? { ...built, ground: dealt.name } : built
+      // stamping makes a new object, and the renderer resolves a world by id, so the one the
+      // map holds has to be this one and not the copy without the stamp
+      registerWorlds([world])
       onWorld?.(world, at)
       out.push(world)
     }
