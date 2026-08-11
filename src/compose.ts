@@ -7,7 +7,7 @@ import { slop, slopBrief } from '@/slop'
 import { dealDirections, directionSeed } from '@/design/directions'
 import { ANGLES } from '@/design/angles'
 import { INTAKE_SYSTEM, MEND_SYSTEM, PAGE_SYSTEM, WORLDS_SYSTEM } from '@/design/prompts'
-import { MODELS, modelById } from '@/models'
+import { MODELS, modelById, type ModelChoice } from '@/models'
 import { BACKDROPS, type Backdrop } from '@/backdrop'
 import { shrinkDataUrl } from '@/imagepipe'
 import { renderPage } from '@/render'
@@ -313,9 +313,27 @@ export async function loadHeldKeys() {
  */
 export const canUseCli = () => (isServed ? heldCli : Boolean(host.cli))
 
+/**
+ * Whether this shell can actually reach a model, as opposed to whether it is in the list.
+ *
+ * A served deployment holds the key and calls the vendor itself, and the page tells it only
+ * which wire to speak. Six of these models speak the openai wire to an endpoint of their own,
+ * and neither the endpoint nor the model id survives that trip: the key is stored under the
+ * wire and the request goes to the wire's default host. Measured against a stand-in vendor, a
+ * key entered for GLM arrived as "Bearer glm-key-abc123" at /v1/chat/completions asking for
+ * gpt-5.2, which on a real deployment is api.openai.com. Sending the base from the page would
+ * close it and open something worse, since the page would then choose where the server's key
+ * goes. So a deployment that cannot route a vendor does not offer it, which is the same answer
+ * this app already gives for a model it has no way to run.
+ */
+export const canReach = (m: ModelChoice = chosen()) => {
+  if (m.wire === 'cli') return canUseCli()
+  return !(isServed && (m.base || m.id === 'custom'))
+}
+
 /** A model the person already has needs no key, only somewhere to run it. */
 export const canWrite = (_p?: Provider) =>
-  (chosen().wire === 'cli' ? canUseCli() : Boolean(keyFor())) || held.includes(chosen().wire)
+  canReach() && ((chosen().wire === 'cli' ? canUseCli() : Boolean(keyFor())) || held.includes(chosen().wire))
 export const canDraw = () => Boolean(imageKey()) || held.includes('gemini')
 
 // One delta listener for the whole app, fanned out by request id, because several pages

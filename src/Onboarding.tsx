@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { Taste } from '@/taste'
-import { CUSTOM, IMAGE_KEY_NAME, canUseCli, canWrite, choose, keyHome, readBrief, setKey, type Intake } from '@/compose'
+import { CUSTOM, IMAGE_KEY_NAME, canReach, canWrite, choose, keyHome, readBrief, setKey, type Intake } from '@/compose'
 import type { Product } from '@/compose'
 import { MARKS, MODELS, modelById } from '@/models'
 
@@ -45,9 +45,10 @@ export function Onboarding({ product, taste, explainOnly, onProduct, onBuild, on
       [IMAGE_KEY_NAME, localStorage.getItem(IMAGE_KEY_NAME) ?? ''],
     ]),
   )
-  // a machine with no claude on it cannot ask the local Claude, and offering a choice that
-  // cannot work is worse than offering one fewer
-  const offered = MODELS.filter((m) => m.wire !== 'cli' || canUseCli())
+  // Offering a choice that cannot work is worse than offering one fewer, and there are two ways
+  // it cannot: a machine with no claude on it, and a served deployment that would send this
+  // vendor's key to a different vendor's endpoint.
+  const offered = MODELS.filter(canReach)
   const model = modelById(pick)
   const picked = Boolean(pick)
   const shown = hover || pick ? modelById(hover || pick) : null

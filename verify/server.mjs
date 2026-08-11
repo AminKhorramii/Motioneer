@@ -142,6 +142,23 @@ page.on('console', (m) => m.type() === 'error' && errors.push(m.text().slice(0, 
 await page.goto(`http://127.0.0.1:${PORT}/`)
 await page.waitForSelector('.onboard .card', { timeout: 20000 })
 
+/**
+ * A deployment only offers what it can actually route.
+ *
+ * The server holds the key and calls the vendor itself, and the page tells it only which wire to
+ * speak, so a model that carries its own endpoint loses it on the way: the key is stored under
+ * the wire and the request goes to the wire's default host. Measured against a stand-in vendor
+ * before this was closed, a key entered for GLM arrived as "Bearer glm-key-abc123" at
+ * /v1/chat/completions asking for gpt-5.2, which on a real deployment is api.openai.com.
+ */
+const modelsOffered = await page.evaluate(() =>
+  [...document.querySelectorAll('.onboard .pick')].map((b) => b.getAttribute('aria-label')))
+console.log('models a served deployment offers:', JSON.stringify(modelsOffered))
+const ownEndpoint = ['Gemini Flash', 'GLM', 'DeepSeek', 'Qwen', 'Kimi', 'MiniMax', 'Anything else']
+const leaky = modelsOffered.filter((m) => ownEndpoint.includes(m))
+if (leaky.length) throw new Error(`served offers ${leaky.join(', ')}, whose key it would send to another vendor`)
+if (!modelsOffered.includes('Claude')) throw new Error('served stopped offering the one model it can route')
+
 // the visitor holds no key, and the app must still offer the described path
 await page.evaluate(() => [...document.querySelectorAll('.onboard .pick')]
   .find((b) => b.getAttribute('aria-label') === 'Claude')?.click())
