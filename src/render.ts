@@ -44,7 +44,9 @@ const COLLAPSE = 900
  */
 const OWN_ROW = Array.from({ length: 14 }, (_, i) => `.page>section:nth-child(${i + 1}){grid-row:${i + 1}}`).join('')
 
-const LAYOUT_CSS: Record<'column' | 'split' | 'mosaic' | 'weave', string> = {
+type Layout = 'column' | 'split' | 'mosaic' | 'weave'
+
+const LAYOUT_CSS: Record<Layout, string> = {
   column: '',
   // The opening section holds still in its own track while the rest of the argument travels
   // past it. It spans every row rather than being positioned, so the grid decides the height
@@ -129,7 +131,7 @@ function tokens(t: Taste) {
   }
 }
 
-function head(t: Taste, title: string, editable: boolean, w: World, still: boolean) {
+function head(t: Taste, title: string, editable: boolean, w: World, still: boolean, layout: Layout) {
   const { gap, surface, line, s, fluid, ease } = tokens(t)
   // a bundled face rides inside the page, but only when this page actually wears it
   const faces = TYPEFACES.filter((f) => t.display.includes(f.family) || t.body.includes(f.family))
@@ -213,7 +215,7 @@ section>.wrap{position:relative}
 section>.wrap::before{content:counter(sec,decimal-leading-zero);position:absolute;left:0;top:.2rem;
 font-size:.72rem;letter-spacing:.14em;color:var(--dim);font-variant-numeric:tabular-nums}
 @container wrap (max-width:30rem){section>.wrap::before{display:none}}` : ''}
-${LAYOUT_CSS[w.layout ?? 'column']}
+${LAYOUT_CSS[layout]}
 ${w.css ? `\n/* world */\n${w.css}\n` : ''}
 ${editable ? `[data-edit]{outline:0;transition:box-shadow .15s ease;border-radius:3px}
 [data-edit]:hover{box-shadow:0 0 0 1px ${alpha(t.accent, 0.45)}}
@@ -595,9 +597,24 @@ export function renderPage(page: Page, opts: { editable?: boolean; title?: strin
     .join('\n')
   // the backdrop goes first so it sits behind the content without needing a stacking hack
   const art = backdropHtml(page.taste, page.backdrop ?? 'none', !!opts.still)
+  /**
+   * A spread only works when the thing it pins is a spine.
+   *
+   * split holds the opening section still in a gutter, and it was written against editorial,
+   * whose opening section is a masthead. A world that asks for a spread and opens on its claim
+   * puts the headline in that gutter instead: measured at the studio's width, 162px wide at 32px
+   * type, which is five characters a line. The detector then reported it and the repair was
+   * asked to fix it, and no amount of lowering the scale or widening the measure could, because
+   * the fault was which section was in the panel and nothing said so. A page falls back to the
+   * stack rather than doing that, since a column is always honest.
+   */
+  const first = page.sections.find((s) => s.on)
+  const wanted: Layout = world.layout ?? 'column'
+  const layout: Layout = wanted === 'split' && first?.role !== 'masthead' ? 'column' : wanted
+
   // Wrapped, so the page's own arrangement is one rule rather than something every section has
   // to agree about. The backdrop stays outside it, since it sits behind the whole page.
-  const shell = `<div class="page page-${world.layout ?? 'column'}">${body}</div>`
-  return `${head(page.taste, opts.title ?? 'Landing', !!opts.editable, world, !!opts.still)}${art}${shell}${opts.editable ? EDIT_SCRIPT : ''}</body></html>`
+  const shell = `<div class="page page-${layout}">${body}</div>`
+  return `${head(page.taste, opts.title ?? 'Landing', !!opts.editable, world, !!opts.still, layout)}${art}${shell}${opts.editable ? EDIT_SCRIPT : ''}</body></html>`
 }
 
