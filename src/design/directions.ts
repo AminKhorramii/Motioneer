@@ -409,14 +409,26 @@ const WILD = 3
  * all. If a wall ever smells samey, the first knob is the favoured count and not the mechanism.
  */
 export function dealDirections(n: number, lean?: { favor: string[]; shun: string[] }): Direction[] {
-  const liked = lean
-    ? shuffled(DIRECTIONS.filter((d) => lean.favor.includes(d.name)))
-        .slice(0, Math.max(0, Math.min(FAVOURED, n - WILD)))
-    : []
-  const rest = shuffled(
-    DIRECTIONS.filter((d) => !liked.includes(d) && !lean?.shun.includes(d.name)),
-  )
-  return shuffled([...liked, ...rest].slice(0, n))
+  const shunned = (d: Direction) => Boolean(lean?.shun.includes(d.name))
+  // a ground both liked and culled is neither, rather than liked twice over
+  const liked = (d: Direction) => Boolean(lean?.favor.includes(d.name)) && !shunned(d)
+  const favoured = shuffled(DIRECTIONS.filter(liked)).slice(0, Math.max(0, Math.min(FAVOURED, n - WILD)))
+  /**
+   * Every liked ground leaves the wild pool, not only the two that were dealt.
+   *
+   * Filtering out just the dealt pair left the rest of them drawable a second time, which read as
+   * a cap and was not one: a taste that had settled on twenty five of the fifty one grounds took
+   * more than two hands in five deals out of six, and took all five in one deal in ten. The cap
+   * is on the wall and not on the deal, so it has to be enforced against the whole liked set.
+   */
+  const wild = shuffled(DIRECTIONS.filter((d) => !liked(d) && !shunned(d)))
+  const dealt = [...favoured, ...wild].slice(0, n)
+  // A memory may bias a wall and may never shrink it. A shun list wide enough to empty the deck
+  // gives its grounds back rather than handing back fewer hands than the wall has places, because
+  // a wall of five with three hands is a worse answer than one that deals something disliked.
+  const short = n - dealt.length
+  if (short > 0) dealt.push(...shuffled(DIRECTIONS.filter((d) => !dealt.includes(d))).slice(0, short))
+  return shuffled(dealt)
 }
 
 /** one direction, folded to the line a design call is handed */

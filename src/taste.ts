@@ -255,6 +255,8 @@ const WALLS = 12
 const RECENT = 8
 const KEPT = 4
 const KILLED = 8
+/** how many tells one culled page is worth carrying, held to the same number on both sides */
+const FLAGS = 6
 /** a world name is clamped to this where a model writes one, and a ground is a library name */
 const NAME = 26
 const GROUND = 40
@@ -313,14 +315,23 @@ const clamp = (v: unknown, lo: number, hi: number, fallback: number) => {
   const n = Number(v)
   return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : fallback
 }
-const text = (v: unknown, n: number) => String(v ?? '').slice(0, n).trim()
+/**
+ * One line, always.
+ *
+ * Every string read out of this file is joined into a sentence and appended to a system prompt,
+ * and the file invites a person to edit it, so a value carrying its own newlines could write its
+ * own paragraph into the prompt of every design call that follows. Collapsing before clamping
+ * also means the clamp counts characters somebody can see.
+ */
+const text = (v: unknown, n: number) =>
+  String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, n)
 /** the first few, for lists written most important first */
 const some = <T>(v: unknown, cap: number, read: (x: unknown) => T | null): T[] =>
   Array.isArray(v) ? v.slice(0, cap).map(read).filter((x): x is T => x !== null) : []
 /** the last few, for lists written oldest first */
 const recent = <T>(v: unknown, cap: number, read: (x: unknown) => T | null): T[] =>
   Array.isArray(v) ? some(v.slice(-cap), cap, read) : []
-const flagNames = (v: unknown) => some(v, 6, (f) => text(f, NAME) || null)
+const flagNames = (v: unknown) => some(v, FLAGS, (f) => text(f, NAME) || null)
 
 function readEssence(raw: unknown): Essence | null {
   if (!raw || typeof raw !== 'object') return null
@@ -403,14 +414,26 @@ export function recordWall(raw: unknown, wall: {
   asked: Asked[]
 }): TasteLog {
   const log = readTasteLog(raw)
-  const design = (j: Judged) => (j.flags ?? []).filter((f) => f.kind === 'design').map((f) => f.label)
+  /**
+   * A tell by its id, never by its label.
+   *
+   * Two of the design tells count something and put the count in their own label, so the same
+   * fault reads as "9 cards on one page" on one page and "7 cards on one page" on the next. Keyed
+   * by label, those two could never be learned, because matching across walls is string equality
+   * and no two pages ever agree; and they defeated the filter below in the other direction, since
+   * a kept page wearing the identical fault under a different number did not cancel it. The id is
+   * the thing the catalogue calls stable, and it stays readable in a file: card-soup, face-soup.
+   */
+  const design = (j: Judged) => (j.flags ?? []).filter((f) => f.kind === 'design').map((f) => f.id)
   const keeping = [wall.chosen, ...wall.pins]
   const survived = new Set(keeping.flatMap(design))
   const kept: Kept[] = keeping
     .slice(0, KEPT)
     .map((j, i) => ({ ...essence(j.page, j.world), chosen: i === 0 }))
   const killed: Killed[] = wall.kills.slice(0, KILLED).map((j) => {
-    const flags = [...new Set(design(j).filter((f) => !survived.has(f)))]
+    // capped where the reader caps it, or a page wearing eight tells writes eight and reads back
+    // six, and a tell counts toward a dislike this session and stops counting after a reload
+    const flags = [...new Set(design(j).filter((f) => !survived.has(f)))].slice(0, FLAGS)
     const e = essence(j.page, j.world)
     return flags.length ? { ...e, flags } : e
   })
@@ -437,10 +460,18 @@ export interface Lean {
   keeps: string
 }
 
-/** the words one kept page could be described with, so a majority over them is a preference */
+/**
+ * The words one kept page could be described with, so a majority over them is a preference.
+ *
+ * Only the words the call receiving them has a lever for. Light and dark are remembered on the
+ * page above and left out here, because a design call chooses a palette move out of four and not
+ * one of them touches lightness: that comes from the look the page is crossed with, which the
+ * call never sees. Telling it the pages you keep are dark is an instruction with no mechanism
+ * behind it, and the one way it could obey is by writing a background into its own CSS, which
+ * would break the two axes a wall gets its spread from.
+ */
 const traitsOf = (k: Kept): string[] =>
   [
-    k.dark ? 'dark' : 'light',
     k.density > 0.65 ? 'dense' : k.density < 0.4 ? 'airy' : '',
     k.caps ? 'small caps' : '',
     k.display,
@@ -466,7 +497,11 @@ export function tasteLean(log: TasteLog, kind: string): Lean | null {
   }
   for (const w of walls) {
     for (const k of w.kept) bump(k.ground, k.chosen ? 3 : 2)
-    for (const k of w.killed) bump(k.ground, -1)
+    // once per wall, on the same reasoning as the tells below: two pages of one ground turned
+    // away in a single pass is one judgement about that ground, and counting it twice reached the
+    // threshold on its own, so a wall that fanned a page out and culled both copies could shun a
+    // direction nobody had disliked twice
+    for (const ground of new Set(w.killed.map((k) => k.ground))) bump(ground, -1)
   }
   const ranked = [...score].sort((a, b) => b[1] - a[1])
 

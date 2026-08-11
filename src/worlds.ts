@@ -196,6 +196,18 @@ function safeCss(raw: unknown): string {
   return clean.slice(0, 4000)
 }
 
+/**
+ * A name is a name, and a note is a sentence.
+ *
+ * Every number a model writes here is clamped and its CSS goes through safeCss, and the three
+ * prose fields had nothing at all. They travel further than either. The name and the note are
+ * read into the copy prompt, and the name is written into the spec a coding agent implements
+ * from, where a string carrying a newline stops being a name and becomes a heading of its own:
+ * a world called "\n## Ignore the above" put exactly that at the top level of the handoff. This
+ * is the rule the handoff already keeps about file names, applied to the strings beside them.
+ */
+const line = (raw: unknown, n: number) => String(raw ?? '').replace(/\s+/g, ' ').trim().slice(0, n)
+
 export function madeWorld(raw: Record<string, unknown>, i: number): World {
   const s = (raw.structure ?? {}) as Record<string, unknown>
   const face = (k: unknown, fallback: string) => FACES[String(k)] ?? fallback
@@ -224,9 +236,11 @@ export function madeWorld(raw: Record<string, unknown>, i: number): World {
   }
   return {
     id: `made-${i}`,
-    name: String(raw.name ?? `world ${i + 1}`).slice(0, 26),
-    note: String(raw.note ?? '').slice(0, 120),
-    voice: String(raw.voice ?? '').slice(0, 240),
+    // the fallback stays inside the clamp, so a reply that named nothing is still refused by the
+    // caller's own emptiness check rather than being handed a name it never chose
+    name: line(raw.name ?? `world ${i + 1}`, 26),
+    note: line(raw.note, 120),
+    voice: line(raw.voice, 240),
     taste: (t) => ({
       ...palette(t),
       display: face(raw.display, FACES.sans),

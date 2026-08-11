@@ -4,6 +4,7 @@ import {
   type Judged, type Taste, type TasteLog,
 } from '@/taste'
 import { PRESETS } from '@/design/presets'
+import { asKind } from '@/design/kinds'
 import { ROLE_LABEL, applyEdit, migratePage, starterPage, type Page, type Role } from '@/sections'
 import { renderBody, renderPage, shellOf } from '@/render'
 import { pageBrief } from '@/brief'
@@ -184,7 +185,7 @@ export default function App() {
     scaffold(base)
     // read once per wall rather than once per call, so a log edited between walls is picked up
     // and a wall in flight cannot change its mind halfway through
-    setMemory(tasteLean(memory.current, p.kind))
+    setMemory(tasteLean(memory.current, asKind(p.kind)))
     // a served deployment answers which keys it holds asynchronously, and someone clicking
     // straight through setup can arrive here before that answer does
     if (!canWrite()) await loadHeldKeys()
@@ -628,7 +629,10 @@ export default function App() {
       remembered.current = true
       memory.current = recordWall(memory.current, {
         at: new Date().toISOString().slice(0, 10),
-        kind: product.kind ?? EMPTY_PRODUCT.kind,
+        // through the same normaliser the read side uses. A wall filed under one string and
+        // looked up under another is a memory that silently never applies, and state saved
+        // before kinds existed comes back with none at all
+        kind: asKind(product.kind),
         chosen: judged(chosen),
         pins,
         kills,

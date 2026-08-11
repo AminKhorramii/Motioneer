@@ -722,7 +722,7 @@ async function mend(
   const text = await ask(
     provider,
     MEND_SYSTEM,
-    `${brief}\n\nThis is a world you designed, grounded in ${ground}:\n\n${JSON.stringify(raw)}\n\n` +
+    `${brief}\n\nThis is a world you designed${ground ? `, grounded in ${ground}` : ''}:\n\n${JSON.stringify(raw)}\n\n` +
       `Rendered, it trips ${flaws.length === 1 ? 'this check' : `these ${flaws.length} checks`}:\n` +
       `${flaws.map((f) => `- ${f}`).join('\n')}\n\n` +
       'Return it with those fixed and everything else left alone.',
@@ -813,13 +813,19 @@ export async function promptWorlds(
       if (!candidate.name) continue
       const at = seen
       seen += 1
-      const dealt = ground[out.length] ?? ground[0]
+      /**
+       * Exactly the ground this world was asked for, and nothing at all when there is none.
+       *
+       * A hand is dealt one ground and a call can answer with more worlds than it was asked for,
+       * and those extra worlds used to fall back to the hand's only ground. A world stamped with
+       * a direction it did not grow from teaches the memory a preference for something no page
+       * on the wall ever stood on, and the memory is the one place that error compounds.
+       */
+      const dealt: Direction | undefined = ground[out.length]
       const flaws = await faultsIn(candidate)
       const built = flaws.length
-        ? await mend(raw as unknown as Record<string, unknown>, candidate, flaws, at, directionSeed(dealt), provider, brief)
+        ? await mend(raw as unknown as Record<string, unknown>, candidate, flaws, at, dealt ? directionSeed(dealt) : '', provider, brief)
         : candidate
-      // the direction it grew from travels with it, so a page kept or killed is remembered as
-      // the ground it stood on rather than as whatever the model called it that day
       const world = dealt ? { ...built, ground: dealt.name } : built
       // stamping makes a new object, and the renderer resolves a world by id, so the one the
       // map holds has to be this one and not the copy without the stamp

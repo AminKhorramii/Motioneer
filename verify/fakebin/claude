@@ -6,11 +6,24 @@
 // /tmp, and a fixture a reboot can sweep away does not fail loudly when it goes: the suite
 // quietly starts calling the real claude on the machine, which is slow, costs money, and on a
 // machine without a session fails fast enough that a wall of unwritten drafts reads as a pass.
+import { appendFileSync } from 'node:fs'
+
 let sys = ''
 const i = process.argv.indexOf('--system-prompt')
 if (i > -1) sys = process.argv[i + 1] ?? ''
 let body = ''
 process.stdin.on('data', (d) => (body += d)).on('end', () => {
+  /**
+   * What the model was actually asked, when a suite wants to assert on it.
+   *
+   * Everything the app puts in front of a model is otherwise unobservable from a suite: it can
+   * see the wall that came back and not the prompt that produced it, so a note the app believes
+   * it is sending could stop being sent and every check would still pass. One line per call,
+   * only when a suite asks for it, so the ordinary runs are untouched.
+   */
+  if (process.env.WALL_PROMPT_LOG) {
+    appendFileSync(process.env.WALL_PROMPT_LOG, JSON.stringify({ sys, body }) + '\n')
+  }
   const ids = [...body.matchAll(/"id":\s*"([a-z0-9]{5,})"/g)].map((m) => m[1])
   // the whole wall in one reply: one entry per page, keeping the angle and every id
   const wall = sys.includes('"pages"')

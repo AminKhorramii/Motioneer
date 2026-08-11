@@ -19,7 +19,7 @@
  * a process holding API keys should end with the window rather than with the login session.
  */
 import { spawn } from 'node:child_process'
-import { mkdtempSync, existsSync, readFileSync, mkdirSync } from 'node:fs'
+import { mkdtempSync, existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { chromium } from 'playwright'
@@ -30,6 +30,29 @@ const { server, url } = await fakeAnthropic()
 const work = mkdtempSync(join(tmpdir(), 'wall-agent-'))
 const at = join(work, '.wall')
 mkdirSync(at, { recursive: true })
+
+/**
+ * A project that has already made walls, so this run is a second wall rather than a first.
+ *
+ * Everything about the memory was proved at the node level and nothing proved it survived the
+ * whole path: read off disk by the server, carried on the request, turned into a lean by the app
+ * and appended to the prompt of a real design call. Each of those could stop happening without a
+ * single existing check going red, because a suite sees the wall that came back and not the
+ * prompt that produced it. WALL_PROMPT_LOG makes the stand-in model write down what it was asked.
+ */
+const LIKED = ['thermal receipt', 'boarding pass']
+const trait = { layout: 'column', display: 'mono', scale: 1.2, density: 0.8, caps: true, dark: true }
+const promptLog = join(work, 'prompts.jsonl')
+writeFileSync(join(at, 'taste.json'), JSON.stringify({
+  format: 1,
+  walls: Array.from({ length: 3 }, (_, n) => ({
+    at: `2026-08-0${n + 1}`,
+    kind: 'software',
+    kept: LIKED.map((ground, i) => ({ ...trait, world: ground, ground, chosen: i === 0 })),
+    killed: [{ ...trait, world: 'glass atrium', ground: 'museum vitrine', flags: ['glassmorphism'] }],
+    asked: [],
+  })),
+}, null, 2))
 
 /** how long the server this run starts waits before deciding the tab is gone */
 const IDLE_MS = 25_000
@@ -45,6 +68,8 @@ const mcp = spawn('node', ['mcp/index.mjs'], {
     // proving a fifteen minute wait works
     WALL_WAIT_MS: '2000',
     WALL_IDLE_MS: String(IDLE_MS),
+    // inherited down to the stand-in model, which the server spawns
+    WALL_PROMPT_LOG: promptLog,
     // the model already on the machine, standing in, so this costs no session and no key
     PATH: join(process.cwd(), 'verify', 'fakebin') + ':' + process.env.PATH,
     HOME: work,
@@ -167,6 +192,35 @@ console.log('intake skipped:', JSON.stringify({
 }))
 if (usedBrief?.oneLiner !== ARGS.oneLiner) {
   throw new Error('the app did not use the one liner it was handed, so it read the brief again')
+}
+
+// ——— 3a. the memory reached the model that designed this wall ———
+const prompts = readFileSync(promptLog, 'utf8').trim().split('\n').map((l) => JSON.parse(l))
+const designs = prompts.filter((p) => p.sys.includes('"worlds"'))
+const pages = prompts.filter((p) => !p.sys.includes('"worlds"') && !p.sys.includes('"product"'))
+const kills = 'taken pages off the wall for glassmorphism'
+const keeps = 'The pages they keep are'
+console.log('the memory reached the model:', JSON.stringify({
+  designCalls: designs.length,
+  toldWhatWasCulled: designs.filter((p) => p.sys.includes(kills)).length,
+  toldWhatIsKept: designs.filter((p) => p.sys.includes(keeps)).length,
+  copyCallsToldWhatWasCulled: pages.filter((p) => p.body.includes('have been taken off')).length,
+  // the note goes after the whole shared system prompt, so the long prefix in front of it caches
+  noteSitsAtTheTail: designs.every((p) => !p.sys.includes(kills) || p.sys.indexOf(kills) > p.sys.length - 600),
+}))
+if (!designs.length) throw new Error('no design call was recorded, so this check proves nothing')
+if (designs.some((p) => !p.sys.includes(kills))) {
+  throw new Error('a design call was not told what this person culls, and pruning goes to every hand')
+}
+// the half that could converge a wall is quarantined to the hands dealt from what they like
+if (designs.filter((p) => p.sys.includes(keeps)).length > 2) {
+  throw new Error(`${designs.filter((p) => p.sys.includes(keeps)).length} of ${designs.length} hands were told what this person likes, and the cap is two`)
+}
+if (!designs.some((p) => p.sys.includes(keeps))) {
+  throw new Error('no hand was told what this person keeps, so the favoured half of the memory never arrives')
+}
+if (!pages.some((p) => p.body.includes('have been taken off'))) {
+  throw new Error('the copy calls were never told what this person culls')
 }
 
 // ——— 3b. the wall is triaged before anything is chosen ———
