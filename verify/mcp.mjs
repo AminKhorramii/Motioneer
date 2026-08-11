@@ -205,9 +205,9 @@ const sent = await page.evaluate(async () => {
   return { hadButton: !!b, toast: document.querySelector('.toast')?.textContent ?? null }
 })
 console.log('sent back:', JSON.stringify(sent))
-const files = ['chosen.md', 'chosen.html', 'chosen.json'].filter((f) => existsSync(join(at, f)))
+const files = ['chosen.md', 'chosen.html', 'chosen.json', 'taste.json'].filter((f) => existsSync(join(at, f)))
 console.log('files written:', JSON.stringify(files))
-if (files.length !== 3) throw new Error(`choosing left ${files.length} of the three files behind`)
+if (files.length !== 4) throw new Error(`choosing left ${files.length} of the four files behind`)
 // both sides of the handoff say which shape they speak, because npx keeps the writer current
 // while whatever reads the directory can be any age
 const structured = JSON.parse(readFileSync(join(at, 'chosen.json'), 'utf8'))
@@ -248,6 +248,40 @@ if (!spec.includes(INSTRUCTION)) throw new Error('the spec does not say what was
 // wrote and the local arrangement that stands in until one arrives. Without it the whole suite
 // would pass on a wall of eight unwritten drafts.
 if (!/ headline \d/.test(spec)) throw new Error('the chosen page was never written, only arranged')
+
+// ——— 4b. what the project now remembers, and a second wall reading it ———
+// The file is the product's rather than the browser's, so it has to be on disk beside the chosen
+// files and it has to reach the next window through the same call that carries the brief. An
+// endpoint of its own would be a second round trip to learn that most projects have nothing yet.
+const taste = JSON.parse(readFileSync(join(at, 'taste.json'), 'utf8'))
+const wall = taste.walls?.[0]
+console.log('what the project remembers:', JSON.stringify({
+  format: taste.format,
+  walls: taste.walls?.length,
+  kind: wall?.kind,
+  chosenIsFirst: wall?.kept?.[0]?.chosen,
+  killed: wall?.killed?.length,
+  // the culled page was designed from a direction, so the memory can name what to stop dealing.
+  // The chosen one here is a built-in world, which grew from nobody's direction and says so by
+  // leaving this out rather than by inventing a name for itself
+  killNamesItsGround: wall?.killed?.[0]?.ground,
+  asked: wall?.asked?.length,
+}))
+if (taste.format !== 1) throw new Error('the memory file says nothing about which shape it is')
+if (!wall?.kept?.[0]?.chosen) throw new Error('the page that was chosen is not marked as chosen, so it counts the same as one nobody picked')
+if (!wall?.killed?.length) throw new Error('a culled page left no trace in the memory, so the next wall deals it again')
+if (!wall.killed[0].ground) throw new Error('the memory cannot say which direction the culled page grew from, so nothing can be shunned')
+
+const second = await (await fetch(`${where}/api/request`)).json()
+console.log('a second wall is handed the memory:', JSON.stringify({
+  carriesTaste: Boolean(second?.taste),
+  walls: second?.taste?.walls?.length,
+  sameWall: JSON.stringify(second?.taste?.walls?.[0]) === JSON.stringify(wall),
+}))
+if (!second?.taste?.walls?.length) throw new Error('the next window opened in this project would start with no memory of this one')
+if (JSON.stringify(second.taste.walls[0]) !== JSON.stringify(wall)) {
+  throw new Error('the memory handed to the next wall is not the memory this one wrote')
+}
 
 // ——— 5. the server outlives the call, then ends with the window ———
 console.log('still serving after the choice:', JSON.stringify((await fetch(`${where}/api/config`)).ok))

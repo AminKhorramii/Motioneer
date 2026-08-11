@@ -1,12 +1,15 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { storyOf, tasteFromImage, type Taste } from '@/taste'
+import {
+  readTasteLog, recordWall, storyOf, tasteFromImage, tasteLean,
+  type Judged, type Taste, type TasteLog,
+} from '@/taste'
 import { PRESETS } from '@/design/presets'
 import { ROLE_LABEL, applyEdit, migratePage, starterPage, type Page, type Role } from '@/sections'
 import { renderBody, renderPage, shellOf } from '@/render'
 import { pageBrief } from '@/brief'
 import { slop } from '@/slop'
 import {
-  EMPTY_PRODUCT, addSection, alternatives, arrangeIn, readBrief, canDraw, canWrite, choose, chosen, promptWorlds, setDesigned, cycleForm, cycleWorld, dropSection, writeOne, illustrate, loadHeldKeys, loadKeys, promptPage, sectionAlternatives, seeded, setMock, type Product,
+  EMPTY_PRODUCT, addSection, alternatives, arrangeIn, readBrief, canDraw, canWrite, choose, chosen, promptWorlds, setDesigned, setMemory, cycleForm, cycleWorld, dropSection, writeOne, illustrate, loadHeldKeys, loadKeys, promptPage, sectionAlternatives, seeded, setMock, type Product,
 } from '@/compose'
 import { Onboarding } from '@/Onboarding'
 import { BriefRail } from '@/BriefRail'
@@ -79,6 +82,18 @@ export default function App() {
    */
   const asked = useRef<{ said: string; of: string }[]>([])
   const edited = useRef<{ path: string; of: string }[]>([])
+  /**
+   * What earlier walls kept and killed, and where that memory lives.
+   *
+   * Two sources that never merge. A window an agent opened reads the project's own file, because
+   * a taste belongs to the thing being designed and mixing a client's brand into a side project
+   * would be worse than remembering nothing. A window opened by hand reads the browser's. Which
+   * one is settled by the brief arriving, so the local read stands aside once it has.
+   */
+  const memory = useRef<TasteLog>({ format: 1, walls: [] })
+  const fromProject = useRef(false)
+  /** whether this wall is already in the log, because choosing twice is still one wall */
+  const remembered = useRef(false)
 
   const page = pages[at] ?? null
 
@@ -88,6 +103,7 @@ export default function App() {
     buried.current.clear()
     asked.current = []
     edited.current = []
+    remembered.current = false
   }, [])
 
   /**
@@ -166,6 +182,9 @@ export default function App() {
   const fill = useCallback(async (base: Page, p: Product) => {
     const mine = ++run.current
     scaffold(base)
+    // read once per wall rather than once per call, so a log edited between walls is picked up
+    // and a wall in flight cannot change its mind halfway through
+    setMemory(tasteLean(memory.current, p.kind))
     // a served deployment answers which keys it holds asynchronously, and someone clicking
     // straight through setup can arrive here before that answer does
     if (!canWrite()) await loadHeldKeys()
@@ -305,6 +324,10 @@ export default function App() {
   useEffect(() => {
     void loadHeldKeys().then(() => knewKeys(true))
     void loadKeys()
+    // the browser's own memory, which a brief arriving from outside overrides rather than joins
+    void host.readTaste().then((raw) => {
+      if (!fromProject.current) memory.current = readTasteLog(raw)
+    })
   }, [])
 
   /**
@@ -324,6 +347,10 @@ export default function App() {
       // an agent opened this window, so the Claude that opened it is right there. Nothing to
       // configure is a better first run than a good default.
       if (!localStorage.getItem('wall-model')) choose('claude-code')
+      // this project's memory is the memory now, and a project with no file yet starts empty
+      // rather than inheriting whatever this browser remembers about somebody else's product
+      fromProject.current = true
+      memory.current = readTasteLog(req.taste)
       setAskedFrom(req.dir)
       setOnboarding(null)
       // The agent that asked already knew what this is, so if it said so there is nothing to
@@ -562,15 +589,19 @@ export default function App() {
    * The wall as a judgement, gathered at the moment of choosing.
    *
    * A culled page was turned away in a pass over nine papers, so nobody ever opened it and no
-   * verdict on it was written down. It is recomputed here instead of carried: rendering a page
-   * and reading the detector over it is a fraction of a millisecond, and a verdict kept up to
-   * date through every rewrite would be state that can go stale.
+   * verdict on it was written down. Every paper is measured here instead: rendering one and
+   * reading the detector over it is a fraction of a millisecond, and a verdict kept up to date
+   * through every rewrite would be state that can go stale.
+   *
+   * The story goes out with this page and the log stays behind for the next wall, so they are
+   * gathered together and written apart. Once per wall, because shipping twice is still one
+   * choice, and a wall counted twice would weigh double against every other wall in the file.
    */
-  function storyHere(chosen: Page) {
-    const judged = (p: Page, flags = false) => ({
+  function judge(chosen: Page) {
+    const judged = (p: Page): Judged => ({
       page: p,
       world: worldById(p.world),
-      ...(flags ? { flags: slop(p, renderPage(p, { title: product.name })) } : {}),
+      flags: slop(p, renderPage(p, { title: product.name })),
     })
     // an edit is stored against the section it landed on, and a section id means nothing outside
     // this app, so it is handed over as the role that section argues
@@ -580,30 +611,62 @@ export default function App() {
       const role = roleOf.get(id)
       return role ? [role, ...rest].join('.') : null
     }
-    return storyOf({
+    const pins = pages.filter((p) => p.pinned && p.id !== chosen.id).map(judged)
+    const kills = graveyard.current.map((g) => judged(g.page))
+    const said = asked.current.map((a) => ({ said: a.said, chosen: a.of === chosen.id }))
+    const story = storyOf({
       of: pages.length + graveyard.current.length,
-      pins: pages.filter((p) => p.pinned && p.id !== chosen.id).map((p) => judged(p)),
-      kills: graveyard.current.map((g) => judged(g.page, true)),
-      asked: asked.current.map((a) => ({ said: a.said, chosen: a.of === chosen.id })),
+      pins,
+      kills,
+      asked: said,
       edited: edited.current
         .filter((e) => e.of === chosen.id)
         .map((e) => dotted(e.path))
         .filter((p): p is string => p !== null),
     })
+    if (!remembered.current) {
+      remembered.current = true
+      memory.current = recordWall(memory.current, {
+        at: new Date().toISOString().slice(0, 10),
+        kind: product.kind ?? EMPTY_PRODUCT.kind,
+        chosen: judged(chosen),
+        pins,
+        kills,
+        asked: said,
+      })
+    }
+    return { story, log: memory.current }
   }
 
   /** Hand the chosen page back as a spec, a render and the page itself. */
   async function sendBack() {
     if (!page || !askedFrom) return
-    const story = storyHere(page)
+    const { story, log } = judge(page)
     const res = await host.handoff(askedFrom, {
       'chosen.md': pageBrief(page, product.name, story),
       'chosen.html': renderPage(page, { title: product.name }),
       // additive under the same format, because bumping it would make every installed reader
       // refuse the file to protect them from a field they can ignore
       'chosen.json': JSON.stringify({ format: 2, product, page, story }, null, 2),
+      // the project's memory rides in the same call. It sorts after chosen.md, which is the file
+      // an agent polls for, and nothing waits on this one, so arriving last costs nobody anything
+      'taste.json': JSON.stringify(log, null, 2),
     })
     flash(res.error ? `Could not write the handoff: ${res.error}` : 'Sent back. Your agent can pick it up now.')
+  }
+
+  /**
+   * Write the page out as one file, which is what choosing means when nobody asked for it.
+   *
+   * The memory goes to the browser here rather than to a project, because a window opened by hand
+   * is not standing in anybody's repository and has nowhere else to put it.
+   */
+  async function shipPage() {
+    if (!page) return
+    const { log } = judge(page)
+    if (!askedFrom) await host.writeTaste(log)
+    const r = await host.exportPage(renderPage(page, { title: product.name }), shipName)
+    if (r) flash(`${r.file} saved, ${r.bytes.toLocaleString()} bytes.`)
   }
 
   return (
@@ -697,9 +760,7 @@ export default function App() {
                 onKill={() => kill(at)}
                 onSend={askedFrom ? sendBack : undefined}
                 onOpen={() => void host.preview(renderPage(page, { title: product.name })).then(() => flash('Opened in your browser.'))}
-                onShip={() => void host.exportPage(renderPage(page, { title: product.name }), shipName).then(
-                  (r) => r && flash(`${r.file} saved, ${r.bytes.toLocaleString()} bytes.`),
-                )}
+                onShip={() => void shipPage()}
               />
             </main>
 

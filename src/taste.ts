@@ -228,7 +228,8 @@ export function storyOf(wall: {
 }): WallStory {
   return {
     of: wall.of,
-    pins: wall.pins.map(seenAs),
+    // what a kept page reads as is not why it was kept, so only the culled carry their tells
+    pins: wall.pins.map((j) => seenAs({ ...j, flags: undefined })),
     kills: wall.kills.map(seenAs),
     // the last few, because a long session asks for many things and the recent ones are the
     // ones the chosen page actually came out of

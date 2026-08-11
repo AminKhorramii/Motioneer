@@ -232,6 +232,15 @@ fn wall_request() -> Option<serde_json::Value> {
     let raw = fs::read_to_string(&file).ok()?;
     let mut value: serde_json::Value = serde_json::from_str(&raw).ok()?;
     let dir = Path::new(&file).parent()?.to_string_lossy().into_owned();
+    // What this project's walls kept and killed before, read here because it is wanted at the
+    // same moment as the brief and lives in the same directory. A project with no file yet is
+    // the ordinary case rather than an error, and so is one this build cannot parse.
+    if let Some(taste) = fs::read_to_string(Path::new(&dir).join("taste.json"))
+        .ok()
+        .and_then(|raw| serde_json::from_str::<serde_json::Value>(&raw).ok())
+    {
+        value.as_object_mut()?.insert("taste".into(), taste);
+    }
     value.as_object_mut()?.insert("dir".into(), dir.into());
     Some(value)
 }
@@ -311,6 +320,8 @@ mod tests {
         assert!(dir.join("chosen.json").exists());
     }
 
+    /// Everything a request carries, in one test, because these all read the same environment
+    /// variable and a second test that sets it would race the one that clears it.
     #[test]
     fn a_request_carries_the_directory_it_came_from() {
         let dir = tmp("request");
@@ -319,10 +330,21 @@ mod tests {
         fs::write(&file, r#"{"brief":"a product","name":"Spoor"}"#).unwrap();
         std::env::set_var("WALL_REQUEST", &file);
 
-        let got = wall_request().expect("a written request should be read");
-        assert_eq!(got["name"], "Spoor");
+        // a project on its first wall has no memory beside the brief, which is the ordinary case
+        // rather than a failure, so nothing is attached and the brief arrives regardless
+        let first = wall_request().expect("a written request should be read");
+        assert_eq!(first["name"], "Spoor");
         // the agent collects from the directory, so the app has to be told which one it is
-        assert_eq!(got["dir"], dir.to_string_lossy().as_ref());
+        assert_eq!(first["dir"], dir.to_string_lossy().as_ref());
+        assert!(first.get("taste").is_none());
+
+        fs::write(
+            dir.join("taste.json"),
+            r#"{"format":1,"walls":[{"at":"2026-08-11","kind":"software","kept":[],"killed":[],"asked":[]}]}"#,
+        )
+        .unwrap();
+        let again = wall_request().expect("a request beside a memory should be read");
+        assert_eq!(again["taste"]["walls"][0]["kind"], "software");
 
         std::env::remove_var("WALL_REQUEST");
         let _ = fs::remove_dir_all(&dir);

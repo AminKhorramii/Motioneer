@@ -1,7 +1,7 @@
 /** Making pages: alternatives, section prompts, and the model path (with a mock for tests). */
 
 import { PRESETS } from '@/design/presets'
-import type { Taste } from '@/taste'
+import { tasteAvoid, tasteBrief, type Lean, type Taste } from '@/taste'
 import { giveKey, host, isDesktop, isServed, servedConfig } from '@/host'
 import { slop, slopBrief } from '@/slop'
 import { dealDirections, directionSeed, type Direction } from '@/design/directions'
@@ -160,6 +160,19 @@ export const setDesigned = (w: World[]) => {
   designed = w
 }
 export const allWorlds = () => [...designed, ...WORLDS]
+
+/**
+ * What this person has kept and killed before, held the way the designed worlds are held.
+ *
+ * Module state rather than a parameter, for the same reason: it is one fact about the session
+ * that three unrelated calls need, and threading it through the deal, the design prompt and the
+ * copy prompt would put a memory argument on every signature between here and the app. The app
+ * computes it once per build, so a log edited between walls is read again on the next one.
+ */
+let memory: Lean | null = null
+export const setMemory = (lean: Lean | null) => {
+  memory = lean
+}
 
 /** Move a page to the next world, keeping its copy. */
 export function cycleWorld(page: Page): Page {
@@ -532,6 +545,8 @@ export async function promptPage(
   // the detector runs before the call, so its findings steer the writing instead of only
   // describing it afterwards
   const avoid = slopBrief(slop(page))
+  // and what this person has culled before, which the detector on this page cannot know
+  const remembered = memory ? tasteAvoid(memory) : ''
   // the copy is written into a design, so it is told which one. Without this a poster and a
   // catalogue come back at the same length, when one wants six words and the other wants forty.
   const w = worldById(page.world)
@@ -545,7 +560,7 @@ export async function promptPage(
     PAGE_SYSTEM,
     `This is a ${product.kind}, not software in general, so the offer, the proof and the ` +
       `substance mean what they mean for a ${product.kind}.\n` +
-      `Product: ${product.name}. ${product.oneLiner}\n${product.what}\nAudience: ${product.audience}\n\n${design}\n\nPage:\n${JSON.stringify(shape, null, 2)}\n\nInstruction: ${instruction}${avoid ? `\n\n${avoid}` : ''}`,
+      `Product: ${product.name}. ${product.oneLiner}\n${product.what}\nAudience: ${product.audience}\n\n${design}\n\nPage:\n${JSON.stringify(shape, null, 2)}\n\nInstruction: ${instruction}${avoid ? `\n\n${avoid}` : ''}${remembered ? `\n\n${remembered}` : ''}`,
     feed,
   )
   if (!text) return null
@@ -589,7 +604,7 @@ export async function promptPage(
  * only stable handle on what a page was: the world's own name is whatever the model called it,
  * and two walls that both started from the till roll never call it the same thing twice.
  */
-const territories = (n: number): Direction[] => dealDirections(n)
+const territories = (n: number): Direction[] => dealDirections(n, memory ?? undefined)
 
 /**
  * A layout for each hand, dealt rather than left to every call to work out for itself.
@@ -769,11 +784,15 @@ export async function promptWorlds(
           if (!delta) onThinking()
         }
       : undefined
+    // A hand dealt from what this person likes hears what they like; a wild hand does not. The
+    // kills half of the note goes to both, because pruning a hated pattern narrows nothing.
+    const note = memory ? tasteBrief(memory, ground.some((d) => memory!.favor.includes(d.name))) : ''
     const text = await ask(
       provider,
       // the territory goes last so the long shared prompt in front of it still caches
       `${WORLDS_SYSTEM}\n\nBuild these particular ones from ${ground.map(directionSeed).join(', or ')}. One object each.` +
-        `\n\nLay this one out as a ${lean}, unless the ground you were given genuinely refuses it.`,
+        `\n\nLay this one out as a ${lean}, unless the ground you were given genuinely refuses it.` +
+        (note ? `\n\n${note}` : ''),
       `${brief}\n\nDesign ${count === 1 ? 'one world' : `${count} worlds`} for it.`,
       feed,
       { maxTokens: 8000, kind: 'design' },

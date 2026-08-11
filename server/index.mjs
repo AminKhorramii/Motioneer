@@ -222,7 +222,14 @@ const server = createServer(async (req, res) => {
     if (!process.env.WALL_REQUEST) return json(res, 200, null)
     try {
       const raw = JSON.parse(await readFile(process.env.WALL_REQUEST, 'utf8'))
-      return json(res, 200, { ...raw, dir: HANDOFF })
+      // What this project's walls kept and killed before, read at the same moment as the brief
+      // because it is wanted at the same moment. An endpoint of its own would be a second round
+      // trip to discover that most projects have no file yet. Unreadable reads as absent, which
+      // is also what a first wall looks like.
+      const taste = HANDOFF
+        ? await readFile(path.join(HANDOFF, 'taste.json'), 'utf8').then(JSON.parse).catch(() => null)
+        : null
+      return json(res, 200, { ...raw, dir: HANDOFF, ...(taste ? { taste } : {}) })
     } catch {
       return json(res, 200, null)
     }

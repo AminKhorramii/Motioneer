@@ -55,12 +55,32 @@ export interface Host {
     audience?: string
     cta?: string
     dir?: string
+    /**
+     * What this project's walls have kept and killed before.
+     *
+     * It travels with the brief rather than over an endpoint of its own, because it is wanted at
+     * exactly the same moment and by exactly the same call, and an endpoint would be a second
+     * round trip to learn that most projects have no file yet.
+     */
+    taste?: unknown
   } | null>
   /** write the chosen design back where whoever asked can find it */
   handoff: (dir: string, files: Record<string, string>) => Promise<{ dir?: string; error?: string }>
+  /**
+   * The memory of a wall opened by hand, which is the browser's own.
+   *
+   * A wall opened by an agent reads and writes the project's file instead, through request and
+   * handoff, and the two never merge: a taste is a property of the thing being designed, and
+   * mixing a client's brand into a personal side project would be worse than remembering
+   * nothing. Every shell inherits this one, because localStorage is enough for a memory that is
+   * twelve short records and no shell has a better place to put it that is worth a command.
+   */
+  readTaste: () => Promise<unknown>
+  writeTaste: (v: unknown) => Promise<boolean>
 }
 
 const STATE_KEY = 'wall-state'
+const TASTE_KEY = 'wall-taste'
 
 const web: Host = {
   readState: async () => {
@@ -106,6 +126,21 @@ const web: Host = {
   // a browser cannot be launched by an agent holding a directory, so there is nothing to hand
   request: async () => null,
   handoff: async () => ({ error: 'handing off needs the desktop app' }),
+  readTaste: async () => {
+    try {
+      return JSON.parse(localStorage.getItem(TASTE_KEY) ?? 'null')
+    } catch {
+      return null
+    }
+  },
+  writeTaste: async (v) => {
+    try {
+      localStorage.setItem(TASTE_KEY, JSON.stringify(v))
+      return true
+    } catch {
+      return false
+    }
+  },
   onDelta: (fn) => {
     deltaFns.add(fn)
     return () => deltaFns.delete(fn)
