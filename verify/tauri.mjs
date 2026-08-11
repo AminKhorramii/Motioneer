@@ -35,7 +35,10 @@ const caps = JSON.parse(read('src-tauri/capabilities/default.json'))
 // ——— every command the page calls exists on the Rust side ———
 
 const called = [...host.matchAll(/invoke\(\s*'([a-z_]+)'/g)].map((m) => m[1])
-const declared = [...main.matchAll(/#\[tauri::command\]\s*(?:pub\s+)?fn\s+([a-z_]+)/g)].map((m) => m[1])
+// the attribute may carry arguments, and two of these commands do: a command written plain runs
+// inline on the thread that invoked it, so the one that opens a folder picker and the one that
+// waits on a whole Claude session are declared async
+const declared = [...main.matchAll(/#\[tauri::command(?:\([^)]*\))?\]\s*(?:pub\s+)?fn\s+([a-z_]+)/g)].map((m) => m[1])
 const handled = (main.match(/generate_handler!\[([^\]]+)\]/)?.[1] ?? '')
   .split(',')
   .map((s) => s.trim())

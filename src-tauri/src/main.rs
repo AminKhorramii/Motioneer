@@ -79,9 +79,14 @@ fn write_state(app: tauri::AppHandle, value: serde_json::Value) -> bool {
 
 /// Ship: a real, self contained index.html the founder owns.
 ///
-/// Not async, so Tauri runs it on a worker thread and the blocking folder picker cannot sit on
-/// the thread that has to draw the picker.
-#[tauri::command]
+/// Marked async, which is what keeps the blocking folder picker off the thread that invoked it.
+/// The comment here used to say the opposite, that a plain command runs on a worker. It does not:
+/// tauri-macros builds a plain command with ExecutionContext::Blocking, whose body calls the
+/// function inline on the invoking thread, and the dialog plugin says in its own documentation
+/// that blocking_pick_folder should not be used there. Every automated path sets WALL_EXPORT_DIR
+/// and never opens the picker, which is why nothing has caught it. What I have not reproduced is
+/// the window freezing, because that needs a built shell and a real click.
+#[tauri::command(async)]
 fn export_page(app: tauri::AppHandle, html: String, name: String) -> Option<Exported> {
     let dir = match std::env::var("WALL_EXPORT_DIR") {
         Ok(d) => PathBuf::from(d),
@@ -115,11 +120,6 @@ fn preview(app: tauri::AppHandle, html: String) -> String {
     file.to_string_lossy().into_owned()
 }
 
-/// A request from outside, written by the MCP server before it launched this window.
-///
-/// The handoff is files in a directory rather than a return value, because the agent that asked
-/// may have timed out, moved on, or been restarted by the time someone finishes choosing, and a
-/// file is still there when it comes back.
 /// The model the person already has.
 ///
 /// Someone who reached Wall through their agent has a working Claude session on this machine,
@@ -127,7 +127,11 @@ fn preview(app: tauri::AppHandle, html: String) -> String {
 /// call: an identical system prompt across a wall means the first request builds the cache and
 /// the rest read it, and the parts of the CLI's own prompt that are about editing code are
 /// excluded because none of it helps write a page and all of it would be paid for.
-#[tauri::command]
+/// Marked async for the same reason as export_page, and with more of it at stake: this one waits
+/// on a whole Claude session, measured in this repo at twenty to a hundred and ten seconds, and a
+/// plain command would run that wait inline on the thread that invoked it. A wall asks for eleven
+/// or more of these within a few seconds.
+#[tauri::command(async)]
 fn claude_text(system: String, user: String, kind: Option<String>) -> serde_json::Value {
     use std::io::Write;
     use std::process::{Command, Stdio};
@@ -217,6 +221,11 @@ fn set_key(name: String, value: String) -> bool {
     e.set_password(&value).is_ok()
 }
 
+/// A request from outside, written by the MCP server before it launched this window.
+///
+/// The handoff is files in a directory rather than a return value, because the agent that asked
+/// may have timed out, moved on, or been restarted by the time someone finishes choosing, and a
+/// file is still there when it comes back.
 #[tauri::command]
 fn wall_request() -> Option<serde_json::Value> {
     let file = std::env::var("WALL_REQUEST").ok()?;
