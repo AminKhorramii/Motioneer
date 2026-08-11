@@ -14,6 +14,7 @@ import { MARKS, MODELS, modelById } from '@/models'
 
 const SAMPLE: Product = {
   name: 'Spoor',
+  kind: 'software',
   oneLiner: 'Every session you ever ran, findable in one keystroke.',
   what: 'Spoor reads what your AI tools already write to disk and turns 900MB of transcripts into memory you can search. Local, instant, yours.',
   audience: 'for people who build with agents',

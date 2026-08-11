@@ -11,6 +11,7 @@
  */
 
 import type { Taste } from '@/taste'
+import { DEFAULT_KIND, KINDS, type Kind } from '@/design/kinds'
 import type { Backdrop } from '@/backdrop'
 import type { WorldId } from '@/worlds'
 
@@ -55,6 +56,13 @@ export interface Page {
   id: string
   taste: Taste
   sections: Section[]
+  /**
+   * What is being launched, which decides what the roles mean.
+   *
+   * It rides on the page rather than being passed down, because a section added or recomposed
+   * long after the page was made still has to speak the same language as the rest of it.
+   */
+  kind?: Kind
   /** marked as a keeper during triage. x cannot remove a pinned page, and the mark stays on
       this one paper: a page derived from it starts unpinned, because a pin is a judgement
       about what you saw, not about what it might become */
@@ -76,7 +84,19 @@ export const uid = () => Math.random().toString(36).slice(2, 9)
  * and the keys are unchanged from the old model, so recorded replies and saved pages still
  * merge. A form reads the keys it needs and ignores the rest.
  */
-export function defaultContent(role: Role, product = 'Product'): Record<string, unknown> {
+/**
+ * The words a role starts from.
+ *
+ * These were written for one kind of thing and were the only kind: a brief for a game came back
+ * with "Simple pricing" over three monthly tiers and a testimonial from a founder somewhere. The
+ * roles are general and the vocabulary is not, so a kind supplies its own words over these, and
+ * anything it does not name stays as it is, which is the software wording this began as.
+ */
+export function defaultContent(role: Role, product = 'Product', kind: Kind = DEFAULT_KIND): Record<string, unknown> {
+  return { ...baseContent(role, product), ...(KINDS[kind]?.roles[role]?.(product) ?? {}) }
+}
+
+function baseContent(role: Role, product: string): Record<string, unknown> {
   switch (role) {
     case 'masthead':
       // One word a link. Nav is read peripherally, on the way to something else, and a phrase
@@ -140,7 +160,7 @@ export function defaultContent(role: Role, product = 'Product'): Record<string, 
   }
 }
 
-export function starterPage(taste: Taste, product = 'Product'): Page {
+export function starterPage(taste: Taste, product = 'Product', kind: Kind = DEFAULT_KIND): Page {
   const argue: [Role, Form][] = [
     ['masthead', 'band'], ['claim', 'prose'], ['proof', 'list'], ['substance', 'list'], ['substance', 'figure'],
     ['proof', 'quote'], ['offer', 'table'], ['objections', 'list'], ['invitation', 'band'],
@@ -148,13 +168,14 @@ export function starterPage(taste: Taste, product = 'Product'): Page {
   ]
   return {
     id: uid(),
+    kind,
     taste,
     sections: argue.map(([role, form]) => ({
       id: uid(),
       role,
       form,
       on: true,
-      content: defaultContent(role, product),
+      content: defaultContent(role, product, kind),
     })),
   }
 }

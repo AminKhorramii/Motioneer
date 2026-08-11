@@ -276,7 +276,7 @@ export default function App() {
   }, [upsertPage, scaffold])
 
   const build = useCallback((p: Product, t: Taste) => {
-    void fill(seeded(starterPage(t, p.name || 'Product'), p), p)
+    void fill(seeded(starterPage(t, p.name || 'Product', p.kind), p), p)
   }, [fill])
 
   /**
@@ -334,7 +334,7 @@ export default function App() {
         // looking at a placeholder. There is a whole wall to look at instead, arranged from the
         // brief as it stands, so the reading happens behind something worth reading.
         setProduct(provisional)
-        scaffold(seeded(starterPage(taste, provisional.name), provisional))
+        scaffold(seeded(starterPage(taste, provisional.name, provisional.kind), provisional))
         setBusy('reading the brief')
       }
       await loadHeldKeys()

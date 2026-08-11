@@ -7,6 +7,7 @@
 
 import { craftBrief } from '@/design/craft'
 import { copyLimits } from '@/design/slop'
+import { kindMenu } from '@/design/kinds'
 import { blockContract } from '@/design/blocks'
 
 export const PAGE_SYSTEM = `You write copy for a whole landing page. You receive the page as JSON: an array of sections, each with an id, a role it plays in the argument, the form it is set in, and content. You also receive an instruction describing what to change.
@@ -83,6 +84,8 @@ Respond with the JSON object alone, because the reply is parsed directly.`
 export const INTAKE_SYSTEM = `You are reading someone's description of the thing they are launching, so that a landing page can be written from it. The description may be a README, a note, a paste from a pitch, or a couple of sentences typed quickly.
 
 Return JSON shaped as {"product":{"name":"","oneLiner":"","what":"","audience":"","cta":""},"questions":[{"key":"","question":"","why":""}]}.
+
+Name the kind of thing this is, in the kind field, as one of: ${kindMenu()}. It decides what the page is made of, because an offer is a price for software, an edition for a game, a format for a book and a date for an event, and a page that guesses wrong sells a game with a monthly subscription. Choose software only when it genuinely is one.
 
 Fill the product fields from what you were actually told. Leave a field empty rather than inventing it, because a made up audience produces a page aimed at nobody. Write oneLiner as a single sentence a stranger would understand, and what as two sentences at most. Write cta as the words that would sit on the button, naming the action rather than the effort, so "Download for macOS" rather than "Get started".
 

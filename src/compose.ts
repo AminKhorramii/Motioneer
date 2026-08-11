@@ -9,6 +9,7 @@ import { ANGLES } from '@/design/angles'
 import { INTAKE_SYSTEM, MEND_SYSTEM, PAGE_SYSTEM, WORLDS_SYSTEM } from '@/design/prompts'
 import { MODELS, modelById, type ModelChoice } from '@/models'
 import { BACKDROPS, type Backdrop } from '@/backdrop'
+import { DEFAULT_KIND, asKind, type Kind } from '@/design/kinds'
 import { shrinkDataUrl } from '@/imagepipe'
 import { renderPage } from '@/render'
 import { strainsIn } from '@/geometry'
@@ -17,13 +18,15 @@ import { ROLE_FORMS, defaultContent, starterPage, uid, type Form, type Page, typ
 
 export interface Product {
   name: string
+  /** what is being launched, which decides what a page's roles are made of */
+  kind: Kind
   oneLiner: string
   what: string
   audience: string
   cta: string
 }
 
-export const EMPTY_PRODUCT: Product = { name: '', oneLiner: '', what: '', audience: '', cta: 'Start free' }
+export const EMPTY_PRODUCT: Product = { name: '', kind: DEFAULT_KIND, oneLiner: '', what: '', audience: '', cta: 'Start free' }
 
 /** seed a page's copy from the product brief */
 export function seeded(page: Page, p: Product): Page {
@@ -132,7 +135,7 @@ function composeSections(page: Page, wanted: Role[]): Section[] {
     const had = pool.get(role)?.shift()
     return had
       ? { ...had, content: structuredClone(had.content) }
-      : { id: uid(), role, form: ROLE_FORMS[role][0], on: true, content: defaultContent(role, name) }
+      : { id: uid(), role, form: ROLE_FORMS[role][0], on: true, content: defaultContent(role, name, page.kind) }
   })
 }
 
@@ -183,7 +186,7 @@ export function sectionAlternatives(page: Page, sectionId: string): Page[] {
 }
 
 export function addSection(page: Page, role: Role, product: string, at?: number): Page {
-  const sec: Section = { id: uid(), role, form: ROLE_FORMS[role][0], on: true, content: defaultContent(role, product) }
+  const sec: Section = { id: uid(), role, form: ROLE_FORMS[role][0], on: true, content: defaultContent(role, product, page.kind) }
   const list = [...page.sections]
   list.splice(at ?? list.length - 1, 0, sec)
   return { ...page, sections: list }
@@ -540,7 +543,9 @@ export async function promptPage(
   const text = await ask(
     provider,
     PAGE_SYSTEM,
-    `Product: ${product.name}. ${product.oneLiner}\n${product.what}\nAudience: ${product.audience}\n\n${design}\n\nPage:\n${JSON.stringify(shape, null, 2)}\n\nInstruction: ${instruction}${avoid ? `\n\n${avoid}` : ''}`,
+    `This is a ${product.kind}, not software in general, so the offer, the proof and the ` +
+      `substance mean what they mean for a ${product.kind}.\n` +
+      `Product: ${product.name}. ${product.oneLiner}\n${product.what}\nAudience: ${product.audience}\n\n${design}\n\nPage:\n${JSON.stringify(shape, null, 2)}\n\nInstruction: ${instruction}${avoid ? `\n\n${avoid}` : ''}`,
     feed,
   )
   if (!text) return null
@@ -741,7 +746,7 @@ export async function promptWorlds(
   }
   // A world is complete long before the reply is, and the page for it can start then, which is
   // what turns one long wait into eight overlapping ones.
-  const brief = `Product: ${product.name}. ${product.oneLiner}\n${product.what}\nAudience: ${product.audience}`
+  const brief = `A ${product.kind}: ${product.name}. ${product.oneLiner}\n${product.what}\nAudience: ${product.audience}`
   // the index is shared, so a world takes the next free page whichever call finished it
   let seen = 0
 
@@ -827,7 +832,7 @@ export async function readBrief(text: string, provider: Provider = 'claude'): Pr
   const j = raw as { product?: Partial<Product>; questions?: Intake['questions'] } | null
   if (!j?.product) return null
   return {
-    product: { ...EMPTY_PRODUCT, ...j.product },
+    product: { ...EMPTY_PRODUCT, ...j.product, kind: asKind((j.product as { kind?: unknown }).kind) },
     questions: (j.questions ?? []).filter((q) => q.key in EMPTY_PRODUCT).slice(0, 3),
   }
 }
