@@ -39,11 +39,35 @@ export interface Flag {
 /** beige and its neighbours, the colour a model picks when it does not have a palette */
 const AI_BEIGE = /^#(f[0-9a-f]{2}(e|f)[0-9a-f]{2}(d|e)[0-9a-f]|f5f5f0|faf8f5|fdfcf8|f7f3ed)$/i
 
+/**
+ * Every string on the page, not only the ones sitting at the top of a section.
+ *
+ * This used to keep the top level entries and drop anything that was not a string, which meant
+ * every list, every table and every group was invisible to the whole copy half of the catalogue.
+ * Measured on the default page that is fifty eight of eighty four strings, and 57% of the
+ * characters: the headline and the sub were policed, and the substance items, the pricing plans,
+ * the objection answers and the footer were not. A page argues most of its case in those, so a
+ * detector that could not read them was checking the part a writer already pays attention to and
+ * skipping the part that fills up with filler.
+ *
+ * A leaf keeps the key nearest to it, so a plan's name is a name and a plan's cta is a cta, which
+ * is what the key scoped tells want: they were written about a field, not about a depth.
+ */
+const strings = (value: unknown, key: string): { key: string; value: string }[] =>
+  typeof value === 'string'
+    ? [{ key, value }]
+    : Array.isArray(value)
+      ? value.flatMap((v) => strings(v, key))
+      : value && typeof value === 'object'
+        ? Object.entries(value as Record<string, unknown>).flatMap(([k, v]) => strings(v, k))
+        : []
+
 const text = (page: Page) =>
   page.sections
     .filter((s) => s.on)
-    .flatMap((s) => Object.entries(s.content).map(([k, v]) => ({ section: s.id, key: k, value: v })))
-    .filter((f): f is { section: string; key: string; value: string } => typeof f.value === 'string')
+    .flatMap((s) =>
+      Object.entries(s.content).flatMap(([k, v]) => strings(v, k).map((f) => ({ section: s.id, ...f }))),
+    )
 
 /**
  * Check a page. `html` is optional so the model loop can check copy before anything renders,
@@ -194,11 +218,19 @@ export function slop(page: Page, html?: string): Flag[] {
   return flags
 }
 
-/** The flags a page has, phrased as instructions, for feeding back into the next prompt. */
+/**
+ * The flags a page has, phrased as instructions, for feeding back into the next prompt.
+ *
+ * One line per pattern rather than one per place it occurs. Flags are collected per section so
+ * the dock can point at the paper, and a prompt does not want that: a page with the same stand-in
+ * under two testimonials was sending the same sentence and the same reason twice, which reads to
+ * a model as emphasis it was never meant to carry, and grows with the page.
+ */
 export function slopBrief(flags: Flag[]): string {
-  if (!flags.length) return ''
+  const once = [...new Map(flags.map((f) => [f.label, f])).values()]
+  if (!once.length) return ''
   return [
     'Avoid these specific patterns, which the current draft trips:',
-    ...flags.map((f) => `- ${f.label}. ${f.why}`),
+    ...once.map((f) => `- ${f.label}. ${f.why}`),
   ].join('\n')
 }

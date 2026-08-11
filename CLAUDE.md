@@ -20,7 +20,10 @@ carries it, and `docs/architecture.md` for the module map.
 - Code: keep logic in the file that owns the data it reads, keep every file far from 1k
   lines, and prefer deleting complexity to rearranging it.
 - The house obeys its own detector: `verify/app.mjs` renders every built-in world on every look
-  and fails if Wall's own output trips the slop catalogue.
+  and fails if Wall's own output trips the slop catalogue. Those pages wear placeholder copy on
+  purpose, so the gate judges the design half, and the copy half of the defaults is asserted
+  separately: each placeholder has a tell of its own and the suite fails if one stops firing,
+  because a stand-in the writing call leaves alone is one that ships.
 
 ## Before pushing
 

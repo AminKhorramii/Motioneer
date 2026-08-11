@@ -943,4 +943,7 @@ function Preview({ html }: { html: string }) {
   )
 }
 
-;(window as unknown as { __wall?: unknown }).__wall = { setMock }
+// The seam the suites drive the model path through. writeOne is here so the copy repair can be
+// asserted on its own: it is the one step whose whole job is to make a second call conditionally,
+// and a suite that can only watch the finished wall cannot tell a repair from a first draft.
+;(window as unknown as { __wall?: unknown }).__wall = { setMock, writeOne, starterPage, slop, PRESETS }

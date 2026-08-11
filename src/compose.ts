@@ -95,6 +95,40 @@ export function arrangeIn(base: Page, i: number, world: World): Page {
  * the writing starts, and why restyling a finished page into a different world afterwards would
  * be a different and worse thing.
  */
+/**
+ * Ask again for the lines that trip the catalogue, and keep the answer only if it is better.
+ *
+ * The detector ran in three places and repaired exactly one of them. A world that trips it goes
+ * back to the model with its faults named and is kept only if it improved; copy that trips it got
+ * a chip on the dock and shipped. The asymmetry showed: a recorded wall handed back a testimonial
+ * signed "A real person" at "founder, somewhere", which is this app's own placeholder for a page
+ * with no customer yet. The copy call is given the page as it stands and rewrites what it chooses
+ * to, so anything it declines to touch survives all the way into the file somebody ships.
+ *
+ * promptPage already reads the detector over the page it is handed and writes the findings into
+ * its own prompt, so handing it the written page names the real faults rather than the defaults',
+ * and this is nine lines rather than a second prompt to keep in agreement with the first.
+ *
+ * Only a page that failed pays for this, and it pays once. A repair that trades one tell for
+ * another is a second opinion rather than a fix, so the page that came back is kept only when it
+ * is carrying strictly fewer.
+ */
+async function mendCopy(page: Page, product: Product, provider: Provider): Promise<Page> {
+  // no html, so this is the copy half: the design half is the world's and was settled before a
+  // word was written
+  const faults = slop(page).filter((f) => f.kind === 'copy')
+  if (!faults.length) return page
+  const again = await promptPage(
+    page,
+    'Those lines trip the checks named below. Rewrite only what they name and leave the rest of ' +
+      'the page exactly as it is, because everything else was already right.',
+    product,
+    provider,
+  ).catch(() => null)
+  if (!again) return page
+  return slop(again).filter((f) => f.kind === 'copy').length < faults.length ? again : page
+}
+
 export async function writeOne(
   base: Page,
   product: Product,
@@ -112,7 +146,11 @@ export async function writeOne(
       (partial) => onPage({ ...partial, angle: angle.name }),
     )
     if (!written) return { ok: 0, error: 'the reply was not usable JSON' }
+    // the page lands before it is judged, so the wall fills at the speed it always did and a
+    // repair improves a paper already on the wall rather than delaying it
     onPage({ ...written, angle: angle.name })
+    const mended = await mendCopy(written, product, 'model')
+    if (mended !== written) onPage({ ...mended, angle: angle.name })
     return { ok: 1 }
   } catch (e) {
     return { ok: 0, error: String(e instanceof Error ? e.message : e).slice(0, 160) }

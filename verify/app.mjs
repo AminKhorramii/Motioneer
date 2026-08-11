@@ -35,12 +35,77 @@ for (const w of core.WORLDS) {
       ...base, world: w.id, backdrop: w.backdrop, taste: t,
       sections: core.dressSections(ordered, w),
     }
-    const flags = core.slop(page, core.renderPage(page, { title: 'Spoor' }))
+    /**
+     * The design half, which is the half a world owns.
+     *
+     * These pages wear the default copy on purpose, and the defaults are deliberate placeholders:
+     * a witness called "A real person" at "founder, somewhere", a logo row reading "Replace these
+     * with real names". Judging the copy half here would flag all sixty four pages identically for
+     * one editorial decision that no world can fix, which is the same reason flawsIn in compose.ts
+     * filters to design before it asks a model to repair a world. The copy half of the defaults is
+     * asserted directly below, where it is actually about the defaults.
+     */
+    const flags = core.slop(page, core.renderPage(page, { title: 'Spoor' })).filter((f) => f.kind === 'design')
     if (flags.length) houseFlags.push(`${w.id} on ${look.name}: ${flags.map((f) => f.label).join(', ')}`)
   }
 }
 console.log('house pages:', JSON.stringify(houseFlags.length ? houseFlags.slice(0, 8) : 'clean, every world on every look'))
 if (houseFlags.length) throw new Error(`the house trips its own detector on ${houseFlags.length} pages`)
+
+// ——— 0d. the placeholders in the defaults are ones the detector can see ———
+// A blank page has to say something under a testimonial, and inventing a customer would be worse
+// than admitting there is not one yet, so the defaults are honest stand-ins. The danger is the
+// other end: the copy call is handed the page as it stands and rewrites what it chooses to, so a
+// stand-in the model leaves alone ships as though somebody meant it. That happened on a real
+// recorded wall. These are the tells that make it impossible to leave silently.
+{
+  const page = core.starterPage(core.PRESETS[0], 'Spoor')
+  const onDefaults = core.slop(page).filter((f) => f.kind === 'copy').map((f) => f.id)
+  console.log('what the default copy admits to:', JSON.stringify([...new Set(onDefaults)]))
+  for (const id of ['invented-witness', 'nowhere-company', 'unfilled-logos']) {
+    if (!onDefaults.includes(id)) {
+      throw new Error(`the defaults no longer trip ${id}, so a placeholder the model leaves alone would ship unseen`)
+    }
+  }
+}
+
+// ——— 0e. the copy detector reads the whole page, not only the top of a section ———
+// It used to keep a section's top level strings and drop everything else, so every list, table and
+// group was invisible: 43% of the characters on a default page were checked and the rest were not.
+// A page argues most of its case in those, and one tell in the catalogue could never fire at all,
+// because the only place company names live is an array. This is the regression for that.
+{
+  const page = core.starterPage(core.PRESETS[0], 'Spoor')
+  const buried = {
+    ...page,
+    sections: page.sections.map((s) => {
+      if (s.role === 'substance' && Array.isArray(s.content.items)) {
+        return { ...s, content: { ...s.content, items: ['A revolutionary way to work', ...s.content.items.slice(1)] } }
+      }
+      if (s.role === 'proof' && Array.isArray(s.content.names)) {
+        return { ...s, content: { ...s.content, names: ['Acme', 'Globex'] } }
+      }
+      return s
+    }),
+  }
+  const found = core.slop(buried).filter((f) => f.kind === 'copy').map((f) => f.id)
+  const walked = (p) => {
+    const all = (v) => typeof v === 'string' ? 1 : Array.isArray(v) ? v.reduce((n, x) => n + all(x), 0)
+      : v && typeof v === 'object' ? Object.values(v).reduce((n, x) => n + all(x), 0) : 0
+    return p.sections.filter((s) => s.on).reduce((n, s) => n + all(s.content), 0)
+  }
+  console.log('copy buried in a list or a row:', JSON.stringify({
+    stringsOnThePage: walked(page),
+    hollowWordInsideAListItem: found.includes('hollow-word'),
+    inventedCompanyInsideALogoRow: found.includes('fake-logos'),
+  }))
+  if (!found.includes('hollow-word')) {
+    throw new Error('a hollow word inside a list item was not seen, so most of the page is unchecked again')
+  }
+  if (!found.includes('fake-logos')) {
+    throw new Error('an invented company in a logo row was not seen, and that tell can only ever match inside an array')
+  }
+}
 
 // ——— 0b. nothing a model writes into a section can become markup ———
 // Copy lands in text nodes, where escaping covers it, and verify/hard.mjs drives that in a real
@@ -342,6 +407,43 @@ console.log('intake gate:', JSON.stringify(gate))
 await page.click('.onboard .primary')
 await page.waitForSelector('.paper.here', { timeout: 20000 })
 console.log('onboarding closed:', JSON.stringify({ gone: (await page.locator('.onboard').count()) === 0 }))
+
+// ——— 1b. copy that trips the catalogue is asked for again, and kept only if it improved ———
+// Worlds have always been repaired and copy never was, so a placeholder the writing call declined
+// to touch went out as though somebody meant it. Both branches are driven here with a counted
+// mock: one where the second answer is clean, and one where it trades one tell for another.
+const repair = await page.evaluate(async () => {
+  const { setMock, writeOne, starterPage, slop, PRESETS } = window.__wall
+  // the attribution rides on every proof section, whichever form it is wearing, so a mock that
+  // only cleaned the quote would leave the tell standing and read as a repair that did not work
+  const dirty = { quote: 'It saved us.', name: 'A real person', role: 'founder, somewhere' }
+  const run = async (secondAnswer) => {
+    let calls = 0
+    setMock((instruction, shape) => {
+      if (instruction === 'worlds' || instruction === 'intake') return null
+      calls++
+      return { sections: shape.map((s) => ({
+        id: s.id,
+        content: s.role === 'proof' ? (calls === 1 ? dirty : secondAnswer) : s.content,
+      })) }
+    })
+    const base = starterPage(PRESETS[0], 'Spoor')
+    let landed = null
+    await writeOne(base, { name: 'Spoor', kind: 'software', oneLiner: '', what: '', audience: '', cta: 'Go' },
+      { id: 'swiss', name: 'swiss', note: '', voice: '', taste: (t) => t, structure: { rules: false, numbered: false, bleed: false, measure: 64, figure: 'framed' }, backdrop: 'none', wear: {} },
+      0, (p) => { landed = p })
+    return { calls, tells: slop(landed).filter((f) => f.kind === 'copy').map((f) => f.id) }
+  }
+  return {
+    fixed: await run({ quote: 'It saved us.', name: 'Priya Raman', role: 'staff engineer, Kestrel Logistics' }),
+    notFixed: await run({ quote: 'It saved us.', name: 'John Doe', role: 'founder, a startup' }),
+  }
+})
+console.log('copy repair:', JSON.stringify(repair))
+if (repair.fixed.calls !== 2) throw new Error('copy that tripped the catalogue was never asked for again')
+if (repair.fixed.tells.length) throw new Error(`the repair landed but the page still reads as ${repair.fixed.tells.join(', ')}`)
+if (repair.notFixed.calls !== 2) throw new Error('the second branch never made its repair call')
+if (!repair.notFixed.tells.length) throw new Error('a repair that traded one tell for another was reported as clean')
 // papers must appear while the models are still writing, so sample the wall mid-flight
 const growth = []
 const watch = setInterval(async () => {

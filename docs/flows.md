@@ -251,6 +251,32 @@ answers, stock filler phrases, chained em dashes, rows of bare statistics, place
 logos, the coloured left border, glowing text. `src/craft.ts` carries the inverse of each into
 the system prompt, so the writing is shaped before there is anything to detect.
 
+**It reads the whole page.** The copy half used to walk a section's top level strings and drop
+everything that was not one, so every list, table and group was invisible to it: on the default
+page that is 58 of 84 strings and 57% of the characters. The headline and the sub were policed
+and the substance items, the pricing plans, the objection answers and the footer were not, which
+is the half of a page that actually fills up with filler. One tell in the catalogue could never
+fire at all, because the only place company names live is an array. A leaf now keeps the key
+nearest to it, so a plan's name is still a `name` and the key scoped tells go on meaning what
+they meant.
+
+**What it finds in copy is now repaired, not only reported.** A world that trips the detector has
+always gone back to the model with its faults named and been kept only if it improved. Copy that
+tripped it got a chip and shipped: a recorded wall handed back a testimonial signed "A real
+person" at "founder, somewhere", which is this app's own placeholder for a page with no customer
+yet, left untouched because the writing call is given the page as it stands and rewrites what it
+chooses to. `mendCopy()` in `src/compose.ts` closes that asymmetry. Only a page that failed pays
+for it, it pays once, it lands after the page is already on the wall so nothing waits for it, and
+the answer is kept only when it carries strictly fewer tells, because a rewrite that trades one
+for another is a second opinion rather than a fix.
+
+**The placeholders in the defaults are ones the detector can see.** A blank page has to put
+something under a testimonial, and admitting there is no customer yet beats inventing one, so the
+defaults are honest stand-ins: "A real person", "founder, somewhere", "Replace these with real
+names". The danger is the other end, so each has a tell of its own and `verify/app.mjs` fails if
+any of them stops firing. The house gate judges those same pages on the design half only, for the
+reason `flawsIn` gives: the copy there is placeholder on purpose and no world can fix it.
+
 **The verdict travels with the paper.** The dock shows `clean` or `N generic` beside ship for
 the page in the middle, with every reason in the tooltip, and the grid shows the same chip on
 every cell. It sits with triage on purpose: the generic pages announce themselves while you are

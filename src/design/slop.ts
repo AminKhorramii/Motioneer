@@ -58,6 +58,32 @@ export const COPY_TELLS: CopyTell[] = [
     label: () => 'unverifiable user count',
     why: 'A total nobody can check reads as decoration, where one named witness would read as evidence.',
   },
+  /**
+   * The two halves of a witness nobody has met.
+   *
+   * A page asked for a testimonial and given no customer invents one, and it invents it in the
+   * open: a real recorded wall shipped the quote "i stopped rebuilding context i already had"
+   * signed "a real person", "founder, somewhere", and every check the house had let it through.
+   * The count above was the only proof tell there was, and a made up total is the mistake a page
+   * makes when it has numbers. This is the one it makes when it has nobody.
+   *
+   * Scoped to the attribution rather than the quote, because the quote is often the one honest
+   * sentence in the section and only the name under it is fiction.
+   */
+  {
+    id: 'invented-witness',
+    key: 'name',
+    find: /^(?:(?:a|the) )?(?:real |happy |satisfied |delighted )?(?:customer|user|client|person|founder|someone)$|^(?:jane|john) (?:doe|smith)$|^(?:your|customer|full|company) name(?: here)?$|^name here$/i,
+    label: (m) => `an invented witness: ${m.toLowerCase()}`,
+    why: 'A quote signed by nobody is weaker than no quote, because it tells the reader the page had to invent its own evidence.',
+  },
+  {
+    id: 'nowhere-company',
+    key: 'role',
+    find: /\b(?:somewhere|anywhere|a company|some company|a startup|a business|your company|company name|acme(?: (?:inc|corp|co))?|example(?: (?:inc|corp|co))?)\b/i,
+    label: (m) => `a witness from nowhere: ${m.toLowerCase()}`,
+    why: 'An employer the reader cannot look up is a stand-in left in the page, so the whole quote reads as filler.',
+  },
   {
     id: 'love-tagline',
     find: /(?:built|made|crafted) with (?:love|❤|passion)/iu,
@@ -87,6 +113,21 @@ export const COPY_TELLS: CopyTell[] = [
     find: /\b(?:acme|globex|initech|umbrella corp|stark industries|wayne enterprises|hooli|vandelay|cyberdyne|massive dynamic)\b/i,
     label: () => 'placeholder company names',
     why: 'A made up logo row promises proof and delivers a prop, which costs more trust than an empty row.',
+  },
+  /**
+   * The other end of the logo row: the instruction to fill it in, left in the page.
+   *
+   * The row above is what a page does when it invents customers. This is what it does when it
+   * leaves ours. The default row reads "Replace these with real names", which is the honest thing
+   * for a blank page to say and the worst thing for a shipped one, and the writing call is handed
+   * the page as it stands and does not always touch a field it has nothing to put in.
+   */
+  {
+    id: 'unfilled-logos',
+    key: 'names',
+    find: /^(?:replace|these|with|real|names|your|logo|logos|company|customer|brand|here|placeholder)$/i,
+    label: (m) => `an unfilled logo row: ${m.toLowerCase()}`,
+    why: 'It is the instruction to put something here, still sitting where the something goes.',
   },
 ]
 
