@@ -166,6 +166,12 @@ because the pin is a judgement about the paper you saw. The keys and the safety 
 photographers cull: flag or reject with one hand, auto advance, and nothing is ever more than
 one `z` from coming back.
 
+**The triage is kept.** Pinning, culling, asking the bar for something and retyping a line on
+the paper are the four judgements a session makes, and all four used to die in the browser. They
+now travel twice: into the handoff as the reasoning behind this choice, and into a small file as
+what you tend to keep. Section 7c is the file, and the paragraph on the cull story in 7b is what
+goes to the agent.
+
 ---
 
 ## 4. Refining
@@ -217,7 +223,7 @@ taste never touches machinery and machinery never hides taste:
 | `design/angles.ts` | the editorial positions a wall argues from | the fan-out |
 | `design/craft.ts` | the writing standards that travel in every prompt | the prompts |
 | `design/slop.ts` | the catalogue of tells, copy and markup, as data | the detector in `slop.ts` |
-| `design/directions.ts` | fifty grounded design directions, dealt as seeds to the world design calls | `compose.ts` |
+| `design/directions.ts` | fifty grounded design directions, dealt as seeds to the world design calls, and the deal that keeps at least three hands wild whatever is remembered | `compose.ts` |
 | `design/prompts.ts` | the three system prompts: writing, world design, intake | `compose.ts`, which sends them |
 
 The split rule for the slop catalogue: a tell that is a pattern lives in the data file; a
@@ -324,7 +330,7 @@ sequenceDiagram
   D-->>C: the wall is open at this url, call collect when they have chosen
   Note over C,U: seconds, not minutes. The agent is free and you are still reading.
   U->>S: pick a page, press "to Claude"
-  S->>S: write chosen.html, chosen.json, chosen.md, in that order
+  S->>S: write chosen.html, chosen.json, chosen.md, taste.json, in that order
   C->>D: collect dir
   D-->>C: the spec, plus paths to the render and the structured page
 ```
@@ -342,14 +348,24 @@ it for the one liner, the audience and the button label, and writes all of them 
 and about forty seconds. When it is not, the wall is arranged from the brief as it stands and put
 on screen first, and the reading happens behind it under a line saying so.
 
-**Both files carry a version.** `npx` keeps the writer current while whatever reads the directory
-can be any age, so `request.json` is stamped `format: 1` and `chosen.json` is stamped `format: 2`,
-and each reader refuses a shape it does not know rather than half reading it into a wrong answer.
+**Every file carries a version.** `npx` keeps the writer current while whatever reads the
+directory can be any age, so `request.json` is stamped `format: 1`, `chosen.json` is stamped
+`format: 2` and `taste.json` is stamped `format: 1`, and each reader refuses a shape it does not
+know rather than half reading it into a wrong answer.
+
+**The cull story travels with the winner.** A page handed over on its own reads as though it
+arrived on its own, and the next screen an agent writes drifts straight back into whatever was
+culled. So `chosen.json` carries a `story` field, and `chosen.md` closes on a `## Why this one`
+section written from it: what was pinned, what was turned away and what the detector read on it,
+what was typed into the prompt bar and whether that page won, and which lines were retyped by
+hand. The field is additive under the same `format: 2` on purpose. Bumping the number would make
+every installed reader refuse the whole file to protect it from a field it can safely ignore.
 
 **The order of the handoff is load bearing.** `chosen.md` is both the spec and the marker the
-agent watches for, so it is written last: the desktop shell takes a `BTreeMap` and gets that for
-free, and the server sorts by name for the same reason. Finding it means the render and the
-structured page are already there.
+agent watches for, so it is written last of the three: the desktop shell takes a `BTreeMap` and
+gets that for free, and the server sorts by name for the same reason. Finding it means the render
+and the structured page are already there. `taste.json` sorts after it and that is fine, because
+nothing polls for the memory: it is read at the start of the next wall, not at the end of this one.
 
 **The server outlives the call and then stops on its own.** It holds API keys, so leaving it
 running until logout is not acceptable, and killing it when `design` returns would close the
@@ -364,6 +380,57 @@ rather than written, so your agent can tell you before you spend time choosing b
 
 `verify/mcp.mjs` drives this whole path over the real protocol, and `verify/oneline.mjs` drives
 the first run version of it where nothing at all is installed.
+
+---
+
+## 7c. What the wall remembers
+
+Every session labels design data and every session used to throw it away, so the tenth wall knew
+exactly as much about you as the first. It now keeps a small file, and the next wall is dealt
+with it in hand.
+
+**The file.** `.wall/taste.json` in the project, beside the handoff, when an agent opened the
+window. `localStorage['wall-taste']` when you opened it yourself. The two never merge, because a
+taste belongs to the thing being designed and mixing a client's brand into a side project would
+be worse than remembering nothing. It is stamped `format: 1`, and a shape this build does not
+know reads as no memory at all.
+
+**What is in it.** Up to twelve walls, newest last. Per wall: the date, the kind of thing it was
+for, the pages kept with the chosen one first, the pages culled with the design tells they wore,
+and what was typed into the bar. A page is written down as the handful of traits a preference
+could be made of, the direction it grew from most of all, because a world's own name is whatever
+the model called it that day and the direction is the stable thing. Nothing derived is stored.
+Every signal is recomputed from the walls each time the file is read, which is what makes
+deleting a line the way to forget a wall.
+
+**Written at the choice, and only then.** Pressing "to Claude" writes it into the project;
+pressing download writes it to the browser. A wall nobody chose from leaves nothing behind, and
+choosing twice from one wall is still one wall, because a wall counted twice would weigh double
+against every other wall in the file.
+
+**How it biases the next wall.** `tasteLean()` reads the last eight walls of the same kind and
+scores each direction: three for being chosen, two for surviving triage pinned, minus one for
+being culled. Three things then happen, in `src/compose.ts`:
+
+- the deal takes at most two of the five hands from what scored well, and never deals a direction
+  scored down twice
+- the design call for a favoured hand is told what your kept pages have in common; every hand,
+  favoured or not, is told which tells you have removed pages for
+- the copy call is told the same removals, after the detector's own note about the page in front
+  of it
+
+**At least three hands are always wild.** This is the whole risk of the feature and the guarantee
+is structural rather than tuned. The failure mode of a system that learns your taste is that it
+stops showing you anything else, and a wall of eight pages you already like is not a wall. So the
+favoured count is capped at two, a dislike has to be repeated before anything stops being dealt,
+the note about what you like never reaches a wild hand, and the log is capped at twelve so a
+taste can move rather than only accumulate. `verify/app.mjs` deals twelve walls from a log biased
+as hard as a log can be and fails if any deal takes more than two favoured hands, if a shunned
+direction is dealt at all, or if fewer than ten of the twelve deals differ.
+
+**Deleting a line is how you forget.** It is a small JSON file written to be read: open it, take
+out the wall you regret, and the bias follows on the next build, because the scores were never
+stored anywhere else. Deleting the file entirely starts you over.
 
 ---
 
@@ -465,7 +532,9 @@ npm run verify:all     # all of them
 `npm run verify` is the house gate and runs `verify/layout.mjs` inside itself, which renders
 every built in world on every look at three widths and fails if Wall's own output trips its own
 slop catalogue. There is no separate command for it, because a geometry check nobody runs is a
-geometry check nobody has.
+geometry check nobody has. It also opens no browser for its first three sections: the house gate,
+the escaping check, and the two node level checks on the taste log, one feeding it a hostile file
+and one proving the deal stays wild under a log biased as hard as a log can be.
 
 The two agent suites stand in for the local Claude with `verify/fakebin/claude`, which they put
 on PATH along with a do-nothing `open`. Both are in the repository rather than in a temporary

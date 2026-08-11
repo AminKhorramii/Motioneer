@@ -9,7 +9,7 @@ module owns the data it reads. Files stay far from a thousand lines.
 src/
   sections.ts   the page model. the single source of shape
   worlds.ts     design worlds: one set of decisions that propagate together
-  taste.ts      the taste sheet, the contract every variant is generated against
+  taste.ts      taste in both senses: the sheet a variant is made against, and what you keep
   render.ts     page model to standalone HTML
   backdrop.ts   drawn art, seeded from the taste sheet
   brief.ts      page model to a markdown spec
