@@ -65,6 +65,101 @@ if (houseFlags.length) throw new Error(`the house trips its own detector on ${ho
   if (broke.length) throw new Error(`${broke.length} of ${escapes.length} image strings escaped their attribute`)
 }
 
+// ——— 0c. the memory a wall keeps, and the promise that it stays wild ———
+// Two things have to hold before anything is allowed to read this file. It is a file a person is
+// invited to open and edit, so nothing in it is trusted; and the whole product risk of
+// remembering a taste is that the tenth wall becomes eight versions of the first, so the deal
+// carries a guarantee rather than a hope, and a guarantee is worth exactly its regression test.
+{
+  const wild = {
+    format: 1,
+    walls: [
+      {
+        at: { nope: true },
+        kind: 'software',
+        kept: [{
+          world: 'w'.repeat(400), ground: 'g'.repeat(400), layout: 'trebuchet',
+          display: 'd'.repeat(90), scale: 4e12, density: -40, caps: 'yes', dark: 1, chosen: 'sure',
+        }],
+        killed: 'not a list',
+        asked: [{ said: 's'.repeat(500), chosen: 1 }],
+      },
+      ...Array.from({ length: 40 }, () => ({ at: '2026-01-01', kind: 'software', kept: [], killed: [], asked: [] })),
+    ],
+  }
+  const read = core.readTasteLog(wild)
+  const first = read.walls[0]
+  const clamped = {
+    walls: read.walls.length,
+    // the newest are the ones kept, so the hostile wall at the front is the one that falls off
+    hostileWallDropped: first?.at === '2026-01-01',
+    fromAnotherFormat: core.readTasteLog({ format: 2, walls: [{ kind: 'software' }] }).walls.length,
+    fromNothing: [null, 'a string', 7, []].map((v) => core.readTasteLog(v).walls.length),
+  }
+  const one = core.readTasteLog({ ...wild, walls: [wild.walls[0]] }).walls[0]
+  const kept = one.kept[0]
+  Object.assign(clamped, {
+    world: kept.world.length,
+    layout: kept.layout,
+    scale: kept.scale,
+    density: kept.density,
+    caps: kept.caps,
+    said: one.asked[0].said.length,
+    killedFromAString: one.killed.length,
+  })
+  console.log('a hostile taste file:', JSON.stringify(clamped))
+  if (read.walls.length > 12) throw new Error('the log grows without bound, so it stops being a file anyone can read')
+  if (clamped.fromAnotherFormat || clamped.fromNothing.some(Boolean)) {
+    throw new Error('a file this build cannot read was read anyway, which biases a wall on a guess')
+  }
+  if (kept.scale > 1.7 || kept.density < 0.25 || kept.world.length > 26 || kept.layout !== 'column') {
+    throw new Error('a value out of range came back out of the log, so the file can design an unreadable page')
+  }
+  if (one.asked[0].said.length > 80) throw new Error('a bar instruction is carried whole, so one wall can fill the file')
+}
+
+{
+  // A log that likes two grounds as hard as a log can, so anything short of a structural
+  // guarantee would deal them and nothing else.
+  const trait = { layout: 'column', display: 'mono', scale: 1.2, density: 0.8, caps: true, dark: true }
+  const loved = ['thermal receipt', 'boarding pass']
+  const hated = ['exhibition poster', 'passport page']
+  const log = core.readTasteLog({
+    format: 1,
+    walls: Array.from({ length: 12 }, () => ({
+      at: '2026-08-01',
+      kind: 'software',
+      kept: loved.map((ground, i) => ({ ...trait, world: ground, ground, chosen: i === 0 })),
+      killed: hated.map((ground) => ({ ...trait, world: ground, ground, flags: ['glassmorphism'] })),
+      asked: [],
+    })),
+  })
+  const lean = core.tasteLean(log, 'software')
+  const deals = Array.from({ length: 12 }, () => core.dealDirections(5, lean).map((d) => d.name))
+  const favoured = deals.map((d) => d.filter((name) => loved.includes(name)).length)
+  const shunned = deals.flat().filter((name) => hated.includes(name))
+  const distinct = new Set(deals.map((d) => [...d].sort().join('|'))).size
+  console.log('taste read back:', JSON.stringify({
+    favor: lean.favor, shun: lean.shun, avoidFlags: lean.avoidFlags, keeps: lean.keeps,
+  }))
+  console.log('twelve deals from a heavily biased log:', JSON.stringify({
+    mostFavouredInOneDeal: Math.max(...favoured),
+    shunnedDealtAnyway: shunned.length,
+    distinctDeals: distinct,
+    // the keeps note is quarantined to the favoured hands, so a wild hand hears nothing about likes
+    wildHandHearsNoLikes: !core.tasteBrief(lean, false).includes(lean.keeps),
+  }))
+  if (Math.max(...favoured) > 2) throw new Error('memory took more than two of five hands, so the wall converges')
+  if (shunned.length) throw new Error('a ground the person culled twice was dealt anyway')
+  if (distinct < 10) throw new Error(`only ${distinct} of 12 deals differed, so the wall is the same wall every time`)
+  if (core.tasteBrief(lean, false).includes(lean.keeps)) {
+    throw new Error('every hand was told what this person likes, which is the convergence the split exists to stop')
+  }
+  if (!core.tasteAvoid(lean).includes('glassmorphism')) {
+    throw new Error('a tell culled on eight walls is not named to the call that writes the next one')
+  }
+}
+
 // ——— 0a. the block library reaches the page, and the geometry holds ———
 // Both gates live in verify/layout.mjs, because they measure rendered pages rather than drive
 // the app, and they are worth running alone while a block is being changed.

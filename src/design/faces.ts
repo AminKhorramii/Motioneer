@@ -34,3 +34,16 @@ export const FACES: Record<string, string> = {
   roboto: ROBOTO, plex: PLEX,
   bricolage: BRICOLAGE, syne: SYNE, bodoni: BODONI, martian: MARTIAN, doto: DOTO,
 }
+
+/**
+ * The name of a face, read back off the stack.
+ *
+ * A page carries the stack, because that is what CSS needs, and a stack is forty characters of
+ * fallbacks that say nothing to a person reading a file. Anything that has to write down which
+ * face a page wore writes the key this vocabulary is spoken in. A stack from outside the
+ * vocabulary, which a taste sheet read off a screenshot can be, answers with its first family
+ * rather than with a default nobody chose.
+ */
+export const faceKey = (stack: string): string =>
+  Object.keys(FACES).find((k) => FACES[k] === stack)
+  ?? (stack.split(',')[0] ?? '').replace(/['"]/g, '').trim().toLowerCase()

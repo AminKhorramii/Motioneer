@@ -15,5 +15,13 @@ export * from '@/slop'
 export { MEASURE, WIDTHS, faultsOf, type Measured } from '@/geometry'
 export { renderPage, renderSection, renderBody, shellOf } from '@/render'
 export { drift, mix, shift, alpha, luminance, type Taste } from '@/taste'
+// what a wall remembers, and the story of how one was chosen. Both are file formats other
+// programs read, so they belong to the core rather than to the window that happens to write them
+export {
+  essence, readTasteLog, recordWall, storyOf, tasteAvoid, tasteBrief, tasteLean,
+  type Asked, type Essence, type Judged, type Kept, type Killed, type Lean, type Seen,
+  type TasteLog, type WallStory, type WallTaste,
+} from '@/taste'
+export { DIRECTIONS, dealDirections, directionSeed, type Direction } from '@/design/directions'
 export { PRESETS } from '@/design/presets'
 export { BLOCKS, TOKENS, blockContract } from '@/design/blocks'

@@ -383,18 +383,40 @@ export const DIRECTIONS: Direction[] = [
   },
 ]
 
-/**
- * Deal directions into hands, one per world, sampled fresh each wall so the library is
- * explored rather than the same eight repeated. The deal is random by design: variety
- * across walls is the point of having fifty.
- */
-export function dealDirections(n: number): Direction[] {
-  const deck = [...DIRECTIONS]
+const shuffled = (xs: Direction[]): Direction[] => {
+  const deck = [...xs]
   for (let i = deck.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1))
     ;[deck[i], deck[j]] = [deck[j], deck[i]]
   }
-  return deck.slice(0, n)
+  return deck
+}
+
+/** how many hands a memory may claim, and how many are kept wild whatever it says */
+const FAVOURED = 2
+const WILD = 3
+
+/**
+ * Deal directions into hands, one per world, sampled fresh each wall so the library is
+ * explored rather than the same eight repeated. The deal is random by design: variety
+ * across walls is the point of having fifty.
+ *
+ * A memory of what this person keeps tilts the deal and is not allowed to decide it, because
+ * the failure mode of a system that learns your taste is that it stops showing you anything
+ * else, and a wall of eight pages you already like is not a wall. The guarantee is structural
+ * rather than tuned: at most two hands come from what was liked, at least three are drawn from
+ * the whole library, and a ground has to be culled repeatedly before it stops being dealt at
+ * all. If a wall ever smells samey, the first knob is the favoured count and not the mechanism.
+ */
+export function dealDirections(n: number, lean?: { favor: string[]; shun: string[] }): Direction[] {
+  const liked = lean
+    ? shuffled(DIRECTIONS.filter((d) => lean.favor.includes(d.name)))
+        .slice(0, Math.max(0, Math.min(FAVOURED, n - WILD)))
+    : []
+  const rest = shuffled(
+    DIRECTIONS.filter((d) => !liked.includes(d) && !lean?.shun.includes(d.name)),
+  )
+  return shuffled([...liked, ...rest].slice(0, n))
 }
 
 /** one direction, folded to the line a design call is handed */
