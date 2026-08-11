@@ -9,6 +9,7 @@
 
 import { ROLE_LABEL, type Page } from '@/sections'
 import { worldById } from '@/worlds'
+import type { Seen, WallStory } from '@/taste'
 
 /** a value on one line, so a nested list reads as a list rather than as run together text */
 const flat = (v: unknown): string => (Array.isArray(v) ? v.map(flat).join(', ') : String(v))
@@ -34,7 +35,43 @@ function lines(obj: unknown, key: string, indent = ''): string[] {
   return value ? [`${indent}${key}: ${value}`] : []
 }
 
-export function pageBrief(page: Page, product: string): string {
+/**
+ * The choosing, told as prose.
+ *
+ * A brief that lists only the winner reads as though the winner arrived on its own, and the next
+ * screen an agent writes from it drifts straight back into whatever was culled. Naming what was
+ * turned away and what it read as is the cheapest way to carry the judgement forward, and it is
+ * prose rather than a table because it is going to a model that reads sentences.
+ */
+function whyThisOne(story: WallStory): string[] {
+  const named = (s: Seen) =>
+    [s.world, s.ground ? `from the ${s.ground}` : '', s.angle ? `arguing ${s.angle}` : '']
+      .filter(Boolean)
+      .join(', ')
+  const said = [
+    ...story.pins.map((s) => `Kept alongside it: ${named(s)}.`),
+    ...story.kills.map(
+      (s) => `Turned away: ${named(s)}${s.flags?.length ? `, which read as ${s.flags.join(' and ')}` : ''}.`,
+    ),
+    ...story.asked
+      .filter((a) => a.chosen)
+      .map((a) => `Asked of this page while it was being read: ${a.said}.`),
+    ...story.asked
+      .filter((a) => !a.chosen)
+      .map((a) => `Asked of a page that was not chosen: ${a.said}.`),
+    ...(story.edited.length
+      ? [
+          `Retyped by hand on this page: ${story.edited.join(', ')}. Those lines were typed by the ` +
+            'person choosing, so they are the words as wanted rather than a draft to improve.',
+        ]
+      : []),
+  ]
+  // the count alone says nothing about taste, so a wall nobody triaged closes on the sections
+  if (!said.length) return []
+  return ['', '## Why this one', '', `Chosen from ${story.of} on the wall, so what was turned away is part of this brief.`, ...said]
+}
+
+export function pageBrief(page: Page, product: string, story?: WallStory): string {
   const t = page.taste
   const w = worldById(page.world)
   const on = page.sections.filter((s) => s.on)
@@ -56,6 +93,7 @@ export function pageBrief(page: Page, product: string): string {
       `### ${i + 1}. ${ROLE_LABEL[sec.role]}, set as ${sec.form}`,
       ...lines(sec.content, ''),
     ]),
+    ...(story ? whyThisOne(story) : []),
     '',
     w.library
       ? `Build this with ${w.library}. Keep the copy. Honour the tokens where the system allows it.`

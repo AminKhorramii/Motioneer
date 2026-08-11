@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { tasteFromImage, type Taste } from '@/taste'
+import { storyOf, tasteFromImage, type Taste } from '@/taste'
 import { PRESETS } from '@/design/presets'
 import { ROLE_LABEL, applyEdit, migratePage, starterPage, type Page, type Role } from '@/sections'
 import { renderBody, renderPage, shellOf } from '@/render'
@@ -14,7 +14,7 @@ import { SectionsRail } from '@/SectionsRail'
 import { Dock } from '@/Dock'
 import { Building } from '@/Building'
 import { Icon } from '@/icons'
-import { WORLDS, register as registerWorlds, type World } from '@/worlds'
+import { WORLDS, register as registerWorlds, worldById, type World } from '@/worlds'
 
 import { host, isTauri } from '@/host'
 
@@ -69,8 +69,26 @@ export default function App() {
   // its id stays refused so a page still streaming in cannot reappear after being turned away.
   const graveyard = useRef<{ page: Page; index: number }[]>([])
   const buried = useRef(new Set<string>())
+  /**
+   * The rest of the judgement, kept beside the graveyard so a choice can say why it was made.
+   *
+   * A pin and a cull are visible on the wall; asking the bar for tighter spacing and retyping a
+   * headline are not, and they are the two clearest statements of taste a session produces. Both
+   * carry which paper they were aimed at, because a rewrite keeps the paper's id and every paper
+   * on a wall shares its section ids, so an unlabelled note would read as a note about all nine.
+   */
+  const asked = useRef<{ said: string; of: string }[]>([])
+  const edited = useRef<{ path: string; of: string }[]>([])
 
   const page = pages[at] ?? null
+
+  /** a new wall is a new triage, so nothing said about the last one travels into it */
+  const forgetTriage = useCallback(() => {
+    graveyard.current = []
+    buried.current.clear()
+    asked.current = []
+    edited.current = []
+  }, [])
 
   /**
    * Start again with a different product. This throws the current wall away, so the button
@@ -85,8 +103,7 @@ export default function App() {
     setArmed(false)
     setPages([])
     setAt(0)
-    graveyard.current = []
-    buried.current.clear()
+    forgetTriage()
     setProduct(EMPTY_PRODUCT)
     setSelected(null)
     void host.writeState(null)
@@ -133,15 +150,13 @@ export default function App() {
    * places that each hold a draft until the written page for that place arrives.
    */
   const scaffold = useCallback((base: Page) => {
-    // a new wall is a new triage
-    graveyard.current = []
-    buried.current.clear()
+    forgetTriage()
     const first = alternatives(base, 9)
     slots.current = first.slice(1).map((x) => x.id)
     setPages(first)
     setDrafts(new Set(slots.current))
     setAt(0)
-  }, [])
+  }, [forgetTriage])
 
   /**
    * Fill the wall. With a key every paper is written from a different angle and lands as
@@ -374,6 +389,9 @@ export default function App() {
       const d = e.data as
         { wall?: string; path?: string; value?: string; id?: string; onto?: string; after?: boolean }
       if (d?.wall === 'edit' && d.path) {
+        // noted against the paper it happened on, because retyping the same line on two papers is
+        // two judgements and every paper on a wall shares its section ids
+        edited.current.push({ path: d.path, of: page?.id ?? '' })
         setPages((all) => all.map((p, i) => (i === at ? applyEdit(p, d.path!, d.value ?? '') : p)))
       } else if (d?.wall === 'move' && d.id && d.onto) {
         setPages((all) => all.map((p, i) => (i === at ? dropSection(p, d.id!, d.onto!, !!d.after) : p)))
@@ -381,7 +399,7 @@ export default function App() {
     }
     window.addEventListener('message', onMsg)
     return () => window.removeEventListener('message', onMsg)
-  }, [at])
+  }, [at, page?.id])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -474,6 +492,9 @@ export default function App() {
       return
     }
     onto(made)
+    // kept only once the rewrite landed, because an instruction the model never answered says
+    // nothing about the page that was chosen
+    asked.current.push({ said: instruction, of: here })
     setBar('')
     flash('This page has been rewritten.')
   }
@@ -537,13 +558,50 @@ export default function App() {
 
   const shipName = (product.name || 'landing').toLowerCase().replace(/\W+/g, '-')
 
+  /**
+   * The wall as a judgement, gathered at the moment of choosing.
+   *
+   * A culled page was turned away in a pass over nine papers, so nobody ever opened it and no
+   * verdict on it was written down. It is recomputed here instead of carried: rendering a page
+   * and reading the detector over it is a fraction of a millisecond, and a verdict kept up to
+   * date through every rewrite would be state that can go stale.
+   */
+  function storyHere(chosen: Page) {
+    const judged = (p: Page, flags = false) => ({
+      page: p,
+      world: worldById(p.world),
+      ...(flags ? { flags: slop(p, renderPage(p, { title: product.name })) } : {}),
+    })
+    // an edit is stored against the section it landed on, and a section id means nothing outside
+    // this app, so it is handed over as the role that section argues
+    const roleOf = new Map(chosen.sections.map((s) => [s.id, s.role]))
+    const dotted = (path: string) => {
+      const [id, ...rest] = path.split('.')
+      const role = roleOf.get(id)
+      return role ? [role, ...rest].join('.') : null
+    }
+    return storyOf({
+      of: pages.length + graveyard.current.length,
+      pins: pages.filter((p) => p.pinned && p.id !== chosen.id).map((p) => judged(p)),
+      kills: graveyard.current.map((g) => judged(g.page, true)),
+      asked: asked.current.map((a) => ({ said: a.said, chosen: a.of === chosen.id })),
+      edited: edited.current
+        .filter((e) => e.of === chosen.id)
+        .map((e) => dotted(e.path))
+        .filter((p): p is string => p !== null),
+    })
+  }
+
   /** Hand the chosen page back as a spec, a render and the page itself. */
   async function sendBack() {
     if (!page || !askedFrom) return
+    const story = storyHere(page)
     const res = await host.handoff(askedFrom, {
-      'chosen.md': pageBrief(page, product.name),
+      'chosen.md': pageBrief(page, product.name, story),
       'chosen.html': renderPage(page, { title: product.name }),
-      'chosen.json': JSON.stringify({ format: 2, product, page }, null, 2),
+      // additive under the same format, because bumping it would make every installed reader
+      // refuse the file to protect them from a field they can ignore
+      'chosen.json': JSON.stringify({ format: 2, product, page, story }, null, 2),
     })
     flash(res.error ? `Could not write the handoff: ${res.error}` : 'Sent back. Your agent can pick it up now.')
   }

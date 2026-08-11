@@ -1,8 +1,21 @@
 import { PRESETS } from '@/design/presets'
 import { FACES } from '@/design/faces'
+import type { Flag } from '@/slop'
+import type { Page } from '@/sections'
+import type { World } from '@/worlds'
 
-/** The taste sheet: the contract every variant is generated against. The looks offered at
-setup live in design/presets.ts, with the rest of the editable design knowledge. */
+/**
+ * Taste, in both senses: the sheet a variant is generated against, and what this person keeps.
+ *
+ * The sheet is the contract, and the looks offered at setup live in design/presets.ts with the
+ * rest of the editable design knowledge. Below it is the other half, which is a record of
+ * judgements rather than of values: what was pinned, what was culled and what it read as, so a
+ * wall can be handed the reasoning and not only the winner.
+ *
+ * The types only. Nothing here imports the renderer or the detector, because a page's flags are
+ * read where a page is already being rendered, and a memory file that had to render to be read
+ * would be a memory file nothing outside the app could open.
+ */
 
 export interface Taste {
   name: string
@@ -160,5 +173,81 @@ export function cross(a: Taste, b: Taste): Taste {
     caps: b.caps,
     radius: Math.round((a.radius + b.radius) / 2),
     density: (a.density + b.density) / 2,
+  }
+}
+
+// ——— the cull story ———
+
+/** how many bar instructions are worth carrying, and how much of one */
+const ASKED = 6
+const SAID = 80
+/** how many hand edits are worth naming before the list stops being read */
+const EDITED = 8
+
+/** something typed into the prompt bar, and whether it was aimed at the page that won */
+export interface Asked {
+  said: string
+  chosen: boolean
+}
+
+/** a paper on the wall, named the way a person would name it when saying why it went */
+export interface Seen {
+  world: string
+  /** the direction it grew from, when a model designed it from one */
+  ground?: string
+  angle?: string
+  /** what the detector reads on it, which on a culled page is usually why it went */
+  flags?: string[]
+}
+
+/**
+ * Why this one, and not the other eight.
+ *
+ * Everything a person does to a wall is a judgement: pinning, culling, asking the bar for
+ * something different, retyping a line straight on the paper. All of it used to die in the
+ * browser, and the handoff carried the winning page as though it had arrived on its own. The
+ * reasoning is the more useful half of a choice: an agent told what was turned away and what it
+ * read as can hold that line through the next screen, and an agent handed only the artifact
+ * cannot.
+ */
+export interface WallStory {
+  /** how many papers were ever up, because one of nine is a different claim from one of two */
+  of: number
+  pins: Seen[]
+  kills: Seen[]
+  asked: Asked[]
+  /** dotted role.key paths retyped by hand on the chosen paper: the words as wanted */
+  edited: string[]
+}
+
+/** a paper and what is known about it, gathered where the renderer and the detector already are */
+export interface Judged {
+  page: Page
+  world: World
+  flags?: Flag[]
+}
+
+const seenAs = (j: Judged): Seen => ({
+  world: j.world.name,
+  ...(j.world.ground ? { ground: j.world.ground } : {}),
+  ...(j.page.angle ? { angle: j.page.angle } : {}),
+  ...(j.flags?.length ? { flags: [...new Set(j.flags.map((f) => f.label))].slice(0, 6) } : {}),
+})
+
+export function storyOf(wall: {
+  of: number
+  pins: Judged[]
+  kills: Judged[]
+  asked: Asked[]
+  edited: string[]
+}): WallStory {
+  return {
+    of: wall.of,
+    pins: wall.pins.map(seenAs),
+    kills: wall.kills.map(seenAs),
+    // the last few, because a long session asks for many things and the recent ones are the
+    // ones the chosen page actually came out of
+    asked: wall.asked.slice(-ASKED).map((a) => ({ said: a.said.slice(0, SAID), chosen: a.chosen })),
+    edited: [...new Set(wall.edited)].slice(0, EDITED),
   }
 }

@@ -169,10 +169,34 @@ if (usedBrief?.oneLiner !== ARGS.oneLiner) {
   throw new Error('the app did not use the one liner it was handed, so it read the brief again')
 }
 
+// ——— 3b. the wall is triaged before anything is chosen ———
+// A choice with no reasoning behind it says only which page won, and the reasoning is the half
+// an agent can act on. Two of the three judgements leave no mark on the page itself: a paper
+// taken off the wall, and an instruction typed into the bar. Both are driven here, so section 4
+// can read them back out of the handoff.
+const culledTo = await page.evaluate(async () => {
+  const cells = [...document.querySelectorAll('.cell')]
+  const cull = cells[cells.length - 1]?.querySelector('button.cull')
+  cull?.click()
+  await new Promise((r) => setTimeout(r, 400))
+  return { hadCull: !!cull, cells: document.querySelectorAll('.cell').length }
+})
+console.log('culled a page:', JSON.stringify(culledTo))
+if (culledTo.cells !== 8) throw new Error(`culling left ${culledTo.cells} papers on the wall`)
+
 // the first paper is the page as it arrived, kept there to compare against, so a choice that
 // stands for the agent path has to be one of the eight the model wrote
 await page.evaluate(() => document.querySelectorAll('.cell')[1]?.click())
 await page.waitForSelector('.paper.here', { timeout: 30000 })
+
+const INSTRUCTION = 'tighter spacing, and name the pain in the headline'
+await page.fill('.dock input.bar', INSTRUCTION)
+await page.press('.dock input.bar', 'Enter')
+await page.waitForFunction(() => !document.querySelector('[data-busy]'), null, { timeout: 120000 })
+console.log('asked the bar for something:', JSON.stringify({
+  said: INSTRUCTION,
+  toast: await page.evaluate(() => document.querySelector('.toast')?.textContent ?? null),
+}))
 
 const sent = await page.evaluate(async () => {
   const b = [...document.querySelectorAll('.filmbar button')].find((x) => x.textContent.includes('to Claude'))
@@ -186,7 +210,22 @@ console.log('files written:', JSON.stringify(files))
 if (files.length !== 3) throw new Error(`choosing left ${files.length} of the three files behind`)
 // both sides of the handoff say which shape they speak, because npx keeps the writer current
 // while whatever reads the directory can be any age
-console.log('chosen format:', JSON.parse(readFileSync(join(at, 'chosen.json'), 'utf8')).format)
+const structured = JSON.parse(readFileSync(join(at, 'chosen.json'), 'utf8'))
+console.log('chosen format:', structured.format)
+// The why, not only the what. The story is additive under the same format on purpose: bumping
+// it would make every installed reader refuse the whole file to protect it from a field it can
+// ignore, so the number staying at 2 is the assertion rather than an oversight.
+console.log('the cull story travelled:', JSON.stringify({
+  of: structured.story?.of,
+  kills: structured.story?.kills?.length,
+  killNamesItsGround: Boolean(structured.story?.kills?.[0]?.ground),
+  asked: structured.story?.asked,
+}))
+if (structured.format !== 2) throw new Error('the story arrived by bumping the format, so every installed reader now refuses the file')
+if (!structured.story?.kills?.length) throw new Error('a page was taken off the wall and the handoff says nothing about it')
+if (!structured.story?.asked?.some((a) => a.said === INSTRUCTION && a.chosen)) {
+  throw new Error('what was asked of the chosen page did not travel with it')
+}
 
 // ——— 4. the agent picks it up ———
 rpc({ jsonrpc: '2.0', id: 6, method: 'tools/call', params: { name: 'collect', arguments: { dir: work } } })
@@ -196,10 +235,15 @@ console.log('collected:', JSON.stringify({
   hasSections: spec.includes('## Sections'),
   namesTheRender: spec.includes(`Reference render: ${join(at, 'chosen.html')}`),
   namesTheStructuredPage: spec.includes(`Structured page: ${join(at, 'chosen.json')}`),
+  saysWhyThisOne: spec.includes('## Why this one'),
   lines: spec.split('\n').length,
 }))
 if (!spec.includes('## Tokens')) throw new Error('collect returned something that is not a spec')
 if (!spec.includes('Structured page:')) throw new Error('collect did not name the structured page')
+// the spec is what an agent implements from, so the reasoning has to reach it as prose rather
+// than sitting in a field beside it that nothing reads
+if (!spec.includes('## Why this one')) throw new Error('the spec carries the winner without the reasoning behind it')
+if (!spec.includes(INSTRUCTION)) throw new Error('the spec does not say what was asked of the page it describes')
 // The stand-in writes "<angle> headline <n>", so this is the difference between a page a model
 // wrote and the local arrangement that stands in until one arrives. Without it the whole suite
 // would pass on a wall of eight unwritten drafts.
