@@ -23,5 +23,7 @@ export {
   type TasteLog, type WallStory, type WallTaste,
 } from '@/taste'
 export { DIRECTIONS, dealDirections, directionSeed, type Direction } from '@/design/directions'
+// the page a model wrote whole, and the filter standing between its markup and the wall
+export { madeWritten, safeMarkup, safeStyle, type Written } from '@/written'
 export { PRESETS } from '@/design/presets'
 export { BLOCKS, TOKENS, blockContract } from '@/design/blocks'

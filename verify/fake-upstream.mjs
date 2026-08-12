@@ -339,6 +339,20 @@ export async function fakeAnthropic(dir = FIXTURES) {
       return res.end()
     }
 
+    /**
+     * Nor may a call for a whole page, for exactly the same reason.
+     *
+     * There is no recorded capture of a page written whole, and it must not help itself to the
+     * next copy fixture on the way past: the corpus is a queue, so three of them would shift every
+     * arranged paper onto somebody else's words and change what the replay is replaying. Answering
+     * nothing is also the case worth exercising, because it is the one the wall has to survive
+     * without a hole in it, and the app falls back to arranging that place.
+     */
+    if (/Build it from /.test(body)) {
+      res.writeHead(200, { ...CORS, 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
+      return res.end()
+    }
+
     const n = seq++
     // real calls do not return in lockstep, and a wall that appears all at once would not
     // exercise the code that puts one paper up while others are still writing

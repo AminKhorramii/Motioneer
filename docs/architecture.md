@@ -14,6 +14,7 @@ src/
   backdrop.ts   drawn art, seeded from the taste sheet
   brief.ts      page model to a markdown spec
   slop.ts       the generic patterns, checked locally
+  written.ts    a page the model wrote whole, and the filter between its markup and the wall
   compose.ts    the model path: angles, fan out, streaming, partial JSON
   host.ts       the only file that knows where Wall is running
   core.ts       the headless core, exported for shells with no DOM

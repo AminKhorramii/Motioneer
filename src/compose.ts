@@ -6,7 +6,8 @@ import { giveKey, host, isDesktop, isServed, servedConfig } from '@/host'
 import { slop, slopBrief } from '@/slop'
 import { dealDirections, directionSeed, type Direction } from '@/design/directions'
 import { ANGLES } from '@/design/angles'
-import { INTAKE_SYSTEM, MEND_SYSTEM, PAGE_SYSTEM, WORLDS_SYSTEM } from '@/design/prompts'
+import { INTAKE_SYSTEM, MEND_SYSTEM, PAGE_SYSTEM, WORLDS_SYSTEM, WRITTEN_SYSTEM } from '@/design/prompts'
+import { madeWritten } from '@/written'
 import { MODELS, modelById, type ModelChoice } from '@/models'
 import { BACKDROPS, type Backdrop } from '@/backdrop'
 import { DEFAULT_KIND, asKind, type Kind } from '@/design/kinds'
@@ -127,6 +128,48 @@ async function mendCopy(page: Page, product: Product, provider: Provider): Promi
   ).catch(() => null)
   if (!again) return page
   return slop(again).filter((f) => f.kind === 'copy').length < faults.length ? again : page
+}
+
+/**
+ * Ask for a whole page, and put it in a place on the wall beside the arranged ones.
+ *
+ * One call rather than two. An arranged page costs a design call for its world and a copy call for
+ * its words, and the split exists because the two halves land in different machinery. Here there
+ * is no machinery to land in, so the page is designed and written at once, which is also the only
+ * way its type can answer to its layout.
+ *
+ * A page that comes back unusable is not an empty place on the wall. The caller is handed nothing
+ * and falls back to arranging that place, because eight papers and one hole is worse than eight
+ * papers, and this path is the experimental half of a wall rather than the whole of it.
+ */
+export async function writeWhole(
+  base: Page,
+  product: Product,
+  direction: Direction,
+  i: number,
+  provider: Provider = 'model',
+): Promise<Page | null> {
+  const angle = ANGLES[i % ANGLES.length]
+  // the same look the arranged page in this place would have worn, so the two are compared on
+  // what the model did with the page and not on which palette each happened to draw
+  const page = arrange(base, i + 1)
+  const brief =
+    `A ${product.kind}: ${product.name}. ${product.oneLiner}\n${product.what}\nAudience: ${product.audience}\n` +
+    `The one action is: ${product.cta}.\n\n` +
+    `Build it from ${directionSeed(direction)}\n\n` +
+    `Argue it as "${angle.name}". ${angle.instruction}`
+  const text = await ask(provider, WRITTEN_SYSTEM, brief, undefined, { maxTokens: 12000, kind: 'design' })
+    .catch(() => null)
+  if (!text) return null
+  const raw = grabJson(text) as Record<string, unknown> | null
+  if (!raw) return null
+  const written = madeWritten(raw)
+  if (!written) return null
+  // No ground stamp yet. The memory reads a direction off the page's world, and a written page
+  // has no designed world to carry one, so keeping or culling one of these teaches the taste log
+  // nothing. That is the right order: it should not bias future walls until it has earned a place
+  // on this one.
+  return { ...page, written, angle: angle.name }
 }
 
 export async function writeOne(

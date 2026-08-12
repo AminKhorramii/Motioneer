@@ -96,6 +96,46 @@ Ask the question a designer would ask: who specifically this is for, what they u
 Respond with the JSON object alone, because the reply is parsed directly.`
 
 /**
+ * Writing the page instead of filling one in.
+ *
+ * Every other prompt here hands the model a shape and asks it to choose values: eight roles, a
+ * form each, twelve blocks, fifteen knobs. This one hands over the tokens and one direction and
+ * asks for the document. It is the longest prompt in the product because it is the only one where
+ * nothing about the answer is decided in advance, so everything the machinery used to guarantee
+ * has to be said instead: the file is one file, the type is the type it was given, and the page
+ * is checked against the same catalogue every arranged page is checked against.
+ *
+ * The tokens are named rather than described. A model handed a hex value writes that hex value
+ * into forty places and the taste sheet stops meaning anything, so it is given the variables and
+ * told they are the palette, which is also what makes a written page restyle when a look changes.
+ */
+export const WRITTEN_SYSTEM = `You are writing a complete landing page as HTML and CSS. Not a template to fill in, and not a description of one: the actual page.
+
+You are given a direction to build from, a brief about the product, and a set of CSS custom properties that are already defined in the document. Design the page the direction asks for.
+
+Return JSON shaped as {"note": "...", "html": "...", "css": "..."}.
+
+- note: one short line naming what you made, the way you would name a design.
+- html: the body of the page. Start at the outermost section and write real content. No <html>, <head>, <body>, <style> or <script> tags: only the content.
+- css: the styles for it, written against your own classes.
+
+The tokens already exist and are the palette. Use var(--bg), var(--ink), var(--dim), var(--accent), var(--accent2), var(--surface), var(--line), var(--r) for radius, and var(--gap). The display and body faces are already set on the document, so inherit them rather than naming a font family, and set weight and size and spacing freely. Working in these is what lets the page be restyled without being rewritten, and a hex value typed into forty rules is a page that can only ever look one way.
+
+The page must be one file that makes no requests. No font imports, no stylesheet links, no images from a url, no scripts, no tracking, no iframes. If you want a picture, draw it in CSS. This is not a preference: a page that fetches anything stops being a file somebody can open.
+
+Write exactly one <h1>. It is the headline, and it is the thing the page is compared on.
+
+Make it responsive with the CSS you write. It will be looked at at 1280, 900 and 390 pixels wide, and a layout that only works at one of them is a layout that breaks rather than adapts.
+
+${craftBrief()}
+
+${copyLimits()}
+
+Design something that could only be this product. The failure here is not ugliness, it is a page that would work equally well for anything: a centred hero, three cards, a pricing table, a footer. You have the whole document, so use it. Set type at sizes a template cannot reach, let something break its column, let the page have a rhythm rather than nine evenly spaced bands.
+
+Respond with the JSON object alone, because the reply is parsed directly.`
+
+/**
  * Correcting a world, which is not the same job as designing one.
  *
  * The design prompt is long because it is deciding what a thing is. This one is handed a

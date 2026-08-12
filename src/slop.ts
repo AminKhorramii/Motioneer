@@ -15,6 +15,7 @@
 import type { Page } from '@/sections'
 import { worldById } from '@/worlds'
 import { COPY_TELLS, LIMITS, MARKUP_TELLS } from '@/design/slop'
+import { wordsIn } from '@/written'
 
 /**
  * Which half of the catalogue a flag came from.
@@ -63,11 +64,16 @@ const strings = (value: unknown, key: string): { key: string; value: string }[] 
         : []
 
 const text = (page: Page) =>
-  page.sections
-    .filter((s) => s.on)
-    .flatMap((s) =>
-      Object.entries(s.content).flatMap(([k, v]) => strings(v, k).map((f) => ({ section: s.id, ...f }))),
-    )
+  // A written page's words are its markup, and its sections are the defaults nobody rewrote.
+  // Reading those would judge it on copy the reader cannot see: the first one rendered end to end
+  // reported six tells, every one of them from a placeholder section that never reaches the page.
+  page.written
+    ? wordsIn(page.written).map((value) => ({ section: 'written', key: '', value }))
+    : page.sections
+        .filter((s) => s.on)
+        .flatMap((s) =>
+          Object.entries(s.content).flatMap(([k, v]) => strings(v, k).map((f) => ({ section: s.id, ...f }))),
+        )
 
 /**
  * Check a page. `html` is optional so the model loop can check copy before anything renders,

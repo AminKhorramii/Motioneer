@@ -14,6 +14,7 @@ import type { Taste } from '@/taste'
 import { DEFAULT_KIND, KINDS, type Kind } from '@/design/kinds'
 import type { Backdrop } from '@/backdrop'
 import type { WorldId } from '@/worlds'
+import type { Written } from '@/written'
 
 /**
  * A masthead does not argue, it orients: whose page this is and where else you can go. It was
@@ -73,6 +74,15 @@ export interface Page {
   backdrop?: Backdrop
   /** the design world this page is built in: one set of decisions, not a shuffle */
   world?: WorldId
+  /**
+   * The page as the model wrote it, when it wrote the whole thing rather than filling a shape.
+   *
+   * Present on a written page and absent on an arranged one, and both sit on the same wall so the
+   * two can be compared rather than argued about. A written page keeps its sections even though
+   * nothing renders from them, because the brief and the handoff read them and a page with none
+   * would reach an agent as an empty specification.
+   */
+  written?: Written
 }
 
 export const uid = () => Math.random().toString(36).slice(2, 9)

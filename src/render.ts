@@ -655,6 +655,24 @@ export const shellOf = (page: Page): string =>
 
 export function renderPage(page: Page, opts: { editable?: boolean; title?: string; still?: boolean; live?: boolean } = {}): string {
   const world = worldById(page.world)
+  /**
+   * A written page shares everything above the body and nothing below it.
+   *
+   * The head carries the tokens and the variable faces this page wears, and both stay, for two
+   * reasons. A page that fetched its own font would stop being one file, which is the promise the
+   * whole product rests on. And a wall is a comparison: handing the arranged pages the embedded
+   * faces and leaving a written one on whatever the machine happens to have would decide the
+   * comparison on availability rather than on design, which is the one thing it must not do.
+   *
+   * Nothing else is shared. No page wrapper, no layout class, no blocks: the markup is the
+   * model's, which is the entire point of it being here.
+   */
+  if (page.written) {
+    const art = backdropHtml(page.taste, page.backdrop ?? 'none', !!opts.still)
+    return `${head(page.taste, opts.title ?? 'Landing', false, world, !!opts.still, 'column')}${art}` +
+      `<style>${page.written.css}</style>${page.written.html}` +
+      `${opts.live ? PATCH_SCRIPT : ''}</body></html>`
+  }
   const { html: body, layout } = renderBody(page)
   // the backdrop goes first so it sits behind the content without needing a stacking hack
   const art = backdropHtml(page.taste, page.backdrop ?? 'none', !!opts.still)

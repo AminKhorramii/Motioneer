@@ -5,12 +5,13 @@ import {
 } from '@/taste'
 import { PRESETS } from '@/design/presets'
 import { asKind } from '@/design/kinds'
+import { dealDirections } from '@/design/directions'
 import { ROLE_LABEL, applyEdit, migratePage, starterPage, type Page, type Role } from '@/sections'
 import { renderBody, renderPage, shellOf } from '@/render'
 import { pageBrief } from '@/brief'
 import { slop } from '@/slop'
 import {
-  EMPTY_PRODUCT, addSection, alternatives, arrangeIn, readBrief, canDraw, canWrite, choose, chosen, promptWorlds, setDesigned, setMemory, cycleForm, cycleWorld, dropSection, writeOne, illustrate, loadHeldKeys, loadKeys, promptPage, sectionAlternatives, seeded, setMock, type Product,
+  EMPTY_PRODUCT, addSection, alternatives, arrangeIn, readBrief, canDraw, canWrite, choose, chosen, promptWorlds, setDesigned, setMemory, cycleForm, cycleWorld, dropSection, writeOne, writeWhole, illustrate, loadHeldKeys, loadKeys, promptPage, sectionAlternatives, seeded, setMock, type Product,
 } from '@/compose'
 import { Onboarding } from '@/Onboarding'
 import { BriefRail } from '@/BriefRail'
@@ -277,7 +278,33 @@ export default function App() {
      * calls, which are the long pole and the thing the reader is actually waiting on, and the
      * copy for a page whose design is already on screen can wait its turn.
      */
-    const designing = promptWorlds(p, 8 - seeded.length, (w, i) => startPage(w, i + seeded.length), 'model', () => {
+    /**
+     * Three of the eight places go to pages the model writes whole.
+     *
+     * The other five are arranged: a world of values, then copy poured into blocks somebody
+     * enumerated. These three are handed the tokens and a direction and come back as markup. Both
+     * halves land on the same wall wearing the same faces and the same look, which makes this an
+     * experiment with a control rather than a demo, and the answer is whichever half survives
+     * triage rather than whichever half reads better in a plan.
+     *
+     * Three, because a place that fails falls back to arranging and the wall must not thin out,
+     * and because five arranged pages is still a usable wall on a day when this half is worse.
+     */
+    const WHOLE = 3
+    const deck = dealDirections(WHOLE)
+    const wholeJobs = deck.map((d, k) => {
+      const at = 8 - WHOLE + k
+      return writeWhole(base, p, d, at).then((made) => {
+        if (run.current !== mine) return { ok: 0 }
+        // a place is only taken once there is something to put in it, so a refusal leaves the
+        // arranged draft standing rather than leaving a hole
+        if (made) land(made, at)
+        return { ok: made ? 1 : 0, error: made ? undefined : 'a written page came back unusable' }
+      }).catch((e: unknown) => ({ ok: 0, error: String(e instanceof Error ? e.message : e).slice(0, 160) }))
+    })
+    jobs.push(...wholeJobs)
+
+    const designing = promptWorlds(p, 8 - seeded.length - WHOLE, (w, i) => startPage(w, i + seeded.length), 'model', () => {
       if (run.current === mine) setBuilding((b) => (b ? { ...b, thoughts: b.thoughts + 1 } : b))
     })
     seeded.forEach((w, k) => startPage(w, k))

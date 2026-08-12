@@ -234,6 +234,42 @@ house on the next run.
 
 ---
 
+## 4c. Two halves of a wall: arranged and written
+
+Five of the eight papers are **arranged**. A world picks values, the renderer assembles blocks, and
+the model chooses between forms this repo enumerated: eight roles, twelve blocks, about fifteen
+knobs. That is a box rather than a space, which `worlds.ts` admits to in its own opening paragraph,
+and it is why the pages have a ceiling no prompt can lift.
+
+Three are **written**. `writeWhole()` in `src/compose.ts` hands the model the tokens, the faces and
+one direction and asks for the document: markup and styles, in one call rather than a design call
+plus a copy call, because there is no machinery for the two halves to land in separately and
+because it is the only way the type can answer to the layout.
+
+Both halves land on the same wall wearing the same look and the same embedded faces, which is what
+makes this an experiment with a control rather than a demonstration. Which approach is better is
+the question a wall exists to answer, so it is answered by culling rather than by argument.
+
+**Nothing about a written page is true by construction, so all of it is proved.** `src/written.ts`
+filters the markup to an allowlist of tags and attributes, because a denylist is a list of the
+attacks somebody thought of. Two things make that load bearing rather than tidy: a shipped page is
+one file that makes no requests, and the frame a paper renders in carries `allow-scripts` with
+`allow-same-origin`, which together are not a sandbox, so a surviving script would run against this
+app's origin where the keys are. Links may point anywhere a reader might click; sources may only be
+a data url, because the same address is a link in one and a tracking pixel in the other.
+
+A reply with no `<h1>` is refused, since that is the one structural claim worth making about a
+document nobody arranged. **A refusal is not a hole in the wall**: the place falls back to an
+arranged page, because eight papers beats seven and a gap.
+
+The detector reads a written page's markup rather than its sections. A written page keeps sections
+so the brief and the handoff have something to describe, and those still hold the defaults nobody
+rewrote, so reading them judged the page on copy the reader could not see. The gap that remains is
+that the tells scoped to a field, a witness, a call to action, a logo row, name a slot the arranged
+model has and a written page does not.
+
+---
+
 ## 5. Slop detection
 
 `src/slop.ts` names the patterns a model reaches for when it has nothing specific to say:
