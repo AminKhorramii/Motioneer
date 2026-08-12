@@ -12,7 +12,7 @@
  * Anything after the command is the brief.
  */
 import { spawn } from 'node:child_process'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, writeFileSync, readdirSync, statSync, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
@@ -24,6 +24,33 @@ const at = path.join(dir, '.wall')
 const brief =
   process.argv.slice(2).join(' ') ||
   'A tool that turns the meeting notes you already keep into decisions you can search.'
+
+/**
+ * Say so when the page about to open is not the code on disk.
+ *
+ * This serves dist, and nothing here builds it, because the loop it was written for keeps a watch
+ * running in another terminal. Without a watch it opens whatever was built last, which looks
+ * exactly like a working wall and is a different program: an afternoon can go into wondering why
+ * a change had no effect. Newest file wins rather than a hash, because this is a warning and not
+ * a gate, and being told is enough.
+ */
+const newest = (dir) => {
+  if (!existsSync(dir)) return 0
+  let latest = 0
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name)
+    latest = Math.max(latest, entry.isDirectory() ? newest(full) : statSync(full).mtimeMs)
+  }
+  return latest
+}
+const built = newest(path.join(ROOT, 'dist'))
+if (!built) {
+  console.log('there is no dist yet, so nothing can be served. run: npm run build\n')
+} else if (newest(path.join(ROOT, 'src')) > built) {
+  const ago = Math.round((Date.now() - built) / 60000)
+  console.log(`the build is older than src, by ${ago} minute${ago === 1 ? '' : 's'}.`)
+  console.log('this will open the previous version. run npm run build, or npm run watch alongside.\n')
+}
 
 mkdirSync(at, { recursive: true })
 const request = path.join(at, 'request.json')
@@ -50,6 +77,16 @@ server.stdout.on('data', (d) => {
     console.log(`\nbrief: ${brief}`)
     console.log(`handoff: ${at}`)
     console.log('edit src, let watch rebuild, then reload the page. ctrl-c to stop.')
+    /**
+     * The other half of the loop, which is a person and an agent looking at the same directory.
+     *
+     * Choosing writes four files here, and the agent that wants to read them is sitting in this
+     * repository already, so the two only ever needed to agree on where. Saying it out loud is the
+     * whole connection: the wall is where judgement happens and the terminal is where it is read.
+     */
+    console.log('\nin the wall: x removes a page, z brings it back, p pins one, and the bar rewrites the one you are on.')
+    console.log('when you have chosen, press "to Claude", then tell your agent:')
+    console.log('    read .try/.wall')
   }
 })
 
