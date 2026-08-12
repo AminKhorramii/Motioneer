@@ -251,6 +251,27 @@ if (houseFlags.length) throw new Error(`the house trips its own detector on ${ho
   }))
   if (starved.length !== 5) throw new Error('a wide enough shun list took places off the wall')
   if (conflicted.some((d) => d.name === 'telegram')) throw new Error('a ground both liked and culled was dealt anyway')
+
+  /**
+   * The cap is a share of the deal, not a number of hands.
+   *
+   * It was "at most two, always leave three wild", which said the right thing about the five hand
+   * deal it was written for and silently said "leave nothing to the memory" when the design half
+   * of the wall shrank to two: the arithmetic went negative and no hand was favoured at all, so
+   * the half of the memory about what a person keeps could not reach anybody. A deal that gets
+   * smaller must weaken the memory rather than switch it off.
+   */
+  const byHands = [1, 2, 3, 4, 5, 8].map((n) => {
+    const deals = Array.from({ length: 200 }, () => core.dealDirections(n, lean).map((d) => d.name))
+    const fav = deals.map((d) => d.filter((x) => lean.favor.includes(x)).length)
+    return { n, most: Math.max(...fav), everyDealFullSize: deals.every((d) => d.length === n) }
+  })
+  console.log('the favoured cap as the deal shrinks:', JSON.stringify(byHands))
+  for (const { n, most, everyDealFullSize } of byHands) {
+    if (!everyDealFullSize) throw new Error(`a deal of ${n} came back the wrong size`)
+    if (most > Math.min(2, Math.floor(n / 2))) throw new Error(`a deal of ${n} gave the memory ${most} hands, which is more than half of it`)
+    if (n >= 2 && most < 1) throw new Error(`a deal of ${n} gave the memory nothing, so a smaller wall turns the memory off rather than down`)
+  }
 }
 
 {

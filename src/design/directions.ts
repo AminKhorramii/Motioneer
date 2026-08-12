@@ -392,9 +392,18 @@ const shuffled = (xs: Direction[]): Direction[] => {
   return deck
 }
 
-/** how many hands a memory may claim, and how many are kept wild whatever it says */
+/**
+ * How many hands a memory may claim, and how many stay wild whatever it says.
+ *
+ * A share rather than a count. This was "at most two, and always leave three wild", which was
+ * written when the deck dealt five hands and quietly became "leave nothing to the memory" when it
+ * dealt two: min(2, 2 - 3) is negative, so a wall whose design half had shrunk got no favoured
+ * hand at all and the half of the memory about what a person keeps could never reach anybody.
+ * Half the hands, capped at two, says the same thing about a five hand deal and still means
+ * something about a two hand one.
+ */
 const FAVOURED = 2
-const WILD = 3
+const WILD_SHARE = 2
 
 /**
  * Deal directions into hands, one per world, sampled fresh each wall so the library is
@@ -404,15 +413,16 @@ const WILD = 3
  * A memory of what this person keeps tilts the deal and is not allowed to decide it, because
  * the failure mode of a system that learns your taste is that it stops showing you anything
  * else, and a wall of eight pages you already like is not a wall. The guarantee is structural
- * rather than tuned: at most two hands come from what was liked, at least three are drawn from
- * the whole library, and a ground has to be culled repeatedly before it stops being dealt at
- * all. If a wall ever smells samey, the first knob is the favoured count and not the mechanism.
+ * rather than tuned: at most two hands come from what was liked and never more than half of
+ * them, the rest are drawn from the whole library, and a ground has to be culled repeatedly
+ * before it stops being dealt at all. If a wall ever smells samey, the first knob is the
+ * favoured count and not the mechanism.
  */
 export function dealDirections(n: number, lean?: { favor: string[]; shun: string[] }): Direction[] {
   const shunned = (d: Direction) => Boolean(lean?.shun.includes(d.name))
   // a ground both liked and culled is neither, rather than liked twice over
   const liked = (d: Direction) => Boolean(lean?.favor.includes(d.name)) && !shunned(d)
-  const favoured = shuffled(DIRECTIONS.filter(liked)).slice(0, Math.max(0, Math.min(FAVOURED, n - WILD)))
+  const favoured = shuffled(DIRECTIONS.filter(liked)).slice(0, Math.max(0, Math.min(FAVOURED, Math.floor(n / WILD_SHARE))))
   /**
    * Every liked ground leaves the wild pool, not only the two that were dealt.
    *
