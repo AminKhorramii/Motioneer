@@ -193,7 +193,16 @@ function safeCss(raw: unknown): string {
         .join(';')
       return kept.trim() ? `${selector}{${kept}}` : ''
     })
-  return clean.slice(0, 4000)
+  /**
+   * Room to draw in.
+   *
+   * Four thousand characters was set when a world's CSS was treatment: rules, slabs, a hairline,
+   * a dashed border. Asking it to draw the object the ground names is asking for gradients with
+   * a dozen stops, pseudo elements and transforms, and a record with grooves and a numbered stamp
+   * does not fit in four thousand characters alongside the rest of a design. A cap still exists
+   * because this ships inside every page, and nine thousand is about two screens of CSS.
+   */
+  return clean.slice(0, 9000)
 }
 
 /**

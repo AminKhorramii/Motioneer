@@ -250,6 +250,20 @@ Both halves land on the same wall wearing the same look and the same embedded fa
 makes this an experiment with a control rather than a demonstration. Which approach is better is
 the question a wall exists to answer, so it is answered by culling rather than by argument.
 
+**Both halves are asked to draw.** Every design prompt used to say "use CSS" and mean treatment: a
+dashed rule, a slab of colour, a hairline. None of them asked for the subject itself. On the first
+real wall a model did it unprompted, drawing a record with grooves and a numbered "500 only" stamp
+for a vinyl reissue, and that was the paper worth looking at, which said the instruction was
+missing rather than the ability. Both calls now carry the same one: draw the object your ground
+already names, at a size somebody notices, because a page that draws its own subject could not be
+any other page. A world's CSS budget went from four thousand characters to nine thousand, since a
+disc with grooves does not fit in a budget set for a dashed rule, and a written page picks the
+backdrop behind it rather than inheriting whatever the place on the wall was wearing.
+
+The three seeded built-in worlds do not respond to any of this: their CSS is written by hand in
+`design/worlds.ts`. So a prompt change reaches five of the eight papers, and the other three are a
+taste decision in a data file.
+
 **Nothing about a written page is true by construction, so all of it is proved.** `src/written.ts`
 filters the markup to an allowlist of tags and attributes, because a denylist is a list of the
 attacks somebody thought of. Two things make that load bearing rather than tidy: a shipped page is

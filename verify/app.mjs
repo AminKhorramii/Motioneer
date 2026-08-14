@@ -415,6 +415,39 @@ if (houseFlags.length) throw new Error(`the house trips its own detector on ${ho
   if (escaped.length) throw new Error(`model authored markup got ${escaped.length} things past the filter: ${escaped.join('; ')}`)
   if (noHeadline !== null) throw new Error('a written page with no headline was accepted, so the wall has a paper nothing can compare')
   if (!good?.html) throw new Error('the filter rejected a page that was fine, so nothing would ever reach the wall')
+
+  // The art behind the page is the one part of the visual system a written page could not reach,
+  // and it costs no markup. A name it invented falls back rather than reaching backdropHtml.
+  const chose = core.madeWritten({ html: '<h1>x</h1>', css: '', note: 'n', backdrop: 'dither' })
+  const invented = core.madeWritten({ html: '<h1>x</h1>', css: '', note: 'n', backdrop: 'javascript:alert(1)' })
+  console.log('a written page picks its own backdrop:', JSON.stringify({
+    kept: chose?.backdrop, refused: invented?.backdrop ?? null,
+  }))
+  if (chose?.backdrop !== 'dither') throw new Error('a written page cannot choose the art behind it')
+  if (invented?.backdrop) throw new Error('a backdrop the model invented was passed through to the renderer')
+}
+
+// ——— 0h. there is room to draw in ———
+// Both design prompts ask for the subject to be drawn in CSS now, because a page that draws its
+// own record or its own boarding pass could not be any other page, and that was the one paper on
+// the first real wall worth looking at. Drawing costs characters: a disc with grooves and a
+// numbered stamp is gradients with a dozen stops, pseudo elements and transforms, and the old cap
+// was set when a world's CSS was a dashed rule and a slab of colour.
+{
+  const drawing = [
+    '.disc::before{content:"";display:block;width:min(60vw,32rem);aspect-ratio:1;border-radius:50%;',
+    'background:repeating-radial-gradient(circle,var(--ink) 0 1px,transparent 1px 4px),',
+    'radial-gradient(circle,var(--accent) 0 18%,var(--ink) 18%)}',
+  ].join('')
+  const long = drawing + `\n.pad{padding:1rem}`.repeat(600)
+  const world = core.madeWorld({ name: 'a pressing plant', palette: 'as-is', css: long }, 0)
+  const kept = world.css.length
+  console.log('room to draw:', JSON.stringify({
+    worldCssKept: kept,
+    theDrawingSurvived: world.css.includes('repeating-radial-gradient'),
+  }))
+  if (kept <= 4000) throw new Error(`a world's CSS is still capped at ${kept}, which is a dashed rule and no drawing`)
+  if (!world.css.includes('repeating-radial-gradient')) throw new Error('the drawing was cut out of the world CSS')
 }
 
 // ——— 0g. a written page wears the same tokens and the same faces as an arranged one ———

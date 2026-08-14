@@ -19,6 +19,8 @@ interface Props {
   world?: WorldId
   bar: string
   busy: boolean
+  /** set when the model wrote this page whole, so the badge can say what it made */
+  written?: { note: string }
   /** what the slop detector found on this page, so the verdict travels with the paper */
   flags: Flag[]
   onBar: (v: string) => void
@@ -33,7 +35,7 @@ interface Props {
 }
 
 export function Dock({
-  at, count, angle, world, bar, busy, flags,
+  at, count, angle, world, bar, busy, flags, written,
   onBar, onRun, onGo, onModel, onKill, onSend, onOpen, onShip,
 }: Props) {
   return (
@@ -79,8 +81,12 @@ export function Dock({
         {angle && <span className="angle">{angle}</span>}
         {/* a badge rather than a control: it says what this page is built in, which is the one
             thing you need before handing it back, and the brief carries the same name */}
-        <span className="angle library" title={worldById(world).note}>
-          {worldById(world).library ?? worldById(world).name}
+        {/* A written page borrows a world for its tokens and its faces and is not built in it, so
+            naming that world here was naming the wrong thing: a page drawn as a record sleeve
+            reported itself as Material 3, which is the one label a reader would act on. It says
+            what it made instead, which is what the model called it. */}
+        <span className="angle library" title={written?.note ?? worldById(world).note}>
+          {written?.note || worldById(world).library || worldById(world).name}
         </span>
         <span className="spacer" />
         {/* the verdict sits beside ship, because it is the last thing worth checking before a

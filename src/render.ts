@@ -668,7 +668,8 @@ export function renderPage(page: Page, opts: { editable?: boolean; title?: strin
    * model's, which is the entire point of it being here.
    */
   if (page.written) {
-    const art = backdropHtml(page.taste, page.backdrop ?? 'none', !!opts.still)
+    // the one the page asked for, not the one the place on the wall happened to be wearing
+    const art = backdropHtml(page.taste, page.written.backdrop ?? page.backdrop ?? 'none', !!opts.still)
     return `${head(page.taste, opts.title ?? 'Landing', false, world, !!opts.still, 'column')}${art}` +
       `<style>${page.written.css}</style>${page.written.html}` +
       `${opts.live ? PATCH_SCRIPT : ''}</body></html>`

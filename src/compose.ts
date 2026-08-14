@@ -876,7 +876,9 @@ export async function promptWorlds(
         (note ? `\n\n${note}` : ''),
       `${brief}\n\nDesign ${count === 1 ? 'one world' : `${count} worlds`} for it.`,
       feed,
-      { maxTokens: 8000, kind: 'design' },
+      // room for the drawing. A world may now carry nine thousand characters of CSS rather than
+      // four, and a reply cut off mid-gradient costs the whole design it was in the middle of
+      { maxTokens: 12000, kind: 'design' },
     ).catch(() => null)
     // A world carries CSS, so a cut reply used to yield nothing at all. The same walk that
     // recovers half-arrived sections recovers half-arrived worlds.

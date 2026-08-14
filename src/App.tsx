@@ -784,7 +784,7 @@ export default function App() {
               </div>
               <Dock
                 at={at} count={pages.length} angle={page.angle} world={page.world} bar={bar} busy={!!busy}
-                flags={flags}
+                flags={flags} written={page.written}
                 onBar={setBar} onRun={runBar}
                 onModel={() => setOnboarding('first')}
                 onGo={(i) => setAt(Math.max(0, Math.min(i, pages.length - 1)))}

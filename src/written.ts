@@ -18,6 +18,8 @@
  * than an opinion held in advance.
  */
 
+import { BACKDROPS, type Backdrop } from '@/backdrop'
+
 /** the tags a landing page is allowed to be made of. Anything that can fetch or execute is absent
     rather than filtered, because a page is a single file that makes no requests, and because the
     frame it renders in shares this app's origin and its stored keys */
@@ -137,6 +139,15 @@ export interface Written {
   css: string
   /** what the model says it made, so the dock can name it the way it names a world */
   note: string
+  /**
+   * The art behind the page, chosen rather than inherited.
+   *
+   * A written page borrows its look from the place on the wall it landed in, and the backdrop came
+   * with it, so a page designed as a printed thing could end up over a live gradient it never
+   * asked for. This is the one part of the visual system the model could not reach and the
+   * cheapest to hand over: it costs no markup and the drawing is already written.
+   */
+  backdrop?: Backdrop
 }
 
 /**
@@ -151,9 +162,11 @@ export interface Written {
 export function madeWritten(raw: Record<string, unknown>): Written | null {
   const html = safeMarkup(raw.html)
   if (!/<h1[\s>]/i.test(html)) return null
+  const backdrop = BACKDROPS.includes(raw.backdrop as Backdrop) ? (raw.backdrop as Backdrop) : undefined
   return {
     html,
     css: safeStyle(raw.css),
     note: String(raw.note ?? '').replace(/\s+/g, ' ').trim().slice(0, 120),
+    ...(backdrop ? { backdrop } : {}),
   }
 }

@@ -10,6 +10,30 @@ import { copyLimits } from '@/design/slop'
 import { kindMenu } from '@/design/kinds'
 import { blockContract } from '@/design/blocks'
 
+/**
+ * Draw the thing, not a box where a picture would go.
+ *
+ * Both design prompts already said to use CSS, and both meant treatment: a dashed rule, a slab of
+ * colour, a hairline. What they never asked for was the subject itself. A model did it unprompted
+ * on one page of one wall, drawing a record with grooves and a numbered stamp for a vinyl reissue,
+ * and that page was the one worth looking at, which says the instruction was missing rather than
+ * the ability.
+ *
+ * Shared by the world call and the whole page call because it is the same knowledge, and a rule
+ * stated twice in two wordings becomes two rules that drift.
+ */
+const DRAW = `Draw the thing the page is about, in CSS, at a size somebody notices.
+
+This is the difference between a design and a template with a slot where a photograph goes. A page that draws its own subject could not be any other page: a record with its grooves, a boarding pass with its stub and perforation, a seed packet with its illustration panel, a tide table with its curve. Reach for the object your ground already names, because it is the one thing on the page that cannot be swapped out for another product's.
+
+The techniques, because CSS draws better than most people expect. repeating-linear-gradient for stripes, rules, perforations, ledger lines and halftone. radial-gradient and conic-gradient for discs, rings, grooves, seals and dials. clip-path for cut and torn shapes. transform with rotate and skew for stamps and tilted labels. box-shadow for printed offset and for depth without a blur under everything. mix-blend-mode for overprint, which is what makes two inks look like two inks. Pseudo elements carry all of it, so the markup stays about the argument.
+
+One large drawn thing beats five small ones, because an illustration the size of a paragraph reads as an icon and an icon is decoration. Give it room and let the type work around it.
+
+No emoji and no unicode characters standing in for pictures, because that borrows a system font's drawing and lands on the same shapes as everyone else. No empty boxes captioned as an image, because a placeholder for art is worse than no art.
+
+Whatever you draw has to survive at 390 pixels wide, so build it from proportions rather than from fixed pixel sizes.`
+
 export const PAGE_SYSTEM = `You write copy for a whole landing page. You receive the page as JSON: an array of sections, each with an id, a role it plays in the argument, the form it is set in, and content. You also receive an instruction describing what to change.
 
 Return JSON shaped as {"sections":[{"id":"...","content":{...}}]}, reusing the same ids and the same content keys, with the copy rewritten to follow the instruction. Reusing ids and keys matters because the app merges your reply into the existing page by id, and an unknown id or missing key is dropped.
@@ -67,6 +91,8 @@ ${blockContract()}
 
 Write CSS that commits to the idea. A receipt has a narrow column, dashed rules and tabular figures. A departures board has slabs of solid colour, tight uppercase rows and hard shadows. A gallery card has enormous margins, one hairline and nothing else. Use borders, background gradients, pseudo elements, counters, transforms and mix-blend-mode. Change the shape of things, not only their size.
 
+${DRAW}
+
 Ground each world in something real, and let that decide the values rather than picking them one at a time.
 
 Avoid the patterns that make a page look generated rather than designed, and the reasons matter more than the list: frosted glass panels, because they read as a period effect and cost contrast; default drop shadows under everything, because when every block floats nothing is above anything; cards inside cards, because two borders around the same content divide attention without adding structure; gradient filled headlines, because that is the decoration a page reaches for when the words are not carrying it; more than three typefaces, because two is a system and four is an accident; body text under fifteen pixels, because it looks refined on your screen and is unreadable on everyone else's; and small labels blinking forever, because they take attention they never give back.
@@ -113,7 +139,7 @@ export const WRITTEN_SYSTEM = `You are writing a complete landing page as HTML a
 
 You are given a direction to build from, a brief about the product, and a set of CSS custom properties that are already defined in the document. Design the page the direction asks for.
 
-Return JSON shaped as {"note": "...", "html": "...", "css": "..."}.
+Return JSON shaped as {"note": "...", "backdrop": "...", "html": "...", "css": "..."}.
 
 - note: one short line naming what you made, the way you would name a design.
 - html: the body of the page. Start at the outermost section and write real content. No <html>, <head>, <body>, <style> or <script> tags: only the content.
@@ -121,7 +147,11 @@ Return JSON shaped as {"note": "...", "html": "...", "css": "..."}.
 
 The tokens already exist and are the palette. Use var(--bg), var(--ink), var(--dim), var(--accent), var(--accent2), var(--surface), var(--line), var(--r) for radius, and var(--gap). The display and body faces are already set on the document, so inherit them rather than naming a font family, and set weight and size and spacing freely. Working in these is what lets the page be restyled without being rewritten, and a hex value typed into forty rules is a page that can only ever look one way.
 
-The page must be one file that makes no requests. No font imports, no stylesheet links, no images from a url, no scripts, no tracking, no iframes. If you want a picture, draw it in CSS. This is not a preference: a page that fetches anything stops being a file somebody can open.
+The page must be one file that makes no requests. No font imports, no stylesheet links, no images from a url, no scripts, no tracking, no iframes. This is not a preference: a page that fetches anything stops being a file somebody can open.
+
+${DRAW}
+
+backdrop: none, contours, grain, ridge, dither or dots, in a field of its own beside the others. It is drawn behind the whole page from your palette, so it costs you no markup. contours, grain and ridge are drawn live; dither and dots are printed textures, and they are what make a page read as printed rather than rendered, so reach for them when the idea comes from paper.
 
 Write exactly one <h1>. It is the headline, and it is the thing the page is compared on.
 
