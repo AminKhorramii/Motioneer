@@ -194,6 +194,19 @@ export async function runClaude(system, user, { model = CLI_MODEL(), bin = 'clau
     let err = ''
     let text = ''
     let line = ''
+    /**
+     * What the session itself said went wrong.
+     *
+     * The CLI reports a failure as a frame on stdout, not as anything on stderr, and the streaming
+     * reader only ever looked for content deltas: every other frame hit the continue below and was
+     * gone. So a call that failed had no text and no error either, and the reason handed back was
+     * whatever happened to be on stderr instead. Measured against a bad key, the CLI wrote
+     * "Failed to authenticate. API Error: 401 API key is invalid." on stdout and one unrelated
+     * warning about connectors on stderr, and the warning is what reached the wall. The
+     * non-streaming path below has always read this frame; this is the same reading, on the path
+     * that a wall actually uses.
+     */
+    let said = ''
     child.stdout.on('data', (d) => {
       if (!streaming) {
         out += d
@@ -210,6 +223,8 @@ export async function runClaude(system, user, { model = CLI_MODEL(), bin = 'clau
         } catch {
           continue
         }
+        // the session's own verdict, kept whichever way the call ends
+        if (j?.type === 'result' && j.is_error && j.result) said = String(j.result)
         const d = j?.type === 'stream_event' && j.event?.type === 'content_block_delta' ? j.event.delta : null
         if (!d) continue
         if (d.text) {
@@ -234,7 +249,20 @@ export async function runClaude(system, user, { model = CLI_MODEL(), bin = 'clau
     )
     child.on('close', () => {
       if (streaming) {
-        return done(text ? { text } : { error: (err || 'no reply').slice(0, 200) })
+        /**
+         * The session's reason first, and stderr last.
+         *
+         * A warning is not a failure, and the CLI writes both to the same place. It prefixes its
+         * warnings, so they are dropped rather than reported: told that a call failed because
+         * connectors are disabled, a person goes and looks at connectors, and the call had
+         * actually failed on a bad key. Naming the wrong cause is worse than naming none.
+         */
+        const warned = err
+          .split('\n')
+          .filter((l) => l.trim() && !l.trimStart().startsWith('⚠'))
+          .join(' ')
+          .trim()
+        return done(text ? { text } : { error: (said || warned || 'no reply').slice(0, 200) })
       }
       try {
         const j = JSON.parse(out)

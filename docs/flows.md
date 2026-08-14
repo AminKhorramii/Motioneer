@@ -583,6 +583,7 @@ npm run verify:server  # the real server against a recorded upstream, asserting 
 npm run verify:stream  # the real streaming path, no mock anywhere
 npm run verify:hard    # copy that fights back: markup, braces, other scripts, other alphabets
 npm run verify:beat    # the thinking beat, and that none of it reaches the reply
+npm run verify:cli     # what a failed local session says it failed for
 npm run verify:image   # the image pipeline, no browser and no Rust needed
 npm run verify:tauri   # the desktop shell's own commands, in Rust, with no window
 npm run verify:mcp     # the agent path over the real protocol, brief to spec
