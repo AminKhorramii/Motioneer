@@ -1,13 +1,13 @@
 /** Making pages: alternatives, section prompts, and the model path (with a mock for tests). */
 
 import { PRESETS } from '@/design/presets'
-import { luminance, tasteAvoid, tasteBrief, type Lean, type Taste } from '@/taste'
+import { tasteAvoid, tasteBrief, type Lean, type Taste } from '@/taste'
 import { giveKey, host, isDesktop, isServed, servedConfig } from '@/host'
 import { slop, slopBrief } from '@/slop'
 import { dealDirections, directionSeed, type Direction } from '@/design/directions'
 import { ANGLES } from '@/design/angles'
 import { INTAKE_SYSTEM, MEND_SYSTEM, PAGE_SYSTEM, WORLDS_SYSTEM, WRITTEN_SYSTEM } from '@/design/prompts'
-import { madeWritten, type Written } from '@/written'
+import { madeWritten, safeStyle, type Written } from '@/written'
 import { grabJson, scanSections } from '@/reply'
 import { MODELS, modelById, type ModelChoice } from '@/models'
 import { BACKDROPS, type Backdrop } from '@/backdrop'
@@ -79,18 +79,18 @@ export function arrange(base: Page, i: number, worlds: World[] = WORLDS): Page {
 const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a)
 
 /**
- * Only the dark looks.
+ * The whole look deck, light and dark.
  *
- * The deck holds eight and three of them are paper white. A wall mixing the two reads as two
- * products rather than one, and the light ones are where a page most easily lands on the default
- * that nobody chose: white background, grey text, blue button. Dark is a decision the whole wall
- * makes together, and the world, the ground and the markup are still eight different answers
- * inside it.
+ * This was filtered to the five dark looks for a wall, and the wall came back reading as generated.
+ * Two reasons, and both were predictable. Light against dark is the loudest difference between two
+ * papers seen side by side, so removing it cut the strongest axis a wall has, from eight looks to
+ * five of one temperature. And dark is where every design tell in the catalogue lives: frosted
+ * panels, a violet wash, glowing text, a transition on everything are all things that only happen
+ * on a dark ground. Pushing every page there put the whole wall in the one region the detector
+ * exists to police. Dark belongs in the deck, not as the deck.
  */
-const dark = (t: Taste) => luminance(t.bg) < 0.5
-
 export function arrangeIn(base: Page, i: number, world: World): Page {
-  const looks = [base.taste, ...PRESETS.filter((p) => p.name !== base.taste.name)].filter(dark)
+  const looks = [base.taste, ...PRESETS.filter((p) => p.name !== base.taste.name)]
   // The stride has to be coprime with the deck or the wall repeats. Three is coprime with the
   // eight looks left after a preset is filtered out, but a taste read from a screenshot is not
   // a preset name, nothing gets filtered, and three into nine visits only three of them: the
@@ -140,6 +140,48 @@ async function mendCopy(page: Page, product: Product, provider: Provider): Promi
   ).catch(() => null)
   if (!again) return page
   return slop(again).filter((f) => f.kind === 'copy').length < faults.length ? again : page
+}
+
+/**
+ * Ask for the styles again when the page reads as generated, and keep them only if it improved.
+ *
+ * The detector has always had two halves and only ever repaired one of each kind of page. A world
+ * that tripped the design half went back with its faults named; a written page got a chip on the
+ * dock and shipped. That was survivable while written pages were three of eight beside worlds that
+ * were being repaired, and became the whole story when they became the wall: a page can trip
+ * frosted panels, a violet wash, glowing text and a transition on everything, and nothing at all
+ * happens.
+ *
+ * The styles rather than the whole page. Every design tell in the catalogue is a CSS decision, the
+ * markup and the words were not what was wrong, and re-asking for the document would spend twelve
+ * thousand tokens to fix four rules. Kept only if it carries strictly fewer, on the same reasoning
+ * the world repair uses: a repair that trades one tell for another is a second opinion.
+ */
+async function mendWritten(page: Page, product: Product, provider: Provider): Promise<Page> {
+  const written = page.written
+  if (!written) return page
+  const faults = slop(page, renderPage(page, { title: product.name })).filter((f) => f.kind === 'design')
+  if (!faults.length) return page
+  const text = await ask(
+    provider,
+    'You wrote the CSS for a landing page. Rendered, it trips checks that exist because those '
+      + 'patterns are what make a page look generated rather than designed, and the reason is given '
+      + 'with each one.\n\nReturn JSON shaped as {"css":"..."} carrying the same design with only '
+      + 'the named faults fixed. Change nothing else: the markup is unchanged and every class you '
+      + 'wrote still has to match it. Fix the fault rather than removing what carried it, because a '
+      + 'page with the offending thing deleted is a page with a hole where a decision was.',
+    `${written.css}\n\nIt trips ${faults.length === 1 ? 'this check' : `these ${faults.length} checks`}:\n`
+      + faults.map((f) => `- ${f.label}. ${f.why}`).join('\n'),
+    undefined,
+    { maxTokens: 6000, kind: 'repair' },
+  ).catch(() => null)
+  const css = text ? safeStyle((grabJson(text) as { css?: unknown } | null)?.css) : ''
+  if (!css) return page
+  const mended = { ...page, written: { ...written, css } }
+  return slop(mended, renderPage(mended, { title: product.name })).filter((f) => f.kind === 'design').length
+    < faults.length
+    ? mended
+    : page
 }
 
 /**
@@ -214,9 +256,8 @@ export async function writeWhole(
   if (!raw) return null
   const written = madeWritten(raw)
   if (!written) return null
-  // the ground rides on the page, since the world underneath is borrowed and shared. A model that
-  // refused its direction named what it used instead, and that is what gets remembered.
-  return landed(written)
+  // a page that reads as generated goes back for its styles once, and only that page pays
+  return mendWritten(landed(written), product, provider)
 }
 
 export async function writeOne(
