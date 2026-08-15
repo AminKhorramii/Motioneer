@@ -69,7 +69,7 @@ await page.waitForFunction(() => {
 
 console.log('after write:', JSON.stringify(await page.evaluate(() => ({
   railSections: document.querySelectorAll('.sec').length,
-  counter: document.querySelector('.filmbar span')?.textContent,
+  counter: document.querySelector('.filmbar .count')?.textContent,
   papersSections: [...document.querySelectorAll('.paper iframe')]
     .map((f) => f.contentDocument?.querySelectorAll('section').length ?? -1),
 }))))
@@ -101,7 +101,7 @@ const read = await page.evaluate(() => {
   const doc = frame.contentDocument
   const text = doc.body.innerText
   return {
-    counter: document.querySelector('.filmbar span')?.textContent,
+    counter: document.querySelector('.filmbar .count')?.textContent,
     headline: doc.querySelector('h1')?.innerText ?? '',
     // markup in copy must arrive as text, never as an element the browser runs
     scriptRan: frame.contentWindow.__pwned !== undefined,

@@ -64,33 +64,44 @@ export function Dock({
       </div>
 
       <div className="filmbar">
-        <div className="nav">
-          <button title="previous alternative, or press the left arrow key"
-            onClick={() => onGo(at - 1)} disabled={at === 0}><Icon.left /></button>
-          <span className="count"><b>{at + 1}</b> of {count}</span>
-          <button title="next alternative, or press the right arrow key"
-            onClick={() => onGo(at + 1)} disabled={at >= count - 1}><Icon.right /></button>
+        {/* Everything that acts on this paper, in one cluster.
+            These used to be spread across the bar with the identity and the counter between them,
+            so the row read as eight unrelated things and the one that matters was last. Grouped,
+            the bar is three clusters rather than nine controls: what you can do, what this is, and
+            where you are. */}
+        <div className="acts">
+          <button aria-label="remove this page"
+            title="take this page off the wall, or press x. z brings the last removed one back."
+            onClick={onKill}><Icon.x /></button>
+          <button className="icon" aria-label="full view" title="open this page in your browser"
+            onClick={onOpen}><Icon.open /></button>
+          <button className={onSend ? 'icon' : 'go'} aria-label="download"
+            title="write this page out as one HTML file" onClick={onShip}>
+            <Icon.down />{onSend ? '' : ' download'}
+          </button>
+          {/* when something asked for this design, handing it back is the whole point of being
+              here, so it is the one thing wearing a name */}
+          {onSend && (
+            <button className="go send" title="hand this design back to the agent that asked"
+              onClick={onSend}>
+              {MARKS['claude-code']?.() ?? <Icon.claude />} to Claude
+            </button>
+          )}
         </div>
-        {/* triage sits beside the counter because narrowing is done while counting through */}
-        <button aria-label="remove this page"
-          title="take this page off the wall, or press x. z brings the last removed one back."
-          onClick={onKill}><Icon.x /></button>
-        {/* the left side says what this paper is. The pin and the world used to sit here too and
-            were the two things in the bar that named a state rather than doing something, so they
-            are keys now: p pins, w moves the page to the next world. */}
-        {angle && <span className="angle">{angle}</span>}
-        {/* a badge rather than a control: it says what this page is built in, which is the one
-            thing you need before handing it back, and the brief carries the same name */}
-        {/* A written page borrows a world for its tokens and its faces and is not built in it, so
-            naming that world here was naming the wrong thing: a page drawn as a record sleeve
-            reported itself as Material 3, which is the one label a reader would act on. It says
-            what it made instead, which is what the model called it. */}
-        <span className="angle library" title={written?.note ?? worldById(world).note}>
-          {written?.note || worldById(world).library || worldById(world).name}
+
+        {/* What this paper is, in one label rather than two chips. A written page says what the
+            model made; an arranged one says the world it is built in, which is the same question
+            answered by whichever half designed it. */}
+        <span className="angle" title={written?.note ?? worldById(world).note}>
+          {[angle, written?.note || worldById(world).library || worldById(world).name]
+            .filter(Boolean)
+            .join(' · ')}
         </span>
+
         <span className="spacer" />
-        {/* the verdict sits beside ship, because it is the last thing worth checking before a
-            page goes out, and the reasons ride in the tooltip rather than taking a panel */}
+
+        {/* the verdict sits with the identity rather than with the actions, because it describes
+            the page rather than doing anything to it, and the reasons ride in the tooltip */}
         <span className={flags.length ? 'flags' : 'flags ok'}
           title={flags.length
             ? flags.map((f) => `${f.kind}: ${f.label}. ${f.why}`).join('\n')
@@ -104,20 +115,14 @@ export function Dock({
               ].filter(Boolean).join(', ')
             : 'clean'}
         </span>
-        <button className="icon" aria-label="full view" title="open this page in your browser"
-          onClick={onOpen}><Icon.open /></button>
-        <button className={onSend ? 'icon' : 'go'} aria-label="download"
-          title="write this page out as one HTML file" onClick={onShip}>
-          <Icon.down />{onSend ? '' : ' download'}
-        </button>
-        {/* when something asked for this design, handing it back is the whole point of being
-            here, so it is the one thing wearing a name */}
-        {onSend && (
-          <button className="go send" title="hand this design back to the agent that asked"
-            onClick={onSend}>
-            {MARKS['claude-code']?.() ?? <Icon.claude />} to Claude
-          </button>
-        )}
+
+        <div className="nav">
+          <button title="previous alternative, or press the left arrow key"
+            onClick={() => onGo(at - 1)} disabled={at === 0}><Icon.left /></button>
+          <span className="count"><b>{at + 1}</b> of {count}</span>
+          <button title="next alternative, or press the right arrow key"
+            onClick={() => onGo(at + 1)} disabled={at >= count - 1}><Icon.right /></button>
+        </div>
       </div>
     </div>
   )

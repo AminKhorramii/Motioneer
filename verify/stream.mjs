@@ -101,7 +101,7 @@ const wall = await page.evaluate(async () => {
     looks.add([b?.fontFamily?.slice(0, 18), h?.fontSize, b?.backgroundColor].join('|'))
   }
   return {
-    counter: document.querySelector('.filmbar span')?.textContent,
+    counter: document.querySelector('.filmbar .count')?.textContent,
     distinctHeadlines: heads.size,
     angles: [...new Set(angles)].length,
     worlds: [...worlds].filter(Boolean),

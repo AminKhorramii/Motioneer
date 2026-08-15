@@ -662,10 +662,10 @@ if (!repair.notFixed.tells.length) throw new Error('a repair that traded one tel
 const growth = []
 const watch = setInterval(async () => {
   try {
-    growth.push(await page.evaluate(() => document.querySelectorAll('.paper').length && document.querySelector('.filmbar span')?.textContent))
+    growth.push(await page.evaluate(() => document.querySelectorAll('.paper').length && document.querySelector('.filmbar .count')?.textContent))
   } catch { /* window closed */ }
 }, REAL ? 900 : 60)
-await page.waitForFunction(() => /of 9$/.test(document.querySelector('.filmbar span')?.textContent ?? ''), null, { timeout: REAL ? 180000 : 20000 })
+await page.waitForFunction(() => /of 9$/.test(document.querySelector('.filmbar .count')?.textContent ?? ''), null, { timeout: REAL ? 180000 : 20000 })
 clearInterval(watch)
 // A mock answers faster than this can sample, so an empty result here means the sampler missed
 // rather than that nothing arrived progressively. Say which, because a check that reports
@@ -698,7 +698,7 @@ await page.waitForTimeout(1500)
 const studio = await page.evaluate(() => ({
   papers: document.querySelectorAll('.paper').length,
   sections: [...document.querySelectorAll('.sec .secline b')].map((b) => b.textContent),
-  counter: document.querySelector('.filmbar span')?.textContent,
+  counter: document.querySelector('.filmbar .count')?.textContent,
   writingWith: document.querySelector('.barwrap .model')?.textContent?.trim(),
 }))
 console.log('studio:', JSON.stringify(studio))
@@ -710,7 +710,7 @@ await page.keyboard.press('ArrowRight')
 await page.waitForTimeout(700)
 const after = await page.evaluate(() => ({
   id: document.querySelector('.paper.here iframe')?.getAttribute('title'),
-  counter: document.querySelector('.filmbar span')?.textContent,
+  counter: document.querySelector('.filmbar .count')?.textContent,
 }))
 console.log('navigate:', JSON.stringify({ moved: before !== after.id, counter: after.counter }))
 
@@ -806,7 +806,7 @@ await page.fill('.bar', 'punchier')
 await page.press('.bar', 'Enter')
 await page.waitForTimeout(1600)
 const variants = await page.evaluate(() => ({
-  counter: document.querySelector('.filmbar span')?.textContent,
+  counter: document.querySelector('.filmbar .count')?.textContent,
   headline: document.querySelector('.paper.here iframe')?.contentDocument?.querySelector('h1')?.innerText?.slice(-12),
 }))
 console.log('prompt bar:', JSON.stringify({ before: countBefore, ...variants }))
