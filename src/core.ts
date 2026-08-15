@@ -25,5 +25,7 @@ export {
 export { DIRECTIONS, dealDirections, directionSeed, type Direction } from '@/design/directions'
 // the page a model wrote whole, and the filter standing between its markup and the wall
 export { madeWritten, safeMarkup, safeStyle, type Written } from '@/written'
+// what a world left unspent, which is the question the slop detector never asked
+export { unspent } from '@/worlds'
 export { PRESETS } from '@/design/presets'
 export { BLOCKS, TOKENS, blockContract } from '@/design/blocks'
