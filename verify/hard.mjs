@@ -36,6 +36,17 @@ await page.evaluate(async () => {
     await new Promise((r) => setTimeout(r, 60))
   }
 })
+// the section list opens from the header now rather than standing beside every paper, so a suite
+// that reads it has to ask for it first
+const openRail = async (page) => {
+  await page.evaluate(() => {
+    const b = [...document.querySelectorAll('.hactions button')].find((x) => x.textContent.trim() === 'sections')
+    if (b && !b.classList.contains('on')) b.click()
+  })
+  await page.waitForTimeout(250)
+}
+
+await openRail(page)
 const grown = await page.evaluate(() => document.querySelectorAll('.sec').length)
 console.log('page grown to:', JSON.stringify({ sections: grown }))
 
@@ -84,7 +95,7 @@ await page.waitForFunction(
 
 console.log('sections per paper:', JSON.stringify(await page.evaluate(async () => {
   const out = []
-  for (let i = 0; i < 9; i++) {
+  for (let i = 0; i < 8; i++) {
     out.push(document.querySelectorAll('.sec').length)
     document.querySelectorAll('.filmbar .nav button')[1]?.click()
     await new Promise((r) => setTimeout(r, 250))

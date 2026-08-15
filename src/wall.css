@@ -661,3 +661,14 @@ header .hactions button.on { color: var(--ink); }
 .barwrap .run:hover:not(:disabled) { background: rgba(255, 255, 255, 0.14); color: var(--ink); }
 .barwrap .run:active:not(:disabled) { transform: scale(0.94); }
 .barwrap .run:disabled { opacity: 0.4; }
+
+
+/* The wall's own progress, said once and clearly.
+   It used to read as a sentence with a number buried in it, and the number was the only part
+   anybody was reading. The turning character advances on the model's beat rather than on a
+   timer, so a still frame honestly means nothing is happening. */
+.building .elapsed { display: flex; align-items: baseline; gap: 0.5rem; font-variant-numeric: tabular-nums; }
+.building .elapsed .spin { display: inline-block; width: 1ch; color: var(--accent); font-family: ui-monospace, Menlo, monospace; }
+.building .elapsed .tally { font-size: 1.35rem; font-weight: 600; color: var(--ink); letter-spacing: -0.01em; }
+.building .elapsed .what { color: var(--dim); }
+.building .elapsed .secs { margin-left: auto; color: var(--dim2); font-size: 12px; }

@@ -14,7 +14,7 @@ import { fakeAnthropic } from './fake-upstream.mjs'
 // an argument points at a different corpus, so the truncated captures can be replayed as a
 // recovery test: those replies were cut off mid-object by a token limit that is now raised
 const corpus = process.argv[2]
-const { server, url, fixtures } = await fakeAnthropic(corpus)
+const { server, url, fixtures } = await fakeAnthropic(corpus, { answerWritten: false })
 
 // both wire formats, before anything else: the anthropic frames and the openai frames differ
 // in shape and in how they end, and every open weight vendor speaks the second one
@@ -77,13 +77,25 @@ console.log('wall filled progressively:', JSON.stringify({
   reachedAllEight: designed.includes(8),
 }))
 
+// the section list opens from the header now rather than standing beside every paper, so a suite
+// that reads it has to ask for it first
+const openRail = async (page) => {
+  await page.evaluate(() => {
+    const b = [...document.querySelectorAll('.hactions button')].find((x) => x.textContent.trim() === 'sections')
+    if (b && !b.classList.contains('on')) b.click()
+  })
+  await page.waitForTimeout(250)
+}
+
+await openRail(page)
+
 const wall = await page.evaluate(async () => {
   const heads = new Set()
   const angles = []
   const worlds = new Set()
   const shapes = new Set()
   const looks = new Set()
-  for (let i = 0; i < 9; i++) {
+  for (let i = 0; i < 8; i++) {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }))
     await new Promise((r) => setTimeout(r, 450))
     const doc = document.querySelector('.paper.here iframe')?.contentDocument
@@ -124,7 +136,7 @@ if (wall.distinctHeadlines <= 1 && wall.headlines.every((h) => !h.trim())) {
 // a world brings CSS with it, and that CSS must not be able to make the page fetch anything
 const worldCss = await page.evaluate(async () => {
   const found = { styled: 0, imports: 0, remote: 0 }
-  for (let i = 0; i < 9; i++) {
+  for (let i = 0; i < 8; i++) {
     const html = document.querySelector('.paper.here iframe')?.contentDocument?.documentElement?.outerHTML ?? ''
     if (html.includes('/* world */')) found.styled++
     if (/@import/i.test(html)) found.imports++
@@ -139,7 +151,7 @@ console.log('world css:', JSON.stringify(worldCss))
 await page.evaluate(() => localStorage.setItem('wall-key-gemini', 'test-key'))
 // go back to the first paper, so the assertion is not at the mercy of which world is centred
 await page.evaluate(async () => {
-  for (let i = 0; i < 9; i++) {
+  for (let i = 0; i < 8; i++) {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft' }))
     await new Promise((r) => setTimeout(r, 90))
   }

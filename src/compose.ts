@@ -1,7 +1,7 @@
 /** Making pages: alternatives, section prompts, and the model path (with a mock for tests). */
 
 import { PRESETS } from '@/design/presets'
-import { tasteAvoid, tasteBrief, type Lean, type Taste } from '@/taste'
+import { luminance, tasteAvoid, tasteBrief, type Lean, type Taste } from '@/taste'
 import { giveKey, host, isDesktop, isServed, servedConfig } from '@/host'
 import { slop, slopBrief } from '@/slop'
 import { dealDirections, directionSeed, type Direction } from '@/design/directions'
@@ -78,8 +78,19 @@ export function arrange(base: Page, i: number, worlds: World[] = WORLDS): Page {
  */
 const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a)
 
+/**
+ * Only the dark looks.
+ *
+ * The deck holds eight and three of them are paper white. A wall mixing the two reads as two
+ * products rather than one, and the light ones are where a page most easily lands on the default
+ * that nobody chose: white background, grey text, blue button. Dark is a decision the whole wall
+ * makes together, and the world, the ground and the markup are still eight different answers
+ * inside it.
+ */
+const dark = (t: Taste) => luminance(t.bg) < 0.5
+
 export function arrangeIn(base: Page, i: number, world: World): Page {
-  const looks = [base.taste, ...PRESETS.filter((p) => p.name !== base.taste.name)]
+  const looks = [base.taste, ...PRESETS.filter((p) => p.name !== base.taste.name)].filter(dark)
   // The stride has to be coprime with the deck or the wall repeats. Three is coprime with the
   // eight looks left after a preset is filtered out, but a taste read from a screenshot is not
   // a preset name, nothing gets filtered, and three into nine visits only three of them: the
@@ -149,6 +160,8 @@ export async function writeWhole(
   direction: Direction,
   i: number,
   provider: Provider = 'model',
+  /** called each time the model proves it is still thinking, before any of it can be read */
+  onBeat?: () => void,
 ): Promise<Page | null> {
   const angle = ANGLES[i % ANGLES.length]
   // the same look the arranged page in this place would have worn, so the two are compared on
@@ -181,11 +194,19 @@ export async function writeWhole(
   // the same split the design hands used: what this person culls goes to every page, because
   // pruning narrows nothing, and what they keep goes only to a page dealt from what they like
   const note = memory ? tasteBrief(memory, memory.favor.includes(direction.name)) : ''
+  /**
+   * The beat, which is the only honest sign of life during this call.
+   *
+   * A whole page is one long call that writes nothing anyone can read until it is nearly done, so
+   * the wall sits still for a minute. The model emits an empty delta while it thinks, and that is
+   * the one mark on screen that moves because something moved rather than because a timer did.
+   */
+  const feed = onBeat ? (delta: string) => { if (!delta) onBeat() } : undefined
   const text = await ask(
     provider,
     note ? `${WRITTEN_SYSTEM}\n\n${note}` : WRITTEN_SYSTEM,
     brief,
-    undefined,
+    feed,
     { maxTokens: 12000, kind: 'design' },
   ).catch(() => null)
   if (!text) return null

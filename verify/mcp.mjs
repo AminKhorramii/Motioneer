@@ -169,7 +169,7 @@ await page.waitForFunction(() => !document.querySelector('[data-busy]'), null, {
 await page.click('.views button:nth-child(2)')
 await page.waitForFunction(() => {
   const marks = [...document.querySelectorAll('.cellbar .flags')]
-  return marks.length >= 9 && marks.every((m) => m.textContent !== 'drafting')
+  return marks.length >= 8 && marks.every((m) => m.textContent !== 'drafting')
 }, null, { timeout: 180000 })
 console.log('wall written:', JSON.stringify(await page.evaluate(() => ({
   papers: document.querySelectorAll('.cell').length,
@@ -237,10 +237,9 @@ const culledTo = await page.evaluate(async () => {
   return { hadCull: !!cull, cells: document.querySelectorAll('.cell').length }
 })
 console.log('culled a page:', JSON.stringify(culledTo))
-if (culledTo.cells !== 8) throw new Error(`culling left ${culledTo.cells} papers on the wall`)
+if (culledTo.cells !== 7) throw new Error(`culling left ${culledTo.cells} papers on the wall`)
 
-// the first paper is the page as it arrived, kept there to compare against, so a choice that
-// stands for the agent path has to be one of the eight the model wrote
+// every paper is one the model wrote now, so any of them stands for the agent path
 await page.evaluate(() => document.querySelectorAll('.cell')[1]?.click())
 await page.waitForSelector('.paper.here', { timeout: 30000 })
 

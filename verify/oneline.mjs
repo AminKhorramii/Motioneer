@@ -90,22 +90,29 @@ page.on('pageerror', (e) => errors.push(String(e).slice(0, 200)))
 await page.goto(url)
 
 // a brief handed in from outside means no setup at all, even in a browser
-await page.waitForSelector('.paper.here', { timeout: 20000 })
+await page.waitForSelector('.building, .paper.here', { timeout: 20000 })
 console.log('greeted with:', JSON.stringify(await page.evaluate(() => ({
   onboarding: !!document.querySelector('.onboard'),
   working: !!document.querySelector('.building') || !!document.querySelector('.paper.here'),
 }))))
 
-// The brief is still being read at this point, and what is on screen is a whole wall arranged
-// from it rather than a placeholder. The wait is the same length either way; this is the
-// difference between spending it looking at pages and spending it looking at a skeleton.
+// The brief is still being read at this point, and the skeleton is what is on screen.
+//
+// This used to assert the opposite: a whole wall arranged from the brief, so the wait was spent
+// looking at pages. Those pages were templates, and once every paper became one the model writes
+// whole they were the only thing on screen this product is not, shown first and eight times over.
+// A skeleton holds the shape of what is coming and claims nothing has arrived, which is true, and
+// the papers now appear one at a time as their calls return.
+// sampled while the reading is happening rather than after it: papers arrive one at a time now,
+// so waiting for the first one would step past the whole window this is about
 const during = await page.evaluate(() => ({
   papers: document.querySelectorAll('.paper').length,
   line: document.querySelector('.busy')?.textContent,
   placeholder: !!document.querySelector('.building'),
 }))
 console.log('while the brief is being read:', JSON.stringify(during))
-if (during.placeholder) throw new Error('the wait for the brief is still spent in front of a placeholder')
+if (!during.placeholder) throw new Error('the wait for the brief shows neither a skeleton nor anything else')
+if (during.papers) throw new Error(`${during.papers} papers are up before anything has been written, which is the templates again`)
 if (during.line !== 'reading the brief') throw new Error(`the wait says "${during.line}" rather than what it is waiting for`)
 
 await page.waitForSelector('.paper.here', { timeout: 120000 })
@@ -114,7 +121,7 @@ await page.waitForFunction(() => !document.querySelector('[data-busy]'), null, {
 console.log('wall written:', JSON.stringify(await page.evaluate(async () => {
   const heads = new Set()
   const angles = new Set()
-  for (let i = 0; i < 9; i++) {
+  for (let i = 0; i < 8; i++) {
     document.querySelectorAll('.filmbar .nav button')[1]?.click()
     await new Promise((r) => setTimeout(r, 260))
     const d = document.querySelector('.paper.here iframe')?.contentDocument
@@ -122,7 +129,7 @@ console.log('wall written:', JSON.stringify(await page.evaluate(async () => {
     const a = document.querySelector('.filmbar .angle')?.textContent
     if (a) angles.add(a)
   }
-  for (let i = 0; i < 9; i++) {
+  for (let i = 0; i < 8; i++) {
     document.querySelectorAll('.filmbar .nav button')[0]?.click()
     await new Promise((r) => setTimeout(r, 90))
   }

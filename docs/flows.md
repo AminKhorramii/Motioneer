@@ -143,7 +143,13 @@ trackpad swipe, or by clicking a neighbour. Only five papers are mounted at a ti
 rest cannot be seen and each one is a live iframe.
 
 **all** is the grid: every paper at once, each labelled with its section count and taste name.
-Click one to open it in the studio.
+Click one to open it in the studio, and press escape to come back out, because reading one paper
+is a detour from comparing eight.
+
+The wall is eight papers and every one of them is designed. It used to open on a ninth, the page
+as it arrived, kept as the thing to compare against: that made sense while the other eight were
+arrangements of it, and became a fixed template sitting in front of eight designs once they were
+each written whole.
 
 The papers are real scrollable DOM in sandboxed iframes, not screenshots, which is the whole
 claim: you are comparing pages, not pictures of pages.
@@ -400,9 +406,10 @@ inline script, and there is no framework and no runtime of ours.
 - **full view** opens it in your browser. Desktop writes a temp file, the web build uses a Blob url.
 - **download** writes it out. Desktop saves a real file and reports the path; the web build
   downloads it and reports the byte count.
-- **copy a brief** puts a markdown spec of the page on your clipboard, tokens once at the top
-  rather than repeated under every section, ready to paste into Claude Code, v0, or a
-  designer's inbox. `src/brief.ts`.
+The markdown spec still exists and is what the handoff writes, in `src/brief.ts`. There is no
+longer a button that copies it: it lived in the brief rail, and that rail is gone along with the
+section list's permanent column, because a wall of eight designs is not improved by two columns of
+chrome standing beside it. If copying comes back it belongs on the dock beside download.
 
 No accounts, no hosting of ours, no lock-in. The file is yours and it opens on its own.
 

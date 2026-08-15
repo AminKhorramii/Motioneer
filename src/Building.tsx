@@ -19,14 +19,14 @@ import { useEffect, useState } from 'react'
  */
 
 interface Props {
-  /** null while designing, otherwise how many pages have arrived */
-  arrived: number | null
+  /** how many of the pages have landed */
+  landed: number
   total: number
   /** beats from the model while it thinks, before it has written anything anyone can read */
   thoughts: number
 }
 
-export function Building({ arrived, total, thoughts }: Props) {
+export function Building({ landed, total, thoughts }: Props) {
   // the timer still runs, but only to count seconds: nothing on screen moves without a reason
   const [, setTick] = useState(0)
   /**
@@ -46,7 +46,17 @@ export function Building({ arrived, total, thoughts }: Props) {
     return () => clearInterval(t)
   }, [since])
 
-  const designing = arrived === null
+  /**
+   * One character that turns, and only when something turned it.
+   *
+   * A spinner on a timer is the same lie as a progress bar that fills at a fixed rate, and this
+   * file already refuses that everywhere else. This advances on the model's own beat while it is
+   * thinking and on a page landing after that, so a still frame means nothing is happening, which
+   * is exactly what somebody waiting a minute needs to be able to tell.
+   */
+  const SPIN = ['-', '\\', '|', '/']
+  const spin = SPIN[(thoughts + landed) % SPIN.length]
+  const done = landed >= total
 
   return (
     <div className="building">
@@ -62,15 +72,14 @@ export function Building({ arrived, total, thoughts }: Props) {
       <div className="progress">
         <div className="slots">
           {Array.from({ length: total }, (_, i) => (
-            <span key={i} className={i < (arrived ?? 0) ? 'slot on' : 'slot'} />
+            <span key={i} className={i < landed ? 'slot on' : 'slot'} />
           ))}
         </div>
         <p className="elapsed">
-          {/* one mark that moves only when the call moves. It is the difference between a page
-              that is waiting and a page that has stopped, and nothing else on screen can say it. */}
-          {designing && <span className="beat" data-on={thoughts % 2 ? '1' : undefined} />}
-          {secs < 60 ? `${secs}s` : `${Math.floor(secs / 60)}m ${secs % 60}s`}
-          {designing ? ' · designing takes about a minute' : ` · ${arrived} of ${total} written`}
+          <span className="spin" aria-hidden>{done ? '' : spin}</span>
+          <b className="tally">{landed} of {total}</b>
+          <span className="what">written</span>
+          <span className="secs">{secs < 60 ? `${secs}s` : `${Math.floor(secs / 60)}m ${secs % 60}s`}</span>
         </p>
       </div>
     </div>

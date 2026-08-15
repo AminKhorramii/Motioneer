@@ -13,7 +13,6 @@ import {
   EMPTY_PRODUCT, addSection, alternatives, readBrief, canDraw, canWrite, choose, chosen, setMemory, cycleForm, cycleWorld, dropSection, dealWritten, writeOne, writeWhole, illustrate, loadHeldKeys, loadKeys, promptPage, sectionAlternatives, seeded, setMock, type Product,
 } from '@/compose'
 import { Onboarding } from '@/Onboarding'
-import { BriefRail } from '@/BriefRail'
 import { SectionsRail } from '@/SectionsRail'
 import { Dock } from '@/Dock'
 import { Building } from '@/Building'
@@ -42,7 +41,7 @@ export default function App() {
   const [bar, setBar] = useState('')
   const [busy, setBusy] = useState('')
   /** null when nothing is being built, otherwise how far along the wall is */
-  const [building, setBuilding] = useState<{ arrived: number | null; landed: string[]; thoughts: number } | null>(null)
+  const [building, setBuilding] = useState<{ landed: number; thoughts: number } | null>(null)
   /**
    * Which papers are still the locally arranged stand-in rather than a written page.
    *
@@ -58,7 +57,8 @@ export default function App() {
   const [toast, setToast] = useState('')
   const toastTimer = useRef(0)
   const [view, setView] = useState<'studio' | 'wall'>('studio')
-  const [briefOpen, setBriefOpen] = useState(false)
+  /** the section list is a detail of one paper, so it is a thing you open rather than a wall */
+  const [railOpen, setRailOpen] = useState(false)
   const [onboarding, setOnboarding] = useState<'first' | 'explain' | null>(
     () => (localStorage.getItem('wall-onboarded') ? null : 'first'),
   )
@@ -136,10 +136,7 @@ export default function App() {
     clearTimeout(toastTimer.current)
     toastTimer.current = window.setTimeout(() => setToast(''), 2600)
   }
-  const copy = async (text: string, what: string) => {
-    await navigator.clipboard?.writeText(text)
-    flash(`${what} copied, ${text.length.toLocaleString()} characters.`)
-  }
+
 
   /** Put a streaming page on the wall, replacing it in place once it already has an id there. */
   const upsertPage = useCallback((page: Page) => {
@@ -167,12 +164,25 @@ export default function App() {
    * Nine: the page as it was given, which stays as the thing to compare against, and eight
    * places that each hold a draft until the written page for that place arrives.
    */
-  const scaffold = useCallback((base: Page) => {
+  const scaffold = useCallback(() => {
     forgetTriage()
-    const first = alternatives(base, 9)
-    slots.current = first.slice(1).map((x) => x.id)
-    setPages(first)
-    setDrafts(new Set(slots.current))
+    /**
+     * Nothing, until there is something.
+     *
+     * The wall used to go up before the model was asked: eight places, each holding a locally
+     * arranged page marked as a draft, so there was something to scroll from the first frame. That
+     * was right while those drafts were the same kind of thing as the pages replacing them, and
+     * stopped being right when every place became a page written whole. Eight templates appearing
+     * at once and then being replaced is a worse first impression than an empty wall filling up:
+     * it shows the one thing this product is not, first, and eight times.
+     *
+     * So a place exists once its page does. They arrive one at a time as their calls return, and
+     * the count in the status line is the honest measure of how far along it is.
+     */
+    forgetTriage()
+    slots.current = []
+    setPages([])
+    setDrafts(new Set())
     setAt(0)
   }, [forgetTriage])
 
@@ -183,7 +193,7 @@ export default function App() {
    */
   const fill = useCallback(async (base: Page, p: Product) => {
     const mine = ++run.current
-    scaffold(base)
+    scaffold()
     // read once per wall rather than once per call, so a log edited between walls is picked up
     // and a wall in flight cannot change its mind halfway through
     setMemory(tasteLean(memory.current, asKind(p.kind)))
@@ -198,7 +208,7 @@ export default function App() {
     // Each page starts the moment its own world is finished, rather than when the whole design
     // is. Writing the wall in one call instead was measured against this and came out the same
     // within noise, so this stays: one path, and the earliest first paper.
-    setBuilding({ arrived: null, landed: [], thoughts: 0 })
+    setBuilding({ landed: 0, thoughts: 0 })
     setBusy('designing')
     const jobs: Promise<{ ok: number; error?: string }>[] = []
 
@@ -211,24 +221,30 @@ export default function App() {
      */
     const land = (page: Page, i: number) => {
       if (run.current !== mine) return
+      /**
+       * A place on the wall, held by index rather than by the id of whatever is in it.
+       *
+       * This used to replace a draft by matching its id, which worked while every place opened
+       * holding one. With the drafts gone there was nothing to match, so it fell through to
+       * appending, and anything that lands twice in the same place appended twice: a copy repair
+       * comes back as a new page with a new id, so a wall of eight quietly became a wall of nine.
+       * The place is the identity, and what is standing in it is a detail.
+       */
       const held = slots.current[i]
-      if (held && held !== page.id) {
-        // a draft turned away during triage turns away the page that was being written for it,
-        // or the wall would grow back the one place the reader just took off it
-        if (buried.current.has(held)) {
-          buried.current.add(page.id)
-          return
-        }
-        slots.current[i] = page.id
-        setPages((all) => all.map((x) => (x.id === held ? page : x)))
-        setDrafts((d) => {
-          const next = new Set(d)
-          next.delete(held)
-          return next
-        })
+      // a place turned away during triage turns away the page still being written for it, or the
+      // wall grows back the one paper the reader just took off it
+      if (held && buried.current.has(held)) {
+        buried.current.add(page.id)
         return
       }
-      upsertPage(page)
+      slots.current[i] = page.id
+      setPages((all) => {
+        const at = held ? all.findIndex((x) => x.id === held) : -1
+        if (at < 0) return [...all, page]
+        const next = [...all]
+        next[at] = page
+        return next
+      })
     }
 
     /**
@@ -265,10 +281,13 @@ export default function App() {
     const deck = dealWritten(WHOLE)
     const arrangeInstead: number[] = []
     const wholeJobs = deck.map((d: Direction, at: number) =>
-      writeWhole(base, p, d, at).then((made) => {
+      writeWhole(base, p, d, at, 'model', () => {
+        if (run.current === mine) setBuilding((b) => (b ? { ...b, thoughts: b.thoughts + 1 } : b))
+      }).then((made) => {
         if (run.current !== mine) return { ok: 0 }
         if (made) {
           land(made, at)
+          setBuilding((b) => (b ? { ...b, landed: b.landed + 1 } : b))
           return { ok: 1 }
         }
         // the place keeps its arranged draft for now and is written properly below
@@ -381,13 +400,19 @@ export default function App() {
       }
       if (told) {
         // nothing to read, so the next thing on screen is the wall itself a moment later
-        setBuilding({ arrived: null, landed: [], thoughts: 0 })
+        setBuilding({ landed: 0, thoughts: 0 })
       } else {
-        // Reading the brief is a model call of its own, and the wait for it used to be spent
-        // looking at a placeholder. There is a whole wall to look at instead, arranged from the
-        // brief as it stands, so the reading happens behind something worth reading.
+        /**
+         * Reading the brief is a model call of its own, and the wait belongs to it.
+         *
+         * This used to put a whole wall up first, arranged from the brief as it stood, so the
+         * reading happened behind something worth looking at. Those were templates, and once every
+         * paper became a page written whole they were the one thing on screen that this product is
+         * not, shown first and eight times. The skeleton is the honest version again: it holds the
+         * shape of what is coming and claims nothing has arrived, which is true.
+         */
         setProduct(provisional)
-        scaffold(seeded(starterPage(taste, provisional.name, provisional.kind), provisional))
+        scaffold()
         setBusy('reading the brief')
       }
       await loadHeldKeys()
@@ -451,6 +476,8 @@ export default function App() {
       if (e.key === 'w') setPage(cycleWorld)
       if (e.key === 'x') kill(at)
       if (e.key === 'z') revive()
+      // the way back out of one paper, because reading one is a detour from comparing eight
+      if (e.key === 'Escape') setView('wall')
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -701,8 +728,10 @@ export default function App() {
             title="every paper at once">all</button>
         </div>
         <div className="hactions">
-          <button className={briefOpen ? 'on' : ''} onClick={() => setBriefOpen((v) => !v)}
-            title="what every page is written from">brief</button>
+          {/* The section list belongs to one paper, so it opens from here rather than standing
+              beside the wall taking a column of it. */}
+          <button className={railOpen ? 'on' : ''} onClick={() => setRailOpen((v) => !v)}
+            disabled={!page} title="the sections of the paper you are on">sections</button>
           {/* writing a wall takes half a minute, so starting another must not be blocked. Runs
               carry a token, so the previous one is abandoned rather than mixed in. */}
           <button className="go" disabled={!page} onClick={() => page && void fill(page, product)}>
@@ -722,32 +751,20 @@ export default function App() {
       {busy && (
         <p className="busy">
           {building
-            ? `${busy}, ${building.landed.length} of 8 designed${building.thoughts ? `, ${clock(building.thoughts)}` : ''}`
+            ? `${building.landed} of 8 written${building.thoughts ? `, ${clock(building.thoughts)} thinking` : ''}`
             : busy}
         </p>
       )}
 
       <div className="body">
-        {briefOpen && (
-          <BriefRail
-            product={product}
-            taste={taste}
-            onProduct={setProduct}
-            onCopy={() => page && void copy(pageBrief(page, product.name), 'Page brief')}
-            onTaste={(t) => {
-              setTaste(t)
-              setPages((all) => all.map((p) => ({ ...p, taste: t })))
-            }}
-          />
-        )}
 
-        {view === 'studio' && building && pages.length < 2 && (
+        {view === 'studio' && (busy || building) && !pages.length && (
           <main className="stage">
-            <Building arrived={building.arrived} total={8} thoughts={building.thoughts} />
+            <Building landed={building?.landed ?? 0} total={8} thoughts={building?.thoughts ?? 0} />
           </main>
         )}
 
-        {view === 'studio' && page && !(building && pages.length < 2) && (
+        {view === 'studio' && page && !((busy || building) && !pages.length) && (
           <>
             <main className="studio" onWheel={onWheel}>
               <div className="film">
@@ -778,7 +795,7 @@ export default function App() {
               />
             </main>
 
-            <SectionsRail
+            {railOpen && <SectionsRail
               page={page}
               selected={selected}
                             onSelect={setSelected}
@@ -795,7 +812,7 @@ export default function App() {
               }}
               onDraw={(id) => void drawImage(id)}
               onAdd={(role: Role) => setPage((p) => addSection(p, role, product.name))}
-            />
+            />}
           </>
         )}
 
@@ -956,4 +973,4 @@ function Preview({ html }: { html: string }) {
 // The seam the suites drive the model path through. writeOne is here so the copy repair can be
 // asserted on its own: it is the one step whose whole job is to make a second call conditionally,
 // and a suite that can only watch the finished wall cannot tell a repair from a first draft.
-;(window as unknown as { __wall?: unknown }).__wall = { setMock, writeOne, starterPage, slop, PRESETS }
+;(window as unknown as { __wall?: unknown }).__wall = { setMock, writeOne, starterPage, slop, PRESETS, pageBrief }

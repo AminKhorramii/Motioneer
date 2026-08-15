@@ -209,7 +209,7 @@ function png(w = 64, h = 40) {
   ])
 }
 
-export async function fakeAnthropic(dir = FIXTURES) {
+export async function fakeAnthropic(dir = FIXTURES, { answerWritten = true } = {}) {
   // 'hard' skips the captured corpus and serves copy built to break the parser
   const hard = dir === 'hard'
   const fixtures = hard ? [] : await loadFixtures(dir)
@@ -350,16 +350,17 @@ export async function fakeAnthropic(dir = FIXTURES) {
      */
     if (/Build it from /.test(body)) {
       /**
-       * Hostile copy has to reach the page that can be broken by it.
+       * Two suites are about the copy stream, and this call is not part of it.
        *
-       * hard mode exists to push braces, markup, other alphabets and a script tag through the copy
-       * path and prove none of it escapes its text node. Answering these calls in that mode would
-       * fill the wall with pages written here instead, and the suite would wait forever for copy
-       * that never got asked for. So this half stands aside and every place falls back to being
-       * arranged, which is the path that suite is about. The written half has its own adversarial
-       * check, against safeMarkup directly, in verify/app.mjs.
+       * A written page is one shot: it carries no sections, does not stream them, and renders from
+       * its own markup rather than from the model this half of the app owns. So the suites that
+       * exist to prove SSE framing, split frames, partial JSON, the progressive repaint and copy
+       * built to break the parser all need the arranged path, and answering here would fill their
+       * wall with pages none of that applies to. This half stands aside for them and every place
+       * falls back to being arranged. The written half is checked adversarially against safeMarkup
+       * directly, in verify/app.mjs.
        */
-      if (hard) {
+      if (hard || !answerWritten) {
         res.writeHead(200, { ...CORS, 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
         return res.end()
       }

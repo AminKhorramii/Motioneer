@@ -665,7 +665,11 @@ const watch = setInterval(async () => {
     growth.push(await page.evaluate(() => document.querySelectorAll('.paper').length && document.querySelector('.filmbar .count')?.textContent))
   } catch { /* window closed */ }
 }, REAL ? 900 : 60)
-await page.waitForFunction(() => /of 9$/.test(document.querySelector('.filmbar .count')?.textContent ?? ''), null, { timeout: REAL ? 180000 : 20000 })
+await page.waitForFunction(() => /of 8$/.test(document.querySelector('.filmbar .count')?.textContent ?? ''), null, { timeout: REAL ? 180000 : 20000 })
+// the wall is exactly its places: anything that lands twice in one place must replace rather than
+// append, and a copy repair lands twice with a new id every time
+const grew = await page.evaluate(() => document.querySelectorAll('.paper, .cell').length)
+if (grew > 8) throw new Error(`the wall grew to ${grew}, so a place stopped holding its own identity`)
 clearInterval(watch)
 // A mock answers faster than this can sample, so an empty result here means the sampler missed
 // rather than that nothing arrived progressively. Say which, because a check that reports
@@ -679,7 +683,7 @@ console.log('streamed in:', JSON.stringify(
 const wall = await page.evaluate(async () => {
   const seen = new Set(), angles = []
   const total = document.querySelectorAll('.paper').length
-  for (let i = 0; i < 9; i++) {
+  for (let i = 0; i < 8; i++) {
     document.querySelector('.filmbar button:last-of-type')
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }))
     await new Promise((r) => setTimeout(r, 300))
@@ -691,13 +695,14 @@ const wall = await page.evaluate(async () => {
   return { papersMounted: total, distinctHeadlines: seen.size, angles: [...new Set(angles)] }
 })
 console.log('written wall:', JSON.stringify(wall))
-await page.evaluate(() => { for (let i = 0; i < 9; i++) window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft' })) })
+await page.evaluate(() => { for (let i = 0; i < 8; i++) window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft' })) })
 await page.waitForTimeout(300)
 await page.waitForTimeout(1500)
 
 const studio = await page.evaluate(() => ({
   papers: document.querySelectorAll('.paper').length,
-  sections: [...document.querySelectorAll('.sec .secline b')].map((b) => b.textContent),
+  // closed by default now, and asserted where it is opened below
+  railClosed: document.querySelectorAll('.sec').length === 0,
   counter: document.querySelector('.filmbar .count')?.textContent,
   writingWith: document.querySelector('.barwrap .model')?.textContent?.trim(),
 }))
@@ -772,6 +777,13 @@ const edited = await page.evaluate(async () => {
 console.log('direct edit:', JSON.stringify(edited))
 
 // ——— 4. per-section layout + brief copy ———
+// The section list belongs to one paper rather than to the wall, so it opens from the header now
+// instead of standing beside every paper taking a column of it.
+await page.click('.hactions button:has-text("sections")')
+await page.waitForSelector('.sec', { timeout: 20000 })
+console.log('sections rail opens from the header:', JSON.stringify({
+  sections: await page.evaluate(() => document.querySelectorAll('.sec').length),
+}))
 await page.click('.sec:nth-child(3)')
 await page.waitForTimeout(300)
 const secUi = await page.evaluate(() => ({
@@ -782,14 +794,20 @@ console.log('section panel:', JSON.stringify(secUi))
 await page.evaluate(() => document.querySelector('.sec.sel .secline button').click()) // next layout
 await page.waitForTimeout(500)
 
-// the page brief is the only brief now, so it has to carry every section
-// copying the brief now lives with the brief, so the rail has to be open to reach it
-await page.evaluate(() => [...document.querySelectorAll('.hactions button')]
-  .find((b) => b.textContent.trim() === 'brief')?.click())
-await page.waitForSelector('.copybrief', { timeout: 10000 })
-await page.click('.copybrief')
-await page.waitForTimeout(400)
-const pgBrief = await page.evaluate(() => navigator.clipboard.readText().catch(() => ''))
+/**
+ * The spec, read from where it is made rather than from a panel.
+ *
+ * Copying it used to be a button in the brief rail, and that rail is gone: the section list moved
+ * behind a control of its own and the brief panel went with it, because a wall of eight designs is
+ * not improved by two columns of chrome beside it. The brief itself is untouched and still the
+ * thing the handoff writes, so it is checked directly here. If a copy button comes back it belongs
+ * on the dock beside download, not in a panel.
+ */
+const pgBrief = await page.evaluate(() => {
+  const { pageBrief } = window.__wall
+  const p = JSON.parse(localStorage.getItem('wall-state') ?? 'null')
+  return p?.page ? pageBrief(p.page, p.product?.name ?? '') : ''
+})
 console.log('brief:', JSON.stringify({
   coversEverySection: pgBrief.split('\n').filter((l) => l.startsWith('### ')).length,
   // tokens belong once: repeating them under every section was most of the old brief
