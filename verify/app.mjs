@@ -52,6 +52,71 @@ for (const w of core.WORLDS) {
 console.log('house pages:', JSON.stringify(houseFlags.length ? houseFlags.slice(0, 8) : 'clean, every world on every look'))
 if (houseFlags.length) throw new Error(`the house trips its own detector on ${houseFlags.length} pages`)
 
+// ——— 0i. the house commits, and restraint is not timidity ———
+// The detector answers whether a design is generic and subtracts. Nothing asked whether it is
+// anything at all, so a world could pass every check by being careful: a column, nothing leaving
+// it, a scale in the middle, no art and ten lines of CSS. Clean and undesigned are different
+// states and only one of them was measurable. The house is held to this the same way it is held
+// to the catalogue, and the second case is the calibration: a quiet world that chose its quiet is
+// committed, or this measure is just a demand to be loud.
+{
+  const timidHouse = []
+  for (const w of core.WORLDS) {
+    const left = core.unspent(w, w.taste(core.PRESETS[0]))
+    if (left.length) timidHouse.push(`${w.id}: ${left.length} unspent`)
+  }
+  const flat = core.madeWorld({
+    name: 'a careful world', palette: 'as-is', scale: 1.3, layout: 'column', backdrop: 'none',
+    structure: { measure: 64, figure: 'framed', breakout: 'none' }, css: 'section{padding:2rem}',
+  }, 0)
+  // enormous margins, one hairline, nothing else: it took the top of the scale and spent its CSS
+  // on the single move it wanted, which is two decisions and a design
+  const quiet = core.madeWorld({
+    name: 'a gallery card', palette: 'as-is', scale: 1.62, layout: 'column', backdrop: 'none',
+    structure: { measure: 52, figure: 'plain', breakout: 'none' },
+    css: `.wrap{max-width:none}section{padding:14rem 0}h1{letter-spacing:-.04em;line-height:.92}` + `\n/* ${'x'.repeat(360)} */`,
+  }, 1)
+  console.log('commitment:', JSON.stringify({
+    houseWorldsJudgedTimid: timidHouse.length ? timidHouse : 'none of ' + core.WORLDS.length,
+    aCarefulWorldIsCaught: core.unspent(flat, flat.taste(core.PRESETS[0])).length,
+    aQuietWorldThatChoseItsQuietIsNot: core.unspent(quiet, quiet.taste(core.PRESETS[0])).length === 0,
+  }))
+  if (timidHouse.length) throw new Error(`the house does not meet its own standard on ${timidHouse.join('; ')}`)
+  if (!core.unspent(flat, flat.taste(core.PRESETS[0])).length) {
+    throw new Error('a world that made no decisions passed, so nothing stops a wall of careful pages')
+  }
+  if (core.unspent(quiet, quiet.taste(core.PRESETS[0])).length) {
+    throw new Error('a restrained world was called timid, which turns this into a demand to be loud')
+  }
+}
+
+// ——— 0j. a refused ground is recorded as what was used, not what was offered ———
+// The deck is dealt blind to the brief, which is what keeps a wall from converging, and the cost
+// is the rare pairing that is untrue rather than surprising: a funeral cannot be a betting slip.
+// A call may refuse on that ground alone and name what it built from instead. The memory then has
+// to file the page under the object it actually used, or it learns to favour a ground this person
+// has never seen a page built from.
+{
+  const took = core.madeWorld({ name: 'night ledger', palette: 'as-is' }, 0)
+  const refused = core.madeWorld({ name: 'quiet notice', palette: 'as-is', ground: 'museum wall label' }, 1)
+  const shouty = core.madeWorld({ name: 'x', palette: 'as-is', ground: 'a\nb'.repeat(60) }, 2)
+  // an object it invented reaches the log and must not be able to reach the deck, which only ever
+  // matches names back against the library
+  const deal = core.dealDirections(5, { favor: ['a thing nobody wrote down', 'thermal receipt'], shun: [] })
+    .map((d) => d.name)
+  console.log('a refused ground:', JSON.stringify({
+    declaredNothing: took.ground ?? null,
+    declaredSomething: refused.ground,
+    clampedToOneLine: !shouty.ground.includes('\n') && shouty.ground.length <= 40,
+    inventedGroundIgnoredByTheDeal: !deal.includes('a thing nobody wrote down'),
+    realOneBesideItStillLands: deal.includes('thermal receipt'),
+  }))
+  if (took.ground) throw new Error('a world that declared no ground got one anyway, so the caller cannot stamp the dealt one')
+  if (refused.ground !== 'museum wall label') throw new Error('a world that named what it built from was not believed')
+  if (shouty.ground.includes('\n')) throw new Error('a declared ground carries its own newlines into the memory file')
+  if (deal.includes('a thing nobody wrote down')) throw new Error('an invented ground reached the deck')
+}
+
 // ——— 0d. the placeholders in the defaults are ones the detector can see ———
 // A blank page has to say something under a testimonial, and inventing a customer would be worse
 // than admitting there is not one yet, so the defaults are honest stand-ins. The danger is the

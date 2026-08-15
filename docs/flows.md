@@ -223,7 +223,7 @@ taste never touches machinery and machinery never hides taste:
 | `design/angles.ts` | the editorial positions a wall argues from | the fan-out |
 | `design/craft.ts` | the writing standards that travel in every prompt | the prompts |
 | `design/slop.ts` | the catalogue of tells, copy and markup, as data | the detector in `slop.ts` |
-| `design/directions.ts` | fifty grounded design directions, dealt as seeds to the world design calls, and the deal that keeps at least three hands wild whatever is remembered | `compose.ts` |
+| `design/directions.ts` | fifty one grounded design directions, dealt blind to the brief and never more than half from memory, so a wall cannot converge | `compose.ts` |
 | `design/prompts.ts` | the three system prompts: writing, world design, intake | `compose.ts`, which sends them |
 
 The split rule for the slop catalogue: a tell that is a pattern lives in the data file; a
@@ -249,6 +249,17 @@ because it is the only way the type can answer to the layout.
 Both halves land on the same wall wearing the same look and the same embedded faces, which is what
 makes this an experiment with a control rather than a demonstration. Which approach is better is
 the question a wall exists to answer, so it is answered by culling rather than by argument.
+
+**The deck is dealt blind to the brief, and that is the engine.** A call handed a seed packet and
+a call handed a fire exit plan cannot converge. Tagging the fifty one objects by industry would
+hand every finance page a ledger forever and trade the best output for the safest, so it is not
+done. The cost is the rare pairing that is untrue rather than surprising, and for that alone a
+design call may refuse its ground: grief, health, safety, money and law are where an unexpected
+register stops being daring. The hatch is deliberately too narrow to be comfortable, because a
+model given room to find a ground unsuitable will find the safe version of the category next, and
+that is the failure the whole deck exists to prevent. A call that refuses names what it built from
+instead, and that is what reaches the memory, or the log would favour a ground no page here was
+ever built from.
 
 **Both halves are asked to draw.** Every design prompt used to say "use CSS" and mean treatment: a
 dashed rule, a slab of colour, a hairline. None of them asked for the subject itself. On the first
@@ -300,6 +311,17 @@ The same catalogue covers the tells of generated writing, not only generated dec
 answers, stock filler phrases, chained em dashes, rows of bare statistics, placeholder company
 logos, the coloured left border, glowing text. `src/craft.ts` carries the inverse of each into
 the system prompt, so the writing is shaped before there is anything to detect.
+
+**It only ever asked half the question.** The catalogue answers whether a design is generic and
+subtracts. Nothing asked whether it is anything at all, so a world could pass every check by being
+careful: a column, nothing leaving it, a scale in the middle of the range, no art behind it and
+ten lines of CSS. Clean and undesigned are different states and only one of them was measurable.
+`unspent()` in `src/worlds.ts` is the other half, counting five moves a world can make and calling
+it timid if it made fewer than two of them, and a timid world goes back through the same repair a
+flawed one does. It counts decisions rather than volume, because the opposite of timid is not
+loud: a gallery card with enormous margins, one hairline and nothing else has committed twice
+over. `verify/app.mjs` holds the house to it, and asserts that the restrained world still passes,
+because without that this becomes a demand to be loud and a wall of eight loud pages is one note.
 
 **It reads the whole page.** The copy half used to walk a section's top level strings and drop
 everything that was not one, so every list, table and group was invisible to it: on the default

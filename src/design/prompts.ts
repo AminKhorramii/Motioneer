@@ -34,6 +34,26 @@ No emoji and no unicode characters standing in for pictures, because that borrow
 
 Whatever you draw has to survive at 390 pixels wide, so build it from proportions rather than from fixed pixel sizes.`
 
+/**
+ * When the ground is wrong rather than surprising.
+ *
+ * The deck is dealt blind to the brief, and that is the engine: a call handed a seed packet and a
+ * call handed a fire exit plan cannot converge, and tagging fifty one objects by industry would
+ * hand every finance page a ledger forever and trade the best output for the safest. The cost of
+ * dealing blind is the small number of pairings that are not daring but untrue, and a page about
+ * a funeral cannot be a betting slip however good the betting slip is.
+ *
+ * So the escape hatch exists and is deliberately too narrow to be comfortable. Any wider and it
+ * becomes the retreat it is there to prevent: given permission to find a ground unsuitable, a
+ * model will find the safe version of the category unsuitable-adjacent, and the wall goes back to
+ * eight tasteful pages that could be anybody's.
+ */
+const REFUSE = `The ground you were given is a starting point, not an instruction to follow against the subject. Refuse it when the register would misrepresent what the page is for: a funeral service as a betting slip, a diagnosis as a gig flyer, a repossession notice as a scoreboard. Grief, health, safety, money and law are where an unexpected register stops being daring and becomes untrue.
+
+Refuse it for that reason and no other. "It does not suit a company like this" is not that reason, and neither is "the audience expects something more conventional". A page that retreats to the safe version of its own category is the exact failure everything above is written to prevent, and the ground is supposed to surprise you.
+
+When you do refuse, build from a different real object that carries the same discipline rather than from nothing, and name that object in the ground field, so what is recorded is what the page actually came from rather than what it was offered.`
+
 export const PAGE_SYSTEM = `You write copy for a whole landing page. You receive the page as JSON: an array of sections, each with an id, a role it plays in the argument, the form it is set in, and content. You also receive an instruction describing what to change.
 
 Return JSON shaped as {"sections":[{"id":"...","content":{...}}]}, reusing the same ids and the same content keys, with the copy rewritten to follow the instruction. Reusing ids and keys matters because the app merges your reply into the existing page by id, and an unknown id or missing key is dropped.
@@ -85,6 +105,8 @@ Measured, eight worlds came back carrying a masthead, a claim, substance twice, 
 So decide what this idea does not need and leave it out. A poster is a claim and an invitation. A field manual is substance and objections with no pricing anywhere. A receipt is substance and an offer. A gallery card is a claim and a colophon.
 
 Nothing about the order is fixed either. Open on masthead only if the idea is a site, because a printed object, a poster, a label or a terminal session never carries a nav and starting on the claim is a bigger difference than any typeface. credits need not be last, proof can open a page that wants to lead with a witness, and a role may repeat where the argument genuinely turns twice. Arrange it the way the object you are working from is arranged, not the way a landing page usually is.
+ground: the real object this world came from, named plainly, as "thermal receipt" or "departures board". Normally it is the one you were handed. It is the field that records what the page grew from, and a world's own name is whatever you called it that day, so this is the stable half.
+
 css: the part that matters most. Thirty to sixty lines of CSS that make the idea real, because the fields above can only change size and spacing, and no arrangement of them will make a page look like a receipt or a departures board. This is where you draw.
 
 ${blockContract()}
@@ -92,6 +114,8 @@ ${blockContract()}
 Write CSS that commits to the idea. A receipt has a narrow column, dashed rules and tabular figures. A departures board has slabs of solid colour, tight uppercase rows and hard shadows. A gallery card has enormous margins, one hairline and nothing else. Use borders, background gradients, pseudo elements, counters, transforms and mix-blend-mode. Change the shape of things, not only their size.
 
 ${DRAW}
+
+${REFUSE}
 
 Ground each world in something real, and let that decide the values rather than picking them one at a time.
 
@@ -150,6 +174,8 @@ The tokens already exist and are the palette. Use var(--bg), var(--ink), var(--d
 The page must be one file that makes no requests. No font imports, no stylesheet links, no images from a url, no scripts, no tracking, no iframes. This is not a preference: a page that fetches anything stops being a file somebody can open.
 
 ${DRAW}
+
+${REFUSE}
 
 backdrop: none, contours, grain, ridge, dither or dots, in a field of its own beside the others. It is drawn behind the whole page from your palette, so it costs you no markup. contours, grain and ridge are drawn live; dither and dots are printed textures, and they are what make a page read as printed rather than rendered, so reach for them when the idea comes from paper.
 

@@ -14,7 +14,7 @@ import { DEFAULT_KIND, asKind, type Kind } from '@/design/kinds'
 import { shrinkDataUrl } from '@/imagepipe'
 import { renderPage } from '@/render'
 import { strainsIn } from '@/geometry'
-import { WORLDS, dressSections, madeWorld, register as registerWorlds, worldById, type World } from '@/worlds'
+import { WORLDS, dressSections, madeWorld, register as registerWorlds, unspent, worldById, type World } from '@/worlds'
 import { ROLE_FORMS, defaultContent, starterPage, uid, type Form, type Page, type Role, type Section } from '@/sections'
 
 export interface Product {
@@ -764,9 +764,15 @@ function flawsIn(world: World): string[] {
   // renderPage resolves a world by id, so an unregistered one would be measured as the fallback
   registerWorlds([world])
   const page = probe(world)
-  return slop(page, renderPage(page, { title: 'Product' }))
-    .filter((f) => f.kind === 'design')
-    .map((f) => `${f.label}. ${f.why}`)
+  return [
+    ...slop(page, renderPage(page, { title: 'Product' }))
+      .filter((f) => f.kind === 'design')
+      .map((f) => `${f.label}. ${f.why}`),
+    // and the other half of the question. The detector says whether this is generic; unspent says
+    // whether it is anything. A world that trips neither has both avoided the median and chosen
+    // something, and a world that trips this one goes back through the same repair.
+    ...unspent(world, page.taste),
+  ]
 }
 
 /**
@@ -909,7 +915,16 @@ export async function promptWorlds(
       const built = flaws.length
         ? await mend(raw as unknown as Record<string, unknown>, candidate, flaws, at, dealt ? directionSeed(dealt) : '', provider, brief)
         : candidate
-      const world = dealt ? { ...built, ground: dealt.name } : built
+      /**
+       * What it built from, which is what it was dealt unless it said otherwise.
+       *
+       * A call may refuse its ground when the register would misrepresent the subject, and it
+       * names what it used instead. Stamping the dealt one over that would file the page in the
+       * memory under an object it deliberately did not use, and the memory would then favour a
+       * ground this person has never actually seen a page built from. An object it invented is
+       * harmless to the deal, which only ever matches names back against the library.
+       */
+      const world = built.ground ? built : dealt ? { ...built, ground: dealt.name } : built
       // stamping makes a new object, and the renderer resolves a world by id, so the one the
       // map holds has to be this one and not the copy without the stamp
       registerWorlds([world])

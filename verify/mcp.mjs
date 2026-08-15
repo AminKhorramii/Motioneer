@@ -196,7 +196,17 @@ if (usedBrief?.oneLiner !== ARGS.oneLiner) {
 
 // ——— 3a. the memory reached the model that designed this wall ———
 const prompts = readFileSync(promptLog, 'utf8').trim().split('\n').map((l) => JSON.parse(l))
-const designs = prompts.filter((p) => p.sys.includes('"worlds"'))
+/**
+ * A repair is not a design call, and both ask for a world.
+ *
+ * Filtering on the reply shape counted them together, which was harmless while repairs were rare
+ * and became wrong the moment a world could be sent back for committing to nothing: a repair is
+ * told to change only the faults it was handed and nothing else, so it is deliberately not told
+ * what this person culls, and counting it here reported that as a design call missing its memory.
+ * The hand's own line is the discriminator, because only the deal writes it.
+ */
+const designs = prompts.filter((p) => p.sys.includes('Build these particular ones from'))
+const repairs = prompts.filter((p) => p.sys.includes('"worlds"') && !p.sys.includes('Build these particular ones from'))
 const pages = prompts.filter((p) => !p.sys.includes('"worlds"') && !p.sys.includes('"product"'))
 const kills = 'taken pages off the wall for glassmorphism'
 const keeps = 'The pages they keep are'
@@ -221,6 +231,15 @@ if (!designs.some((p) => p.sys.includes(keeps))) {
 }
 if (!pages.some((p) => p.body.includes('have been taken off'))) {
   throw new Error('the copy calls were never told what this person culls')
+}
+// and the other side of that distinction, so the two never merge again: a repair is handed the
+// faults it must fix and nothing else, because a repair that redesigns is a second opinion
+console.log('repairs are a different call:', JSON.stringify({
+  repairCalls: repairs.length,
+  noneCarryTheMemory: repairs.every((p) => !p.sys.includes(kills) && !p.sys.includes(keeps)),
+}))
+if (repairs.some((p) => p.sys.includes(kills) || p.sys.includes(keeps))) {
+  throw new Error('a repair was handed the memory, so it was invited to redesign rather than to fix what was named')
 }
 
 // ——— 3b. the wall is triaged before anything is chosen ———

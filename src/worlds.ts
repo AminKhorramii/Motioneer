@@ -250,6 +250,10 @@ export function madeWorld(raw: Record<string, unknown>, i: number): World {
     name: line(raw.name ?? `world ${i + 1}`, 26),
     note: line(raw.note, 120),
     voice: line(raw.voice, 240),
+    // What it says it built from, which is the dealt ground unless it refused one. Kept only when
+    // it names something, so the caller can fall back to what it handed over: a world that says
+    // nothing here was not declining, it was not asked in a version of this prompt.
+    ...(line(raw.ground, 40) ? { ground: line(raw.ground, 40) } : {}),
     taste: (t) => ({
       ...palette(t),
       display: face(raw.display, FACES.sans),
@@ -354,6 +358,46 @@ export function dressSections(sections: Section[], world: World): Section[] {
     prev = form
     return { ...s, form }
   })
+}
+
+/**
+ * What a world left unspent.
+ *
+ * The detector answers one question, is this generic, and subtracts. Nothing ever asked the other
+ * one, did this commit to anything, so a world could pass every check by being careful: a column,
+ * nothing leaving it, a scale in the middle of the range, no art behind it and ten lines of CSS.
+ * Clean and undesigned are not the same state, and only one of them was measurable.
+ *
+ * A count rather than a catalogue, so it lives as code here beside the data it reads, on the same
+ * split rule the slop catalogue keeps. And it counts moves made rather than volume, because the
+ * failure this guards against is timidity and the opposite of timid is not loud. A gallery card
+ * with enormous margins, one hairline and nothing else has committed twice over: it took the top
+ * of the scale and it spent its CSS on the one move it wanted. It is the world that did none of
+ * these things that has not designed anything, and that world is the one worth asking again.
+ */
+const COMMITTED = 2
+
+export function unspent(w: World, t: Taste): string[] {
+  const css = w.css ?? ''
+  const drawn = /gradient|::(?:before|after)|clip-path|transform|blend-mode/i.test(css)
+  const at = (label: string, spent: boolean) => (spent ? null : label)
+  const moves = [
+    // the range is 1.1 to 1.7, and a measured run put six of eight between 1.15 and 1.3, which is
+    // one page wearing eight palettes. The middle is where a scale goes when nobody chose it.
+    at(`the type scale sits at ${t.scale.toFixed(2)}, in the middle of the range where a scale goes when nobody chose one`,
+      t.scale <= 1.2 || t.scale >= 1.42),
+    at('the page is a stack and nothing leaves its column, which is the silhouette of every generated page',
+      (w.layout ?? 'column') !== 'column' || (w.structure.breakout ?? 'none') !== 'none'),
+    at('nothing is drawn and there is no art behind the page, so the whole design is size and spacing',
+      drawn || (w.backdrop ?? 'none') !== 'none'),
+    at('the CSS is too short to be a design, and the CSS is where the idea becomes real',
+      css.length >= 400),
+    at('every section is given equal air, which reads as one treatment applied to all content',
+      Boolean(w.structure.rhythm?.length)),
+  ].filter((m): m is string => m !== null)
+  // spending two of the five is enough. Naming everything a careful world left alone would be a
+  // demand for loudness, and a wall of eight loud pages is its own single note.
+  return moves.length > 5 - COMMITTED ? moves : []
 }
 
 /** The signature a page wears, used to check that a wall spans real ground. */
