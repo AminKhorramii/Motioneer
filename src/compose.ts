@@ -7,7 +7,8 @@ import { slop, slopBrief } from '@/slop'
 import { dealDirections, directionSeed, type Direction } from '@/design/directions'
 import { ANGLES } from '@/design/angles'
 import { INTAKE_SYSTEM, MEND_SYSTEM, PAGE_SYSTEM, WORLDS_SYSTEM, WRITTEN_SYSTEM } from '@/design/prompts'
-import { madeWritten } from '@/written'
+import { madeWritten, type Written } from '@/written'
+import { grabJson, scanSections } from '@/reply'
 import { MODELS, modelById, type ModelChoice } from '@/models'
 import { BACKDROPS, type Backdrop } from '@/backdrop'
 import { DEFAULT_KIND, asKind, type Kind } from '@/design/kinds'
@@ -153,23 +154,48 @@ export async function writeWhole(
   // the same look the arranged page in this place would have worn, so the two are compared on
   // what the model did with the page and not on which palette each happened to draw
   const page = arrange(base, i + 1)
+  const landed = (written: Written): Page => ({
+    ...page,
+    written,
+    angle: angle.name,
+    ground: written.ground ?? direction.name,
+  })
+  /**
+   * The stand-in answers here too, or a suite reaches the network.
+   *
+   * Every other model call in this file checks the mock first and this one did not, so a run with
+   * a mock installed sent eight real requests and got eight 401s before falling back to arranging.
+   * The suites passed, because falling back is what they were written to survive, which is exactly
+   * how a path stays untested while looking tested.
+   */
+  if (mockReply) {
+    const out = mockReply('written', direction.name) as Record<string, unknown> | null
+    const written = out && typeof out === 'object' ? madeWritten(out) : null
+    return written ? landed(written) : null
+  }
   const brief =
     `A ${product.kind}: ${product.name}. ${product.oneLiner}\n${product.what}\nAudience: ${product.audience}\n` +
     `The one action is: ${product.cta}.\n\n` +
     `Build it from ${directionSeed(direction)}\n\n` +
     `Argue it as "${angle.name}". ${angle.instruction}`
-  const text = await ask(provider, WRITTEN_SYSTEM, brief, undefined, { maxTokens: 12000, kind: 'design' })
-    .catch(() => null)
+  // the same split the design hands used: what this person culls goes to every page, because
+  // pruning narrows nothing, and what they keep goes only to a page dealt from what they like
+  const note = memory ? tasteBrief(memory, memory.favor.includes(direction.name)) : ''
+  const text = await ask(
+    provider,
+    note ? `${WRITTEN_SYSTEM}\n\n${note}` : WRITTEN_SYSTEM,
+    brief,
+    undefined,
+    { maxTokens: 12000, kind: 'design' },
+  ).catch(() => null)
   if (!text) return null
   const raw = grabJson(text) as Record<string, unknown> | null
   if (!raw) return null
   const written = madeWritten(raw)
   if (!written) return null
-  // No ground stamp yet. The memory reads a direction off the page's world, and a written page
-  // has no designed world to carry one, so keeping or culling one of these teaches the taste log
-  // nothing. That is the right order: it should not bias future walls until it has earned a place
-  // on this one.
-  return { ...page, written, angle: angle.name }
+  // the ground rides on the page, since the world underneath is borrowed and shared. A model that
+  // refused its direction named what it used instead, and that is what gets remembered.
+  return landed(written)
 }
 
 export async function writeOne(
@@ -254,6 +280,16 @@ let memory: Lean | null = null
 export const setMemory = (lean: Lean | null) => {
   memory = lean
 }
+
+/**
+ * The deal for the pages the model writes whole, which is now most of the wall.
+ *
+ * It lives here rather than at the call site because the memory does, and a caller that dealt its
+ * own directions would be dealing them blind to what this person keeps: while the written pages
+ * were three of eight that was a deliberate quarantine, and the moment they became the wall it
+ * became the memory quietly having nothing left to bias.
+ */
+export const dealWritten = (n: number): Direction[] => dealDirections(n, memory ?? undefined)
 
 /** Move a page to the next world, keeping its copy. */
 export function cycleWorld(page: Page): Page {
@@ -476,115 +512,6 @@ async function ask(
   }
 }
 
-/**
- * Pull the section objects that have finished arriving out of a partial JSON reply. The walk
- * tracks strings and brace depth, so a closing brace inside a headline does not end an object
- * early.
- *
- * It resumes from a cursor rather than re-reading the buffer, because copy full of braces
- * makes almost every delta trigger a scan, and re-reading turns one page into quadratic work.
- * With several pages streaming at once that is enough to stall the app.
- */
-function scanSections(buf: string, from: number, key = '"sections"') {
-  const out: { id: string; content: Record<string, unknown> }[] = []
-  let cursor = from
-  if (from === 0) {
-    const at = buf.indexOf(key)
-    const open = at < 0 ? -1 : buf.indexOf('[', at)
-    if (open < 0) return { out, cursor }
-    cursor = open + 1
-  }
-  let depth = 0
-  let start = -1
-  let inString = false
-  let escaped = false
-  let done = cursor
-  for (let i = cursor; i < buf.length; i++) {
-    const ch = buf[i]
-    if (inString) {
-      if (escaped) escaped = false
-      else if (ch === '\\') escaped = true
-      else if (ch === '"') inString = false
-      continue
-    }
-    if (ch === '"') inString = true
-    else if (ch === '{') {
-      if (depth === 0) start = i
-      depth++
-    } else if (ch === '}') {
-      depth--
-      if (depth === 0 && start >= 0) {
-        try {
-          const obj = JSON.parse(buf.slice(start, i + 1)) as { id?: string; content?: Record<string, unknown> }
-          if (obj.id !== undefined || obj.content !== undefined || key !== '"sections"') {
-            out.push(obj as { id: string; content: Record<string, unknown> })
-          }
-        } catch {
-          // an object that fails to parse is simply not finished yet
-        }
-        start = -1
-        done = i + 1
-      }
-    }
-  }
-  return { out, cursor: done }
-}
-
-/**
- * The control characters a model leaves loose inside its own strings, escaped.
- *
- * A world carries thirty to sixty lines of CSS in one JSON string, and a reply that writes those
- * lines as actual lines is not JSON any more. Neither reader here could take it: the parse fails
- * outright and the brace walk, which finds the object boundaries correctly, then fails on the
- * same slice for the same reason. Measured across the four shapes a reply arrives in, this is the
- * one that lost the whole answer while nothing was wrong with the answer.
- */
-const looseJson = (s: string) => {
-  let out = ''
-  let inString = false
-  let escaped = false
-  for (const ch of s) {
-    if (!inString) {
-      if (ch === '"') inString = true
-      out += ch
-      continue
-    }
-    if (escaped) {
-      escaped = false
-      out += ch
-      continue
-    }
-    if (ch === '\\') {
-      escaped = true
-      out += ch
-      continue
-    }
-    if (ch === '"') {
-      inString = false
-      out += ch
-      continue
-    }
-    out += ch === '\n' ? '\\n' : ch === '\r' ? '\\r' : ch === '\t' ? '\\t' : ch
-  }
-  return out
-}
-
-const grabJson = (text: string) => {
-  const start = text.indexOf('{')
-  const end = text.lastIndexOf('}')
-  if (start < 0 || end <= start) return null
-  const cut = text.slice(start, end + 1)
-  try {
-    return JSON.parse(cut) as Record<string, unknown>
-  } catch {
-    // a second reading, with the loose newlines inside its strings tied down
-    try {
-      return JSON.parse(looseJson(cut)) as Record<string, unknown>
-    } catch {
-      return null
-    }
-  }
-}
 
 
 /** prompt the whole page. This is how variants are made. */

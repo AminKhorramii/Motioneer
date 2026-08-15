@@ -15,6 +15,7 @@ src/
   brief.ts      page model to a markdown spec
   slop.ts       the generic patterns, checked locally
   written.ts    a page the model wrote whole, and the filter between its markup and the wall
+  reply.ts      reading an object out of a model reply that is partial, fenced or not quite JSON
   compose.ts    the model path: angles, fan out, streaming, partial JSON
   host.ts       the only file that knows where Wall is running
   core.ts       the headless core, exported for shells with no DOM
