@@ -5,13 +5,12 @@ import {
 } from '@/taste'
 import { PRESETS } from '@/design/presets'
 import { asKind } from '@/design/kinds'
-import { dealDirections } from '@/design/directions'
 import { ROLE_LABEL, applyEdit, migratePage, starterPage, type Page, type Role } from '@/sections'
 import { renderBody, renderPage, shellOf } from '@/render'
 import { pageBrief } from '@/brief'
 import { slop } from '@/slop'
 import {
-  EMPTY_PRODUCT, addSection, alternatives, arrangeIn, readBrief, canDraw, canWrite, choose, chosen, promptWorlds, setDesigned, setMemory, cycleForm, cycleWorld, dropSection, writeOne, writeWhole, illustrate, loadHeldKeys, loadKeys, promptPage, sectionAlternatives, seeded, setMock, type Product,
+  EMPTY_PRODUCT, addSection, alternatives, readBrief, canDraw, canWrite, choose, chosen, setMemory, cycleForm, cycleWorld, dropSection, dealWritten, writeOne, writeWhole, illustrate, loadHeldKeys, loadKeys, promptPage, sectionAlternatives, seeded, setMock, type Product,
 } from '@/compose'
 import { Onboarding } from '@/Onboarding'
 import { BriefRail } from '@/BriefRail'
@@ -19,7 +18,8 @@ import { SectionsRail } from '@/SectionsRail'
 import { Dock } from '@/Dock'
 import { Building } from '@/Building'
 import { Icon } from '@/icons'
-import { WORLDS, register as registerWorlds, worldById, type World } from '@/worlds'
+import { WORLDS, register as registerWorlds, worldById } from '@/worlds'
+import type { Direction } from '@/design/directions'
 
 import { host, isTauri } from '@/host'
 
@@ -201,7 +201,6 @@ export default function App() {
     setBuilding({ arrived: null, landed: [], thoughts: 0 })
     setBusy('designing')
     const jobs: Promise<{ ok: number; error?: string }>[] = []
-    const started: World[] = []
 
     /**
      * Put a paper in its own place on the wall.
@@ -232,23 +231,6 @@ export default function App() {
       upsertPage(page)
     }
 
-    const startPage = (world: World, i: number) => {
-      // the wall has as many places as it has drafts, and a call that answers with more worlds
-      // than it was asked for cannot be allowed to grow one
-      if (run.current !== mine || started[i] || i >= slots.current.length) return
-      started[i] = world
-      registerWorlds([world])
-      // The design is worth showing before the words are. A world is finished several seconds
-      // before the page written in it, and restyling the draft in place the moment it lands
-      // means the wall visibly turns into the designed one while the copy is still being
-      // written, rather than staying still until a whole page is ready.
-      const held = slots.current[i]
-      if (held) upsertPage({ ...arrangeIn(base, i + 1, world), id: held })
-      setBuilding((b) => ({ arrived: jobs.length + 1, landed: started.filter(Boolean).map((w) => w.name), thoughts: b?.thoughts ?? 0 }))
-      setBusy('writing')
-      jobs.push(writeOne(base, p, world, i, (page) => land(page, i)))
-    }
-
     /**
      * A world that is already written costs nothing to design, so its page starts writing at once.
      *
@@ -267,57 +249,58 @@ export default function App() {
      * These are the same three the deck deals into those places, so the written page lands in the
      * world its draft was already wearing and the wall gains words rather than changing shape.
      */
-    const SYSTEMS = ['editorial', 'poster', 'terminal']
-    const seeded = WORLDS.filter((w) => SYSTEMS.includes(w.id))
-
     /**
-     * The design calls are dispatched before the seeded pages start writing.
+     * Every place on the wall goes to a page the model writes whole.
      *
-     * Every call is a whole session and only five run at once, so the order they are asked in is
-     * the order they get the machine. Seeding first put three copy calls in front of the design
-     * calls, which are the long pole and the thing the reader is actually waiting on, and the
-     * copy for a page whose design is already on screen can wait its turn.
+     * This started as three of eight beside five arranged ones, which was an experiment with a
+     * control: same look, same faces, same wall, and whichever half survived triage was the
+     * answer. The three written pages were the ones worth keeping, so they are the wall now.
+     *
+     * The arranged path is not deleted and is not dead. It is the floor: a place whose written
+     * page comes back unusable is arranged instead, below, because eight papers beats seven and a
+     * gap, and because a day when the model cannot write markup should cost a duller wall rather
+     * than no wall. Turning this back down is one number.
      */
-    /**
-     * Three of the eight places go to pages the model writes whole.
-     *
-     * The other five are arranged: a world of values, then copy poured into blocks somebody
-     * enumerated. These three are handed the tokens and a direction and come back as markup. Both
-     * halves land on the same wall wearing the same faces and the same look, which makes this an
-     * experiment with a control rather than a demo, and the answer is whichever half survives
-     * triage rather than whichever half reads better in a plan.
-     *
-     * Three, because a place that fails falls back to arranging and the wall must not thin out,
-     * and because five arranged pages is still a usable wall on a day when this half is worse.
-     */
-    const WHOLE = 3
-    const deck = dealDirections(WHOLE)
-    const wholeJobs = deck.map((d, k) => {
-      const at = 8 - WHOLE + k
-      return writeWhole(base, p, d, at).then((made) => {
+    const WHOLE = 8
+    const deck = dealWritten(WHOLE)
+    const arrangeInstead: number[] = []
+    const wholeJobs = deck.map((d: Direction, at: number) =>
+      writeWhole(base, p, d, at).then((made) => {
         if (run.current !== mine) return { ok: 0 }
-        // a place is only taken once there is something to put in it, so a refusal leaves the
-        // arranged draft standing rather than leaving a hole
-        if (made) land(made, at)
-        return { ok: made ? 1 : 0, error: made ? undefined : 'a written page came back unusable' }
-      }).catch((e: unknown) => ({ ok: 0, error: String(e instanceof Error ? e.message : e).slice(0, 160) }))
-    })
-    jobs.push(...wholeJobs)
-
-    const designing = promptWorlds(p, 8 - seeded.length - WHOLE, (w, i) => startPage(w, i + seeded.length), 'model', () => {
-      if (run.current === mine) setBuilding((b) => (b ? { ...b, thoughts: b.thoughts + 1 } : b))
-    })
-    seeded.forEach((w, k) => startPage(w, k))
-    const worlds = await designing
+        if (made) {
+          land(made, at)
+          return { ok: 1 }
+        }
+        // the place keeps its arranged draft for now and is written properly below
+        arrangeInstead.push(at)
+        return { ok: 0 }
+      }).catch((e) => {
+        arrangeInstead.push(at)
+        return { ok: 0, error: String(e instanceof Error ? e.message : e).slice(0, 160) }
+      }),
+    )
+    const first = await Promise.all(wholeJobs)
     if (run.current !== mine) return
-    setDesigned(worlds)
-    registerWorlds(worlds)
-    setBusy('writing')
 
-    // a provider that does not stream hands the worlds over at the end, so anything that did
-    // not arrive as it was written starts here
-    worlds.forEach((w, i) => startPage(w, i + seeded.length))
-    const results = await Promise.all(jobs)
+    /**
+     * The floor, run only for the places nothing came back for.
+     *
+     * The arranged path is still the whole of the old machinery, and it stays reachable for the
+     * one case that matters: a reply that could not be used. A page arranged from a built-in world
+     * is duller than one the model drew, and it is a page, which beats a place on the wall still
+     * wearing a draft that says it is a draft.
+     */
+    if (arrangeInstead.length) {
+      setBusy('writing')
+      const spare = WORLDS.filter((w) => !w.library)
+      registerWorlds(spare)
+      await Promise.all(
+        arrangeInstead.map((at, n) =>
+          writeOne(base, p, spare[n % spare.length], at, (pg) => land(pg, at)),
+        ),
+      )
+    }
+    const results: { ok: number; error?: string }[] = [...first, ...(jobs.length ? await Promise.all(jobs) : [])]
     const written = results.reduce((x, r) => x + r.ok, 0)
     const error = results.find((r) => r.error)?.error
 

@@ -83,6 +83,16 @@ export interface Page {
    * would reach an agent as an empty specification.
    */
   written?: Written
+  /**
+   * The direction this page grew from, when the page carries it rather than its world.
+   *
+   * An arranged page keeps this on the world it is built in, because a world is the thing that was
+   * designed. A written page has no designed world, only a borrowed one it took its tokens from,
+   * and that world is shared across the wall so stamping it would mark every page at once. Without
+   * somewhere of its own to put this, keeping or culling a written page taught the memory nothing,
+   * which was survivable while they were three of eight and is not now they are the wall.
+   */
+  ground?: string
 }
 
 export const uid = () => Math.random().toString(36).slice(2, 9)

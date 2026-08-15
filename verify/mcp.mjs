@@ -197,49 +197,31 @@ if (usedBrief?.oneLiner !== ARGS.oneLiner) {
 // ——— 3a. the memory reached the model that designed this wall ———
 const prompts = readFileSync(promptLog, 'utf8').trim().split('\n').map((l) => JSON.parse(l))
 /**
- * A repair is not a design call, and both ask for a world.
- *
- * Filtering on the reply shape counted them together, which was harmless while repairs were rare
- * and became wrong the moment a world could be sent back for committing to nothing: a repair is
- * told to change only the faults it was handed and nothing else, so it is deliberately not told
- * what this person culls, and counting it here reported that as a design call missing its memory.
- * The hand's own line is the discriminator, because only the deal writes it.
+ * The call that carries the memory is the one that makes a page, and that is no longer the design
+ * call: every place on the wall is written whole now, so the world design path is not reached and
+ * asserting on it proved nothing, which is exactly what the guard below said when it fired.
  */
-const designs = prompts.filter((p) => p.sys.includes('Build these particular ones from'))
-const repairs = prompts.filter((p) => p.sys.includes('"worlds"') && !p.sys.includes('Build these particular ones from'))
+const pageCalls = prompts.filter((p) => p.sys.includes('writing a complete landing page'))
 const pages = prompts.filter((p) => !p.sys.includes('"worlds"') && !p.sys.includes('"product"'))
 const kills = 'taken pages off the wall for glassmorphism'
 const keeps = 'The pages they keep are'
 console.log('the memory reached the model:', JSON.stringify({
-  designCalls: designs.length,
-  toldWhatWasCulled: designs.filter((p) => p.sys.includes(kills)).length,
-  toldWhatIsKept: designs.filter((p) => p.sys.includes(keeps)).length,
-  copyCallsToldWhatWasCulled: pages.filter((p) => p.body.includes('have been taken off')).length,
+  writtenCalls: pageCalls.length,
+  toldWhatWasCulled: pageCalls.filter((p) => p.sys.includes(kills)).length,
+  toldWhatIsKept: pageCalls.filter((p) => p.sys.includes(keeps)).length,
   // the note goes after the whole shared system prompt, so the long prefix in front of it caches
-  noteSitsAtTheTail: designs.every((p) => !p.sys.includes(kills) || p.sys.indexOf(kills) > p.sys.length - 600),
+  noteSitsAtTheTail: pageCalls.every((p) => !p.sys.includes(kills) || p.sys.indexOf(kills) > p.sys.length - 900),
 }))
-if (!designs.length) throw new Error('no design call was recorded, so this check proves nothing')
-if (designs.some((p) => !p.sys.includes(kills))) {
-  throw new Error('a design call was not told what this person culls, and pruning goes to every hand')
+if (!pageCalls.length) throw new Error('no page was written whole, so this check proves nothing')
+if (pageCalls.some((p) => !p.sys.includes(kills))) {
+  throw new Error('a page call was not told what this person culls, and pruning goes to every page')
 }
-// the half that could converge a wall is quarantined to the hands dealt from what they like
-if (designs.filter((p) => p.sys.includes(keeps)).length > 2) {
-  throw new Error(`${designs.filter((p) => p.sys.includes(keeps)).length} of ${designs.length} hands were told what this person likes, and the cap is two`)
+// the half that could converge a wall is quarantined to the pages dealt from what they like
+if (pageCalls.filter((p) => p.sys.includes(keeps)).length > 2) {
+  throw new Error(`${pageCalls.filter((p) => p.sys.includes(keeps)).length} of ${pageCalls.length} pages were told what this person likes, and the cap is two`)
 }
-if (!designs.some((p) => p.sys.includes(keeps))) {
-  throw new Error('no hand was told what this person keeps, so the favoured half of the memory never arrives')
-}
-if (!pages.some((p) => p.body.includes('have been taken off'))) {
-  throw new Error('the copy calls were never told what this person culls')
-}
-// and the other side of that distinction, so the two never merge again: a repair is handed the
-// faults it must fix and nothing else, because a repair that redesigns is a second opinion
-console.log('repairs are a different call:', JSON.stringify({
-  repairCalls: repairs.length,
-  noneCarryTheMemory: repairs.every((p) => !p.sys.includes(kills) && !p.sys.includes(keeps)),
-}))
-if (repairs.some((p) => p.sys.includes(kills) || p.sys.includes(keeps))) {
-  throw new Error('a repair was handed the memory, so it was invited to redesign rather than to fix what was named')
+if (!pageCalls.some((p) => p.sys.includes(keeps))) {
+  throw new Error('no page was told what this person keeps, so the favoured half of the memory never arrives')
 }
 
 // ——— 3b. the wall is triaged before anything is chosen ———

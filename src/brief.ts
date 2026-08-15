@@ -10,6 +10,7 @@
 import { ROLE_LABEL, type Page } from '@/sections'
 import { worldById } from '@/worlds'
 import type { Seen, WallStory } from '@/taste'
+import { wordsIn } from '@/written'
 
 /** a value on one line, so a nested list reads as a list rather than as run together text */
 const flat = (v: unknown): string => (Array.isArray(v) ? v.map(flat).join(', ') : String(v))
@@ -76,14 +77,54 @@ export function pageBrief(page: Page, product: string, story?: WallStory): strin
   const w = worldById(page.world)
   const on = page.sections.filter((s) => s.on)
   const s = w.structure
-
-  return [
-    `# ${product || 'Landing page'}`,
-    '',
+  const tokens = [
     '## Tokens',
     `bg ${t.bg} · ink ${t.ink} · dim ${t.dim} · accent ${t.accent} · accent2 ${t.accent2}`,
     `display ${t.display.split(',')[0]} · body ${t.body.split(',')[0]} · scale ${t.scale.toFixed(2)} · weight ${t.weight}`,
     `radius ${t.radius}px · density ${t.density.toFixed(2)} · motion ${t.motion}`,
+  ]
+
+  /**
+   * A page the model wrote whole has no sections to describe, and describing them anyway is worse
+   * than saying nothing.
+   *
+   * A written page keeps the section list it was arranged from, untouched, because the handoff and
+   * the rail both wanted something to read. This function read exactly that: the spec for a drawn
+   * record sleeve came out as ten placeholder sections nobody had written, under a world it had
+   * only borrowed its tokens from, with no mention of anything actually on the page. It was
+   * survivable while these were three papers of eight and somebody was likely to choose one of the
+   * other five. It is the whole wall now, so it is every handoff.
+   *
+   * The structure is the markup, and the markup is already in the render beside this file, so what
+   * belongs here is what a person cannot get from reading that: what it is, what it grew from, and
+   * the words, in order, so the copy survives being rebuilt in somebody else's stack.
+   */
+  if (page.written) {
+    return [
+      `# ${product || 'Landing page'}`,
+      '',
+      ...tokens,
+      '',
+      '## What this is',
+      page.written.note || 'A page written as one piece rather than assembled from sections.',
+      ...(page.ground ? [`It was built from ${page.ground}.`] : []),
+      '',
+      'This page was written whole, so its structure is its own markup rather than a list of'
+        + ' sections, and the render beside this file is the specification for the layout. Rebuild'
+        + ' it from that and keep the tokens above, because they are what let it be restyled.',
+      '',
+      '## The words on it, in order',
+      ...wordsIn(page.written).map((line) => `- ${line}`),
+      ...(story ? whyThisOne(story) : []),
+      '',
+      'Build one self-contained HTML file. Keep the copy. Honour the tokens.',
+    ].join('\n')
+  }
+
+  return [
+    `# ${product || 'Landing page'}`,
+    '',
+    ...tokens,
     ...(w.library ? [`Built in ${w.library}. Use its own components and tokens rather than reproducing the CSS below; the values here are what this page set them to.`] : []),
     `${w.name}: ${s.rules ? 'ruled' : 'unruled'} · ${s.numbered ? 'numbered' : 'unnumbered'} · ${s.bleed ? 'full bleed' : 'contained'} · measure ${s.measure}ch · figures ${s.figure}`,
     '',

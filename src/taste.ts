@@ -213,8 +213,8 @@ export interface Judged {
 }
 
 const seenAs = (j: Judged): Seen => ({
-  world: j.world.name,
-  ...(j.world.ground ? { ground: j.world.ground } : {}),
+  world: j.page.written?.note || j.world.name,
+  ...(j.page.ground || j.world.ground ? { ground: j.page.ground ?? j.world.ground } : {}),
   ...(j.page.angle ? { angle: j.page.angle } : {}),
   ...(j.flags?.length ? { flags: [...new Set(j.flags.map((f) => f.label))].slice(0, 6) } : {}),
 })
@@ -302,7 +302,9 @@ const NOTHING: TasteLog = { format: 1, walls: [] }
 
 export const essence = (page: Page, world: World): Essence => ({
   world: world.name.slice(0, NAME),
-  ...(world.ground ? { ground: world.ground.slice(0, GROUND) } : {}),
+  // the page's own first, because a written page carries its ground itself: the world under it is
+  // borrowed for tokens and shared across the wall, so it could never hold one page's direction
+  ...(page.ground || world.ground ? { ground: (page.ground ?? world.ground ?? '').slice(0, GROUND) } : {}),
   layout: world.layout ?? 'column',
   display: faceKey(page.taste.display),
   scale: page.taste.scale,

@@ -349,7 +349,37 @@ export async function fakeAnthropic(dir = FIXTURES) {
      * without a hole in it, and the app falls back to arranging that place.
      */
     if (/Build it from /.test(body)) {
+      /**
+       * Hostile copy has to reach the page that can be broken by it.
+       *
+       * hard mode exists to push braces, markup, other alphabets and a script tag through the copy
+       * path and prove none of it escapes its text node. Answering these calls in that mode would
+       * fill the wall with pages written here instead, and the suite would wait forever for copy
+       * that never got asked for. So this half stands aside and every place falls back to being
+       * arranged, which is the path that suite is about. The written half has its own adversarial
+       * check, against safeMarkup directly, in verify/app.mjs.
+       */
+      if (hard) {
+        res.writeHead(200, { ...CORS, 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
+        return res.end()
+      }
+      // Named after the ground it was handed, so the suite can see the deal reach the page, and
+      // carrying a headline because a page with no h1 is refused on the way in. This used to
+      // answer nothing, which exercised only the fallback: fine while written pages were three of
+      // eight and a hole once they became the wall, because the path that matters was untested.
+      const ground = (body.match(/Build it from ([^:\\]+)/) || [])[1] || 'somewhere'
+      const reply = '```json\n' + JSON.stringify({
+        note: `a ${ground}`,
+        ground,
+        backdrop: 'dither',
+        html: `<section class="lede"><h1>${ground} headline ${seq}</h1><p>Written whole, not arranged.</p></section>`,
+        css: '.lede{padding:8rem 2rem}.lede h1{font-size:clamp(2rem,7vw,6rem)}'
+          + '.lede::before{content:"";display:block;width:min(50vw,26rem);aspect-ratio:1;'
+          + 'background:repeating-radial-gradient(circle,var(--ink) 0 1px,transparent 1px 5px)}',
+      }) + '\n```'
+      seq++
       res.writeHead(200, { ...CORS, 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
+      for (const { text } of chunkUp(intakeStream(reply))) res.write(text)
       return res.end()
     }
 

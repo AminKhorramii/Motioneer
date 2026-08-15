@@ -140,6 +140,15 @@ export interface Written {
   /** what the model says it made, so the dock can name it the way it names a world */
   note: string
   /**
+   * The real object it built from, when it refused the one it was dealt.
+   *
+   * Absent normally, because the caller already knows what it handed over. Present when the call
+   * declined that ground as untrue to the subject and built from another, and then this is what
+   * the memory has to record: filing the page under the object it deliberately did not use would
+   * teach a preference for a ground no page here was ever built from.
+   */
+  ground?: string
+  /**
    * The art behind the page, chosen rather than inherited.
    *
    * A written page borrows its look from the place on the wall it landed in, and the backdrop came
@@ -163,10 +172,12 @@ export function madeWritten(raw: Record<string, unknown>): Written | null {
   const html = safeMarkup(raw.html)
   if (!/<h1[\s>]/i.test(html)) return null
   const backdrop = BACKDROPS.includes(raw.backdrop as Backdrop) ? (raw.backdrop as Backdrop) : undefined
+  const ground = String(raw.ground ?? '').replace(/\s+/g, ' ').trim().slice(0, 40)
   return {
     html,
     css: safeStyle(raw.css),
     note: String(raw.note ?? '').replace(/\s+/g, ' ').trim().slice(0, 120),
+    ...(ground ? { ground } : {}),
     ...(backdrop ? { backdrop } : {}),
   }
 }
