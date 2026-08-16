@@ -67,6 +67,24 @@ const quiet = await runClaude('sys', 'user', { bin: silent, onDelta: () => {} })
 console.log('a session that said nothing:', JSON.stringify(quiet))
 ok(Boolean(quiet.error), 'a silent failure is still reported as one', quiet.error)
 
+// ——— a session that never answers does not hang the wall ———
+// This was the one failure with nothing covering it. A missing binary, a bad key, a reply that is
+// not JSON and a stream that stops were all handled; a process that simply never closes was not,
+// and it is the worst of them, because the promise never settles and the wall sits at seven of
+// eight for as long as the window is open. Measured on the bench three times before it was found,
+// where the number being reported was the harness giving up rather than the wall finishing.
+const hangs = fake('hangs', `process.stdin.resume(); setInterval(() => {}, 1000)`)
+// the real ceiling is seven minutes, which is generous because a page written whole thinks for
+// minutes before it writes a character. The suite asserts the mechanism, not the number.
+process.env.WALL_CALL_MS = '2500'
+const began = Date.now()
+const gaveUp = await runClaude('sys', 'user', { bin: hangs, onDelta: () => {} })
+const waited = Date.now() - began
+console.log('a session that never answers:', JSON.stringify({ ...gaveUp, waitedMs: waited }))
+ok(Boolean(gaveUp.error), 'it comes back at all rather than hanging for ever', gaveUp.error)
+ok(waited < 8000, 'it comes back when told to rather than at its own pace', `${waited}ms`)
+delete process.env.WALL_CALL_MS
+
 // ——— and a binary that is not there is named as that ———
 const missing = await runClaude('sys', 'user', { bin: join(work, 'not-here'), onDelta: () => {} })
 console.log('no claude on the machine:', JSON.stringify(missing))

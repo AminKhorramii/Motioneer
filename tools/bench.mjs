@@ -100,15 +100,29 @@ for (let i = 0; i < 20 && (await page.locator('.onboard').count()); i++) {
 console.log(`asked at ${((Date.now() - t0) / 1000).toFixed(0)}s, waiting for the wall`)
 
 // papers arrive one at a time now, so this waits for the work to stop rather than for a count
+/**
+ * Waiting for the wall to stop, and saying so when it did not.
+ *
+ * This loop used to run four hundred times at a second and a half and then carry on as though the
+ * wall had finished, so the number it printed was six hundred seconds plus setup, three runs in a
+ * row, to within two seconds. That is not a wall being slow, it is a harness giving up, and
+ * reporting it as a duration hid a real bug for three benches: one session never answered and
+ * nothing had a timeout, so the wall never finished at all.
+ */
+let finished = false
 for (let i = 0; i < 400; i++) {
   const now = await page.evaluate(() => ({
     papers: document.querySelectorAll('.paper, .cell').length,
     busy: Boolean(document.querySelector('[data-busy]')),
   }))
-  if (!now.busy && now.papers) break
+  if (!now.busy && now.papers) {
+    finished = true
+    break
+  }
   await page.waitForTimeout(1500)
 }
-const took = Math.round((Date.now() - t0) / 1000)
+const took = finished ? Math.round((Date.now() - t0) / 1000) : null
+if (!finished) console.log('\n  the wall never stopped working; every number below is of an unfinished wall\n')
 
 await page.click('.views button:nth-child(2)')
 /**
@@ -182,6 +196,7 @@ const scored = papers.map((html, i) => {
 const score = {
   at: stamp,
   seconds: took,
+  finished,
   papers: scored.length,
   drew: scored.filter((p) => p.drew).length,
   unread: scored.filter((p) => p.unread).length,
@@ -207,7 +222,7 @@ console.log(`  design flags  ${score.designFlags}${delta(score.designFlags, prev
 console.log(`  copy flags    ${score.copyFlags}${delta(score.copyFlags, prev?.copyFlags)}`)
 console.log(`  makes requests ${score.makesRequests}${delta(score.makesRequests, prev?.makesRequests)}`)
 console.log(`  median size   ${score.medianKb}KB${delta(score.medianKb, prev?.medianKb)}`)
-console.log(`  took          ${score.seconds}s${delta(score.seconds, prev?.seconds)}`)
+console.log(`  took          ${score.seconds === null ? 'never finished' : `${score.seconds}s${delta(score.seconds, prev?.seconds)}`}`)
 for (const p of scored) {
   const tells = [...p.design, ...p.copy]
   console.log(`   ${p.paper}. ${p.unread ? 'not read' : p.drew ? 'drew' : 'NO DRAWING'}  ${tells.length ? tells.join(', ') : 'clean'}`)

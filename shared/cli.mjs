@@ -189,11 +189,30 @@ export async function runClaude(system, user, { model = CLI_MODEL(), bin = 'clau
         env: budget === null ? process.env : { ...process.env, MAX_THINKING_TOKENS: budget },
       },
     )
+    /**
+     * A ceiling, because a session that never answers used to hang the whole wall.
+     *
+     * There was no timeout here at all. Every other failure was handled: a missing binary, a bad
+     * key, a reply that is not JSON, a stream that stops. The one case nothing covered was the
+     * process that simply never closes, and it is the worst of them, because the promise never
+     * settles, Promise.all never resolves, the busy line never clears and the wall sits at seven
+     * of eight for as long as the window is open. Measured on the bench three times: the wall
+     * never finished, and the number being reported was the harness giving up.
+     *
+     * Generous rather than tight. A page written whole spends minutes thinking before it writes a
+     * character, and killing real work would be a worse bug than the one this fixes.
+     */
+    const ceiling = Number(process.env.WALL_CALL_MS || 420_000)
+    const bell = setTimeout(() => {
+      child.kill('SIGKILL')
+      done({ error: `the session did not answer within ${Math.round(ceiling / 1000)}s` })
+    }, ceiling)
     // whichever way this ends, the next call in the queue gets the slot
     let ended = false
     const done = (result) => {
       if (ended) return
       ended = true
+      clearTimeout(bell)
       give()
       resolve(result)
     }
