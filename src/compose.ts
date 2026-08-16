@@ -157,6 +157,16 @@ async function mendCopy(page: Page, product: Product, provider: Provider): Promi
  * thousand tokens to fix four rules. Kept only if it carries strictly fewer, on the same reasoning
  * the world repair uses: a repair that trades one tell for another is a second opinion.
  */
+/**
+ * What the repairs did, said out loud where a harness can hear it.
+ *
+ * Whether this fires, and whether the answer it gets back is better, has been guessed at for
+ * several rounds: a wall came back with two design flags and there was no way to tell whether the
+ * repair had not run or had run and lost. It is a console line rather than app state because it
+ * is a measurement of the model rather than a fact about the page, and the bench reads it.
+ */
+const say = (m: string) => console.info(`[wall] ${m}`)
+
 async function mendWritten(page: Page, product: Product, provider: Provider): Promise<Page> {
   const written = page.written
   if (!written) return page
@@ -183,10 +193,14 @@ async function mendWritten(page: Page, product: Product, provider: Provider): Pr
     { maxTokens: 6000, kind: 'repair' },
   ).catch(() => null)
   const css = text ? safeStyle((grabJson(text) as { css?: unknown } | null)?.css) : ''
-  if (!css) return page
+  if (!css) {
+    say(`repair ${faults.length} faults: no usable reply`)
+    return page
+  }
   const mended = { ...page, written: { ...written, css } }
   const after = slop(mended, renderPage(mended, { title: product.name })).filter((f) => f.kind === 'design').length
     + undrawn(mended.written!).length
+  say(`repair ${faults.length} faults -> ${after}: ${after < faults.length ? 'kept' : 'discarded'}`)
   return after < faults.length ? mended : page
 }
 

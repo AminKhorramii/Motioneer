@@ -25,9 +25,13 @@ import { host, isTauri } from '@/host'
 const PAGE_W = 1280
 
 /**
- * A beat is the model proving it is still thinking, and the stream emits at most one a second,
- * so the count of them is an elapsed clock wearing the wrong name. Nobody reads "170 beats" as
- * "you have been waiting nearly three minutes", which is the only thing it was ever saying.
+ * Seconds, said the way a person reads them.
+ *
+ * This used to be handed the beat count, on the reasoning that a beat is about a second so the
+ * count is a clock. That held while one call beat at a time. Eight pages are written at once now,
+ * every one of them beating, so the number ran at eight times real time: measured on the bench, a
+ * wall four minutes old announced fifteen minutes and fifty one seconds of thinking. A count of
+ * beats is proof of life and never a duration, so the duration is now a duration.
  */
 const clock = (beats: number) =>
   beats < 60 ? `${beats}s` : `${Math.floor(beats / 60)}m ${String(beats % 60).padStart(2, '0')}s`
@@ -41,7 +45,7 @@ export default function App() {
   const [bar, setBar] = useState('')
   const [busy, setBusy] = useState('')
   /** null when nothing is being built, otherwise how far along the wall is */
-  const [building, setBuilding] = useState<{ landed: number; thoughts: number } | null>(null)
+  const [building, setBuilding] = useState<{ landed: number; thoughts: number; since: number } | null>(null)
   /**
    * Which papers are still the locally arranged stand-in rather than a written page.
    *
@@ -96,6 +100,18 @@ export default function App() {
   const fromProject = useRef(false)
   /** whether this wall is already in the log, because choosing twice is still one wall */
   const remembered = useRef(false)
+  /**
+   * One tick a second while a wall is being made, so the line can say how long it has been.
+   *
+   * The elapsed time has to come from a clock rather than from the work, because the work is eight
+   * calls at once and anything counted across them runs at eight times real time.
+   */
+  const [, tick] = useState(0)
+  useEffect(() => {
+    if (!building) return
+    const t = setInterval(() => tick((v) => v + 1), 1000)
+    return () => clearInterval(t)
+  }, [building])
 
   const page = pages[at] ?? null
 
@@ -208,7 +224,7 @@ export default function App() {
     // Each page starts the moment its own world is finished, rather than when the whole design
     // is. Writing the wall in one call instead was measured against this and came out the same
     // within noise, so this stays: one path, and the earliest first paper.
-    setBuilding({ landed: 0, thoughts: 0 })
+    setBuilding({ landed: 0, thoughts: 0, since: Date.now() })
     setBusy('designing')
     const jobs: Promise<{ ok: number; error?: string }>[] = []
 
@@ -414,7 +430,7 @@ export default function App() {
       }
       if (told) {
         // nothing to read, so the next thing on screen is the wall itself a moment later
-        setBuilding({ landed: 0, thoughts: 0 })
+        setBuilding({ landed: 0, thoughts: 0, since: Date.now() })
       } else {
         /**
          * Reading the brief is a model call of its own, and the wait belongs to it.
@@ -765,7 +781,7 @@ export default function App() {
       {busy && (
         <p className="busy">
           {building
-            ? `${building.landed} of 8 written${building.thoughts ? `, ${clock(building.thoughts)} thinking` : ''}`
+            ? `${building.landed} of 8 written, ${clock(Math.round((Date.now() - building.since) / 1000))}`
             : busy}
         </p>
       )}
@@ -797,7 +813,7 @@ export default function App() {
                 })}
               </div>
               <Dock
-                at={at} count={pages.length} angle={page.angle} world={page.world} bar={bar} busy={!!busy}
+                at={at} count={pages.length} angle={page.angle} bar={bar} busy={!!busy}
                 flags={flags} written={page.written}
                 onBar={setBar} onRun={runBar}
                 onModel={() => setOnboarding('first')}

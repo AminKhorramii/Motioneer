@@ -757,7 +757,7 @@ const wall = await page.evaluate(async () => {
     await new Promise((r) => setTimeout(r, 300))
     const doc = document.querySelector('.paper.here iframe')?.contentDocument
     seen.add(doc?.querySelector('h1')?.innerText ?? '')
-    const a = document.querySelector('.filmbar .angle')?.textContent
+    const a = document.querySelector('.filmbar')?.dataset.angle
     if (a) angles.push(a)
   }
   return { papersMounted: total, distinctHeadlines: seen.size, angles: [...new Set(angles)] }

@@ -1,6 +1,5 @@
 import { chosen } from '@/compose'
 import { Icon } from '@/icons'
-import { worldById, type WorldId } from '@/worlds'
 import { MARKS } from '@/models'
 import type { Flag } from '@/slop'
 
@@ -16,7 +15,6 @@ interface Props {
   at: number
   count: number
   angle?: string
-  world?: WorldId
   bar: string
   busy: boolean
   /** set when the model wrote this page whole, so the badge can say what it made */
@@ -35,7 +33,7 @@ interface Props {
 }
 
 export function Dock({
-  at, count, angle, world, bar, busy, flags, written,
+  at, count, angle, bar, busy, flags, written,
   onBar, onRun, onGo, onModel, onKill, onSend, onOpen, onShip,
 }: Props) {
   return (
@@ -63,45 +61,43 @@ export function Dock({
         )}
       </div>
 
-      <div className="filmbar">
-        {/* Everything that acts on this paper, in one cluster.
-            These used to be spread across the bar with the identity and the counter between them,
-            so the row read as eight unrelated things and the one that matters was last. Grouped,
-            the bar is three clusters rather than nine controls: what you can do, what this is, and
-            where you are. */}
-        <div className="acts">
-          <button aria-label="remove this page"
-            title="take this page off the wall, or press x. z brings the last removed one back."
-            onClick={onKill}><Icon.x /></button>
-          <button className="icon" aria-label="full view" title="open this page in your browser"
-            onClick={onOpen}><Icon.open /></button>
-          <button className={onSend ? 'icon' : 'go'} aria-label="download"
-            title="write this page out as one HTML file" onClick={onShip}>
-            <Icon.down />{onSend ? '' : ' download'}
-          </button>
-          {/* when something asked for this design, handing it back is the whole point of being
-              here, so it is the one thing wearing a name */}
-          {onSend && (
-            <button className="go send" title="hand this design back to the agent that asked"
-              onClick={onSend}>
-              {MARKS['claude-code']?.() ?? <Icon.claude />} to Claude
-            </button>
-          )}
+      {/**
+        * The angle rides as an attribute rather than as a label.
+        *
+        * It used to be printed beside the counter, joined with what the model called the page, and
+        * the model's name for a page is a sentence: "a paperback jacket for a barometer: bands, one
+        * mark, three needles" is true, useful in a brief, and half a toolbar wide. The bar is for
+        * what you can do and where you are; what a paper is, is the paper.
+        *
+        * It stays readable to a harness on the same reasoning data-busy is there for: three suites
+        * check that eight papers argue eight different cases, which is the anti-convergence check
+        * for the words, and losing the label should not lose the check.
+        */}
+      <div className="filmbar" data-angle={angle} data-made={written?.note}>
+        {/**
+          * Where you are, then what this is, then what to do about it, left to right.
+          *
+          * Three rules decide this order and nothing else does. The act that ends the session sits
+          * at the far edge, because a primary action wants one predictable place and the end of a
+          * row is the one people find without looking. Removing a paper sits at the other end,
+          * beside the arrows it is used with: triage is a pass with one hand on the keys, and a
+          * destructive control next to the button that hands work over is a misclick waiting for a
+          * tired evening. And the verdict sits just before the actions, because it is the last
+          * thing worth reading before a page goes anywhere.
+          */}
+        <div className="nav">
+          <button title="previous alternative, or press the left arrow key"
+            onClick={() => onGo(at - 1)} disabled={at === 0}><Icon.left /></button>
+          <span className="count"><b>{at + 1}</b> of {count}</span>
+          <button title="next alternative, or press the right arrow key"
+            onClick={() => onGo(at + 1)} disabled={at >= count - 1}><Icon.right /></button>
         </div>
-
-        {/* What this paper is, in one label rather than two chips. A written page says what the
-            model made; an arranged one says the world it is built in, which is the same question
-            answered by whichever half designed it. */}
-        <span className="angle" title={written?.note ?? worldById(world).note}>
-          {[angle, written?.note || worldById(world).library || worldById(world).name]
-            .filter(Boolean)
-            .join(' · ')}
-        </span>
+        <button aria-label="remove this page"
+          title="take this page off the wall, or press x. z brings the last removed one back."
+          onClick={onKill}><Icon.x /></button>
 
         <span className="spacer" />
 
-        {/* the verdict sits with the identity rather than with the actions, because it describes
-            the page rather than doing anything to it, and the reasons ride in the tooltip */}
         <span className={flags.length ? 'flags' : 'flags ok'}
           title={flags.length
             ? flags.map((f) => `${f.kind}: ${f.label}. ${f.why}`).join('\n')
@@ -116,12 +112,21 @@ export function Dock({
             : 'clean'}
         </span>
 
-        <div className="nav">
-          <button title="previous alternative, or press the left arrow key"
-            onClick={() => onGo(at - 1)} disabled={at === 0}><Icon.left /></button>
-          <span className="count"><b>{at + 1}</b> of {count}</span>
-          <button title="next alternative, or press the right arrow key"
-            onClick={() => onGo(at + 1)} disabled={at >= count - 1}><Icon.right /></button>
+        <div className="acts">
+          <button className="icon" aria-label="full view" title="open this page in your browser"
+            onClick={onOpen}><Icon.open /></button>
+          <button className={onSend ? 'icon' : 'go'} aria-label="download"
+            title="write this page out as one HTML file" onClick={onShip}>
+            <Icon.down />{onSend ? '' : ' download'}
+          </button>
+          {/* when something asked for this design, handing it back is the whole point of being
+              here, so it is the one thing wearing a name, and it is last */}
+          {onSend && (
+            <button className="go send" title="hand this design back to the agent that asked"
+              onClick={onSend}>
+              {MARKS['claude-code']?.() ?? <Icon.claude />} to Claude
+            </button>
+          )}
         </div>
       </div>
     </div>

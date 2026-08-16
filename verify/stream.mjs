@@ -101,7 +101,7 @@ const wall = await page.evaluate(async () => {
     const doc = document.querySelector('.paper.here iframe')?.contentDocument
     // a world may compose a page with no hero at all, so read whatever heading leads it
     heads.add(doc?.querySelector('h1, h2')?.innerText ?? `missing-${i}`)
-    const a = document.querySelector('.filmbar .angle')?.textContent
+    const a = document.querySelector('.filmbar')?.dataset.angle
     if (a) angles.push(a)
     worlds.add(document.querySelector('.filmbar .library')?.textContent ?? '')
     shapes.add(document.querySelectorAll('.sec').length + ':' + [...document.querySelectorAll('.sec b')].map((b) => b.textContent).join(','))

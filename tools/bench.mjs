@@ -66,6 +66,12 @@ const url = await new Promise((resolve) => {
 
 browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+// what the repair passes did, straight from the app rather than inferred from the final flags
+const repairs = []
+page.on('console', (m) => {
+  const t = m.text()
+  if (t.startsWith('[wall] ')) repairs.push(t.slice(7))
+})
 await page.goto(url)
 await page.evaluate(() => localStorage.setItem('wall-model', 'claude-code'))
 await page.reload()
@@ -110,11 +116,28 @@ console.log(`asked at ${((Date.now() - t0) / 1000).toFixed(0)}s, waiting for the
  * nothing had a timeout, so the wall never finished at all.
  */
 let finished = false
-for (let i = 0; i < 400; i++) {
+/**
+ * A timeline rather than a verdict.
+ *
+ * Three runs were spent guessing where the time went, because all this reported was a single
+ * number at the end and that number was its own ceiling. A wall is eight pages written whole and
+ * then, for any page the detector reads something on, a second call to repair its styles. Which
+ * half of that is the wait is not a thing to reason about when it can be watched.
+ */
+const timeline = []
+let seen = -1
+for (let i = 0; i < 1200; i++) {
   const now = await page.evaluate(() => ({
     papers: document.querySelectorAll('.paper, .cell').length,
     busy: Boolean(document.querySelector('[data-busy]')),
+    line: document.querySelector('.busy')?.textContent ?? '',
   }))
+  const secs = Math.round((Date.now() - t0) / 1000)
+  if (now.papers !== seen) {
+    seen = now.papers
+    timeline.push({ at: secs, papers: now.papers, line: now.line })
+    console.log(`  ${String(secs).padStart(4)}s  ${now.papers} paper${now.papers === 1 ? '' : 's'}  ${now.line}`)
+  }
   if (!now.busy && now.papers) {
     finished = true
     break
@@ -197,6 +220,8 @@ const score = {
   at: stamp,
   seconds: took,
   finished,
+  timeline,
+  repairs,
   papers: scored.length,
   drew: scored.filter((p) => p.drew).length,
   unread: scored.filter((p) => p.unread).length,
@@ -227,6 +252,8 @@ for (const p of scored) {
   const tells = [...p.design, ...p.copy]
   console.log(`   ${p.paper}. ${p.unread ? 'not read' : p.drew ? 'drew' : 'NO DRAWING'}  ${tells.length ? tells.join(', ') : 'clean'}`)
 }
+console.log(`\n  repairs`)
+console.log(repairs.length ? repairs.map((r) => `   ${r}`).join('\n') : '   none fired')
 console.log(`\n  wall.png and paper-1..${scored.length}.png are in that directory.`)
 await browser.close()
 server.kill()

@@ -126,7 +126,7 @@ console.log('wall written:', JSON.stringify(await page.evaluate(async () => {
     await new Promise((r) => setTimeout(r, 260))
     const d = document.querySelector('.paper.here iframe')?.contentDocument
     heads.add(d?.querySelector('h1, h2')?.innerText ?? '')
-    const a = document.querySelector('.filmbar .angle')?.textContent
+    const a = document.querySelector('.filmbar')?.dataset.angle
     if (a) angles.add(a)
   }
   for (let i = 0; i < 8; i++) {

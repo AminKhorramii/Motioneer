@@ -215,7 +215,9 @@ button:disabled { opacity: 0.32; pointer-events: none; }
 /* the acting half of the bar, kept together so the row reads as clusters rather than as a queue
    of controls. The gap is tighter than the bar's own, because these belong to each other. */
 .filmbar .acts { display: flex; align-items: center; gap: 0.25rem; }
-.filmbar .acts .go { margin-left: 0.35rem; }
+/* the act that ends the session gets room of its own, so the eye lands on it rather than on the
+   icon beside it */
+.filmbar .acts .go { margin-left: 0.5rem; }
 
 /* the slop count sits beside ship, because it is the last thing worth checking before you
    send a page out, and on every grid cell, because generic should announce itself to triage */
