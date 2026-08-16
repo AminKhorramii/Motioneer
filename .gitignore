@@ -1,6 +1,8 @@
 node_modules/
 dist/
 shots/
+# a bench run is a real wall: screenshots and a scorecard, regenerated rather than kept
+bench/
 .DS_Store
 *.log
 dist-core/

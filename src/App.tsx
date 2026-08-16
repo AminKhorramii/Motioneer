@@ -10,7 +10,7 @@ import { renderBody, renderPage, shellOf } from '@/render'
 import { pageBrief } from '@/brief'
 import { slop } from '@/slop'
 import {
-  EMPTY_PRODUCT, addSection, alternatives, dealShapes, readBrief, canDraw, canWrite, choose, chosen, setMemory, cycleForm, cycleWorld, dropSection, dealWritten, writeOne, writeWhole, illustrate, loadHeldKeys, loadKeys, promptPage, sectionAlternatives, seeded, setMock, type Product,
+  EMPTY_PRODUCT, addSection, alternatives, arrangeIn, dealShapes, readBrief, canDraw, canWrite, choose, chosen, setMemory, cycleForm, cycleWorld, dropSection, dealWritten, writeOne, writeWhole, illustrate, loadHeldKeys, loadKeys, promptPage, sectionAlternatives, seeded, setMock, type Product,
 } from '@/compose'
 import { Onboarding } from '@/Onboarding'
 import { SectionsRail } from '@/SectionsRail'
@@ -316,9 +316,21 @@ export default function App() {
       const spare = WORLDS.filter((w) => !w.library)
       registerWorlds(spare)
       await Promise.all(
-        arrangeInstead.map((at, n) =>
-          writeOne(base, p, spare[n % spare.length], at, (pg) => land(pg, at)),
-        ),
+        arrangeInstead.map(async (at, n) => {
+          const world = spare[n % spare.length]
+          const wrote = await writeOne(base, p, world, at, (pg) => land(pg, at))
+          /**
+           * And a floor under the floor.
+           *
+           * The fallback is itself a model call, so it can fail too, and when it did the place was
+           * left with nothing in it: a bench run came back with six papers on a wall of eight and
+           * said so only in a status line. A page arranged locally from a built-in world against
+           * the copy the brief already seeded needs no model at all. It is the dullest page the
+           * app can make and it is a page, which beats a wall that is quietly short.
+           */
+          if (!wrote.ok) land(arrangeIn(base, at + 1, world), at)
+          return wrote
+        }),
       )
     }
     const results: { ok: number; error?: string }[] = [...first, ...(jobs.length ? await Promise.all(jobs) : [])]

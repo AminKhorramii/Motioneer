@@ -86,9 +86,16 @@ export const INTAKE_MODEL = () =>
  *
  * So they queue. A call that has to wait its turn starts later and finishes sooner than one that
  * starts immediately and then fights for the machine.
+ *
+ * Eight, because that is now the wall. It was five when a wall was five design calls and eight
+ * shorter copy calls arriving at staggered times; every place is a page written whole now, so a
+ * wall is eight calls that all start together and a cap of five makes that two waves of one long
+ * call each. Measured on the bench: 610 seconds for six papers. Thirteen at once was the number
+ * that produced contention, a straggler and a lost page, and eight is well under it while making
+ * a wall one wave instead of two.
  */
 const MAX_AT_ONCE = Number(
-  (typeof process !== 'undefined' ? process.env?.WALL_MAX_CALLS : '') || 5,
+  (typeof process !== 'undefined' ? process.env?.WALL_MAX_CALLS : '') || 8,
 )
 let running = 0
 const waiting = []

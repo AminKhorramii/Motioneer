@@ -32,7 +32,8 @@
     "try": "node tools/try.mjs",
     "wallclock": "npm run build && node tools/wallclock.mjs",
     "verify:beat": "node verify/beat.mjs",
-    "verify:cli": "node verify/cli.mjs"
+    "verify:cli": "node verify/cli.mjs",
+    "bench": "npm run build && node tools/bench.mjs"
   },
   "devDependencies": {
     "@fontsource-variable/archivo": "^5.3.0",
