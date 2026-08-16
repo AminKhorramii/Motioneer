@@ -68,7 +68,7 @@ const text = (page: Page) =>
   // Reading those would judge it on copy the reader cannot see: the first one rendered end to end
   // reported six tells, every one of them from a placeholder section that never reaches the page.
   page.written
-    ? wordsIn(page.written).map((value) => ({ section: 'written', key: '', value }))
+    ? wordsIn(page.written).map((f) => ({ section: 'written', ...f }))
     : page.sections
         .filter((s) => s.on)
         .flatMap((s) =>

@@ -36,6 +36,16 @@ const TAGS = new Set([
 const ATTRS = new Set([
   'class', 'id', 'style', 'href', 'src', 'alt', 'title', 'colspan', 'rowspan',
   'width', 'height', 'datetime', 'role', 'aria-label', 'aria-hidden', 'lang', 'dir',
+  /**
+   * The one attribute that is here for the detector rather than for the page.
+   *
+   * Half the copy catalogue is scoped to a field: a call to action, a witness, the employer under
+   * a quote, a row of logos. An arranged page has those fields because the page model has slots.
+   * A written page has markup, so none of those tells could fire on it, and the wall became all
+   * written pages: the same fabricated testimonial that trips three checks on an arranged page was
+   * clean on a written one. This is the model naming its own slots, and it costs one attribute.
+   */
+  'data-k',
 ])
 
 /**
@@ -124,13 +134,22 @@ export function safeStyle(raw: unknown): string {
  * is a real gap in the gate, and narrowing it means asking the model to mark its own attribution,
  * which is a change to the prompt rather than to this.
  */
-export const wordsIn = (written: Written): string[] =>
-  written.html
-    // one entry per text node rather than per word, because the catalogue matches phrases and
-    // several of its tells are anchored to a whole line
-    .split(/<[^>]*>/)
-    .map((s) => s.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim())
-    .filter(Boolean)
+export const wordsIn = (written: Written): { key: string; value: string }[] => {
+  const out: { key: string; value: string }[] = []
+  let key = ''
+  // one pass, carrying the nearest data-k down to the text it wraps and dropping it at the close.
+  // Text nodes rather than words, because the catalogue matches phrases and several of its tells
+  // are anchored to a whole line.
+  for (const m of written.html.matchAll(/<([^>]*)>|([^<]+)/g)) {
+    if (m[1] !== undefined) {
+      key = m[1].startsWith('/') ? '' : /data-k\s*=\s*"([^"]*)"/.exec(m[1])?.[1] ?? key
+      continue
+    }
+    const value = m[2].replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim()
+    if (value) out.push({ key, value })
+  }
+  return out
+}
 
 export interface Written {
   /** the body markup, filtered */

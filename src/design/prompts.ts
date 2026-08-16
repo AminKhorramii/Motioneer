@@ -183,6 +183,10 @@ ${REFUSE}
 
 backdrop: none, contours, grain, ridge, dither or dots, in a field of its own beside the others. It is drawn behind the whole page from your palette, so it costs you no markup. contours, grain and ridge are drawn live; dither and dots are printed textures, and they are what make a page read as printed rather than rendered, so reach for them when the idea comes from paper.
 
+Never invent proof. If you have not been given a customer, a quote, a logo or a number, the page does not get one: leave the section out entirely rather than filling it with a plausible name at a plausible company. A made up testimonial is the single most damaging thing a launch page can carry, because the first reader who checks finds nothing, and a page with no testimonial has cost you nothing. The same goes for logo rows, user counts and awards. What you may do instead is say plainly what the thing is and what it is made of, which is what somebody buying a made thing is reading for anyway.
+
+Mark the fields you do fill. Put data-k on the element carrying each of these, so the page can be checked the way a structured one is: data-k="name" on a person's name, data-k="role" on their title and employer, data-k="cta" on the words inside a button, data-k="names" on each entry in a row of company names. It costs one attribute and it is the difference between a page that is checked and a page that is trusted.
+
 Write exactly one <h1>. It is the headline, and it is the thing the page is compared on.
 
 Make it responsive with the CSS you write. It will be looked at at 1280, 900 and 390 pixels wide, and a layout that only works at one of them is a layout that breaks rather than adapts.

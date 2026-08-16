@@ -489,6 +489,28 @@ if (houseFlags.length) throw new Error(`the house trips its own detector on ${ho
     kept: chose?.backdrop, refused: invented?.backdrop ?? null,
   }))
   if (chose?.backdrop !== 'dither') throw new Error('a written page cannot choose the art behind it')
+
+  /**
+   * The fabricated witness, on the half of the wall that is now all of it.
+   *
+   * Half the copy catalogue is scoped to a field, an arranged page has fields because the model has
+   * slots, and a written page has markup. So the same testimonial that tripped three checks on an
+   * arranged page was clean on a written one, and every paper became written. The model marks its
+   * own slots with data-k now, which is one attribute and the difference between a page that is
+   * checked and a page that is trusted.
+   */
+  const fabricated = core.madeWritten({
+    note: 'x', css: '',
+    html: '<section><h1>Orbital</h1><blockquote>It replaced three tools.</blockquote>'
+      + '<cite data-k="name">A real person</cite><span data-k="role">founder, somewhere</span></section>',
+  })
+  const onWritten = core.slop({ ...core.starterPage(core.PRESETS[0], 'Orbital'), written: fabricated })
+    .filter((f) => f.kind === 'copy').map((f) => f.id)
+  console.log('a fabricated witness on a written page:', JSON.stringify(onWritten))
+  if (!onWritten.includes('invented-witness') || !onWritten.includes('nowhere-company')) {
+    throw new Error('a written page can still ship a customer nobody has met, which is the one thing a launch page must not do')
+  }
+  if (!fabricated.html.includes('data-k')) throw new Error('the filter strips the attribute the detector reads')
   if (invented?.backdrop) throw new Error('a backdrop the model invented was passed through to the renderer')
 }
 
