@@ -111,7 +111,22 @@ for (let i = 0; i < 400; i++) {
 const took = Math.round((Date.now() - t0) / 1000)
 
 await page.click('.views button:nth-child(2)')
-await page.waitForTimeout(1200)
+/**
+ * Every cell, including the ones below the fold.
+ *
+ * A paper's frame is marked lazy, so a cell the viewport has not reached has no document to read
+ * and the bench counted seven papers on a wall of eight. The wall was right and the measurement
+ * was short, which is the second time this instrument has reported its own limitation as a
+ * finding. Scrolling to the end mounts them before anything is read.
+ */
+await page.evaluate(async () => {
+  for (const cell of document.querySelectorAll('.cell')) {
+    cell.scrollIntoView({ block: 'center' })
+    await new Promise((r) => setTimeout(r, 120))
+  }
+  window.scrollTo(0, 0)
+})
+await page.waitForTimeout(1500)
 await page.screenshot({ path: path.join(here, 'wall.png'), fullPage: true })
 
 /**
@@ -121,7 +136,7 @@ await page.screenshot({ path: path.join(here, 'wall.png'), fullPage: true })
  * somebody would ship, after the filter, the repair and the renderer have all had their turn.
  */
 const papers = await page.evaluate(() =>
-  [...document.querySelectorAll('.cell iframe')].map((f) => f.contentDocument?.documentElement?.outerHTML ?? ''))
+  [...document.querySelectorAll('.cell')].map((c) => c.querySelector('iframe')?.contentDocument?.documentElement?.outerHTML ?? ''))
 
 papers.forEach((html, i) => writeFileSync(path.join(here, `paper-${i + 1}.html`), html))
 
@@ -146,6 +161,9 @@ const scored = papers.map((html, i) => {
   const css = styleOf(html)
   // the design half reads the rendered page, so a stub page carries it honestly; the copy half is
   // read from the markup the same way the app reads a written page
+  // a cell whose frame never mounted is reported rather than scored, so a hole in the measurement
+  // never reads as a clean page
+  if (!html) return { paper: i + 1, design: [], copy: [], drew: false, kb: 0, requests: 0, unread: true }
   const body = bodyOf(html)
   const stub = { id: `p${i}`, taste: core.PRESETS[0], sections: [], written: { html: body, css, note: '' } }
   // the design half reads the rendered document, the copy half reads only what a reader sees
@@ -166,6 +184,7 @@ const score = {
   seconds: took,
   papers: scored.length,
   drew: scored.filter((p) => p.drew).length,
+  unread: scored.filter((p) => p.unread).length,
   clean: scored.filter((p) => !p.design.length && !p.copy.length).length,
   designFlags: scored.reduce((n, p) => n + p.design.length, 0),
   copyFlags: scored.reduce((n, p) => n + p.copy.length, 0),
@@ -191,7 +210,7 @@ console.log(`  median size   ${score.medianKb}KB${delta(score.medianKb, prev?.me
 console.log(`  took          ${score.seconds}s${delta(score.seconds, prev?.seconds)}`)
 for (const p of scored) {
   const tells = [...p.design, ...p.copy]
-  console.log(`   ${p.paper}. ${p.drew ? 'drew' : 'NO DRAWING'}  ${tells.length ? tells.join(', ') : 'clean'}`)
+  console.log(`   ${p.paper}. ${p.unread ? 'not read' : p.drew ? 'drew' : 'NO DRAWING'}  ${tells.length ? tells.join(', ') : 'clean'}`)
 }
 console.log(`\n  wall.png and paper-1..${scored.length}.png are in that directory.`)
 await browser.close()
