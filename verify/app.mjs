@@ -589,6 +589,31 @@ if (houseFlags.length) throw new Error(`the house trips its own detector on ${ho
   }
 }
 
+// ——— 0k. a page asked to draw is checked for having drawn ———
+// Every design call is told to draw the object its ground names, and until now nothing measured
+// whether any of them did: unspent reads a World, and the wall is written pages. That is the shape
+// of failure this repository keeps finding, a promise in a prompt with no gate behind it, in a
+// codebase whose own note says written guidance increases slop and gates reverse it.
+{
+  const page = (css) => core.madeWritten({
+    note: 'x', css, html: '<section class="a"><h1>Field Mark One</h1></section>',
+  })
+  const laidOut = core.undrawn(page('.a{padding:6rem 2rem;display:grid;gap:2rem;border-top:1px solid var(--line)}'))
+  const tiny = core.undrawn(page('.a::before{content:"";width:12px;height:12px;background:radial-gradient(circle,var(--accent),transparent)}'))
+  const drawn = core.undrawn(page(
+    '.a::before{content:"";display:block;width:min(60vw,30rem);aspect-ratio:1;border-radius:50%;'
+    + 'background:conic-gradient(from 0deg,var(--ink) 0 2deg,transparent 2deg 30deg),'
+    + 'radial-gradient(circle,var(--surface) 60%,var(--ink) 61%)}'))
+  console.log('did it draw:', JSON.stringify({
+    aPageThatOnlyLaysOut: laidOut.length,
+    aDrawingTheSizeOfABullet: tiny.length,
+    aDialGivenRoom: drawn.length,
+  }))
+  if (!laidOut.length) throw new Error('a page with no drawing at all passed, so the instruction to draw has no gate behind it')
+  if (!tiny.length) throw new Error('a drawing the size of a bullet passed, and an icon is decoration rather than the subject')
+  if (drawn.length) throw new Error('a real drawing was called undrawn, which turns this into noise the repair cannot act on')
+}
+
 // ——— 0a. the block library reaches the page, and the geometry holds ———
 // Both gates live in verify/layout.mjs, because they measure rendered pages rather than drive
 // the app, and they are worth running alone while a block is being changed.

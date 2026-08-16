@@ -7,7 +7,7 @@ import { slop, slopBrief } from '@/slop'
 import { dealDirections, directionSeed, type Direction } from '@/design/directions'
 import { ANGLES } from '@/design/angles'
 import { INTAKE_SYSTEM, MEND_SYSTEM, PAGE_SYSTEM, WORLDS_SYSTEM, WRITTEN_SYSTEM } from '@/design/prompts'
-import { madeWritten, safeStyle, type Written } from '@/written'
+import { madeWritten, safeStyle, undrawn, type Written } from '@/written'
 import { grabJson, scanSections } from '@/reply'
 import { MODELS, modelById, type ModelChoice } from '@/models'
 import { BACKDROPS, type Backdrop } from '@/backdrop'
@@ -160,7 +160,14 @@ async function mendCopy(page: Page, product: Product, provider: Provider): Promi
 async function mendWritten(page: Page, product: Product, provider: Provider): Promise<Page> {
   const written = page.written
   if (!written) return page
-  const faults = slop(page, renderPage(page, { title: product.name })).filter((f) => f.kind === 'design')
+  const faults = [
+    ...slop(page, renderPage(page, { title: product.name }))
+      .filter((f) => f.kind === 'design')
+      .map((f) => `${f.label}. ${f.why}`),
+    // and the other half of the question the detector never asks: not whether this reads as
+    // generated, but whether it drew the thing it was asked to draw
+    ...undrawn(written),
+  ]
   if (!faults.length) return page
   const text = await ask(
     provider,
@@ -171,17 +178,16 @@ async function mendWritten(page: Page, product: Product, provider: Provider): Pr
       + 'wrote still has to match it. Fix the fault rather than removing what carried it, because a '
       + 'page with the offending thing deleted is a page with a hole where a decision was.',
     `${written.css}\n\nIt trips ${faults.length === 1 ? 'this check' : `these ${faults.length} checks`}:\n`
-      + faults.map((f) => `- ${f.label}. ${f.why}`).join('\n'),
+      + faults.map((f) => `- ${f}`).join('\n'),
     undefined,
     { maxTokens: 6000, kind: 'repair' },
   ).catch(() => null)
   const css = text ? safeStyle((grabJson(text) as { css?: unknown } | null)?.css) : ''
   if (!css) return page
   const mended = { ...page, written: { ...written, css } }
-  return slop(mended, renderPage(mended, { title: product.name })).filter((f) => f.kind === 'design').length
-    < faults.length
-    ? mended
-    : page
+  const after = slop(mended, renderPage(mended, { title: product.name })).filter((f) => f.kind === 'design').length
+    + undrawn(mended.written!).length
+  return after < faults.length ? mended : page
 }
 
 /**

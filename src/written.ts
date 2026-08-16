@@ -187,6 +187,51 @@ export interface Written {
  * headline per paper would be reading an empty string. A reply that cannot manage it is refused,
  * and the wall falls back to an arranged page in that place rather than showing a hole.
  */
+/**
+ * The shapes a page draws with, as opposed to the ones it merely lays out with.
+ *
+ * Padding, borders, flex and grid arrange things. These make something that was not there: a
+ * gradient with stops is a disc or a stripe or a halftone, a clip-path is a cut edge, a blend mode
+ * is two inks overprinting, and a pseudo element is where all of it hangs without touching the
+ * markup. A page built only from the first list has laid out its words, which is not the same as
+ * having drawn anything.
+ */
+const DRAWS = /(?:repeating-)?(?:linear|radial|conic)-gradient|clip-path|mix-blend-mode|::(?:before|after)/i
+
+/**
+ * And whether the drawn thing was given room to be looked at.
+ *
+ * An illustration the size of a paragraph reads as an icon, and an icon is decoration, which is
+ * the failure the instruction names explicitly. This is an approximation and says so: a shape with
+ * proportions, or a size expressed against the viewport, or a length large enough that nothing
+ * incidental is that big. It cannot tell a large drawing from a large empty box, so it is a floor
+ * rather than a judgement.
+ */
+const SIZED = /aspect-ratio|\d{2,}v[wh]|clamp\([^)]*v[wh]|(?:[1-9]\d|\d{3,})rem/i
+
+/**
+ * What a written page did not draw.
+ *
+ * Every design call is asked to draw the object its ground names, and until now nothing checked
+ * whether any of them did. That is the shape of failure this codebase keeps finding: a promise in
+ * a prompt with no gate behind it, in a repository whose own note says written guidance increases
+ * slop and mechanical gates reverse it. The wall is written pages now, so this is the whole wall.
+ *
+ * Two faults rather than one, because they want different repairs: a page with no drawing needs
+ * one, and a page whose drawing is the size of a bullet needs it given room.
+ */
+export function undrawn(written: Written): string[] {
+  if (!DRAWS.test(written.css)) {
+    return ['nothing on this page is drawn. Every rule here arranges words, and the object the ground '
+      + 'names does not appear, so the page could be about anything.']
+  }
+  if (!SIZED.test(written.css)) {
+    return ['something is drawn and nothing was given room to be seen. An illustration the size of a '
+      + 'paragraph reads as an icon, and an icon is decoration rather than the subject.']
+  }
+  return []
+}
+
 export function madeWritten(raw: Record<string, unknown>): Written | null {
   const html = safeMarkup(raw.html)
   if (!/<h1[\s>]/i.test(html)) return null
