@@ -614,6 +614,27 @@ if (houseFlags.length) throw new Error(`the house trips its own detector on ${ho
   if (drawn.length) throw new Error('a real drawing was called undrawn, which turns this into noise the repair cannot act on')
 }
 
+// ——— 0l. eight independent calls do not all reach for a column ———
+// The arranged path measured this and wrote it down: handed one ground each and blind to the other
+// seven, the model chose a column four times in five across two real walls and never once reached
+// for anything else. Not a failure to describe the alternatives, a failure of independence, and
+// variety across a wall cannot come out of every call picking the most natural answer. The written
+// path deals grounds and never dealt this, so it is the wall now.
+{
+  const deals = Array.from({ length: 200 }, () => core.dealShapes(8))
+  const distinctWithin = deals.map((d) => new Set(d).size)
+  const everyDealFull = deals.every((d) => d.length === 8 && d.every(Boolean))
+  const acrossWalls = new Set(deals.map((d) => d.join('|'))).size
+  console.log('silhouettes dealt to eight hands:', JSON.stringify({
+    distinctPerWall: Math.min(...distinctWithin),
+    everyHandGotOne: everyDealFull,
+    distinctDealsOutOf200: acrossWalls,
+  }))
+  if (!everyDealFull) throw new Error('a hand was dealt no silhouette, so it picks its own and they converge')
+  if (Math.min(...distinctWithin) < 6) throw new Error('a wall of eight got fewer than six silhouettes, so the deal is not spreading them')
+  if (acrossWalls < 150) throw new Error('the same deal keeps coming up, so two walls in a row share a shape order')
+}
+
 // ——— 0a. the block library reaches the page, and the geometry holds ———
 // Both gates live in verify/layout.mjs, because they measure rendered pages rather than drive
 // the app, and they are worth running alone while a block is being changed.

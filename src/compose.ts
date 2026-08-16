@@ -4,7 +4,7 @@ import { PRESETS } from '@/design/presets'
 import { tasteAvoid, tasteBrief, type Lean, type Taste } from '@/taste'
 import { giveKey, host, isDesktop, isServed, servedConfig } from '@/host'
 import { slop, slopBrief } from '@/slop'
-import { dealDirections, directionSeed, type Direction } from '@/design/directions'
+import { dealDirections, dealShapes, directionSeed, type Direction } from '@/design/directions'
 import { ANGLES } from '@/design/angles'
 import { INTAKE_SYSTEM, MEND_SYSTEM, PAGE_SYSTEM, WORLDS_SYSTEM, WRITTEN_SYSTEM } from '@/design/prompts'
 import { madeWritten, safeStyle, undrawn, type Written } from '@/written'
@@ -207,6 +207,8 @@ export async function writeWhole(
   product: Product,
   direction: Direction,
   i: number,
+  /** the silhouette this hand was dealt, so eight independent calls do not all reach for a column */
+  shape: string,
   provider: Provider = 'model',
   /** called each time the model proves it is still thinking, before any of it can be read */
   onBeat?: () => void,
@@ -238,7 +240,8 @@ export async function writeWhole(
     `A ${product.kind}: ${product.name}. ${product.oneLiner}\n${product.what}\nAudience: ${product.audience}\n` +
     `The one action is: ${product.cta}.\n\n` +
     `Build it from ${directionSeed(direction)}\n\n` +
-    `Argue it as "${angle.name}". ${angle.instruction}`
+    `Argue it as "${angle.name}". ${angle.instruction}\n\n` +
+    `Lay this one out as ${shape}, unless the ground you were given genuinely refuses it.`
   // the same split the design hands used: what this person culls goes to every page, because
   // pruning narrows nothing, and what they keep goes only to a page dealt from what they like
   const note = memory ? tasteBrief(memory, memory.favor.includes(direction.name)) : ''
@@ -358,6 +361,7 @@ export const setMemory = (lean: Lean | null) => {
  * became the memory quietly having nothing left to bias.
  */
 export const dealWritten = (n: number): Direction[] => dealDirections(n, memory ?? undefined)
+export { dealShapes }
 
 /** Move a page to the next world, keeping its copy. */
 export function cycleWorld(page: Page): Page {

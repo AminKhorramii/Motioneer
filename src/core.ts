@@ -22,7 +22,7 @@ export {
   type Asked, type Essence, type Judged, type Kept, type Killed, type Lean, type Seen,
   type TasteLog, type WallStory, type WallTaste,
 } from '@/taste'
-export { DIRECTIONS, dealDirections, directionSeed, type Direction } from '@/design/directions'
+export { DIRECTIONS, dealDirections, dealShapes, directionSeed, type Direction } from '@/design/directions'
 // the page a model wrote whole, and the filter standing between its markup and the wall
 export { madeWritten, safeMarkup, safeStyle, undrawn, type Written } from '@/written'
 // what a world left unspent, which is the question the slop detector never asked

@@ -444,3 +444,38 @@ export function dealDirections(n: number, lean?: { favor: string[]; shun: string
 /** one direction, folded to the line a design call is handed */
 export const directionSeed = (d: Direction): string =>
   `${d.name}: ${d.ground}. Chain: ${d.chain}. Avoid ${d.avoid}. Voice: ${d.voice}`
+
+/**
+ * A silhouette for each hand, dealt rather than left to every call to work out for itself.
+ *
+ * The arranged path learned this the hard way and wrote it down: measured across two real walls,
+ * the model chose a column four times in five, both times, and never once reached for anything
+ * else. That is not the prompt failing to describe the alternatives. Every call is handed one
+ * ground and cannot see the other seven, so each independently picks the arrangement that best
+ * fits the object it was given, and for most objects that is a column. Variety across a wall
+ * cannot come out of independent calls each choosing the most natural answer.
+ *
+ * The written path deals grounds and never dealt this, so eight pages agreed on their shape while
+ * disagreeing about everything else. It is a lean rather than an instruction, on the same terms:
+ * a ground that genuinely refuses its shape should win, because a spread forced onto a receipt is
+ * worse than another column.
+ */
+const SHAPES = [
+  'a single column, read straight down',
+  'a spread: the opening held still in a panel while the rest of the argument travels past it',
+  'a grid on two tracks, with some things spanning both',
+  'a stepped arrangement where no two consecutive things begin at the same left edge',
+  'one full bleed field, with everything set into it rather than stacked on it',
+  'a stack of bands edge to edge, each one a different height',
+]
+
+export function dealShapes(n: number): string[] {
+  const deck = [...SHAPES]
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[deck[i], deck[j]] = [deck[j], deck[i]]
+  }
+  // more hands than shapes means a repeat, which is honest: six silhouettes across eight papers
+  // still disagrees far more than eight independent calls each choosing a column
+  return Array.from({ length: n }, (_, i) => deck[i % deck.length])
+}
