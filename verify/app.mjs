@@ -614,6 +614,46 @@ if (houseFlags.length) throw new Error(`the house trips its own detector on ${ho
   if (drawn.length) throw new Error('a real drawing was called undrawn, which turns this into noise the repair cannot act on')
 }
 
+// ——— 0m. the ruler reads a written page, and reads a bleed as design ———
+// written.ts opens by saying the detector and the ruler both run over a written page exactly as
+// they run over an arranged one. Only the first half was ever true: strainsIn was reached through
+// faultsIn, faultsIn takes a World, and a written page has none. So while the wall became written
+// pages, nothing measured one laid out, and a page could ship eight pixel body text clean.
+//
+// Pointing a ruler built for arranged pages at written ones is where this could go wrong, so both
+// directions are asserted. A page that scrolls is broken under any intent. A box past the edge is
+// a bleed, and on a page built to draw one large thing the bleed is the design: flagging it would
+// have the repair sand off the exact thing the written path exists to get.
+{
+  const flat = { scrolls: 0, past: [], crushed: [], tiny: [], dup: [], empty: 0, edges: [], wordColumn: [], unreadable: [] }
+  const bleeding = { ...flat, past: ['div right=1420'] }
+  const dragging = { ...flat, scrolls: 140, past: ['div right=1420'] }
+  const unreadable = { ...flat, tiny: ['8px'], crushed: ['61px at 17px type'] }
+
+  const bleedOnPage = core.faultsOf(bleeding, 'page')
+  const bleedOnWorld = core.faultsOf(bleeding, 'world')
+  const dragOnPage = core.faultsOf(dragging, 'page')
+  const smallOnPage = core.faultsOf(unreadable, 'page')
+  console.log('ruler on a written page:', JSON.stringify({
+    aClippedBleed: bleedOnPage.length,
+    theSameBleedOnAWorld: bleedOnWorld.length,
+    aBleedThatDragsTheReader: dragOnPage.length,
+    tinyTypeAndACrushedColumn: smallOnPage.length,
+  }))
+  if (bleedOnPage.length) throw new Error('a clipped bleed was called a fault on a written page, so the repair will sand off the drawing')
+  if (!bleedOnWorld.length) throw new Error('the arranged path stopped seeing boxes past the edge, which this change must not touch')
+  if (!dragOnPage.some((f) => f.includes('sideways'))) throw new Error('a page dragging the reader sideways passed, which is broken under any intent')
+  if (smallOnPage.length !== 2) throw new Error('eight pixel type and a crushed column must both still be faults on a written page')
+
+  // and the sentences have to reach a lever this author actually has. geometry.ts records that
+  // every world repair asked about geometry failed, because a world picks values and nothing told
+  // it which knob made a 45px column. A written page typed its own CSS, so naming structure.base
+  // at it is an instruction to turn a knob that is not there.
+  const knobs = /structure\.|palette|contrast\b|breakout|scale\b/
+  const misaddressed = [...dragOnPage, ...smallOnPage].filter((f) => knobs.test(f))
+  if (misaddressed.length) throw new Error(`a written page was sent to a world's knobs: ${misaddressed[0]}`)
+}
+
 // ——— 0l. eight independent calls do not all reach for a column ———
 // The arranged path measured this and wrote it down: handed one ground each and blind to the other
 // seven, the model chose a column four times in five across two real walls and never once reached

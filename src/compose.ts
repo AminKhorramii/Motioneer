@@ -14,7 +14,7 @@ import { BACKDROPS, type Backdrop } from '@/backdrop'
 import { DEFAULT_KIND, asKind, type Kind } from '@/design/kinds'
 import { shrinkDataUrl } from '@/imagepipe'
 import { renderPage } from '@/render'
-import { strainsIn } from '@/geometry'
+import { WIDTHS, strainsIn } from '@/geometry'
 import { WORLDS, dressSections, madeWorld, register as registerWorlds, unspent, worldById, type World } from '@/worlds'
 import { ROLE_FORMS, defaultContent, starterPage, uid, type Form, type Page, type Role, type Section } from '@/sections'
 
@@ -170,13 +170,25 @@ const say = (m: string) => console.info(`[wall] ${m}`)
 async function mendWritten(page: Page, product: Product, provider: Provider): Promise<Page> {
   const written = page.written
   if (!written) return page
+  const html = renderPage(page, { title: product.name })
   const faults = [
-    ...slop(page, renderPage(page, { title: product.name }))
+    ...slop(page, html)
       .filter((f) => f.kind === 'design')
       .map((f) => `${f.label}. ${f.why}`),
     // and the other half of the question the detector never asks: not whether this reads as
     // generated, but whether it drew the thing it was asked to draw
     ...undrawn(written),
+    /**
+     * And the half neither of them can reach, which had never run here at all.
+     *
+     * This module's own opening paragraph said the detector and the ruler both run over a written
+     * page exactly as they run over an arranged one. Only the first was true: strainsIn was called
+     * from faultsIn, faultsIn takes a World, and a written page has none. So for as long as the
+     * wall has been written pages, nothing has measured one laid out. A page could scroll sideways,
+     * set eight pixel body text or crush a column to a stack of single words, and every gate we had
+     * would call it clean, because all of them read source and none of them read boxes.
+     */
+    ...await strainsIn(html, WIDTHS, 'page').catch(() => []),
   ]
   if (!faults.length) return page
   const text = await ask(
@@ -198,8 +210,13 @@ async function mendWritten(page: Page, product: Product, provider: Provider): Pr
     return page
   }
   const mended = { ...page, written: { ...written, css } }
-  const after = slop(mended, renderPage(mended, { title: product.name })).filter((f) => f.kind === 'design').length
+  // counted exactly as the faults above were, or the comparison is rigged. Leaving the ruler out
+  // of this half would score the repair against a shorter list than the one it was given and keep
+  // work that made the page worse, which is the failure the strictly-fewer rule exists to prevent
+  const mendedHtml = renderPage(mended, { title: product.name })
+  const after = slop(mended, mendedHtml).filter((f) => f.kind === 'design').length
     + undrawn(mended.written!).length
+    + (await strainsIn(mendedHtml, WIDTHS, 'page').catch(() => [])).length
   say(`repair ${faults.length} faults -> ${after}: ${after < faults.length ? 'kept' : 'discarded'}`)
   return after < faults.length ? mended : page
 }

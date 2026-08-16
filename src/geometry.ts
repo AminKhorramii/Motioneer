@@ -106,6 +106,15 @@ export const MEASURE = (doc: Document = document): Measured => {
 }
 
 /**
+ * Who wrote the thing being measured, which decides what a fault is allowed to say.
+ *
+ * A world picks values from a fixed set of knobs, so its faults have to name the knob. A written
+ * page is CSS the model typed, so its faults name the rule. The same measurement, pointed at two
+ * kinds of author.
+ */
+export type Author = 'world' | 'page'
+
+/**
  * A measurement said as faults, in the words a designer of the page would need to fix it.
  *
  * Each one names the lever, and that is the whole difference between a fault and a complaint.
@@ -116,35 +125,61 @@ export const MEASURE = (doc: Document = document): Measured => {
  * and a layout, and nothing had ever told it which of those produced a 45px column.
  *
  * The measurement still leads, because it is the evidence. What follows it is where to reach.
+ *
+ * That failure is also the argument for pointing this at written pages, where it had never run.
+ * The repair failed on worlds because the author could not reach the cause; a page that wrote its
+ * own CSS can reach every one of these, so the evidence arrives somewhere it can be acted on.
+ *
+ * Two of the nine faults are withheld from a written page rather than reworded. A grid of shared
+ * left edges is a rule about arranged sections and a written page has no .wrap to measure. And a
+ * box past the edge is a bleed, which on a page built to draw one large thing is the design and
+ * not a fault: it is reported only when the page also scrolls sideways, which is the case where
+ * the bleed was not clipped and the reader is the one who pays. Sanding intentional bleeds off
+ * these pages would cost exactly the quality the whole written path exists to get.
+ *
+ * A third goes quiet on its own and is worth naming rather than discovering later: the button
+ * contrast check reads .btn-primary, which is a class the renderer puts on an arranged page. A
+ * written page names its own classes, so an unreadable button on one is currently unmeasured.
  */
-export function faultsOf(m: Measured): string[] {
+export function faultsOf(m: Measured, wrote: Author = 'world'): string[] {
   const out: string[] = []
+  const own = wrote === 'page'
   if (m.scrolls > 1) {
     out.push(`the page scrolls ${m.scrolls}px sideways, so something is wider than the window. ` +
-      'A fixed width in the css you wrote is the usual cause, since every other width here is set by the frame.')
+      (own
+        ? 'If a drawing is meant to run past the edge, clip it with overflow:hidden on the box that holds it, ' +
+          'so the bleed stays and the reader stops being dragged sideways to see nothing.'
+        : 'A fixed width in the css you wrote is the usual cause, since every other width here is set by the frame.'))
   }
-  if (m.past.length) {
+  // on a written page a box past the edge is a bleed, and a bleed is the design: it is only
+  // evidence of anything when the page scrolls, which is the unclipped case named above
+  if (m.past.length && !own) {
     out.push(`${m.past.length} boxes sit past the edge of the page, starting with ${m.past[0]}. ` +
       'Same cause: a width or a margin in your css that the frame did not choose.')
   }
   // a page is allowed the column, a centred block and a bleed, and no more. Past that the
   // sections are not sharing a grid, which is what reads as wild rather than as designed
-  if (m.edges.length > 3) {
+  if (m.edges.length > 3 && !own) {
     out.push(`${m.edges.length} different left edges (${m.edges.join(', ')}), so the sections are not sharing a grid. ` +
       'structure.breakout and layout decide where a section is allowed to leave the column, and a page reads as ' +
       'composed when it leaves from the same few places rather than from everywhere.')
   }
   if (m.crushed.length) {
     out.push(`${m.crushed.length} columns too narrow to hold a line: ${m.crushed[0]}. ` +
-      'Widen structure.measure, lower structure.base, or give the page fewer sections standing side by side, ' +
+      (own
+        ? 'Widen that column, drop its type size, or let it stop standing beside its neighbours at this width, '
+        : 'Widen structure.measure, lower structure.base, or give the page fewer sections standing side by side, ') +
       'because a column narrower than about twelve characters of its own type is a list of words.')
   }
   if (m.tiny.length) {
-    out.push(`body text at ${m.tiny[0]}, which is unreadable on a normal screen. structure.base sets it.`)
+    out.push(`body text at ${m.tiny[0]}, which is unreadable on a normal screen.` +
+      (own ? '' : ' structure.base sets it.'))
   }
   if (m.wordColumn.length) {
     out.push(`${m.wordColumn[0]}, which is a column of words rather than a headline. ` +
-      'Lower scale, widen structure.measure, or choose a layout that gives this section the full width, ' +
+      (own
+        ? 'Give that heading more width or set it smaller, '
+        : 'Lower scale, widen structure.measure, or choose a layout that gives this section the full width, ') +
       'because a heading is sized against the track it is set in and not against the window.')
   }
   if (m.unreadable.length) {
@@ -166,7 +201,7 @@ export function faultsOf(m: Measured): string[] {
  * Anything that goes wrong here reports nothing rather than something invented. A measurement
  * that failed is not evidence of a fault, and a wall must not be held up by a ruler.
  */
-export async function strainsIn(html: string, widths: number[] = WIDTHS): Promise<string[]> {
+export async function strainsIn(html: string, widths: number[] = WIDTHS, wrote: Author = 'world'): Promise<string[]> {
   if (typeof document === 'undefined') return []
   const out: string[] = []
   for (const width of widths) {
@@ -183,7 +218,7 @@ export async function strainsIn(html: string, widths: number[] = WIDTHS): Promis
       doc.close()
       await doc.fonts?.ready?.catch?.(() => {})
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
-      for (const fault of faultsOf(MEASURE(doc))) {
+      for (const fault of faultsOf(MEASURE(doc), wrote)) {
         // one page, three widths: a fault that holds at every one of them is still one fault
         if (!out.includes(fault)) out.push(fault)
       }
