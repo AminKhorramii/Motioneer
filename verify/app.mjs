@@ -400,6 +400,52 @@ if (houseFlags.length) throw new Error(`the house trips its own detector on ${ho
   if (JSON.stringify(nine) !== JSON.stringify(core.readTasteLog(nine))) {
     throw new Error('the log writes more than it reads back, so a tell counts this session and stops counting after a reload')
   }
+
+  /**
+   * And a sitting nobody bought anything at still teaches.
+   *
+   * The record used to be built at the moment of choosing and only then, so the sale was the one
+   * event this file ever heard about. Culling is the judgement people actually make: turn four
+   * papers away and close the tab, and under the old shape every one of those verdicts was gone,
+   * because the record could not be assembled without a winner. The shun half never needed one.
+   *
+   * Which makes the sitting the unit, and a sitting gets written down repeatedly as it goes, so
+   * the replacing is what keeps one wall worth one vote. Asserted here rather than assumed,
+   * because appending instead would let a wall culled from four times outweigh four other walls.
+   */
+  const sitting = (id, kills, chosen) => ({
+    id, at: '2026-08-04', kind: 'software', asked: [], pins: [],
+    kills: kills.map((g) => ({ ...seen(g), flags: [tell('accent-border-card', 'a card with an accent border')] })),
+    ...(chosen ? { chosen: { ...seen(chosen), flags: [] } } : {}),
+  })
+  // one sitting, culled from three times and never shipped
+  let open = { format: 1, walls: [] }
+  for (const kills of [['telegram'], ['telegram', 'ticket stub'], ['telegram', 'ticket stub', 'wine label']]) {
+    open = core.recordWall(open, sitting('w1', kills))
+  }
+  // then the same sitting again, this time with a page chosen
+  const closed = core.recordWall(open, sitting('w1', ['telegram', 'ticket stub', 'wine label'], 'thermal receipt'))
+  // two such sittings are what a shun is supposed to take
+  const twice = core.recordWall(closed, sitting('w2', ['telegram'], 'thermal receipt'))
+
+  console.log('a sitting nobody bought at:', JSON.stringify({
+    wallsAfterThreeCulls: open.walls.length,
+    cullsKeptWithoutAWinner: open.walls[0].killed.length,
+    keptWithoutAWinner: open.walls[0].kept.length,
+    wallsAfterChoosing: closed.walls.length,
+    chosenAfterChoosing: closed.walls[0].kept.filter((k) => k.chosen).length,
+    shunnedAcrossTwoSittings: core.tasteLean(core.readTasteLog(twice), 'software').shun,
+  }))
+  if (open.walls.length !== 1) throw new Error('culling four times wrote four walls, so one sitting outvotes four other walls')
+  if (open.walls[0].killed.length !== 3) throw new Error('a sitting with no winner did not keep its culls, which is the whole judgement it has')
+  if (open.walls[0].kept.some((k) => k.chosen)) throw new Error('a page was marked chosen on a wall where nothing was chosen')
+  if (closed.walls.length !== 1) throw new Error('choosing appended a second copy of a sitting already in the file')
+  if (closed.walls[0].kept.filter((k) => k.chosen).length !== 1) throw new Error('choosing did not replace the open record with one naming the winner')
+  if (!core.tasteLean(core.readTasteLog(twice), 'software').shun.includes('telegram')) {
+    throw new Error('a ground culled at two separate sittings was not shunned, so recording as you go bought nothing')
+  }
+  // the id has to survive a write and a read, or every reload starts appending duplicates again
+  if (core.readTasteLog(closed).walls[0].id !== 'w1') throw new Error('the sitting id does not read back, so a reloaded wall records itself twice')
 }
 
 {

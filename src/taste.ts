@@ -285,6 +285,19 @@ export interface Killed extends Essence {
 }
 
 export interface WallTaste {
+  /**
+   * Which sitting this was, so the same one can be written down more than once.
+   *
+   * A wall used to be recorded once, at the moment of choosing, because a wall counted twice
+   * weighs double against every other wall in the file. That made choosing the only judgement
+   * this file ever heard, and culling is the judgement people actually make: turning seven papers
+   * away is seven verdicts, and every one of them was thrown away if the tab was closed instead of
+   * shipped. The record is now written as the sitting goes and replaces itself by this, which
+   * keeps the once-per-wall weighting and stops requiring a sale to learn anything.
+   *
+   * Absent on walls written before this existed, which append as they always did.
+   */
+  id?: string
   at: string
   /** taste is kind scoped, because a game never seeds a book */
   kind: string
@@ -380,6 +393,7 @@ export function readTasteLog(raw: unknown): TasteLog {
       const kind = text(r.kind, NAME)
       if (!kind) return null
       return {
+        ...(text(r.id, NAME) ? { id: text(r.id, NAME) } : {}),
         at: /^\d{4}-\d{2}-\d{2}$/.test(String(r.at)) ? String(r.at) : '',
         kind,
         kept: some(r.kept, KEPT, (k) => {
@@ -408,9 +422,18 @@ export function readTasteLog(raw: unknown): TasteLog {
  * fills up with the model's own weather.
  */
 export function recordWall(raw: unknown, wall: {
+  /** the sitting, so writing it again replaces it rather than counting it twice */
+  id?: string
   at: string
   kind: string
-  chosen: Judged
+  /**
+   * The page that won, when one did.
+   *
+   * Absent while a sitting is still going on. A wall somebody culled four papers from and then
+   * closed taught nothing at all under the old shape, because the record could not be built
+   * without a winner, and the shun half of this file only ever needed the losers.
+   */
+  chosen?: Judged
   pins: Judged[]
   kills: Judged[]
   asked: Asked[]
@@ -427,11 +450,13 @@ export function recordWall(raw: unknown, wall: {
    * the thing the catalogue calls stable, and it stays readable in a file: card-soup, face-soup.
    */
   const design = (j: Judged) => (j.flags ?? []).filter((f) => f.kind === 'design').map((f) => f.id)
-  const keeping = [wall.chosen, ...wall.pins]
+  const keeping = wall.chosen ? [wall.chosen, ...wall.pins] : wall.pins
   const survived = new Set(keeping.flatMap(design))
+  // the winner leads the list when there is one, so the flag stays a fact about position rather
+  // than becoming true of whichever page happened to be pinned first
   const kept: Kept[] = keeping
     .slice(0, KEPT)
-    .map((j, i) => ({ ...essence(j.page, j.world), chosen: i === 0 }))
+    .map((j, i) => ({ ...essence(j.page, j.world), chosen: Boolean(wall.chosen) && i === 0 }))
   const killed: Killed[] = wall.kills.slice(0, KILLED).map((j) => {
     // capped where the reader caps it, or a page wearing eight tells writes eight and reads back
     // six, and a tell counts toward a dislike this session and stops counting after a reload
@@ -440,14 +465,19 @@ export function recordWall(raw: unknown, wall: {
     return flags.length ? { ...e, flags } : e
   })
   const added: WallTaste = {
+    ...(wall.id ? { id: wall.id } : {}),
     at: wall.at.slice(0, 10),
     kind: wall.kind,
     kept,
     killed,
     asked: wall.asked.slice(-ASKED).map((a) => ({ said: a.said.slice(0, SAID), chosen: a.chosen })),
   }
+  // the same sitting written again replaces itself, so a wall culled from four times and then
+  // shipped is one wall in the file rather than five. That weighting is what the old write-once
+  // guard was protecting, and it protected it by only ever hearing about walls somebody bought
+  const rest = wall.id ? log.walls.filter((w) => w.id !== wall.id) : log.walls
   // newest last, and the oldest fall off the front, so the file reads in the order it happened
-  return { format: 1, walls: [...log.walls, added].slice(-WALLS) }
+  return { format: 1, walls: [...rest, added].slice(-WALLS) }
 }
 
 /** what the log adds up to, recomputed every time it is read */

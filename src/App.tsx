@@ -99,8 +99,16 @@ export default function App() {
    */
   const memory = useRef<TasteLog>({ format: 1, walls: [] })
   const fromProject = useRef(false)
-  /** whether this wall is already in the log, because choosing twice is still one wall */
-  const remembered = useRef(false)
+  /**
+   * Which sitting this is, so the log can be written as it happens.
+   *
+   * This used to be a boolean saying the wall had been recorded, because a wall was recorded once,
+   * at the moment somebody chose. That made the sale the only event the memory heard, and the
+   * memory is mostly built out of culls: turn seven papers away and close the tab and every one of
+   * those verdicts was gone. An id instead of a flag lets the same wall be written down repeatedly
+   * and replace itself, which keeps the one-wall-one-vote weighting the flag was there to defend.
+   */
+  const wallId = useRef('')
   /**
    * One tick a second while a wall is being made, so the line can say how long it has been.
    *
@@ -122,7 +130,9 @@ export default function App() {
     buried.current.clear()
     asked.current = []
     edited.current = []
-    remembered.current = false
+    // a new sitting, so what gets written from here on is a wall of its own rather than more
+    // verdicts appended to the one before it
+    wallId.current = `w${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
   }, [])
 
   /**
@@ -532,6 +542,43 @@ export default function App() {
     setAt((v) => Math.min(v + 1, pages.length - 1))
   }
 
+  /** a paper with a verdict attached, which is what the log and the story are both built from */
+  const judged = (p: Page): Judged => ({
+    page: p,
+    world: worldById(p.world),
+    flags: slop(p, renderPage(p, { title: product.name })),
+  })
+
+  /**
+   * Write this sitting into the log, as it stands.
+   *
+   * Called on every cull and again when a page is chosen, and it replaces the sitting's own entry
+   * each time rather than adding one. What made this worth changing is that culling was the only
+   * judgement in the app that cost nothing to record and was the one being thrown away: the record
+   * was built at the moment of choosing, so a wall somebody culled four papers from and then closed
+   * taught the next wall nothing. The shun half of taste never needed a winner.
+   *
+   * Persisted here as well as recorded, because a log held in a ref is lost with the tab, which is
+   * the same failure one level down. A window opened by an agent keeps its memory in the handoff
+   * the send writes, so the browser's copy is only written when there is no project to write to.
+   */
+  function remember(chosen?: Page) {
+    memory.current = recordWall(memory.current, {
+      id: wallId.current,
+      at: new Date().toISOString().slice(0, 10),
+      // through the same normaliser the read side uses. A wall filed under one string and
+      // looked up under another is a memory that silently never applies, and state saved
+      // before kinds existed comes back with none at all
+      kind: asKind(product.kind),
+      ...(chosen ? { chosen: judged(chosen) } : {}),
+      pins: pages.filter((p) => p.pinned && p.id !== chosen?.id).map(judged),
+      kills: graveyard.current.map((g) => judged(g.page)),
+      asked: asked.current.map((a) => ({ said: a.said, chosen: a.of === chosen?.id })),
+    })
+    if (!askedFrom) void host.writeTaste(memory.current)
+    return memory.current
+  }
+
   function kill(i: number) {
     const p = pages[i]
     if (!p) return
@@ -542,6 +589,8 @@ export default function App() {
     setPages((all) => all.filter((x) => x.id !== p.id))
     if (i < at) setAt(at - 1)
     else if (i === at && i === pages.length - 1) setAt(Math.max(0, i - 1))
+    // the verdict is written down now rather than at the till, so closing the tab still teaches
+    remember()
     flash('Removed. Press z to bring it back.')
   }
 
@@ -554,6 +603,8 @@ export default function App() {
       return [...all.slice(0, i), g.page, ...all.slice(i)]
     })
     setAt(Math.min(g.index, pages.length))
+    // taking it back is a verdict too, and the entry this replaces still says it was culled
+    remember()
     flash('Back on the wall.')
   }
 
@@ -671,15 +722,10 @@ export default function App() {
    * through every rewrite would be state that can go stale.
    *
    * The story goes out with this page and the log stays behind for the next wall, so they are
-   * gathered together and written apart. Once per wall, because shipping twice is still one
-   * choice, and a wall counted twice would weigh double against every other wall in the file.
+   * gathered together and written apart. The log has been accumulating since the first cull; this
+   * is the same sitting written once more, now with a winner in it, replacing what stood there.
    */
   function judge(chosen: Page) {
-    const judged = (p: Page): Judged => ({
-      page: p,
-      world: worldById(p.world),
-      flags: slop(p, renderPage(p, { title: product.name })),
-    })
     // an edit is stored against the section it landed on, and a section id means nothing outside
     // this app, so it is handed over as the role that section argues
     const roleOf = new Map(chosen.sections.map((s) => [s.id, s.role]))
@@ -688,34 +734,17 @@ export default function App() {
       const role = roleOf.get(id)
       return role ? [role, ...rest].join('.') : null
     }
-    const pins = pages.filter((p) => p.pinned && p.id !== chosen.id).map(judged)
-    const kills = graveyard.current.map((g) => judged(g.page))
-    const said = asked.current.map((a) => ({ said: a.said, chosen: a.of === chosen.id }))
     const story = storyOf({
       of: pages.length + graveyard.current.length,
-      pins,
-      kills,
-      asked: said,
+      pins: pages.filter((p) => p.pinned && p.id !== chosen.id).map(judged),
+      kills: graveyard.current.map((g) => judged(g.page)),
+      asked: asked.current.map((a) => ({ said: a.said, chosen: a.of === chosen.id })),
       edited: edited.current
         .filter((e) => e.of === chosen.id)
         .map((e) => dotted(e.path))
         .filter((p): p is string => p !== null),
     })
-    if (!remembered.current) {
-      remembered.current = true
-      memory.current = recordWall(memory.current, {
-        at: new Date().toISOString().slice(0, 10),
-        // through the same normaliser the read side uses. A wall filed under one string and
-        // looked up under another is a memory that silently never applies, and state saved
-        // before kinds existed comes back with none at all
-        kind: asKind(product.kind),
-        chosen: judged(chosen),
-        pins,
-        kills,
-        asked: said,
-      })
-    }
-    return { story, log: memory.current }
+    return { story, log: remember(chosen) }
   }
 
   /** Hand the chosen page back as a spec, a render and the page itself. */
@@ -743,8 +772,8 @@ export default function App() {
    */
   async function shipPage() {
     if (!page) return
-    const { log } = judge(page)
-    if (!askedFrom) await host.writeTaste(log)
+    // judge records and persists through remember, the same path every cull in this sitting took
+    judge(page)
     const r = await host.exportPage(renderPage(page, { title: product.name }), shipName)
     if (r) flash(`${r.file} saved, ${r.bytes.toLocaleString()} bytes.`)
   }
