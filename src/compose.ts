@@ -300,6 +300,57 @@ export async function writeWhole(
   return mendWritten(landed(written), product, provider)
 }
 
+/**
+ * Change a written page by asking the thing that wrote it.
+ *
+ * The bar rewrites the page you are reading, and for a written page it had been rewriting
+ * something else. promptPage edits page.sections, which is what an arranged page is made of and
+ * what a written page merely still carries for the brief: the instruction landed on data the
+ * renderer never reads, the paper on screen did not move, and the app said "This page has been
+ * rewritten." Worse than the no-op, the instruction was then pushed into the asked list, so it
+ * travelled into the handoff story and into the taste log as a thing that had taken effect. A
+ * memory of preferences is built out of that list, and it was being fed events that never happened.
+ *
+ * The whole document goes back rather than the styles alone, because unlike the repair this is not
+ * known in advance to be a CSS fault: "name the pain in the headline" is words, "make the dial
+ * bigger" is CSS, and the person typing is owed both. Nothing is mended afterwards. The repair
+ * exists because eight pages are written while nobody is looking; here somebody is looking, and a
+ * second call spent arguing with an instruction a reader just gave is the wrong way round.
+ */
+export async function rewriteWritten(
+  page: Page,
+  instruction: string,
+  product: Product,
+  provider: Provider = 'model',
+): Promise<Page | null> {
+  const written = page.written
+  if (!written) return null
+  if (mockReply) {
+    const out = mockReply('rewrite', instruction) as Record<string, unknown> | null
+    const made = out && typeof out === 'object' ? madeWritten(out) : null
+    return made ? { ...page, written: { ...written, ...made } } : null
+  }
+  const text = await ask(
+    provider,
+    `${WRITTEN_SYSTEM}\n\nYou are changing a page you already wrote. Do what is asked and leave the `
+      + `rest of the page alone: the reader is looking at it and expects to recognise it afterwards. `
+      + `Return the whole document again, in the same shape, with the change made.`,
+    `The page as it stands.\n\nHTML:\n${written.html}\n\nCSS:\n${written.css}\n\n`
+      + `A ${product.kind}: ${product.name}. ${product.oneLiner}\n\n`
+      + `Change this, and only this: ${instruction}`,
+    undefined,
+    { maxTokens: 12000, kind: 'design' },
+  ).catch(() => null)
+  if (!text) return null
+  const raw = grabJson(text) as Record<string, unknown> | null
+  if (!raw) return null
+  const made = madeWritten(raw)
+  if (!made) return null
+  // the ground and the backdrop were decided when the page was dealt and are not the bar's to
+  // change, so what comes back replaces the document and inherits the rest of what this page is
+  return { ...page, written: { ...written, html: made.html, css: made.css, note: made.note || written.note } }
+}
+
 export async function writeOne(
   base: Page,
   product: Product,

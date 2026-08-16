@@ -938,6 +938,50 @@ const variants = await page.evaluate(() => ({
 console.log('prompt bar:', JSON.stringify({ before: countBefore, ...variants }))
 await page.screenshot({ path: `${OUT}/wall-variants.png` })
 
+// ——— 5a. and the bar reaches a written page, which is the whole wall ———
+// The bar called promptPage for every page. promptPage rewrites page.sections, which is what an
+// arranged page is made of and what a written page only still carries so the brief has something
+// to describe. So on a written page the instruction landed on data the renderer never reads: the
+// paper did not move, the app said "This page has been rewritten," and the instruction was pushed
+// into the asked list, from where it travels into the handoff story and the taste log as a thing
+// that took effect. The memory of what a person wants was being fed events that never happened.
+const barOnWritten = await page.evaluate(async () => {
+  const { setMock, rewriteWritten, promptPage, madeWritten } = window.__wall
+  const written = madeWritten({
+    html: '<section class="a"><h1>Field Mark One</h1><p data-k="cta">Notify me on March 14</p></section>',
+    css: '.a{padding:6rem}.a::before{content:"";display:block;width:min(60vw,30rem);aspect-ratio:1;background:conic-gradient(from 0deg,var(--ink) 0 2deg,transparent 2deg 30deg)}',
+    note: 'a barometer jacket', ground: 'paperback cover', backdrop: 'none',
+  })
+  const page0 = { ...window.__wall.starterPage(window.__wall.PRESETS[0], 'Field Mark One'), written }
+  const product = { name: 'Field Mark One', kind: 'hardware', oneLiner: '', what: '', audience: '', cta: 'Notify me' }
+
+  setMock((instruction) => instruction === 'worlds' || instruction === 'intake' ? null : ({
+    html: '<section class="a"><h1>Two hundred made</h1><p data-k="cta">Notify me on March 14</p></section>',
+    css: '.a{padding:6rem}.a::before{content:"";display:block;width:min(60vw,30rem);aspect-ratio:1;background:conic-gradient(from 0deg,var(--ink) 0 2deg,transparent 2deg 30deg)}',
+    note: 'a barometer jacket',
+  }))
+  const rewritten = await rewriteWritten(page0, 'name the count in the headline', product, 'model')
+
+  // the other half of the point: the call the bar used to make cannot move this page at all
+  setMock((instruction, shape) => instruction === 'worlds' || instruction === 'intake' ? null
+    : ({ sections: (shape ?? []).map((s) => ({ id: s.id, content: s.content })) }))
+  const viaSections = await promptPage(page0, 'name the count in the headline', product, 'model', () => {}).catch(() => null)
+
+  return {
+    headlineNow: /<h1[^>]*>([^<]*)</.exec(rewritten?.written?.html ?? '')?.[1] ?? '',
+    keptGround: rewritten?.written?.ground,
+    keptBackdrop: rewritten?.written?.backdrop,
+    sectionsPathLeftTheDocument: viaSections?.written?.html === page0.written.html,
+  }
+})
+console.log('bar on a written page:', JSON.stringify(barOnWritten))
+if (barOnWritten.headlineNow !== 'Two hundred made') throw new Error('the bar did not change the document a reader is looking at')
+// the ground was dealt and the backdrop chosen when the page was made, and an instruction about
+// the headline is not permission to refile the page under a different object
+if (barOnWritten.keptGround !== 'paperback cover') throw new Error('a rewrite lost the ground, so the taste log would learn a preference for an object no page was built from')
+if (barOnWritten.keptBackdrop !== 'none') throw new Error('a rewrite lost the backdrop the page chose')
+if (!barOnWritten.sectionsPathLeftTheDocument) throw new Error('promptPage now moves a written document, so this routing is stale and the test is lying')
+
 // ——— 6. ship ———
 // a browser hands the page over as a download rather than writing where it was told, which is
 // the one place the shells genuinely differ. What is asserted about the file is the same.

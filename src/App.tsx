@@ -9,8 +9,9 @@ import { ROLE_LABEL, applyEdit, migratePage, starterPage, type Page, type Role }
 import { renderBody, renderPage, shellOf } from '@/render'
 import { pageBrief } from '@/brief'
 import { slop } from '@/slop'
+import { madeWritten } from '@/written'
 import {
-  EMPTY_PRODUCT, addSection, alternatives, arrangeIn, dealShapes, readBrief, canDraw, canWrite, choose, chosen, setMemory, cycleForm, cycleWorld, dropSection, dealWritten, writeOne, writeWhole, illustrate, loadHeldKeys, loadKeys, promptPage, sectionAlternatives, seeded, setMock, type Product,
+  EMPTY_PRODUCT, addSection, alternatives, arrangeIn, dealShapes, readBrief, canDraw, canWrite, choose, chosen, setMemory, cycleForm, cycleWorld, dropSection, dealWritten, writeOne, writeWhole, illustrate, loadHeldKeys, loadKeys, promptPage, rewriteWritten, sectionAlternatives, seeded, setMock, type Product,
 } from '@/compose'
 import { Onboarding } from '@/Onboarding'
 import { SectionsRail } from '@/SectionsRail'
@@ -578,7 +579,15 @@ export default function App() {
     // as it stands is held until there is a whole one to put in its place
     const was = page
     const onto = (p: Page) => upsertPage({ ...p, id: here, pinned: was.pinned })
-    const made = await promptPage(page, instruction, product, 'model', onto)
+    /**
+     * Which of the two kinds of page this is, because the bar changes each of them differently.
+     *
+     * promptPage rewrites sections, which a written page keeps for the brief and never renders. It
+     * ran here anyway, so the bar reported success over a paper that had not moved.
+     */
+    const made = await (page.written
+      ? rewriteWritten(page, instruction, product, 'model')
+      : promptPage(page, instruction, product, 'model', onto))
       .catch((e: unknown) => String(e instanceof Error ? e.message : e).slice(0, 160))
     setBusy('')
     if (!made || typeof made === 'string') {
@@ -1003,4 +1012,9 @@ function Preview({ html }: { html: string }) {
 // The seam the suites drive the model path through. writeOne is here so the copy repair can be
 // asserted on its own: it is the one step whose whole job is to make a second call conditionally,
 // and a suite that can only watch the finished wall cannot tell a repair from a first draft.
-;(window as unknown as { __wall?: unknown }).__wall = { setMock, writeOne, starterPage, slop, PRESETS, pageBrief }
+;(window as unknown as { __wall?: unknown }).__wall = {
+  setMock, writeOne, starterPage, slop, PRESETS, pageBrief,
+  // the written page and the one call that changes it, so a suite can prove the bar reaches the
+  // document a reader is looking at rather than the sections underneath it
+  rewriteWritten, promptPage, madeWritten,
+}
