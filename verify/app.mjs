@@ -735,6 +735,50 @@ if (houseFlags.length) throw new Error(`the house trips its own detector on ${ho
   if (failures.length) throw new Error(`a look that ships cannot be read: ${failures.join('; ')}`)
 }
 
+// ——— 0o. the catalogue describes the register that is generic now, not the one that was ———
+// The oldest entries here describe a violet wash and a glow behind a headline, which is what a
+// generated page looked like in 2022. It moved: the register that now reads as machine made is
+// cream stock, a rusty orange and a large serif, and a page could wear all three and trip nothing.
+// One of the eight shipped looks was wearing all three, which is how this got found.
+//
+// Written as a conjunction and asserted as one. No single ingredient is a fault: cream is paper,
+// terracotta is an ink older than any of this, a serif is a serif. italic-serif is the recorded
+// case of what a one-ingredient rule does here, and it killed both worlds that survived repair on
+// a real wall by telling them their serif was wrong when the fault was an italic.
+{
+  const serif = core.PRESETS.find((p) => p.name === 'gallery').display
+  const mono = core.PRESETS.find((p) => p.name === 'terminal').display
+  const trips = (bg, accent, display) => {
+    const taste = { ...core.PRESETS[3], bg, accent, display }
+    return core.slop({ ...core.starterPage(taste, 'Spoor'), taste }, '<style>.x{}</style>')
+      .some((f) => f.id === 'cream-and-rust')
+  }
+  const signature = trips('#f6f2ea', '#b4472a', serif)
+  const onMono = trips('#f6f2ea', '#b4472a', mono)
+  const creamAlone = trips('#f6f2ea', '#2f5d50', serif)
+  const rustAlone = trips('#0c0d10', '#b4472a', serif)
+  // the pink that made this rule too wide the first time: hue 342, caught by a band that wrapped
+  // past 340 to take in carmine, and it is the one colour on a riso page doing real work
+  const risoPink = trips('#f2efe6', '#e21f57', serif)
+  console.log('the register that is generic now:', JSON.stringify({
+    creamRustSerif: signature, theSameTwoOnMono: onMono, creamWithAGreen: creamAlone,
+    rustOnADarkGround: rustAlone, fluorescentPinkOnCream: risoPink,
+  }))
+  if (!signature) throw new Error('the current generated house style passes, so the catalogue is still describing 2022')
+  if (onMono) throw new Error('the rule fired without a serif, so it is not the conjunction it claims to be')
+  if (creamAlone) throw new Error('cream on its own was called a fault, and cream is paper')
+  if (rustAlone) throw new Error('terracotta on its own was called a fault, and it is an ink older than this repository')
+  if (risoPink) throw new Error('a fluorescent pink was called terracotta, so a repair would go after the one colour doing real work')
+
+  // and the house obeys it: no shipped look and no ground may wear the signature
+  const wearing = [
+    ...core.PRESETS.filter((p) => trips(p.bg, p.accent, p.display)).map((p) => `look ${p.name}`),
+    ...core.DIRECTIONS.filter((d) => d.inks && trips(d.inks.bg, d.inks.accent, serif)).map((d) => `ground ${d.name}`),
+  ]
+  console.log('  wearing it:', wearing.length ? wearing : 'none')
+  if (wearing.length) throw new Error(`the house ships the register it exists to avoid: ${wearing.join(', ')}`)
+}
+
 // ——— 0m. the ruler reads a written page, and reads a bleed as design ———
 // written.ts opens by saying the detector and the ruler both run over a written page exactly as
 // they run over an arranged one. Only the first half was ever true: strainsIn was reached through

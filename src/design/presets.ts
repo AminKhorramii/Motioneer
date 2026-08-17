@@ -42,7 +42,12 @@ export const PRESETS: Taste[] = [
   },
   {
     name: 'paper editorial',
-    bg: '#f6f2ea', ink: '#1b1a17', dim: '#6d675d', accent: '#b4472a', accent2: '#2f5d50',
+    // a claret rather than the terracotta it was drawn with. Cream stock, a rusty orange and a
+    // serif are the three the 2026 generated look is made of, and this look had all three: it was
+    // the one paper on the wall wearing the house style of the thing the wall exists to avoid.
+    // Claret is the older editorial red anyway, and it reads better on this ground: 6.41 to 1
+    // against 4.85, and 7.16 for the button against 5.42
+    bg: '#f6f2ea', ink: '#1b1a17', dim: '#6d675d', accent: '#a8203a', accent2: '#2f5d50',
     display: FACES.serif, body: FACES.serif, scale: 1.42, radius: 2, density: 0.4, weight: 500, caps: true, motion: 'still',
   },
   {

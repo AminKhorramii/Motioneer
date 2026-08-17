@@ -37,8 +37,58 @@ export interface Flag {
   section?: string
 }
 
-/** beige and its neighbours, the colour a model picks when it does not have a palette */
-const AI_BEIGE = /^#(f[0-9a-f]{2}(e|f)[0-9a-f]{2}(d|e)[0-9a-f]|f5f5f0|faf8f5|fdfcf8|f7f3ed)$/i
+/**
+ * The four off-whites a model reaches for when it has not been given a palette.
+ *
+ * A list, and it says so now. It used to open with a pattern: f, two digits, e or f, two digits,
+ * d or e, one digit. That is eight hex digits and a colour has six, so the branch could never
+ * match anything, and this rule had always been four literals wearing a regex.
+ *
+ * Widening it is the obvious repair and it is the wrong one. Measured across these four and the
+ * deck's own paper grounds, the two sets do not separate on hue, saturation or lightness: the
+ * till roll at #f7f6f2 sits between #f5f5f0 and #faf8f5 on every axis. That is the finding rather
+ * than an obstacle to it. Cream is not a tell, it is paper, and it is the right ground for a
+ * field guide and the lazy ground for a generated page in identically the same pixels.
+ *
+ * What is a tell is the combination, which is checked below with the other comparisons.
+ */
+const AI_BEIGE = /^#(f5f5f0|faf8f5|fdfcf8|f7f3ed)$/i
+
+/**
+ * Warm off-white, and rust, and a serif: the signature as it stands in 2026.
+ *
+ * The catalogue's oldest entries describe a violet wash and a glow, which was the generated look
+ * of 2022. It moved. The register that now reads as machine made is cream stock, a terracotta
+ * accent and a large italic serif, and a page can wear all three while tripping nothing here.
+ *
+ * Written as three conditions because no one of them is a fault. Cream is paper, terracotta is an
+ * ink that has existed for as long as ink, and a serif is a serif. italic-serif below records what
+ * happens when a rule fires on one ingredient: it fired on any page with an italic blockquote,
+ * told the designer its serif was the problem when the display was Inter, and killed both worlds
+ * that survived repair on a real wall. A conjunction is the shape that survives.
+ */
+const hslOf = (hex: string) => {
+  const n = hex.replace('#', '')
+  if (!/^[0-9a-f]{6}$/i.test(n)) return null
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(n.slice(i, i + 2), 16) / 255)
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, d = mx - mn
+  if (!d) return { h: 0, s: 0, l }
+  const s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn)
+  const h = (mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4) * 60
+  return { h, s, l }
+}
+/** paper: warm, pale, and not vivid */
+const isCream = (c: { h: number; s: number; l: number }) => c.h >= 25 && c.h <= 65 && c.l > 0.85 && c.s < 0.7
+/**
+ * The terracotta band: orange-red, deep enough to be an ink rather than a tint.
+ *
+ * Orange side only. This first wrapped past 340 to take in carmine and oxblood, and that caught a
+ * fluorescent riso pink at hue 342 and called it rust, which would have sent a repair after the
+ * one colour on that page that was doing real work. The tell being described is rusty orange, so
+ * the band is rusty orange: a deep carmine on cream is a stamp, not the house style.
+ */
+const isRust = (c: { h: number; s: number; l: number }) =>
+  c.h <= 35 && c.s > 0.4 && c.l > 0.2 && c.l < 0.55
 
 /**
  * Every string on the page, not only the ones sitting at the top of a section.
@@ -182,6 +232,16 @@ export function slop(page: Page, html?: string): Flag[] {
     if (/serif/i.test(display) && /font-style:\s*italic/.test(html)) {
       add('design', 'italic-serif', 'italic serif display',
         'It is the fastest way to look editorial, which is why it now reads as a template.')
+    }
+
+    // the 2026 signature, and only when all three are present: see the note on the helpers above
+    const ground = hslOf(String(page.taste?.bg ?? ''))
+    const ink = hslOf(String(page.taste?.accent ?? ''))
+    if (ground && ink && isCream(ground) && isRust(ink) && /serif/i.test(display)) {
+      add('design', 'cream-and-rust', 'cream ground, terracotta accent, serif display',
+        'Those three together are the current house style of generated design, so a page wearing '
+        + 'all of them reads as machine made however well each one is done. Any one of the three is '
+        + 'fine: change the one you care about least.')
     }
 
     for (const tell of MARKUP_TELLS) {

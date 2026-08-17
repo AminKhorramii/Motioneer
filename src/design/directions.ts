@@ -382,8 +382,10 @@ export const DIRECTIONS: Direction[] = [
     chain: 'serif caps small, ruled border as the one move, cream palette, dosage as a table, sparse',
     avoid: 'skulls and flourish; the label is exactness, and ornament dilutes a dose',
     voice: 'Contents, dose, caution. Not to be taken.',
-    // sepia on aged label stock, with the green kept for what is in the bottle
-    inks: { bg: '#eee5cf', ink: '#26200f', dim: '#6d6247', accent: '#7a2f12', accent2: '#4c6b34' },
+    // the green leads and the sepia answers, which is the way round an apothecary label actually
+    // works: the colour carries what is in the bottle. Drawn the other way first, and sepia on
+    // aged stock is cream and rust, which is the register generated pages have converged on
+    inks: { bg: '#eee5cf', ink: '#26200f', dim: '#6d6247', accent: '#3f5a28', accent2: '#7a2f12' },
   },
   {
     name: 'wine label',
