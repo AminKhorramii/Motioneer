@@ -28,4 +28,8 @@ export { madeWritten, safeMarkup, safeStyle, undrawn, type Written } from '@/wri
 // what a world left unspent, which is the question the slop detector never asked
 export { unspent } from '@/worlds'
 export { PRESETS } from '@/design/presets'
+// what is being launched, which decides what the page is made of rather than how it looks. The
+// list travels because a suite has to be able to check every kind, and because whoever reads a
+// brief is offered these names and their meanings together
+export { KINDS, KIND_IDS, DEFAULT_KIND, asKind, kindMenu, type Kind } from '@/design/kinds'
 export { BLOCKS, TOKENS, blockContract } from '@/design/blocks'

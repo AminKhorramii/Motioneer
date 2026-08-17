@@ -21,7 +21,7 @@
 
 import type { Role } from '@/sections'
 
-export type Kind = 'software' | 'game' | 'film' | 'book' | 'music' | 'event' | 'hardware'
+export type Kind = 'software' | 'game' | 'film' | 'book' | 'music' | 'event' | 'hardware' | 'prelaunch'
 
 /** the words a kind puts in a role, over the base. A function, because the name goes in them. */
 type Words = (product: string) => Record<string, unknown>
@@ -293,6 +293,91 @@ export const KINDS: Record<Kind, { note: string; roles: Partial<Record<Role, Wor
         { title: 'Product', links: ['Specifications', 'Buy', 'Support'] },
         { title: 'Maker', links: ['About', 'Contact'] },
         { title: 'Legal', links: ['Privacy', 'Returns'] },
+      ] }),
+    },
+  },
+
+  /**
+   * A thing that does not exist yet, which is a different argument from a thing you can buy.
+   *
+   * hardware above is retail: buy now, returns, a guarantee, three models. Every one of those
+   * answers is unavailable before a run is made, and the page still has to be written. An interest
+   * check, a group buy and a campaign pre-launch are all the same artifact under different names,
+   * and it is a real separately budgeted deliverable rather than a category invented here: it is
+   * posted with a run size, a spec and a date, and its whole job is to find out whether enough
+   * people want the thing to justify making it.
+   *
+   * The proof role is the reason this could not be a variation on hardware. Retail proof is an
+   * owner, and a pre-launch has no owners, so the wording hardware ships, "An owner, six months
+   * in", is a fabrication by construction on this page. What a reader is actually weighing is
+   * whether these people can deliver, so the honest proof is who is making it, what they made
+   * before, and how far along it is. That is checkable and a testimonial would not be.
+   *
+   * The objections are the ones people really have about paying for something unbuilt, and they
+   * are the ones a page most wants to skip.
+   */
+  prelaunch: {
+    note: 'a run, a group buy or a campaign for something not made yet, which people register for before it exists',
+    roles: {
+      masthead: () => ({ links: ['The run', 'Specification', 'Register'], cta: 'Register interest' }),
+      claim: () => ({ cta: 'Register interest', cta2: 'Read the specification' }),
+      proof: (p) => ({
+        /**
+         * No quote, and no witness under it either.
+         *
+         * A kind's words are merged over the base rather than replacing it, so clearing only the
+         * quote left the base's stand-in witness and its unfilled logo row underneath: measured,
+         * this kind tripped invented-witness, nowhere-company and unfilled-logos while hardware
+         * tripped none, which made the one kind written never to fabricate proof the only one
+         * carrying a fabricated one. Every field the witness is made of is cleared here, because
+         * empty is the true state of them before anything has shipped, and a slot that cannot
+         * honestly be filled is worse than absent.
+         *
+         * What stands in for proof is the state of the thing and the record of the people making
+         * it, both of which a reader can go and check.
+         */
+        title: 'Where it is up to',
+        quote: '', name: '', role: '', label: '', names: [],
+        items: [
+          { title: 'Made before', body: `What the people behind ${p} have shipped, and how many.` },
+          { title: 'The prototype', body: 'Which revision exists, and what is still being changed.' },
+          { title: 'The maker', body: 'Who is manufacturing it, named.' },
+        ],
+      }),
+      substance: () => ({
+        title: 'The specification',
+        caption: 'The thing as it stands, photographed or drawn.',
+        items: [
+          { title: 'The material', body: 'What it is made of, named.' },
+          { title: 'The measurements', body: 'Size and weight, in numbers.' },
+          { title: 'What is in the box', body: 'Everything, listed.' },
+        ],
+      }),
+      offer: () => ({
+        title: 'The run',
+        plans: [
+          { name: 'The run', price: '', line: 'how many are being made', features: ['The number', 'What it costs', 'When it opens'] },
+          { name: 'The date', price: '', line: 'when registration closes', features: ['The closing date', 'When it ships'] },
+          { name: 'The floor', price: '', line: 'what has to be reached', features: ['The number it needs', 'What happens if it is not reached'] },
+        ],
+      }),
+      objections: () => ({
+        title: 'Before you register',
+        items: [
+          { q: 'What if it does not reach the number?', a: 'Say plainly whether it is cancelled and whether anybody is charged.' },
+          { q: 'When am I actually charged?', a: 'At registration or at production, stated, with the date.' },
+          { q: 'What happens if it is late?', a: 'The honest answer, and how you will say so.' },
+        ],
+      }),
+      invitation: () => ({
+        headline: 'Register before it closes.',
+        sub: 'Registering is not an order, and the date it closes is stated.',
+        cta: 'Register interest',
+      }),
+      credits: () => ({ groups: [
+        { title: 'The run', links: ['Specification', 'Register', 'Updates'] },
+        { title: 'Maker', links: ['About', 'Previous runs', 'Contact'] },
+        { title: 'Legal', links: ['Privacy', 'Terms'] },
       ] }),
     },
   },

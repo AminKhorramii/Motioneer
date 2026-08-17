@@ -134,6 +134,32 @@ if (houseFlags.length) throw new Error(`the house trips its own detector on ${ho
   }
 }
 
+// ——— 0d2. and no other kind inherits a witness it cannot honestly have ———
+// A kind's words are merged over the base rather than replacing it, which is the right default and
+// a trap on exactly one role. The base proof carries a stand-in witness and an unfilled logo row,
+// so a kind that overrides the quote and nothing else keeps both underneath, unrendered by a list
+// form and still read by the detector. Measured when prelaunch was added: it tripped all three
+// fabrication tells while hardware tripped none, so the one kind written never to invent proof was
+// the only one carrying an invented one.
+//
+// software is exempt and must stay exempt: it is the base, and 0d above requires its placeholders
+// to stay visible so the copy call cannot leave one in silently.
+{
+  const FABRICATED = ['invented-witness', 'nowhere-company', 'unfilled-logos']
+  const carrying = []
+  for (const kind of core.KIND_IDS.filter((k) => k !== 'software')) {
+    const page = core.starterPage(core.PRESETS[0], 'Ortho-40', kind)
+    const tells = new Set(core.slop(page, core.renderPage(page, { title: 'Ortho-40' }))
+      .filter((f) => f.kind === 'copy').map((f) => f.id))
+    const bad = FABRICATED.filter((t) => tells.has(t))
+    if (bad.length) carrying.push(`${kind}: ${bad.join(', ')}`)
+  }
+  console.log('kinds inheriting a witness they cannot have:', JSON.stringify(carrying.length ? carrying : 'none'))
+  if (carrying.length) {
+    throw new Error(`a kind ships the base's stand-in witness, so its defaults invent proof it cannot have: ${carrying.join('; ')}`)
+  }
+}
+
 // ——— 0e. the copy detector reads the whole page, not only the top of a section ———
 // It used to keep a section's top level strings and drop everything else, so every list, table and
 // group was invisible: 43% of the characters on a default page were checked and the rest were not.
