@@ -157,7 +157,18 @@ Respond with the JSON object alone, because the reply is parsed directly.`
  *
  * The tokens are named rather than described. A model handed a hex value writes that hex value
  * into forty places and the taste sheet stops meaning anything, so it is given the variables and
- * told they are the palette, which is also what makes a written page restyle when a look changes.
+ * told to build its base from them, which is also what makes a written page restyle when a look
+ * changes: shellOf keys on taste, so a page that reads var(--bg) moves when the look under it does.
+ *
+ * They are the ground rather than the whole palette, which is a correction. They used to be "the
+ * palette", flatly, and a preset carries exactly two chromatic values, so no written page could
+ * ever hold more than two colours whatever it was about. That sat directly against the drawing
+ * instruction three paragraphs below it, which asks for overprint and for two inks that look like
+ * two inks. The grounds are printed objects and printed objects have real palettes, older and more
+ * specific than anything a model invents: refusing them was costing the wall the cheapest source
+ * of variety it has. The licence is bounded by provenance rather than by count, because a limit on
+ * how many colours is a limit a page satisfies by being timid, and the failure being guarded
+ * against is colour nobody chose rather than colour there is a lot of.
  */
 export const WRITTEN_SYSTEM = `You are writing a complete landing page as HTML and CSS. Not a template to fill in, and not a description of one: the actual page.
 
@@ -173,7 +184,11 @@ Dark and light both occur on this wall, and the tokens tell you which you have: 
 
 What a dark page must not become is the one every generated page becomes: a glow behind the headline, frosted panels floating over a gradient, a violet to indigo wash, and a transition on everything. Those are not dark design, they are the absence of it, and they are checked for. Light comes from contrast and from restraint here, not from adding luminance.
 
-The tokens already exist and are the palette. Use var(--bg), var(--ink), var(--dim), var(--accent), var(--accent2), var(--surface), var(--line), var(--r) for radius, and var(--gap). The display and body faces are already set on the document, so inherit them rather than naming a font family, and set weight and size and spacing freely. Working in these is what lets the page be restyled without being rewritten, and a hex value typed into forty rules is a page that can only ever look one way.
+The tokens are the ground you are designing on, not the whole of your palette. Set the paper and the type from var(--bg), var(--ink), var(--dim), var(--surface), var(--line), var(--r) for radius and var(--gap), and take var(--accent) and var(--accent2) as the two the wall dealt you. A page whose base is built from these still moves when the look under it changes, which is what they are for, and it is why a whole page of typed hex is a page that can only ever look one way. The display and body faces are already set on the document, so inherit them rather than naming a font family, and set weight and size and spacing freely.
+
+Colour past those two comes from the object your direction names, and you should go and get it. A risograph zine is two fluorescent inks that go muddy where they cross and bright where they do not. A seed packet is four spot colours on kraft board. An engraved stamp sheet is six. A wine label is one foil and one ink on uncoated stock. A field guide is tinted plates against cream. Those palettes are specific, they are older than any of this, and they are the fastest way for a page to stop looking like a page and start looking like a thing. Mix them as real inks: overprint them, let them misregister, let one dominate and make the others answer to it.
+
+This is not a licence for a page of unrelated colours. What it must not become is a gradient behind the headline in hues nobody chose, a different colour for each of six cards, or an accent laid on every heading until nothing is accented. Two colours used with conviction beat five arranged politely, and five that belong to a real object beat two that came with the furniture. If you cannot say which object a colour came from, it is decoration, and it should go.
 
 The page must be one file that makes no requests. No font imports, no stylesheet links, no images from a url, no scripts, no tracking, no iframes. This is not a preference: a page that fetches anything stops being a file somebody can open.
 
