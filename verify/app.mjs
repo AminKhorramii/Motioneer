@@ -698,12 +698,19 @@ if (houseFlags.length) throw new Error(`the house trips its own detector on ${ho
   ]
   const failures = []
   const table = []
-  for (const p of core.PRESETS) {
-    const row = { look: p.name }
+  // the looks somebody tuned by eye, and the inks a direction now carries. The second list is why
+  // this gate was built first: a palette per object is dozens of hand written colour sets, and the
+  // point of having a gate is to be free to get one wrong somewhere a reader never sees it
+  const palettes = [
+    ...core.PRESETS.map((p) => ({ from: 'look', name: p.name, p })),
+    ...core.DIRECTIONS.filter((d) => d.inks).map((d) => ({ from: 'ground', name: d.name, p: d.inks })),
+  ]
+  for (const { from, name, p } of palettes) {
+    const row = { look: `${from} ${name}` }
     for (const pair of PAIRS) {
       const r = core.contrast(...pair.of(p))
       row[pair.key] = Number(r.toFixed(2))
-      if (r < pair.floor) failures.push(`${p.name}: ${pair.key} is ${r.toFixed(2)}:1, under ${pair.floor} (${pair.why})`)
+      if (r < pair.floor) failures.push(`${from} ${name}: ${pair.key} is ${r.toFixed(2)}:1, under ${pair.floor} (${pair.why})`)
     }
     table.push(row)
   }

@@ -247,7 +247,24 @@ export async function writeWhole(
   const angle = ANGLES[i % ANGLES.length]
   // the same look the arranged page in this place would have worn, so the two are compared on
   // what the model did with the page and not on which palette each happened to draw
-  const page = arrange(base, i + 1)
+  const dealt = arrange(base, i + 1)
+  /**
+   * And the object's own colours over the top of it, when the ground has them.
+   *
+   * The colour half only. The look still decides the type, the scale, the radius and the feel, so
+   * the two axes a wall varies on stay independent: the object says what colour this page is and
+   * the look says how it reads. Overriding the whole taste would collapse them into one axis and
+   * hand every page built from the same ground an identical paper.
+   *
+   * This is the lever the wall was missing. Measured over two real walls the model typed five
+   * colours of its own across eight pages and reached for a token three hundred and twenty nine
+   * times, so it was never withholding colour: it was using the variables it was given, and every
+   * look hands it the same two accents. A paragraph in the prompt asking for more was tried first
+   * and moved nothing, which is this repository's own note about guidance and gates, again.
+   */
+  const page = direction.inks
+    ? { ...dealt, taste: { ...dealt.taste, ...direction.inks } }
+    : dealt
   const landed = (written: Written): Page => ({
     ...page,
     written,

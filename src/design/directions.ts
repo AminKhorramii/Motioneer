@@ -11,6 +11,32 @@
  * cliche waiting.
  */
 
+/**
+ * The colours the object was actually printed in.
+ *
+ * Every chain below already names a palette in prose, "tinted paper palette", "one municipal
+ * accent", "monochrome", and prose is the one part of a direction the machinery could not act on.
+ * Measured over two real walls, the model typed five colours of its own across eight pages and
+ * reached for a token three hundred and twenty nine times: it was not withholding colour, it was
+ * faithfully using the variables it was handed, and every look in the deck hands it the same two.
+ * So the lever is here rather than in the prompt, which is where a paragraph asking for more
+ * colour was tried first and moved nothing.
+ *
+ * These override the colour half of whichever look the page was dealt and leave the type, the
+ * scale and the feel alone. That keeps the two axes a wall varies on independent: the object
+ * decides what colour the page is, the look still decides how it reads.
+ *
+ * Every one of these is checked in the suite before it can ship, on the pairs that actually
+ * render. A palette is taste and can be argued about; a palette nobody can read is not.
+ */
+export interface Inks {
+  bg: string
+  ink: string
+  dim: string
+  accent: string
+  accent2: string
+}
+
 export interface Direction {
   name: string
   /** the real object, which decides every value that follows */
@@ -21,6 +47,8 @@ export interface Direction {
   avoid: string
   /** how to write for it */
   voice: string
+  /** what it was printed in, when the object has a palette specific enough to be worth taking */
+  inks?: Inks
 }
 
 export const DIRECTIONS: Direction[] = [
@@ -30,6 +58,8 @@ export const DIRECTIONS: Direction[] = [
     chain: 'mono faces, measure under 50, dense, ruled, monochrome palette, offer worn as a table, claim as prose, rhythm tight with one long breath before the offer',
     avoid: 'drawing a torn paper edge on screen, which is a prop; the receipt is the column and the discipline, not the paper',
     voice: 'Itemised and unpersuasive. Names, quantities, amounts.',
+    // till roll: no colour at all, because the machine only burns one
+    inks: { bg: '#f7f6f2', ink: '#1a1a18', dim: '#6e6d68', accent: '#2b2b28', accent2: '#8d8b84' },
   },
   {
     name: 'boarding pass',
@@ -72,6 +102,8 @@ export const DIRECTIONS: Direction[] = [
     chain: 'serif display small but fine, generous margins, figure as the one artwork, tinted palette, five sections, credits as colophon',
     avoid: 'perforating the borders in CSS; the sheet is the repetition and restraint',
     voice: 'A denomination and an occasion. Ceremony in miniature.',
+    // engraved: deep carmine and a bottle green on gummed paper
+    inks: { bg: '#f4efe2', ink: '#1e1b16', dim: '#6b655a', accent: '#7a2438', accent2: '#2a5148' },
   },
   {
     name: 'classified ads page',
@@ -93,6 +125,8 @@ export const DIRECTIONS: Direction[] = [
     chain: 'grotesk caps, tabular figures, dense ruled rows, dark ground with one signal accent, substance as a table, claim as statement',
     avoid: 'animating the flaps; the board is the grid of certainty, not the mechanism',
     voice: 'Destination, time, status. The status column carries all the emotion.',
+    // split flap: amber for now, green for boarding, everything else off
+    inks: { bg: '#0b0d0e', ink: '#e8e6df', dim: '#7d817c', accent: '#e8a33d', accent2: '#6fb98f' },
   },
   {
     name: 'metro signage',
@@ -163,6 +197,8 @@ export const DIRECTIONS: Direction[] = [
     chain: 'mono labels, one pale ink on one deep ground, unruled but dimensioned, figure as the hero, credits as a title block',
     avoid: 'the blueprint blue as a costume on ordinary layout; the drawing convention is the point',
     voice: 'Dimensioned. Everything named, nothing sold.',
+    // cyanotype: white lines bitten out of prussian blue
+    inks: { bg: '#10315e', ink: '#eef3fb', dim: '#9fb6d6', accent: '#ffffff', accent2: '#7fb2e8' },
   },
   {
     name: 'topographic map',
@@ -177,6 +213,8 @@ export const DIRECTIONS: Direction[] = [
     chain: 'dark ground, fine sans, one pale accent, sparse rhythm, figure as the sky, claim as statement over it',
     avoid: 'a purple nebula wash; the chart is points and lines, not a poster of space',
     voice: 'Precise wonder. Magnitudes and names, not awe adjectives.',
+    // night sky printing: white stars, cyan for the ecliptic
+    inks: { bg: '#070c1c', ink: '#e6ecf7', dim: '#7d8aa6', accent: '#f2f5fb', accent2: '#58c8e8' },
   },
   {
     name: 'field guide',
@@ -184,6 +222,8 @@ export const DIRECTIONS: Direction[] = [
     chain: 'serif body, italic binomials, figure opposite prose, numbered plates, tinted paper, objections as distinguishing marks',
     avoid: 'generic nature imagery; the guide lives on the one distinguishing detail',
     voice: 'Distinguishing marks first. Easily confused with, except for.',
+    // tinted plates against cream: field green and a mammal brown
+    inks: { bg: '#f3eee1', ink: '#221f18', dim: '#6c6558', accent: '#3f5e3a', accent2: '#8a5a2b' },
   },
   {
     name: 'nutrition label',
@@ -212,6 +252,8 @@ export const DIRECTIONS: Direction[] = [
     chain: 'mono, claim as transcript, offer as transcript, contours backdrop, dense, one phosphor accent',
     avoid: 'drawing the window chrome; the session is the text, and dots are a prop',
     voice: 'Commands and output. The output is the proof.',
+    // phosphor on unlit glass, and the amber a second channel used to be
+    inks: { bg: '#05070a', ink: '#cfe9d4', dim: '#5d8168', accent: '#3ddc84', accent2: '#d8c53a' },
   },
   {
     name: 'broadsheet front page',
@@ -240,6 +282,11 @@ export const DIRECTIONS: Direction[] = [
     chain: 'sans bold, two inks via tinted palette, bleed on, uneven rhythm, grain backdrop, statement wear',
     avoid: 'simulating misprint precisely; take the two-ink constraint, not fake noise',
     voice: 'Direct and a little loud. Made by someone, for someone.',
+    // two drums, fluorescent pink and riso blue, muddy where they cross. The pink is a step down
+    // from the ink itself: fluorescent pink sits in the band where neither black nor white clears
+    // the floor for a button label, which is the real reason riso work sets black type beside the
+    // pink rather than reversing out of it
+    inks: { bg: '#f2efe6', ink: '#17161a', dim: '#5f5c58', accent: '#e21f57', accent2: '#1552c9' },
   },
   {
     name: 'gig flyer',
@@ -247,6 +294,8 @@ export const DIRECTIONS: Direction[] = [
     chain: 'grotesk heavy, poster scale, contrast palette, four sections, claim as statement, invitation as band',
     avoid: 'careful kerning; the flyer is urgency, and polish reads as a brand pretending',
     voice: 'Who, where, when, how much. Doors at eight.',
+    // photocopied black on whatever fluorescent stock the shop had
+    inks: { bg: '#0d0d0d', ink: '#f2f2f2', dim: '#8f8f8f', accent: '#f5f13c', accent2: '#ff5ea8' },
   },
   {
     name: 'film title card',
@@ -324,6 +373,8 @@ export const DIRECTIONS: Direction[] = [
     chain: 'serif display, figure as the one illustration, tinted warm paper, sowing table for substance, five sections',
     avoid: 'vintage filters; take the structure of promise plus instructions, not the nostalgia',
     voice: 'Sow in spring. Thin to six inches. Harvest when.',
+    // spot red and spot green on kraft board, no fourth plate
+    inks: { bg: '#dfcfa9', ink: '#241d12', dim: '#6a5a41', accent: '#b4331f', accent2: '#2f6b3f' },
   },
   {
     name: 'apothecary label',
@@ -331,6 +382,8 @@ export const DIRECTIONS: Direction[] = [
     chain: 'serif caps small, ruled border as the one move, cream palette, dosage as a table, sparse',
     avoid: 'skulls and flourish; the label is exactness, and ornament dilutes a dose',
     voice: 'Contents, dose, caution. Not to be taken.',
+    // sepia on aged label stock, with the green kept for what is in the bottle
+    inks: { bg: '#eee5cf', ink: '#26200f', dim: '#6d6247', accent: '#7a2f12', accent2: '#4c6b34' },
   },
   {
     name: 'wine label',
@@ -338,6 +391,8 @@ export const DIRECTIONS: Direction[] = [
     chain: 'serif or fraunces display, one vintage figure large, cream tinted, sparse, credits as the estate line',
     avoid: 'a story paragraph; the label is a name and a year trusted',
     voice: 'Named, dated, placed. The year does the talking.',
+    // oxblood and a gold foil on uncoated cream
+    inks: { bg: '#efe7d6', ink: '#1c1712', dim: '#6a6053', accent: '#6d1f2b', accent2: '#a8842f' },
   },
   {
     name: 'bistro menu',
