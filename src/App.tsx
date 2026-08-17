@@ -11,7 +11,7 @@ import { pageBrief } from '@/brief'
 import { slop } from '@/slop'
 import { madeWritten } from '@/written'
 import {
-  EMPTY_PRODUCT, addSection, alternatives, arrangeIn, dealShapes, readBrief, canDraw, canWrite, choose, chosen, setMemory, cycleForm, cycleWorld, dropSection, dealWritten, writeOne, writeWhole, illustrate, loadHeldKeys, loadKeys, promptPage, rewriteWritten, sectionAlternatives, seeded, setMock, type Product,
+  EMPTY_PRODUCT, addSection, alternatives, arrangeIn, dealShapes, dealDepictions, readBrief, canDraw, canWrite, choose, chosen, setMemory, cycleForm, cycleWorld, dropSection, dealWritten, writeOne, writeWhole, illustrate, loadHeldKeys, loadKeys, promptPage, rewriteWritten, sectionAlternatives, seeded, setMock, type Product,
 } from '@/compose'
 import { Onboarding } from '@/Onboarding'
 import { SectionsRail } from '@/SectionsRail'
@@ -308,9 +308,11 @@ export default function App() {
     const deck = dealWritten(WHOLE)
     // one silhouette each, so the wall disagrees about shape as well as about subject
     const shapes = dealShapes(WHOLE)
+    // and how each of them draws, which is the axis a wall of eight had never varied
+    const depictions = dealDepictions(WHOLE)
     const arrangeInstead: number[] = []
     const wholeJobs = deck.map((d: Direction, at: number) =>
-      writeWhole(base, p, d, at, shapes[at], 'model', () => {
+      writeWhole(base, p, d, at, shapes[at], depictions[at], 'model', () => {
         if (run.current === mine) setBuilding((b) => (b ? { ...b, thoughts: b.thoughts + 1 } : b))
       }).then((made) => {
         if (run.current !== mine) return { ok: 0 }

@@ -866,6 +866,34 @@ if (houseFlags.length) throw new Error(`the house trips its own detector on ${ho
   if (acrossWalls < 150) throw new Error('the same deal keeps coming up, so two walls in a row share a shape order')
 }
 
+// ——— 0l2. and they do not all draw the same picture inside those shapes ———
+// Measured by pulling every drawn element out of three real walls and putting them side by side:
+// of twelve marks, nine were the same watch dial, face on, hands at about ten past ten. Twenty
+// four independent calls, one picture. What differed between them was almost entirely the palette.
+//
+// Same failure as the silhouettes and the same cause, one level down: each call is handed a
+// subject, cannot see the other seven, and picks the most obvious rendering, which is the same
+// answer every time. Varying the ground and the shape of the page cannot reach inside the drawing.
+{
+  const deals = Array.from({ length: 200 }, () => core.dealDepictions(8))
+  const distinctWithin = deals.map((d) => new Set(d).size)
+  const everyDealFull = deals.every((d) => d.length === 8 && d.every(Boolean))
+  const acrossWalls = new Set(deals.map((d) => d.join('|'))).size
+  // a depiction must be a way of looking rather than a subject, or it fights the ground it lands
+  // on: "in cross section" composes with a watch and a tomato, "a dial" composes with neither
+  const namesASubject = core.dealDepictions(8).filter((d) => /watch|dial|bottle|packet|card\b/i.test(d))
+  console.log('depictions dealt to eight hands:', JSON.stringify({
+    distinctPerWall: Math.min(...distinctWithin),
+    everyHandGotOne: everyDealFull,
+    distinctDealsOutOf200: acrossWalls,
+    anyThatNameASubject: namesASubject.length,
+  }))
+  if (!everyDealFull) throw new Error('a hand was dealt no depiction, so it picks its own and eight of them converge on one picture')
+  if (Math.min(...distinctWithin) < 6) throw new Error('a wall of eight got fewer than six depictions, so the deal is not spreading them')
+  if (acrossWalls < 150) throw new Error('the same deal keeps coming up, so two walls in a row draw in the same order')
+  if (namesASubject.length) throw new Error('a depiction names a subject rather than a way of looking, so it will fight whatever ground it is dealt beside')
+}
+
 // ——— 0a. the block library reaches the page, and the geometry holds ———
 // Both gates live in verify/layout.mjs, because they measure rendered pages rather than drive
 // the app, and they are worth running alone while a block is being changed.

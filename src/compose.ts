@@ -4,7 +4,7 @@ import { PRESETS } from '@/design/presets'
 import { tasteAvoid, tasteBrief, type Lean, type Taste } from '@/taste'
 import { giveKey, host, isDesktop, isServed, servedConfig } from '@/host'
 import { slop, slopBrief } from '@/slop'
-import { dealDirections, dealShapes, directionSeed, type Direction } from '@/design/directions'
+import { dealDirections, dealShapes, dealDepictions, directionSeed, type Direction } from '@/design/directions'
 import { ANGLES } from '@/design/angles'
 import { INTAKE_SYSTEM, MEND_SYSTEM, PAGE_SYSTEM, WORLDS_SYSTEM, WRITTEN_SYSTEM } from '@/design/prompts'
 import { madeWritten, safeStyle, undrawn, type Written } from '@/written'
@@ -240,6 +240,14 @@ export async function writeWhole(
   i: number,
   /** the silhouette this hand was dealt, so eight independent calls do not all reach for a column */
   shape: string,
+  /**
+   * And how this hand draws its subject, for the same reason one level down.
+   *
+   * Pulled out of three real walls and laid side by side, nine of twelve drawn marks were the
+   * same watch dial: eight independent calls each pick the most obvious rendering of the thing
+   * they were handed, and obvious is the same answer every time.
+   */
+  depiction: string,
   provider: Provider = 'model',
   /** called each time the model proves it is still thinking, before any of it can be read */
   onBeat?: () => void,
@@ -289,7 +297,10 @@ export async function writeWhole(
     `The one action is: ${product.cta}.\n\n` +
     `Build it from ${directionSeed(direction)}\n\n` +
     `Argue it as "${angle.name}". ${angle.instruction}\n\n` +
-    `Lay this one out as ${shape}, unless the ground you were given genuinely refuses it.`
+    `Lay this one out as ${shape}, unless the ground you were given genuinely refuses it.\n\n` +
+    `Draw the subject ${depiction}, unless the subject genuinely refuses it. This is how this one ` +
+    `is depicted and not what it is: the other pages on this wall are drawing the same thing other ` +
+    `ways, so the picture here has to be the one nobody else will arrive at on their own.`
   // the same split the design hands used: what this person culls goes to every page, because
   // pruning narrows nothing, and what they keep goes only to a page dealt from what they like
   const note = memory ? tasteBrief(memory, memory.favor.includes(direction.name)) : ''
@@ -460,7 +471,7 @@ export const setMemory = (lean: Lean | null) => {
  * became the memory quietly having nothing left to bias.
  */
 export const dealWritten = (n: number): Direction[] => dealDirections(n, memory ?? undefined)
-export { dealShapes }
+export { dealShapes, dealDepictions }
 
 /** Move a page to the next world, keeping its copy. */
 export function cycleWorld(page: Page): Page {

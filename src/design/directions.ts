@@ -536,3 +536,43 @@ export function dealShapes(n: number): string[] {
   // still disagrees far more than eight independent calls each choosing a column
   return Array.from({ length: n }, (_, i) => deck[i % deck.length])
 }
+
+/**
+ * How the subject is depicted, which is the axis nothing here has ever varied.
+ *
+ * Measured by pulling every drawn element out of three real walls and looking at them together:
+ * of twelve marks, nine were the same watch dial. A circular bezel, a tick ring, two hands at
+ * about ten past ten, a crown on the right. Across twenty four independent calls the engine drew
+ * one object over and over, and what differed between them was almost entirely the palette.
+ *
+ * This is the same failure dealShapes was written for, one level down, and it has the same cause.
+ * Every call is handed a subject and cannot see the other seven, so each independently picks the
+ * most obvious way to render it, and for a watch that is a dial seen face on. Anti convergence
+ * that stops at the page cannot reach it: the ground varies, the silhouette of the page varies,
+ * and then eight calls all draw the same picture inside them.
+ *
+ * The entries are ways of looking rather than subjects, so they compose with any ground. A dive
+ * watch becomes a case in section, an exploded parts diagram, a lume plot repeated, a bezel at
+ * four times size. A lean and not an instruction, on the same terms as the shapes: a subject that
+ * genuinely refuses its depiction should win, because a forced cutaway is worse than a good
+ * elevation.
+ */
+const DEPICTIONS = [
+  'in cross section, cut through so the inside is the picture',
+  'exploded, the parts separated along one axis with the gaps doing the explaining',
+  'in plan, seen from directly above with nothing in perspective',
+  'as a solid silhouette, no interior detail, the outline carrying all of it',
+  'as a repeat, the one form tiled or ranked until the pattern is the subject',
+  'as a detail at several times size, cropped so the whole is never shown',
+  'as a labelled diagram, with leader lines to the parts that are named',
+  'ghosted, the outer shell drawn faintly so an inner part reads through it',
+]
+
+export function dealDepictions(n: number): string[] {
+  const deck = [...DEPICTIONS]
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[deck[i], deck[j]] = [deck[j], deck[i]]
+  }
+  return Array.from({ length: n }, (_, i) => deck[i % deck.length])
+}
