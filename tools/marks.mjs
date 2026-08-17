@@ -31,6 +31,18 @@ const latest = () => {
   return path.join('bench', dirs[dirs.length - 1])
 }
 const dir = process.argv[2] ? process.argv[2].replace(/\/$/, '') : latest()
+/**
+ * A named directory has to exist and hold papers before anything is written into it.
+ *
+ * This used to go straight to mkdirSync with recursive on, which creates whatever it is pointed
+ * at. A mistyped path therefore built the directory, read no papers out of it, wrote an empty
+ * contact sheet and exited zero: a green run, a junk folder, and no way to tell it from a wall
+ * where nothing drew. That is the shape of failure this repository keeps finding in its own
+ * signals, so it fails here instead.
+ */
+if (!existsSync(dir)) throw new Error(`no such bench: ${dir}`)
+const papers = readdirSync(dir).filter((x) => /^paper-\d+\.html$/.test(x)).sort()
+if (!papers.length) throw new Error(`no papers in ${dir}, so there is nothing to pull marks from`)
 const out = path.join(dir, 'marks')
 if (existsSync(out)) rmSync(out, { recursive: true })
 mkdirSync(out, { recursive: true })
@@ -102,7 +114,17 @@ const FIND = () => {
     b.t = [...b.t].sort()
   }
   boxes.sort((a, b) => b.w * b.h - a.w * a.h)
-  return boxes.filter((b) => b.w >= 60 && b.h >= 60).slice(0, 3)
+  /**
+   * A mark is bigger than a bullet, which is the same floor the drawing gate holds pages to.
+   *
+   * At sixty pixels this reported a page whose only drawing rule was `.pip`, a six percent circle
+   * used as an indicator dot, as having drawn something. Two such pages then collided on the same
+   * fingerprint and the wall scored three distinct marks out of six, when the truth was that two
+   * of the six had drawn nothing worth the name. An icon is decoration rather than the subject,
+   * so a single small part is not a mark: either the thing has real size, or it is assembled from
+   * enough pieces that somebody clearly built a picture.
+   */
+  return boxes.filter((b) => (b.w >= 130 && b.h >= 130) || (b.n >= 3 && b.w >= 80 && b.h >= 80)).slice(0, 3)
 }
 
 /**
@@ -132,7 +154,7 @@ const ctx = await browser.newContext({ viewport: { width: 1280, height: 1400 }, 
 const page = await ctx.newPage()
 const rows = []
 
-for (const f of readdirSync(dir).filter((x) => x.endsWith('.html')).sort()) {
+for (const f of papers) {
   await page.goto('file://' + path.resolve(dir, f), { waitUntil: 'load' })
   await page.waitForTimeout(350)
   const boxes = await page.evaluate(FIND).catch(() => [])
@@ -155,7 +177,7 @@ const prints = new Set(drew.map((r) => r.print))
 console.log(`\n  ${dir}\n`)
 for (const r of rows) {
   if (!r.mark) { console.log(`  ${r.paper.padEnd(9)} nothing drawn that this can see`); continue }
-  console.log(`  ${r.paper.padEnd(9)} ${String(Math.round(r.mark.w)).padStart(4)}x${String(Math.round(r.mark.h)).padEnd(5)} ${String(r.mark.n).padStart(2)} parts  ${r.print}`)
+  console.log(`  ${r.paper.padEnd(9)} ${String(Math.round(r.mark.w)).padStart(4)}x${String(Math.round(r.mark.h)).padEnd(5)} ${String(r.mark.n).padStart(2)} part${r.mark.n === 1 ? ' ' : 's'}  ${r.print}`)
 }
 console.log(`\n  ${drew.length} of ${rows.length} papers drew something this can find`)
 console.log(`  ${prints.size} distinct marks out of ${drew.length}   <- the number that should go up\n`)
