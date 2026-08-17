@@ -14,7 +14,7 @@ export * from '@/brief'
 export * from '@/slop'
 export { MEASURE, WIDTHS, faultsOf, type Measured } from '@/geometry'
 export { renderPage, renderSection, renderBody, shellOf } from '@/render'
-export { drift, mix, shift, alpha, luminance, type Taste } from '@/taste'
+export { drift, mix, shift, alpha, luminance, contrast, type Taste } from '@/taste'
 // what a wall remembers, and the story of how one was chosen. Both are file formats other
 // programs read, so they belong to the core rather than to the window that happens to write them
 export {

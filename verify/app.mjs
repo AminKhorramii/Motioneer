@@ -660,6 +660,74 @@ if (houseFlags.length) throw new Error(`the house trips its own detector on ${ho
   if (drawn.length) throw new Error('a real drawing was called undrawn, which turns this into noise the repair cannot act on')
 }
 
+// ——— 0n. every palette that ships can be read ———
+// Palettes are about to stop being eight presets somebody tuned by eye and start being data: a
+// direction that carries its own inks is a set of colours typed into a file, and fifty one of them
+// will not all be typed well. Most of what can be wrong with a palette is taste and can be argued
+// about. One thing cannot, and it is the one a reader has no way around, so it is the part with a
+// gate on it. This runs on the palette rather than on a rendered page because it has to be true
+// before anything is built from it, and because a page is where you find out too late.
+//
+// The ratios are the ones the accessibility guidelines are stated in. Body text is held to 4.5,
+// the figure for text at a normal size, since ink on bg is exactly that. Accents are held to 3,
+// the large and bold figure, because that is what an accent is used for here: headlines, figures,
+// the fill behind a button. dim is deliberately held to 3 rather than 4.5. It is the quiet colour
+// and holding it to body contrast would flatten the one distinction the palette is drawing.
+{
+  /**
+   * Each ink against the thing it is actually set on, which is not always the background.
+   *
+   * The first draft of this held every colour to a text floor over bg and immediately failed a
+   * look on its accent, which turned out to be measuring a pair that never renders: the button
+   * fills with the accent and sets --btn-ink on top of it, and that pair was a comfortable 6:1.
+   * A gate that fails a palette for a combination the page never shows is a gate that gets turned
+   * off, so each ink is held to the job it does.
+   *
+   * accent2 is the one with no text floor. It is the second ink, and what it is for is drawing:
+   * a bezel, an overprint, a halftone. Holding it to a reading contrast would forbid exactly the
+   * palettes worth adding, because a fluorescent ink on newsprint is low contrast on purpose and
+   * is still the right colour. It only has to be visible.
+   */
+  const btnInk = (p) => (core.contrast('#101216', p.accent) >= core.contrast('#ffffff', p.accent) ? '#101216' : '#ffffff')
+  const PAIRS = [
+    { key: 'ink on bg', floor: 4.5, of: (p) => [p.ink, p.bg], why: 'body text' },
+    { key: 'dim on bg', floor: 3, of: (p) => [p.dim, p.bg], why: 'secondary text' },
+    { key: 'accent on bg', floor: 3, of: (p) => [p.accent, p.bg], why: 'figures and labels set large or bold' },
+    { key: 'btn ink on accent', floor: 4.5, of: (p) => [btnInk(p), p.accent], why: 'the one control that has to be readable' },
+    { key: 'accent2 on bg', floor: 1.4, of: (p) => [p.accent2, p.bg], why: 'the second ink, which only has to be visible' },
+  ]
+  const failures = []
+  const table = []
+  for (const p of core.PRESETS) {
+    const row = { look: p.name }
+    for (const pair of PAIRS) {
+      const r = core.contrast(...pair.of(p))
+      row[pair.key] = Number(r.toFixed(2))
+      if (r < pair.floor) failures.push(`${p.name}: ${pair.key} is ${r.toFixed(2)}:1, under ${pair.floor} (${pair.why})`)
+    }
+    table.push(row)
+  }
+  // the maths itself, checked against the two pairs whose answers are fixed by definition, so a
+  // gate that quietly started returning 1 for everything cannot pass by finding no failures
+  const black = core.contrast('#000000', '#ffffff')
+  const same = core.contrast('#7f7f7f', '#7f7f7f')
+  console.log('palette contrast:', JSON.stringify({
+    blackOnWhite: Number(black.toFixed(1)), aColourWithItself: Number(same.toFixed(1)),
+    looks: table.length, tightest: table
+      .map((r) => ({ look: r.look, at: Math.min(...PAIRS.map((p) => r[p.key] / p.floor)) }))
+      .sort((a, b) => a.at - b.at)[0],
+    failures: failures.length ? failures : 'none',
+  }))
+  if (Math.abs(black - 21) > 0.1) throw new Error(`black on white came out at ${black.toFixed(2)}, so the ratio is not the one the floors are written in`)
+  if (Math.abs(same - 1) > 0.001) throw new Error('a colour against itself is not 1, so this gate cannot be trusted to find anything')
+  // short hex is what a hand written palette uses, and reading it as NaN made every floor pass
+  if (Math.abs(core.contrast('#fff', '#000') - 21) > 0.1) throw new Error('three digit hex does not read, so a palette written the short way passes every floor without being measured')
+  if (table.some((r) => Object.values(r).some((v) => typeof v === 'number' && !Number.isFinite(v)))) {
+    throw new Error('a pair measured as NaN, which passes every comparison silently rather than failing')
+  }
+  if (failures.length) throw new Error(`a look that ships cannot be read: ${failures.join('; ')}`)
+}
+
 // ——— 0m. the ruler reads a written page, and reads a bleed as design ———
 // written.ts opens by saying the detector and the ruler both run over a written page exactly as
 // they run over an arranged one. Only the first half was ever true: strainsIn was reached through

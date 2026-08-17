@@ -14,7 +14,10 @@ import { FACES } from '@/design/faces'
 export const PRESETS: Taste[] = [
   {
     name: 'anime',
-    bg: '#fdf2f8', ink: '#1a1024', dim: '#7c6a8c', accent: '#ff4d8d', accent2: '#38d0ff',
+    // one shade deeper than it was drawn: #ff4d8d set as a figure on this ground came out at 2.87
+    // to 1 and the floor for type at that size is 3. The same pink to look at, and the only
+    // palette in the deck that had to move when the contrast gate went in
+    bg: '#fdf2f8', ink: '#1a1024', dim: '#7c6a8c', accent: '#fa3f83', accent2: '#38d0ff',
     display: FACES.grotesk, body: FACES.sans, scale: 1.38, radius: 20, density: 0.45, weight: 800, caps: false, motion: 'lively',
   },
   {

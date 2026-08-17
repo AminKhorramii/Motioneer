@@ -4,7 +4,7 @@
  * small script that reports text edits back to the app.
  */
 
-import { alpha, luminance, mix, shift, type Taste } from '@/taste'
+import { alpha, contrast, luminance, mix, shift, type Taste } from '@/taste'
 import { type Page, type Section } from '@/sections'
 import { backdropHtml } from '@/backdrop'
 import { worldById, type World } from '@/worlds'
@@ -131,6 +131,24 @@ function tokens(t: Taste) {
   }
 }
 
+/**
+ * What to set the one real button's label in, decided by measuring rather than by guessing.
+ *
+ * This was a luminance threshold: over 0.6 take black, under it take white. Luminance is a
+ * weighted average of the raw channels, and it does not predict which of black or white will read
+ * better on a saturated hue sitting in the middle of the range. Two of the eight shipped looks
+ * were picking the worse of the two: on the anime pink it chose white at 3.14 to 1 when black was
+ * 5.98, and neon was the same story. Both were under the floor for a button label, and both had
+ * been that way in every wall anybody has ever made here.
+ *
+ * They also could not be found, because the answer it returned was #fff, three digit hex read as
+ * NaN, and every comparison against NaN is false. A palette gate found all of it at once.
+ *
+ * There are only two candidates, so there is no reason to predict the winner instead of asking.
+ */
+const btnInk = (accent: string) =>
+  contrast('#101216', accent) >= contrast('#ffffff', accent) ? '#101216' : '#ffffff'
+
 function head(t: Taste, title: string, editable: boolean, w: World, still: boolean, layout: Layout) {
   const { gap, surface, line, s, fluid, ease } = tokens(t)
   // a bundled face rides inside the page, but only when this page actually wears it
@@ -150,7 +168,7 @@ ${/* Every measurement a block is allowed to have, in one place. A block reads t
 --measure:${w.structure.measure}ch;--headline:20ch;--subhead:24ch;
 --split:1.05fr .95fr;--tile:15rem;
 --rowsplit:minmax(9rem,15rem) 1fr;--rule:1px;--stack:1.05rem;--beat:1;
---btn-fill:var(--accent);--btn-ink:${luminance(t.accent) > 0.6 ? '#101216' : '#fff'}}
+--btn-fill:var(--accent);--btn-ink:${btnInk(t.accent)}}
 body{background:var(--bg);color:var(--ink);font-family:${t.body};font-size:${(w.structure.base ?? 16.5).toFixed(2)}px;
 line-height:${(1.45 + gap * 0.28).toFixed(2)};-webkit-font-smoothing:antialiased}
 a{color:inherit;text-decoration:none}

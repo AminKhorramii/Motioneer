@@ -87,19 +87,44 @@ export const MEASURE = (doc: Document = document): Measured => {
     if (per < 12) out.wordColumn.push(h.tagName.toLowerCase() + ' at ' + per + ' characters a line')
   }
 
-  // the one real button, against its own fill. A world that restyled only the colour shipped
-  // accent text on an accent ground, which is a button with nothing readable in it
-  const lum = (c: string) => {
-    const [r, g, b, a] = (c.match(/[\d.]+/g) ?? ['0', '0', '0', '1']).map(Number)
-    return a === 0 ? null : (0.299 * r + 0.587 * g + 0.114 * b) / 255
+  /**
+   * The one real button, against its own fill. A world that restyled only the colour shipped
+   * accent text on an accent ground, which is a button with nothing readable in it.
+   *
+   * Two things were wrong with this once written pages became the wall. It read .btn-primary,
+   * which the renderer puts on an arranged page and a written page never has, so the check has
+   * been running on nothing. And it compared a weighted average of the raw channels, which is not
+   * how a screen emits them: the same arithmetic gap is worth far more between two dark colours
+   * than between two light ones, so a fixed difference passes pairs at one end and fails them at
+   * the other. It takes the ratio the guidelines are stated in now, undoing the transfer curve
+   * first, and three to one is the floor for the large bold type a button is set in.
+   *
+   * A written page is found through data-k="cta", which the writing prompt already asks for and
+   * the copy detector already reads. That makes the coverage exactly as good as the model's
+   * willingness to mark its own call to action: a page that skips the attribute is a page whose
+   * button is unmeasured, which is the same gap the key scoped copy tells have and is worth
+   * naming rather than papering over. The maths is inline because MEASURE is serialised into the
+   * page it measures and closes over nothing, so it cannot reach the copy of this in taste.ts.
+   */
+  const rel = (c: string) => {
+    const n = (c.match(/[\d.]+/g) ?? []).map(Number)
+    if (n.length < 3) return null
+    // fully transparent is not a colour, it is the absence of one, so keep walking up for a ground
+    if (n.length > 3 && n[3] === 0) return null
+    const [r, g, b] = n.slice(0, 3)
+      .map((v) => v / 255)
+      .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
   }
-  for (const b of doc.querySelectorAll('.btn-primary')) {
+  for (const b of doc.querySelectorAll('.btn-primary, [data-k="cta"]')) {
     const cs = css(b)
-    const ink = lum(cs.color)
-    let ground = lum(cs.backgroundColor)
-    for (let el = b.parentElement; ground === null && el; el = el.parentElement) ground = lum(css(el).backgroundColor)
-    if (ink !== null && ground !== null && Math.abs(ink - ground) < 0.18) {
-      out.unreadable.push('button ink ' + cs.color + ' on ' + cs.backgroundColor)
+    const ink = rel(cs.color)
+    let ground = rel(cs.backgroundColor)
+    for (let el = b.parentElement; ground === null && el; el = el.parentElement) ground = rel(css(el).backgroundColor)
+    if (ink === null || ground === null) continue
+    const ratio = (Math.max(ink, ground) + 0.05) / (Math.min(ink, ground) + 0.05)
+    if (ratio < 3) {
+      out.unreadable.push('button ink ' + cs.color + ' on ' + cs.backgroundColor + ' at ' + ratio.toFixed(1) + ':1')
     }
   }
   return out
@@ -183,8 +208,11 @@ export function faultsOf(m: Measured, wrote: Author = 'world'): string[] {
       'because a heading is sized against the track it is set in and not against the window.')
   }
   if (m.unreadable.length) {
-    out.push(`${m.unreadable[0]}, so the button has nothing readable in it. palette decides how far the accent ` +
-      'sits from the background, and contrast pulls them apart.')
+    out.push(`${m.unreadable[0]}, so the button has nothing readable in it. ` +
+      (own
+        ? 'Three to one is the floor for type this size, so move the fill or move the label: an accent set on ' +
+          'the same accent is the usual way here, and it happens when both sides were reached for by name.'
+        : 'palette decides how far the accent sits from the background, and contrast pulls them apart.'))
   }
   if (m.dup.length) out.push(`the id ${m.dup[0]} is used twice, which is a section asking for a role twice over.`)
   if (m.empty) out.push(`${m.empty} sections render with no height at all, so something in your css is collapsing them.`)
