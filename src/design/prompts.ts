@@ -215,6 +215,47 @@ Design something that could only be this product. The failure here is not ugline
 Respond with the JSON object alone, because the reply is parsed directly.`
 
 /**
+ * One drawn thing, rather than a page with one on it.
+ *
+ * Measured across four real walls, the drawing is between two and thirty one percent of a page's
+ * styles and it is the part that carries the design: the page scoring one drawing rule out of
+ * fifty seven was the emptiest thing on any wall, and the two scoring around thirty were the best.
+ * So roughly nine tenths of a twelve thousand token call and four minutes of waiting goes on the
+ * page around the mark, and the mark is what nobody else makes.
+ *
+ * The deck is why this is worth asking for separately. A ground is a way of drawing rather than a
+ * page layout, so all fifty one of them compose with a single element, and so do the depictions and
+ * the inks. Nothing about the taste here is page shaped, which is what makes the smaller unit the
+ * same product rather than a different one.
+ *
+ * It stays in the tokens for a reason worth stating plainly: a mark built on var(--accent) takes on
+ * the theme of whatever it is dropped into, and one built from typed hex is a sticker. That is the
+ * whole difference between this and every stock illustration set, and it is why the styles are
+ * asked for in variables even though nothing here will be restyled by us.
+ */
+export const MARK_SYSTEM = `You are drawing one thing in HTML and CSS. Not a page, not a section, not a component with controls: a single self contained drawn element, of the kind a designer would put at the top of a page, in an empty state, on a certificate, or behind a heading.
+
+Return JSON shaped as {"note": "...", "backdrop": "...", "html": "...", "css": "..."}.
+
+- note: one short line naming what you drew, the way you would name a drawing.
+- html: the markup for the one element and whatever is inside it. No <html>, <head>, <body>, <style> or <script>. One outermost element, and everything else nested inside it.
+- css: the styles for it, written against your own classes.
+
+${DRAW}
+
+Centre it. The document it lands in is a stage and nothing else is on it, so give your outermost element a height near the viewport, centre what you draw inside that, and let it breathe. It will be looked at at 1280 and at 390 pixels wide, so build it from proportions rather than fixed pixel sizes.
+
+Words are allowed and are not the point. A dial has numerals, a stamp has a denomination, a seal has a date: type that belongs to the object drawn is part of the drawing. Type that explains the object is not, so no headline, no paragraph, no caption, no call to action, and nothing that reads as a sentence addressed to a visitor.
+
+The tokens are the ground you are drawing on. Set it from var(--bg), var(--ink), var(--dim), var(--surface), var(--line), and take var(--accent) and var(--accent2) as the two inks you were handed. Colour past those two comes from the object your ground names, and you should take it: overprint them, let them misregister, let one dominate. A mark built on the tokens takes on the theme of whatever it is dropped into, and a mark built from typed hex everywhere can only ever look one way, which is the difference between this and a stock illustration.
+
+The page must make no requests. No font imports, no stylesheet links, no images from a url, no scripts. Inherit the faces already set on the document rather than naming a font family.
+
+What this must not become is an icon. An icon is a small simple symbol that stands in for a thing, and the internet has enough of them. This is the thing itself, drawn at a size somebody notices, with the detail that makes it that object and not a category.
+
+Respond with the JSON object alone, because the reply is parsed directly.`
+
+/**
  * Correcting a world, which is not the same job as designing one.
  *
  * The design prompt is long because it is deciding what a thing is. This one is handed a

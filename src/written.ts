@@ -232,6 +232,36 @@ export function undrawn(written: Written): string[] {
   return []
 }
 
+/**
+ * Read a reply into a mark, which is a page's opposite in the one way that matters.
+ *
+ * A page is refused when it has no headline, because a landing page without one is a paragraph.
+ * A mark has no headline at all and is refused when it does not draw, for the same reason turned
+ * around: a mark that only lays type out is a caption. So the structural claim moves from the
+ * markup to the styles, and it is the check the whole thing exists to pass rather than a gate
+ * bolted on afterwards.
+ *
+ * Everything else is shared with a written page on purpose. The same allowlist stands between this
+ * markup and the app's origin, the same clamp keeps the styles from reaching the network, and the
+ * same detector reads the result. A mark is a written page with a different job, not a second kind
+ * of thing needing a second set of defences.
+ */
+export function madeMark(raw: Record<string, unknown>): Written | null {
+  const css = safeStyle(raw.css)
+  if (!DRAWS.test(css)) return null
+  const html = safeMarkup(raw.html)
+  if (!html.trim()) return null
+  const backdrop = BACKDROPS.includes(raw.backdrop as Backdrop) ? (raw.backdrop as Backdrop) : undefined
+  const ground = String(raw.ground ?? '').replace(/\s+/g, ' ').trim().slice(0, 40)
+  return {
+    html,
+    css,
+    note: String(raw.note ?? '').replace(/\s+/g, ' ').trim().slice(0, 120),
+    ...(ground ? { ground } : {}),
+    ...(backdrop ? { backdrop } : {}),
+  }
+}
+
 export function madeWritten(raw: Record<string, unknown>): Written | null {
   const html = safeMarkup(raw.html)
   if (!/<h1[\s>]/i.test(html)) return null

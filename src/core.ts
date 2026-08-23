@@ -24,7 +24,7 @@ export {
 } from '@/taste'
 export { DIRECTIONS, dealDirections, dealShapes, dealDepictions, directionSeed, type Direction, type Inks } from '@/design/directions'
 // the page a model wrote whole, and the filter standing between its markup and the wall
-export { madeWritten, safeMarkup, safeStyle, undrawn, type Written } from '@/written'
+export { madeWritten, madeMark, safeMarkup, safeStyle, undrawn, type Written } from '@/written'
 // what a world left unspent, which is the question the slop detector never asked
 export { unspent } from '@/worlds'
 export { PRESETS } from '@/design/presets'
@@ -33,3 +33,9 @@ export { PRESETS } from '@/design/presets'
 // brief is offered these names and their meanings together
 export { KINDS, KIND_IDS, DEFAULT_KIND, asKind, kindMenu, type Kind } from '@/design/kinds'
 export { BLOCKS, TOKENS, blockContract } from '@/design/blocks'
+// the prompt for one drawn thing rather than a page with one on it. It travels because the mark
+// path is driven from a tool rather than from the window, and because the deck it composes with
+// already lives out here
+export { MARK_SYSTEM, WRITTEN_SYSTEM } from '@/design/prompts'
+// reading one finished reply, which the mark tool needs for the same reason the app does
+export { grabJson } from '@/reply'

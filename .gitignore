@@ -27,3 +27,4 @@ src-tauri/gen/
 src-tauri/icon-source.png
 wall-mcp-*.tgz
 .try/
+marks/
