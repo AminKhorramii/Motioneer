@@ -18,7 +18,8 @@
  */
 
 import { chromium } from 'playwright'
-import { mkdirSync, writeFileSync, existsSync, rmSync } from 'node:fs'
+import { mkdirSync, writeFileSync, existsSync, rmSync, renameSync } from 'node:fs'
+import { spawn } from 'node:child_process'
 import path from 'node:path'
 import { runClaude } from '../shared/cli.mjs'
 import {
@@ -29,8 +30,19 @@ import {
 const SUBJECT = process.argv.slice(2).join(' ')
   || 'the empty state for a board that has no cards on it yet'
 const HANDS = Number(process.env.WALL_MARKS || 8)
+/**
+ * The last wall is kept until this one exists, rather than cleared to make room for it.
+ *
+ * This used to empty the directory on the way in, which is destructive before it is useful: eight
+ * calls can fail, and then the previous run is gone and nothing has replaced it. The old wall moves
+ * aside to marks.last instead, so a failed run costs nothing and the two can be compared.
+ */
 const out = 'marks'
-if (existsSync(out)) rmSync(out, { recursive: true })
+const previous = 'marks.last'
+if (existsSync(out)) {
+  if (existsSync(previous)) rmSync(previous, { recursive: true })
+  renameSync(out, previous)
+}
 mkdirSync(out, { recursive: true })
 
 const grounds = dealDirections(HANDS)
@@ -97,4 +109,17 @@ writeFileSync(path.join(out, 'sheet.html'), `<html><body style="margin:0;backgro
 <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:14px">${cells}</div>
 <style>figure{margin:0}img{width:100%;aspect-ratio:1;object-fit:cover;object-position:center;background:#1e1e1e;display:block}
 figcaption{padding:5px 2px;text-align:center;line-height:1.4}</style></body></html>`)
+/**
+ * And it opens, because a tool that draws eight things and then prints a file path has not shown
+ * you anything. The browser it used to take the photographs is headless and closes, so nothing
+ * appeared on screen and the wall looked like it had not run.
+ */
+const sheet = path.resolve(out, 'sheet.html')
 console.log(`\n  ${path.join(out, 'sheet.html')}\n`)
+if (drew.length && !process.env.WALL_NO_OPEN) {
+  const [cmd, args] =
+    process.platform === 'darwin' ? ['open', [sheet]]
+      : process.platform === 'win32' ? ['cmd', ['/c', 'start', '', sheet]]
+        : ['xdg-open', [sheet]]
+  spawn(cmd, args, { stdio: 'ignore', detached: true }).unref()
+}
