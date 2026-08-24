@@ -228,8 +228,36 @@ export function slop(page: Page, html?: string): Flag[] {
      * Which face is the display is a comparison rather than a pattern, so it belongs in the
      * detector rather than in the catalogue, which is the split that file already draws.
      */
+    /**
+     * An italic serif display, which means the headline and not any italic on the page.
+     *
+     * This was narrowed once already, for exactly this, and the narrowing was left half done: the
+     * check that the display face is really a serif went in, and "italic anywhere in the document"
+     * stayed. So it went on firing on body text. Handed a wall of marks drawn in the deck's own
+     * serif grounds it flagged five of eight, and the thing it was pointing at on the field guide
+     * was `.binomial` at one rem, an italic species name, which is what a field guide is for and
+     * what that ground's own chain asks for in writing.
+     *
+     * A rule with a rendered word for it is a rule that fights the deck, so the italic now has to
+     * be on something display sized: a heading, or type set large enough that it is the headline
+     * whatever it is called. Two conditions again, on the same reasoning as the entry above.
+     */
     const display = String(page.taste?.display ?? '').replace(/sans-serif/gi, '')
-    if (/serif/i.test(display) && /font-style:\s*italic/.test(html)) {
+    const bigItalic = [...html.matchAll(/([^{}]+)\{([^{}]*font-style:\s*italic[^{}]*)\}/gi)].some(([, sel, body]) => {
+      if (/\bh[12]\b/i.test(sel)) return true
+      /**
+       * The largest length this rule sets type at, in rem, so a clamp is read by its ceiling.
+       *
+       * The lookbehind is load bearing. Written without it, the leading digits of a decimal with no
+       * zero in front of it are read as a whole number: .56rem matched as 56rem, so an italic agate
+       * mark measured fifty six rem and tripped a rule about headlines. Css is full of .5 and .75,
+       * so this was not an edge case, it was most of them.
+       */
+      const sizes = [...body.matchAll(/(?<![\d.])(\d*\.?\d+)(rem|px)\b/gi)]
+        .map(([, n, unit]) => (unit.toLowerCase() === 'px' ? Number(n) / 16 : Number(n)))
+      return /font-size/i.test(body) && Math.max(0, ...sizes) >= 1.6
+    })
+    if (/serif/i.test(display) && bigItalic) {
       add('design', 'italic-serif', 'italic serif display',
         'It is the fastest way to look editorial, which is why it now reads as a template.')
     }

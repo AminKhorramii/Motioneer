@@ -13,7 +13,9 @@
  * Everything opinionated is reused rather than rewritten, which is the whole reason this is a small
  * file. The deck deals the grounds, because a ground is a way of drawing and not a page layout. The
  * depictions deal how each hand looks at its subject, which is the axis that stopped eight calls
- * drawing one watch dial. The inks come from the ground when it carries them. The allowlist, the
+ * drawing one watch dial. The mark is drawn in its ground's own direction, and that direction is
+ * handed back beside it, because a set of tokens cannot be judged as a set of tokens and a picture
+ * can. The allowlist, the
  * clamp and the shell are the page path's, unchanged.
  */
 
@@ -24,7 +26,7 @@ import path from 'node:path'
 import { runClaude } from '../shared/cli.mjs'
 import {
   DIRECTIONS, PRESETS, MARK_SYSTEM, dealDirections, dealDepictions, directionSeed,
-  grabJson, madeMark, renderPage, slop, starterPage,
+  grabJson, madeMark, renderPage, slop, starterPage, tasteOf, themeOf, themeCss, swatches, unreadable,
 } from '../dist-core/core.js'
 
 const SUBJECT = process.argv.slice(2).join(' ')
@@ -76,21 +78,32 @@ const rows = []
 
 for (const m of made) {
   if (!m.mark) { rows.push(m); continue }
-  // the ground's own inks when it carries them, and the look deck by stride when it does not, so
-  // eight marks disagree about colour the way eight papers do
-  const look = PRESETS[(m.i * 3) % PRESETS.length]
-  const taste = m.mark.ground || DIRECTIONS.find((d) => d.name === m.ground.name)?.inks
-    ? { ...look, ...(m.ground.inks ?? {}) }
-    : look
+  /**
+   * The mark is drawn in its ground's own direction, which is the argument for both of these.
+   *
+   * A direction is twenty values and cannot be judged as twenty values: nobody compares eight token
+   * sets by reading them, which is why every theme picker in existence is a swatch strip and a
+   * dropdown. A mark drawn in one is a picture, and eight pictures can be compared at a glance. So
+   * the mark is the interface to the direction and the direction is what you take away.
+   *
+   * A ground that has no look yet falls back to the deck by stride, which keeps eight marks
+   * disagreeing about colour even while thirty nine of the fifty one are still only prose.
+   */
+  const taste = m.ground.look
+    ? tasteOf(m.ground.look, m.ground.name)
+    : PRESETS[(m.i * 3) % PRESETS.length]
   const stage = { ...starterPage(taste, 'Mark'), taste, written: m.mark }
   const html = renderPage(stage, { title: m.mark.note || 'Mark', still: true })
+  // and the direction travels with it, in the token names it will be pasted into
+  const theme = themeOf(taste)
+  writeFileSync(path.join(out, `mark-${m.i + 1}.css`), themeCss(theme))
   await page.setContent(html, { waitUntil: 'load' })
   await page.waitForTimeout(250)
   const file = `mark-${m.i + 1}.png`
   await page.screenshot({ path: path.join(out, file) }).catch(() => {})
   writeFileSync(path.join(out, `mark-${m.i + 1}.html`), html)
   const flags = slop(stage, html).filter((f) => f.kind === 'design').map((f) => f.id)
-  rows.push({ ...m, file, flags, bytes: html.length })
+  rows.push({ ...m, file, flags, bytes: html.length, taste, theme, faults: unreadable(theme) })
 }
 await browser.close()
 
@@ -103,12 +116,18 @@ for (const r of rows) {
   console.log(`      ${r.depiction.slice(0, 76)}`)
 }
 
+const swatch = (r) => swatches(r.theme.light)
+  .map((c) => `<i style="background:${c}"></i>`).join('')
 const cells = drew.map((r) =>
-  `<figure><img src="${r.file}"><figcaption>${r.ground.name} · ${(r.mark.note || '').slice(0, 40)}</figcaption></figure>`).join('')
+  `<figure><img src="${r.file}"><div class="ink">${swatch(r)}</div>` +
+  `<figcaption>${r.ground.name} · ${(r.mark.note || '').slice(0, 38)}` +
+  `<br><a href="mark-${r.i + 1}.css">the direction</a>${r.faults.length ? ' · ' + r.faults.length + ' faults' : ''}</figcaption></figure>`).join('')
 writeFileSync(path.join(out, 'sheet.html'), `<html><body style="margin:0;background:#141414;font:10px ui-monospace,monospace;color:#8a8a8a">
 <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:14px">${cells}</div>
 <style>figure{margin:0}img{width:100%;aspect-ratio:1;object-fit:cover;object-position:center;background:#1e1e1e;display:block}
-figcaption{padding:5px 2px;text-align:center;line-height:1.4}</style></body></html>`)
+.ink{display:flex;height:9px}.ink i{flex:1}
+figcaption{padding:5px 2px;text-align:center;line-height:1.5}
+a{color:#8a8a8a}</style></body></html>`)
 /**
  * And it opens, because a tool that draws eight things and then prints a file path has not shown
  * you anything. The browser it used to take the photographs is headless and closes, so nothing

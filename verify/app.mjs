@@ -858,6 +858,38 @@ if (houseFlags.length) throw new Error(`the house trips its own detector on ${ho
   if (moved < 0.4) throw new Error('the derived counterpart is not a counterpart, so both modes are the same mode')
 }
 
+// ——— 0r. an italic serif display is a headline, not any italic on the page ———
+// The catalogue's own note on this entry records that it once fired on any page carrying an italic
+// blockquote and killed both worlds that survived repair on a real wall. The narrowing that followed
+// was half done: it started checking that the display face is really a serif and went on matching
+// italic anywhere in the document. Handed marks drawn in the deck's serif grounds it flagged five of
+// eight, and what it was pointing at on the field guide was an italic species name at one rem, which
+// is what a field guide is for and what that ground's chain asks for in writing.
+{
+  const serif = core.PRESETS.find((p) => p.name === 'gallery')
+  const sans = core.PRESETS.find((p) => p.name === 'quiet dark')
+  const trips = (taste, css) => core.slop({ ...core.starterPage(taste, 'Spoor'), taste }, `<style>${css}</style>`)
+    .some((f) => f.id === 'italic-serif')
+
+  const binomial = '.binomial{margin:0;font-style:italic;font-size:1.05rem;color:var(--ink)}'
+  const headline = 'h1{font-style:italic;font-size:3.2rem;line-height:1.1}'
+  const namedBig = '.lede{font-style:italic;font-size:clamp(1.4rem,4vw,2.6rem)}'
+  const smallMark = '.mark{font-style:italic;font-size:clamp(.56rem,1.2vmin,.7rem)}'
+
+  console.log('italic serif display:', JSON.stringify({
+    anItalicSpeciesNameInBodyText: trips(serif, binomial),
+    anItalicSerifHeadline: trips(serif, headline),
+    aBigItalicLedeUnderAnyName: trips(serif, namedBig),
+    anItalicAgateMark: trips(serif, smallMark),
+    theSameHeadlineOnASansPage: trips(sans, headline),
+  }))
+  if (trips(serif, binomial)) throw new Error('an italic species name was called an italic serif display, so the rule fights the ground that asks for it')
+  if (trips(serif, smallMark)) throw new Error('italic agate tripped a rule about displays')
+  if (!trips(serif, headline)) throw new Error('an italic serif headline passed, which is the thing this entry is for')
+  if (!trips(serif, namedBig)) throw new Error('a big italic lede passed because it was not called h1, so the rule can be dodged by renaming')
+  if (trips(sans, headline)) throw new Error('the rule fired without a serif display, which is the half that was already fixed once')
+}
+
 // ——— 0m. the ruler reads a written page, and reads a bleed as design ———
 // written.ts opens by saying the detector and the ruler both run over a written page exactly as
 // they run over an arranged one. Only the first half was ever true: strainsIn was reached through
