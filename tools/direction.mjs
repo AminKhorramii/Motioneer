@@ -19,7 +19,7 @@ import { mkdirSync, writeFileSync, existsSync, rmSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import path from 'node:path'
 import {
-  DIRECTIONS, PRESETS, themeOf, themeCss, unreadable,
+  DIRECTIONS, PRESETS, themeOf, themeCss, unreadable, tasteOf,
 } from '../dist-core/core.js'
 
 const out = 'directions'
@@ -55,19 +55,21 @@ const FIXTURES = `
 
 const CSS = `
 *{box-sizing:border-box}
-body{margin:0;font:14px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
-.pane{background:var(--background);color:var(--foreground);padding:26px 24px}
-.board{display:grid;gap:14px;max-width:460px}
+body{margin:0;font-size:14px;line-height:1.55;font-family:var(--body)}
+.pane{background:var(--background);color:var(--foreground);padding:calc(var(--gap) * 1.7) 24px}
+.board{display:grid;gap:var(--gap);max-width:460px}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .row.tight{justify-content:space-between;gap:6px}
-h1{font-size:26px;line-height:1.15;margin:0;letter-spacing:-.02em}
+h1{font-family:var(--display);font-weight:var(--weight);font-size:var(--h1);line-height:1.1;
+  margin:0;letter-spacing:-.015em;text-transform:var(--caps)}
 p{margin:0}
 .body{font-size:14px}
 .muted{color:var(--muted-foreground)}
 .small{font-size:12px}
 .badge{background:var(--accent);color:var(--accent-foreground);border-radius:999px;
   padding:3px 10px;font-size:11px;letter-spacing:.04em;text-transform:none}
-button{border:0;border-radius:var(--radius,.5rem);padding:9px 15px;font:inherit;font-size:13px;cursor:pointer}
+button{border:0;border-radius:var(--radius,.5rem);padding:9px 15px;font-family:var(--body);
+  font-size:13px;cursor:pointer;text-transform:var(--caps)}
 .primary{background:var(--primary);color:var(--primary-foreground)}
 .secondary{background:var(--secondary);color:var(--secondary-foreground)}
 .destructive{background:var(--destructive);color:var(--destructive-foreground)}
@@ -91,13 +93,17 @@ input:focus{outline:2px solid var(--ring);outline-offset:1px}
  * which set of tokens is in scope. That is also the honest way to show it, since it is exactly what
  * happens in the app it gets pasted into.
  */
-const page = (theme) => `<html><head><style>${themeCss(theme)}${CSS}</style></head>
+const form = (t) => `:root{--display:${t.display};--body:${t.body};--weight:${t.weight};
+  --h1:${(18 * t.scale ** 1.6).toFixed(1)}px;--gap:${(22 - t.density * 14).toFixed(1)}px;
+  --caps:${t.caps ? 'uppercase' : 'none'}}`
+
+const page = (theme, t) => `<html><head><style>${themeCss(theme)}${form(t)}${CSS}</style></head>
 <body><div class="pair"><div class="pane">${FIXTURES}</div>
 <div class="pane dark" style="color-scheme:dark">${FIXTURES}</div></div></body></html>`
 
 const looks = [
   ...PRESETS.map((p) => ({ from: 'look', name: p.name, taste: p })),
-  ...DIRECTIONS.filter((d) => d.inks).map((d) => ({ from: 'ground', name: d.name, taste: { ...PRESETS[3], ...d.inks } })),
+  ...DIRECTIONS.filter((d) => d.look).map((d) => ({ from: 'ground', name: d.name, taste: tasteOf(d.look, d.name) })),
 ]
 
 const browser = await chromium.launch()
@@ -109,7 +115,7 @@ for (const l of looks) {
   const theme = themeOf(l.taste)
   const faults = unreadable(theme)
   const slug = `${l.from}-${l.name.replace(/\W+/g, '-')}`
-  await tab.setContent(page(theme), { waitUntil: "load" })
+  await tab.setContent(page(theme, l.taste), { waitUntil: 'load' })
   await tab.waitForTimeout(120)
   await tab.screenshot({ path: path.join(out, `${slug}.png`), fullPage: true }).catch(() => {})
   writeFileSync(path.join(out, `${slug}.css`), themeCss(theme))

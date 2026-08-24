@@ -150,6 +150,27 @@ function modeOf(bg: string, ink: string, dim: string, accent: string, accent2: s
  * made out of the original's own ink and ground rather than out of neutral grey, which is what makes
  * a warm theme stay warm in the dark instead of turning into everybody else's charcoal.
  */
+/**
+ * How much colour a colour has, and where to find some when it has none.
+ *
+ * Blueprint is white lines bitten out of prussian blue, so its accent is #ffffff. Deriving the
+ * light counterpart lifted that toward black until it cleared contrast and handed back #929292:
+ * readable, and grey, and nothing to do with a cyanotype. Pure white and pure black carry no hue,
+ * so there is nothing for a lift to preserve, and the direction loses the thing it was.
+ *
+ * The second ink is where the hue comes from, because a direction that spends one of its two on an
+ * achromatic has put all of its colour in the other. Falling back to the ground rather than to a
+ * default keeps a monochrome direction monochrome, which is right: a till roll has no hue anywhere
+ * and inventing one for it would be worse than grey.
+ */
+const chroma = (hex: string) => {
+  const n = hex.replace('#', '')
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(n.slice(i, i + 2), 16))
+  return (Math.max(r, g, b) - Math.min(r, g, b)) / 255
+}
+const hued = (ink: string, second: string, ground: string) =>
+  chroma(ink) > 0.06 ? ink : mix(ink, chroma(second) > 0.06 ? second : ground, 0.55)
+
 export function themeOf(taste: Taste): Theme {
   const wasDark = luminance(taste.bg) < 0.5
   const here = modeOf(taste.bg, taste.ink, taste.dim, taste.accent, taste.accent2)
@@ -157,7 +178,11 @@ export function themeOf(taste: Taste): Theme {
   const farBg = wasDark ? mix(taste.ink, '#ffffff', 0.72) : mix(taste.ink, '#000000', 0.86)
   const farInk = wasDark ? mix(taste.bg, '#000000', 0.78) : mix(taste.bg, '#ffffff', 0.12)
   const farDim = mix(farInk, farBg, 0.42)
-  const there = modeOf(farBg, farInk, farDim, lift(taste.accent, farBg, 3), lift(taste.accent2, farBg, 3))
+  const there = modeOf(
+    farBg, farInk, farDim,
+    lift(hued(taste.accent, taste.accent2, taste.bg), farBg, 3),
+    lift(hued(taste.accent2, taste.accent, taste.bg), farBg, 3),
+  )
   return wasDark
     ? { light: there, dark: here, radius: taste.radius }
     : { light: here, dark: there, radius: taste.radius }

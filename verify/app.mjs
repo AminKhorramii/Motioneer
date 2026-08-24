@@ -729,7 +729,7 @@ if (houseFlags.length) throw new Error(`the house trips its own detector on ${ho
   // point of having a gate is to be free to get one wrong somewhere a reader never sees it
   const palettes = [
     ...core.PRESETS.map((p) => ({ from: 'look', name: p.name, p })),
-    ...core.DIRECTIONS.filter((d) => d.inks).map((d) => ({ from: 'ground', name: d.name, p: d.inks })),
+    ...core.DIRECTIONS.filter((d) => d.look).map((d) => ({ from: 'ground', name: d.name, p: d.look })),
   ]
   for (const { from, name, p } of palettes) {
     const row = { look: `${from} ${name}` }
@@ -799,7 +799,7 @@ if (houseFlags.length) throw new Error(`the house trips its own detector on ${ho
   // and the house obeys it: no shipped look and no ground may wear the signature
   const wearing = [
     ...core.PRESETS.filter((p) => trips(p.bg, p.accent, p.display)).map((p) => `look ${p.name}`),
-    ...core.DIRECTIONS.filter((d) => d.inks && trips(d.inks.bg, d.inks.accent, serif)).map((d) => `ground ${d.name}`),
+    ...core.DIRECTIONS.filter((d) => d.look && trips(d.look.bg, d.look.accent, serif)).map((d) => `ground ${d.name}`),
   ]
   console.log('  wearing it:', wearing.length ? wearing : 'none')
   if (wearing.length) throw new Error(`the house ships the register it exists to avoid: ${wearing.join(', ')}`)
@@ -838,8 +838,8 @@ if (houseFlags.length) throw new Error(`the house trips its own detector on ${ho
   for (const p of core.PRESETS) {
     for (const f of core.unreadable(core.themeOf(p))) failing.push(`look ${p.name} ${f}`)
   }
-  for (const d of core.DIRECTIONS.filter((x) => x.inks)) {
-    for (const f of core.unreadable(core.themeOf({ ...core.PRESETS[3], ...d.inks }))) failing.push(`ground ${d.name} ${f}`)
+  for (const d of core.DIRECTIONS.filter((x) => x.look)) {
+    for (const f of core.unreadable(core.themeOf({ ...core.PRESETS[3], ...d.look }))) failing.push(`ground ${d.name} ${f}`)
   }
   const css = core.themeCss(core.themeOf(core.PRESETS[0]))
   const modes = css.match(/:root|\.dark/g) ?? []
@@ -848,7 +848,7 @@ if (houseFlags.length) throw new Error(`the house trips its own detector on ${ho
   const anime = core.themeOf(core.PRESETS[0])
   const moved = core.luminance(anime.light.background) - core.luminance(anime.dark.background)
   console.log('directions as tokens:', JSON.stringify({
-    checked: core.PRESETS.length + core.DIRECTIONS.filter((x) => x.inks).length,
+    checked: core.PRESETS.length + core.DIRECTIONS.filter((x) => x.look).length,
     failures: failing.length ? failing.slice(0, 3) : 'none',
     bothModesEmitted: modes.length === 2,
     lightToDarkGap: Number(moved.toFixed(2)),

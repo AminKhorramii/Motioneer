@@ -270,8 +270,8 @@ export async function writeWhole(
    * look hands it the same two accents. A paragraph in the prompt asking for more was tried first
    * and moved nothing, which is this repository's own note about guidance and gates, again.
    */
-  const page = direction.inks
-    ? { ...dealt, taste: { ...dealt.taste, ...direction.inks } }
+  const page = direction.look
+    ? { ...dealt, taste: { ...dealt.taste, ...direction.look } }
     : dealt
   const landed = (written: Written): Page => ({
     ...page,

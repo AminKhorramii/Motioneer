@@ -11,31 +11,64 @@
  * cliche waiting.
  */
 
+import { FACES } from '@/design/faces'
+
 /**
- * The colours the object was actually printed in.
+ * What the object was printed in and set in, as values rather than as prose.
  *
- * Every chain below already names a palette in prose, "tinted paper palette", "one municipal
- * accent", "monochrome", and prose is the one part of a direction the machinery could not act on.
- * Measured over two real walls, the model typed five colours of its own across eight pages and
- * reached for a token three hundred and twenty nine times: it was not withholding colour, it was
- * faithfully using the variables it was handed, and every look in the deck hands it the same two.
- * So the lever is here rather than in the prompt, which is where a paragraph asking for more
- * colour was tried first and moved nothing.
+ * Every chain below already describes this: "tinted paper palette", "mono faces, measure under
+ * 50, dense", "grotesk heavy, poster scale". Prose is the one part of a direction the machinery
+ * could never act on, and the measurements say so twice over. Asked in a prompt for more colour,
+ * eight pages typed five colours of their own and reached for a token three hundred and twenty
+ * nine times; given the colours as values, the same brief produced thirty nine. Then the same
+ * lesson again one level along: twelve grounds carrying only their inks rendered onto identical
+ * fixtures as twelve colour schemes wearing one look, because the type and the spacing were still
+ * only written down.
  *
- * These override the colour half of whichever look the page was dealt and leave the type, the
- * scale and the feel alone. That keeps the two axes a wall varies on independent: the object
- * decides what colour the page is, the look still decides how it reads.
+ * So both halves live here. The palette is the loudest part of a direction and it is not the
+ * direction: a till roll and a wine label are not one system in different paint, and the thing
+ * that makes them different is mono against fraunces and dense against sparse.
  *
- * Every one of these is checked in the suite before it can ship, on the pairs that actually
- * render. A palette is taste and can be argued about; a palette nobody can read is not.
+ * Every one is checked in the suite before it can ship, on the pairs that actually render, in both
+ * modes. A palette is taste and can be argued about; a palette nobody can read is not.
  */
-export interface Inks {
+export interface Look {
   bg: string
   ink: string
   dim: string
   accent: string
   accent2: string
+  /**
+   * And the half that is not colour, which was prose until now.
+   *
+   * The chain above each of these already said it: mono faces and dense for a till roll, serif
+   * caps small and sparse for an apothecary label, grotesk heavy at poster scale for a gig flyer.
+   * Rendered onto the same fixtures, twelve grounds carrying only their inks came out as twelve
+   * colour schemes wearing one look, because every one of them borrowed its type and its spacing
+   * from whichever preset happened to be underneath. A palette is the loudest part of a direction
+   * and it is not the direction: a receipt and a wine label are not the same system in different
+   * paint. This is the rest of the chain, said in values.
+   */
+  display: keyof typeof FACES
+  body: keyof typeof FACES
+  scale: number
+  radius: number
+  density: number
+  weight: number
+  caps: boolean
+  motion: 'still' | 'soft' | 'lively'
+  /** the art behind it, when the object implies one */
+  backdrop?: string
 }
+
+/** a look as the taste sheet the renderer wants, with the faces resolved from their names */
+export const tasteOf = (look: Look, name: string) => ({
+  name,
+  bg: look.bg, ink: look.ink, dim: look.dim, accent: look.accent, accent2: look.accent2,
+  display: FACES[look.display], body: FACES[look.body],
+  scale: look.scale, radius: look.radius, density: look.density,
+  weight: look.weight, caps: look.caps, motion: look.motion,
+})
 
 export interface Direction {
   name: string
@@ -47,8 +80,8 @@ export interface Direction {
   avoid: string
   /** how to write for it */
   voice: string
-  /** what it was printed in, when the object has a palette specific enough to be worth taking */
-  inks?: Inks
+  /** what it was printed in and set in, when the object is specific enough to be worth taking */
+  look?: Look
 }
 
 export const DIRECTIONS: Direction[] = [
@@ -59,7 +92,8 @@ export const DIRECTIONS: Direction[] = [
     avoid: 'drawing a torn paper edge on screen, which is a prop; the receipt is the column and the discipline, not the paper',
     voice: 'Itemised and unpersuasive. Names, quantities, amounts.',
     // till roll: no colour at all, because the machine only burns one
-    inks: { bg: '#f7f6f2', ink: '#1a1a18', dim: '#6e6d68', accent: '#2b2b28', accent2: '#8d8b84' },
+    look: { bg: '#f7f6f2', ink: '#1a1a18', dim: '#6e6d68', accent: '#2b2b28', accent2: '#8d8b84',
+      display: 'mono', body: 'mono', scale: 1.15, radius: 0, density: 0.8, weight: 500, caps: false, motion: 'still' },
   },
   {
     name: 'boarding pass',
@@ -103,7 +137,8 @@ export const DIRECTIONS: Direction[] = [
     avoid: 'perforating the borders in CSS; the sheet is the repetition and restraint',
     voice: 'A denomination and an occasion. Ceremony in miniature.',
     // engraved: deep carmine and a bottle green on gummed paper
-    inks: { bg: '#f4efe2', ink: '#1e1b16', dim: '#6b655a', accent: '#7a2438', accent2: '#2a5148' },
+    look: { bg: '#f4efe2', ink: '#1e1b16', dim: '#6b655a', accent: '#7a2438', accent2: '#2a5148',
+      display: 'serif', body: 'serif', scale: 1.3, radius: 2, density: 0.3, weight: 400, caps: true, motion: 'still' },
   },
   {
     name: 'classified ads page',
@@ -126,7 +161,8 @@ export const DIRECTIONS: Direction[] = [
     avoid: 'animating the flaps; the board is the grid of certainty, not the mechanism',
     voice: 'Destination, time, status. The status column carries all the emotion.',
     // split flap: amber for now, green for boarding, everything else off
-    inks: { bg: '#0b0d0e', ink: '#e8e6df', dim: '#7d817c', accent: '#e8a33d', accent2: '#6fb98f' },
+    look: { bg: '#0b0d0e', ink: '#e8e6df', dim: '#7d817c', accent: '#e8a33d', accent2: '#6fb98f',
+      display: 'grotesk', body: 'mono', scale: 1.25, radius: 0, density: 0.75, weight: 700, caps: true, motion: 'soft' },
   },
   {
     name: 'metro signage',
@@ -198,7 +234,8 @@ export const DIRECTIONS: Direction[] = [
     avoid: 'the blueprint blue as a costume on ordinary layout; the drawing convention is the point',
     voice: 'Dimensioned. Everything named, nothing sold.',
     // cyanotype: white lines bitten out of prussian blue
-    inks: { bg: '#10315e', ink: '#eef3fb', dim: '#9fb6d6', accent: '#ffffff', accent2: '#7fb2e8' },
+    look: { bg: '#10315e', ink: '#eef3fb', dim: '#9fb6d6', accent: '#ffffff', accent2: '#7fb2e8',
+      display: 'mono', body: 'mono', scale: 1.2, radius: 0, density: 0.6, weight: 500, caps: true, motion: 'still' },
   },
   {
     name: 'topographic map',
@@ -214,7 +251,8 @@ export const DIRECTIONS: Direction[] = [
     avoid: 'a purple nebula wash; the chart is points and lines, not a poster of space',
     voice: 'Precise wonder. Magnitudes and names, not awe adjectives.',
     // night sky printing: white stars, cyan for the ecliptic
-    inks: { bg: '#070c1c', ink: '#e6ecf7', dim: '#7d8aa6', accent: '#f2f5fb', accent2: '#58c8e8' },
+    look: { bg: '#070c1c', ink: '#e6ecf7', dim: '#7d8aa6', accent: '#f2f5fb', accent2: '#58c8e8',
+      display: 'sans', body: 'sans', scale: 1.4, radius: 0, density: 0.28, weight: 300, caps: true, motion: 'still' },
   },
   {
     name: 'field guide',
@@ -223,7 +261,8 @@ export const DIRECTIONS: Direction[] = [
     avoid: 'generic nature imagery; the guide lives on the one distinguishing detail',
     voice: 'Distinguishing marks first. Easily confused with, except for.',
     // tinted plates against cream: field green and a mammal brown
-    inks: { bg: '#f3eee1', ink: '#221f18', dim: '#6c6558', accent: '#3f5e3a', accent2: '#8a5a2b' },
+    look: { bg: '#f3eee1', ink: '#221f18', dim: '#6c6558', accent: '#3f5e3a', accent2: '#8a5a2b',
+      display: 'serif', body: 'serif', scale: 1.34, radius: 2, density: 0.42, weight: 400, caps: false, motion: 'still' },
   },
   {
     name: 'nutrition label',
@@ -253,7 +292,8 @@ export const DIRECTIONS: Direction[] = [
     avoid: 'drawing the window chrome; the session is the text, and dots are a prop',
     voice: 'Commands and output. The output is the proof.',
     // phosphor on unlit glass, and the amber a second channel used to be
-    inks: { bg: '#05070a', ink: '#cfe9d4', dim: '#5d8168', accent: '#3ddc84', accent2: '#d8c53a' },
+    look: { bg: '#05070a', ink: '#cfe9d4', dim: '#5d8168', accent: '#3ddc84', accent2: '#d8c53a',
+      display: 'mono', body: 'mono', scale: 1.18, radius: 0, density: 0.8, weight: 500, caps: false, motion: 'lively', backdrop: 'contours' },
   },
   {
     name: 'broadsheet front page',
@@ -286,7 +326,8 @@ export const DIRECTIONS: Direction[] = [
     // from the ink itself: fluorescent pink sits in the band where neither black nor white clears
     // the floor for a button label, which is the real reason riso work sets black type beside the
     // pink rather than reversing out of it
-    inks: { bg: '#f2efe6', ink: '#17161a', dim: '#5f5c58', accent: '#e21f57', accent2: '#1552c9' },
+    look: { bg: '#f2efe6', ink: '#17161a', dim: '#5f5c58', accent: '#e21f57', accent2: '#1552c9',
+      display: 'grotesk', body: 'sans', scale: 1.5, radius: 0, density: 0.55, weight: 800, caps: false, motion: 'lively', backdrop: 'grain' },
   },
   {
     name: 'gig flyer',
@@ -295,7 +336,8 @@ export const DIRECTIONS: Direction[] = [
     avoid: 'careful kerning; the flyer is urgency, and polish reads as a brand pretending',
     voice: 'Who, where, when, how much. Doors at eight.',
     // photocopied black on whatever fluorescent stock the shop had
-    inks: { bg: '#0d0d0d', ink: '#f2f2f2', dim: '#8f8f8f', accent: '#f5f13c', accent2: '#ff5ea8' },
+    look: { bg: '#0d0d0d', ink: '#f2f2f2', dim: '#8f8f8f', accent: '#f5f13c', accent2: '#ff5ea8',
+      display: 'grotesk', body: 'grotesk', scale: 1.62, radius: 0, density: 0.6, weight: 900, caps: true, motion: 'lively' },
   },
   {
     name: 'film title card',
@@ -374,7 +416,8 @@ export const DIRECTIONS: Direction[] = [
     avoid: 'vintage filters; take the structure of promise plus instructions, not the nostalgia',
     voice: 'Sow in spring. Thin to six inches. Harvest when.',
     // spot red and spot green on kraft board, no fourth plate
-    inks: { bg: '#dfcfa9', ink: '#241d12', dim: '#6a5a41', accent: '#b4331f', accent2: '#2f6b3f' },
+    look: { bg: '#dfcfa9', ink: '#241d12', dim: '#6a5a41', accent: '#b4331f', accent2: '#2f6b3f',
+      display: 'fraunces', body: 'serif', scale: 1.38, radius: 4, density: 0.4, weight: 600, caps: false, motion: 'soft' },
   },
   {
     name: 'apothecary label',
@@ -385,7 +428,8 @@ export const DIRECTIONS: Direction[] = [
     // the green leads and the sepia answers, which is the way round an apothecary label actually
     // works: the colour carries what is in the bottle. Drawn the other way first, and sepia on
     // aged stock is cream and rust, which is the register generated pages have converged on
-    inks: { bg: '#eee5cf', ink: '#26200f', dim: '#6d6247', accent: '#3f5a28', accent2: '#7a2f12' },
+    look: { bg: '#eee5cf', ink: '#26200f', dim: '#6d6247', accent: '#3f5a28', accent2: '#7a2f12',
+      display: 'serif', body: 'serif', scale: 1.22, radius: 0, density: 0.35, weight: 500, caps: true, motion: 'still' },
   },
   {
     name: 'wine label',
@@ -394,7 +438,8 @@ export const DIRECTIONS: Direction[] = [
     avoid: 'a story paragraph; the label is a name and a year trusted',
     voice: 'Named, dated, placed. The year does the talking.',
     // oxblood and a gold foil on uncoated cream
-    inks: { bg: '#efe7d6', ink: '#1c1712', dim: '#6a6053', accent: '#6d1f2b', accent2: '#a8842f' },
+    look: { bg: '#efe7d6', ink: '#1c1712', dim: '#6a6053', accent: '#6d1f2b', accent2: '#a8842f',
+      display: 'fraunces', body: 'serif', scale: 1.44, radius: 0, density: 0.3, weight: 400, caps: true, motion: 'still' },
   },
   {
     name: 'bistro menu',
