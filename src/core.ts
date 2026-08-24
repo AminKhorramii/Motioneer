@@ -39,3 +39,6 @@ export { BLOCKS, TOKENS, blockContract } from '@/design/blocks'
 export { MARK_SYSTEM, WRITTEN_SYSTEM } from '@/design/prompts'
 // reading one finished reply, which the mark tool needs for the same reason the app does
 export { grabJson } from '@/reply'
+// a direction said in the token names the rest of the world already uses, with both modes derived
+// and every pair that renders measured rather than assumed
+export { themeOf, themeCss, themeTailwind, unreadable, swatches, PAIRS, type Theme, type Tokens } from '@/theme'

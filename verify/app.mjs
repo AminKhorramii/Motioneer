@@ -805,6 +805,59 @@ if (houseFlags.length) throw new Error(`the house trips its own detector on ${ho
   if (wearing.length) throw new Error(`the house ships the register it exists to avoid: ${wearing.join(', ')}`)
 }
 
+// ——— 0q. a direction can be read in the token names it will actually be pasted into ———
+// A look here is bg, ink, dim, accent, accent2. The app somebody is building has a --primary and a
+// --muted-foreground and a --ring, so a direction that does not name those is a swatch strip. The
+// translation is most of what makes one droppable, and both modes are derived rather than guessed,
+// because a dark counterpart written by hand is where unreadable pairs come from.
+//
+// The catch worth naming: the derivation lifts each ink until it clears its floor, so a gate that
+// only ever sees lifted values cannot go red and would be the third measurement in this repository
+// that could only report success. So the first thing asserted is that it fails when it should.
+{
+  const bad = {
+    background: '#ffffff', foreground: '#f2f2f2', card: '#ffffff', cardForeground: '#111111',
+    popover: '#ffffff', popoverForeground: '#111111', primary: '#cccccc', primaryForeground: '#dddddd',
+    secondary: '#eeeeee', secondaryForeground: '#111111', muted: '#eeeeee', mutedForeground: '#111111',
+    accent: '#eeeeee', accentForeground: '#111111', destructive: '#c0392b', destructiveForeground: '#ffffff',
+    border: '#fefefe', input: '#fefefe', ring: '#cccccc', chart: ['#1', '#2', '#3', '#4', '#5'],
+  }
+  const caught = core.unreadable({ light: bad, dark: bad, radius: 8 })
+  // grey on white body text, near white on light grey button label, and an invisible border
+  const kinds = new Set(caught.map((c) => c.split(': ')[1].split(' is ')[0]))
+  console.log('a direction that cannot be read:', JSON.stringify({
+    faultsFound: caught.length, pairsNamed: [...kinds],
+  }))
+  if (caught.length < 6) throw new Error('a palette built to be unreadable passed, so this gate cannot go red')
+  if (!kinds.has('body text')) throw new Error('grey body text on white was not caught')
+  if (!kinds.has('the primary button label')) throw new Error('a button label on its own fill was not caught')
+  if (!kinds.has('a border')) throw new Error('an invisible border was not caught')
+
+  // and then: everything that ships clears every pair, in both modes
+  const failing = []
+  for (const p of core.PRESETS) {
+    for (const f of core.unreadable(core.themeOf(p))) failing.push(`look ${p.name} ${f}`)
+  }
+  for (const d of core.DIRECTIONS.filter((x) => x.inks)) {
+    for (const f of core.unreadable(core.themeOf({ ...core.PRESETS[3], ...d.inks }))) failing.push(`ground ${d.name} ${f}`)
+  }
+  const css = core.themeCss(core.themeOf(core.PRESETS[0]))
+  const modes = css.match(/:root|\.dark/g) ?? []
+  // the counterpart has to be a different mode rather than the same values twice, which is what a
+  // derivation that quietly fell back to its input would produce
+  const anime = core.themeOf(core.PRESETS[0])
+  const moved = core.luminance(anime.light.background) - core.luminance(anime.dark.background)
+  console.log('directions as tokens:', JSON.stringify({
+    checked: core.PRESETS.length + core.DIRECTIONS.filter((x) => x.inks).length,
+    failures: failing.length ? failing.slice(0, 3) : 'none',
+    bothModesEmitted: modes.length === 2,
+    lightToDarkGap: Number(moved.toFixed(2)),
+  }))
+  if (failing.length) throw new Error(`a direction that ships cannot be read: ${failing[0]}`)
+  if (modes.length !== 2) throw new Error('the css does not carry both modes, so half the theme is missing')
+  if (moved < 0.4) throw new Error('the derived counterpart is not a counterpart, so both modes are the same mode')
+}
+
 // ——— 0m. the ruler reads a written page, and reads a bleed as design ———
 // written.ts opens by saying the detector and the ruler both run over a written page exactly as
 // they run over an arranged one. Only the first half was ever true: strainsIn was reached through
