@@ -30,3 +30,5 @@ wall-mcp-*.tgz
 marks/
 marks.last/
 directions/
+identity/
+identity.last/
