@@ -15,8 +15,7 @@
  * depictions deal how each hand looks at its subject, which is the axis that stopped eight calls
  * drawing one watch dial. The mark is drawn in its ground's own direction, and that direction is
  * handed back beside it, because a set of tokens cannot be judged as a set of tokens and a picture
- * can. The allowlist, the
- * clamp and the shell are the page path's, unchanged.
+ * can. The allowlist, the clamp and the shell are the page path's, unchanged.
  */
 
 import { chromium } from 'playwright'
@@ -134,8 +133,11 @@ a{color:#8a8a8a}</style></body></html>`)
  * appeared on screen and the wall looked like it had not run.
  */
 const sheet = path.resolve(out, 'sheet.html')
-console.log(`\n  ${path.join(out, 'sheet.html')}\n`)
-if (drew.length && !process.env.WALL_NO_OPEN) {
+console.log(`\n  ${sheet}\n`)
+if (!drew.length) console.log('  nothing drew, so there is nothing to open\n')
+else if (process.env.WALL_NO_OPEN) console.log('  not opening it: WALL_NO_OPEN is set\n')
+else {
+  console.log('  opening it now\n')
   const [cmd, args] =
     process.platform === 'darwin' ? ['open', [sheet]]
       : process.platform === 'win32' ? ['cmd', ['/c', 'start', '', sheet]]

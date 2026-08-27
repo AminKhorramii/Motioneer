@@ -132,8 +132,10 @@ writeFileSync(path.join(out, 'sheet.html'), `<html><body style="margin:0;backgro
 figcaption{padding:6px 2px;text-align:center}</style></body></html>`)
 
 console.log(`\n  ${rows.length} directions, ${rows.filter((r) => !r.faults.length).length} reading in both modes`)
-console.log(`  ${path.join(out, 'sheet.html')}\n`)
-if (!process.env.WALL_NO_OPEN) {
+console.log(`  ${path.resolve(out, 'sheet.html')}\n`)
+if (process.env.WALL_NO_OPEN) console.log('  not opening it: WALL_NO_OPEN is set\n')
+else {
+  console.log('  opening it now\n')
   const sheet = path.resolve(out, 'sheet.html')
   const [cmd, args] = process.platform === 'darwin' ? ['open', [sheet]]
     : process.platform === 'win32' ? ['cmd', ['/c', 'start', '', sheet]] : ['xdg-open', [sheet]]
