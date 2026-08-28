@@ -76,7 +76,22 @@ for (const m of made) {
   const stage = { ...starterPage(taste, 'Mark'), taste, written: m.mark }
   const html = renderPage(stage, { title: m.mark.note || 'Mark', still: false })
   const slug = `${m.i + 1}-${m.ground.name.replace(/\W+/g, '-')}`
-  writeFileSync(path.join(out, `${slug}.html`), html)
+  /**
+   * The page carries a transport listener, because the sheet cannot reach in.
+   *
+   * A file:// document loaded in a file:// iframe is an opaque origin, so contentDocument throws
+   * and getAnimations is unreachable. Driven that way the scrubber moved its own readout and
+   * nothing else: a control that looks connected and is not, which is the exact kind of signal this
+   * repository refuses to print. postMessage crosses the boundary, and the page answers with how
+   * many animations it is holding so the sheet can say whether it is really driving anything.
+   */
+  const listener = `<script>addEventListener('message',function(e){
+  var d=e.data||{}; if(d.wall!=='hold')return;
+  var a=document.getAnimations();
+  a.forEach(function(x){try{x.pause();x.currentTime=d.t}catch(_){}});
+  (e.source||parent).postMessage({wall:'held',n:a.length,i:d.i},'*');
+});<\/script>`
+  writeFileSync(path.join(out, `${slug}.html`), html.replace('</body>', listener + '</body>'))
 
   // the clip, recorded by the browser itself so no encoder is needed
   const dir = path.join(out, `_${slug}`)
@@ -123,19 +138,106 @@ for (const m of made) {
 await browser.close()
 
 const shown = rows.filter((r) => r.mark)
-const strips = shown.map((r) => `<section>
-  <h2>${r.ground.name} · ${(r.mark.note || '').slice(0, 44)}</h2>
-  <p>${r.motion} · ${r.keyframes} keyframes · ${r.faults.length ? r.faults[0].split('.')[0] : 'moves as a mechanism'}</p>
-  <div class="strip">${r.frames.map((f) => `<img src="${f}">`).join('')}</div>
-  <video src="${r.slug}.webm" autoplay loop muted playsinline></video>
-</section>`).join('')
+
+/**
+ * A wall of moving marks needs a transport, which a wall of still ones does not.
+ *
+ * Eight animations left to themselves start whenever their iframe finishes loading, so a contact
+ * sheet of them is eight clocks disagreeing: you can never see the same instant twice and you
+ * cannot compare a moment across options, which is the only comparison that matters when the thing
+ * being judged is timing. Scrubbing them together is the whole instrument.
+ *
+ * Driven through the Web Animations API rather than by overriding css. Forcing animation-delay to a
+ * common value would scrub them, and it would also flatten every stagger to zero, which destroys
+ * the exact property being compared. Animation.currentTime already counts from each animation's own
+ * start and has its delay folded in, so setting the same currentTime on all of them holds a single
+ * global moment while every offset stays intact.
+ *
+ * This is a picker and deliberately not an editor. There is no curve to drag and no keyframe to
+ * move, because the answer to a motion you do not like here is a different motion, not a nudged
+ * one: eight were written and the good one is chosen rather than repaired.
+ */
+const CYCLE = 4200
+const cells = shown.map((r, i) => `<figure>
+  <iframe src="${r.slug}.html" loading="eager" data-i="${i}"></iframe>
+  <figcaption><b>${r.ground.name}</b> · ${(r.mark.note || '').slice(0, 40)}
+  <br>${r.faults.length ? r.faults[0].split('.')[0] : 'moves as a mechanism'}
+  <br><a href="${r.slug}.webm">clip</a> · <a href="${r.slug}.html">page</a></figcaption>
+</figure>`).join('')
+
 const sheet = path.resolve(out, 'sheet.html')
-writeFileSync(sheet, `<html><body style="margin:0;background:#101010;font:11px ui-monospace,monospace;color:#8b8b8b">
-<div style="padding:16px;display:grid;gap:22px">${strips}</div>
-<style>section{display:grid;gap:8px}h2{font-size:12px;color:#ddd;margin:0;font-weight:500}
-p{margin:0;color:#777}.strip{display:grid;grid-template-columns:repeat(${FRAMES},1fr);gap:5px}
-.strip img{width:100%;display:block;background:#1a1a1a}
-video{width:320px;display:block;background:#1a1a1a;border-radius:3px}</style></body></html>`)
+writeFileSync(sheet, `<html><head><meta charset="utf-8"><title>${SUBJECT}</title></head>
+<body>
+<header>
+  <button id="play">pause</button>
+  <input id="scrub" type="range" min="0" max="${CYCLE}" value="0" step="10">
+  <span id="at">0.00s</span>
+  <label>speed <select id="rate"><option value="0.25">quarter</option><option value="0.5">half</option><option value="1" selected>full</option></select></label>
+  <span id="driven" class="hint">connecting</span>
+  <span class="hint">space to play, arrows to step</span>
+</header>
+<div class="grid">${cells}</div>
+<style>
+  body{margin:0;background:#0e0e0f;font:11px ui-monospace,monospace;color:#8b8b8b}
+  header{position:sticky;top:0;z-index:2;display:flex;gap:14px;align-items:center;
+    padding:12px 16px;background:#141416;border-bottom:1px solid #232326}
+  button,select{background:#232326;color:#ddd;border:1px solid #34343a;border-radius:4px;
+    padding:5px 12px;font:inherit;cursor:pointer}
+  #scrub{flex:1;accent-color:#7aa2f7}
+  #at{min-width:52px;color:#ddd}
+  .hint{color:#5a5a60}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:14px}
+  figure{margin:0;display:grid;gap:6px}
+  iframe{width:100%;aspect-ratio:1;border:0;border-radius:4px;background:#1a1a1c;display:block}
+  figcaption{line-height:1.6}b{color:#ddd;font-weight:500}a{color:#7aa2f7}
+</style>
+<script>
+  const frames = [...document.querySelectorAll('iframe')]
+  const scrub = document.getElementById('scrub')
+  const play = document.getElementById('play')
+  const at = document.getElementById('at')
+  const rate = document.getElementById('rate')
+  const link = document.getElementById('driven')
+  let running = true, t = 0, last = performance.now()
+
+  // every animation in every frame, re-read each tick because a frame can still be loading
+  const held = new Map()
+  addEventListener('message', (e) => {
+    const d = e.data || {}
+    if (d.wall === 'held') { held.set(d.i, d.n); paint() }
+  })
+  const paint = () => {
+    const live = [...held.values()].filter((n) => n > 0).length
+    link.textContent = live + ' of ' + frames.length + ' driven'
+    link.style.color = live === frames.length ? '#7ab88a' : '#c98b5e'
+  }
+  const hold = (ms) => {
+    frames.forEach((f, i) => {
+      try { f.contentWindow.postMessage({ wall: 'hold', t: ms, i }, '*') } catch {}
+    })
+    scrub.value = ms
+    at.textContent = (ms / 1000).toFixed(2) + 's'
+  }
+  const tick = (now) => {
+    const step = now - last
+    last = now
+    if (running) { t = (t + step * Number(rate.value)) % ${CYCLE}; hold(t) }
+    requestAnimationFrame(tick)
+  }
+  requestAnimationFrame(tick)
+
+  play.onclick = () => { running = !running; play.textContent = running ? 'pause' : 'play' }
+  scrub.oninput = () => { running = false; play.textContent = 'play'; t = Number(scrub.value); hold(t) }
+  rate.onchange = () => { last = performance.now() }
+  addEventListener('keydown', (e) => {
+    if (e.key === ' ') { e.preventDefault(); play.click() }
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+      e.preventDefault(); running = false; play.textContent = 'play'
+      t = Math.max(0, Math.min(${CYCLE}, t + (e.key === 'ArrowRight' ? 100 : -100))); hold(t)
+    }
+  })
+</script>
+</body></html>`)
 
 console.log(`\n  ${shown.length} of ${rows.length} moved, in ${Math.floor(seconds / 60)}m ${seconds % 60}s`)
 console.log(`  ${sheet}\n`)
