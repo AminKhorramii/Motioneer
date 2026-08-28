@@ -311,6 +311,15 @@ Stagger with animation-delay, or with the delay in the animation shorthand. Thin
 
 Take the timing from the object rather than from a default. A press is stepped, so use steps() and let it jerk. A flap overshoots and settles. A pen draws at a constant rate and stops dead. Nothing here should ease-in-out over 300ms, which is the house style of every generated interface.
 
+Animate transform and opacity and nothing else. Those two are the only properties the compositor can carry on its own; width, height, top, left, margin and padding all make the browser lay the whole page out again on every frame, which is where dropped frames come from on anything the size of a dashboard. Every effect worth having has a transform spelling that looks identical: a bar that fills is scaleX from a transform-origin, a thing that grows is scale, a thing that arrives is translate. Set transform-origin deliberately whenever you rotate or scale, because the default centre is rarely where the movement is actually hinged.
+
+Numbers, because this is where polish lives and defaults are what make motion look generated:
+
+- One part moves for 240ms to 520ms. Under 150ms reads as a glitch, over 700ms reads as slow.
+- Consecutive parts start 40ms to 90ms apart. That is the interval that reads as one mechanism rather than as a queue; 200ms apart is a slideshow, 10ms apart is a single blur.
+- The whole thing is over inside 1.4s, however many parts there are. If eight parts at 70ms would run past that, overlap them harder rather than making the reader wait.
+- Easing is asymmetric and named as a curve: cubic-bezier(.16,1,.3,1) for something arriving and settling, cubic-bezier(.4,0,1,1) for something leaving, steps(n,end) for anything mechanical. Never ease, ease-in-out, or linear on a movement, which are the three defaults every generated interface already wears.
+
 Respect a reader who does not want it: put everything inside @media (prefers-reduced-motion: no-preference) so the component is untouched for anybody who has asked for stillness.
 
 If it loops, close the loop, and let no frame be blank: this will be watched from the middle, so the component must be legible at every instant including the first one somebody sees.

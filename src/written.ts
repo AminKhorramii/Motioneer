@@ -325,6 +325,33 @@ export function brittle(css: string): string[] {
  * the sheet names more than one, and a sheet that names no attribute at all is left alone, because it
  * is reaching elements directly and will apply either way.
  */
+/**
+ * Motion that makes the browser lay the page out again on every frame.
+ *
+ * A keyframe that moves width, height, top or margin is asking for the whole page to be measured
+ * sixty times a second, and on anything the size of a dashboard that is where dropped frames come
+ * from. Transform and opacity are the two the compositor can do on its own, and every effect these
+ * keyframes actually want has a transform spelling: a bar that fills is scaleX from a
+ * transform-origin, a panel that grows is scale, a row that slides in is translate. The visual result
+ * is the same and the cost is not.
+ *
+ * Only properties inside @keyframes are judged. A static rule setting a width is layout, which is the
+ * component's own business and none of this gate's.
+ */
+const HEAVY = /(?:^|[;{\s])(width|height|top|left|right|bottom|margin(?:-[a-z]+)?|padding(?:-[a-z]+)?|font-size|line-height|flex-basis|gap|border-width)\s*:/gi
+
+export function janky(css: string): string[] {
+  const frames = [...css.matchAll(/@keyframes[^{]*\{((?:[^{}]|\{[^{}]*\})*)\}/gi)].map((m) => m[1])
+  const found = new Set<string>()
+  for (const body of frames) for (const [, prop] of body.matchAll(HEAVY)) found.add(prop.toLowerCase())
+  if (!found.size) return []
+  const named = [...found].slice(0, 3).join(', ')
+  return [`the keyframes animate ${named}, which makes the browser lay the page out again on every `
+    + 'frame and is where dropped frames come from on anything the size of a dashboard. Every one of '
+    + 'these has a transform spelling that looks identical and costs nothing: a bar that fills is '
+    + 'scaleX with a transform-origin, a thing that grows is scale, a thing that moves is translate.']
+}
+
 export function scopeOf(css: string, declared?: unknown): string {
   const used = [...css.matchAll(/\[(data-[-\w]+)\]/g)].map((m) => m[1])
   const said = String(declared ?? '').replace(/[^-\w]/g, '').slice(0, 40)

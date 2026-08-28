@@ -29,7 +29,7 @@ import path from 'node:path'
 import { hasClaude, runClaude } from '../shared/cli.mjs'
 import { listenNear, movedFrom } from '../shared/port.mjs'
 import {
-  MOTION_SYSTEM, dealMotions, grabJson, safeStyle, unmoved, brittle, scopeOf,
+  MOTION_SYSTEM, dealMotions, grabJson, safeStyle, unmoved, brittle, janky, scopeOf,
   PRESETS, themeOf, themeCss,
 } from '../dist-core/core.js'
 
@@ -537,7 +537,7 @@ async function askModel(brief, tries = 3) {
 function judge(raw, fallbackScope) {
   const css = safeStyle(raw.css)
   if (!css) return { why: 'the reply carried no css that is allowed in a sheet' }
-  const faults = [...unmoved({ html: '', css, note: '' }), ...brittle(css)]
+  const faults = [...unmoved({ html: '', css, note: '' }), ...brittle(css), ...janky(css)]
   if (faults.length) return { why: faults[0] }
   return { css, scope: scopeOf(css, raw.scope ?? fallbackScope), note: String(raw.note ?? '').slice(0, 90) }
 }
@@ -815,7 +815,7 @@ figcaption b{font-weight:500}.note{color:var(--dim)}.verb{color:var(--faint);fon
   <header>
     ${TARGET ? '<button class="btn" id="pick">Pick element</button>' : ''}
     <button class="btn go" id="ask">Give it motion</button>
-    <select id="count"><option>2</option><option selected>3</option><option>4</option><option>6</option></select>
+    <select id="count"><option>3</option><option>4</option><option selected>5</option><option>6</option></select>
     <span class="sep"></span>
     <button class="btn" id="play"><span id="glyph">❚❚</span><span id="word">Pause</span></button>
     <span class="clock" id="at">0.00</span><span class="unit">/ <b id="span">4.2s</b></span>
