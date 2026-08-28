@@ -21,6 +21,7 @@
  */
 
 import { createServer } from 'node:http'
+import net from 'node:net'
 import { readFileSync, writeFileSync, existsSync, statSync, readdirSync, mkdirSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import path from 'node:path'
@@ -31,17 +32,20 @@ import {
 } from '../dist-core/core.js'
 
 const args = process.argv.slice(2)
+const appAt = args.indexOf('--app')
+const TARGET = appAt > -1 ? String(args[appAt + 1] ?? '').replace(/\/$/, '') : null
 const cssAt = args.indexOf('--css')
 const SHEET = cssAt > -1 ? args[cssAt + 1] : null
 // with no folder given it opens on the components in this repo, so `npm run studio` is a thing you
 // can run on a clean checkout and immediately have something to animate
-const ROOT = args.find((a, i) => !a.startsWith('--') && !(cssAt > -1 && i === cssAt + 1)) ?? 'examples/components'
+const ROOT = args.find((a, i) => !a.startsWith('--')
+  && !(cssAt > -1 && i === cssAt + 1) && !(appAt > -1 && i === appAt + 1)) ?? 'examples/components'
 const PORT = Number(process.env.WALL_PORT || 4321)
 const KIND = /\.(tsx|jsx|vue|svelte|astro|html|htm)$/i
 const work = '.studio'
 mkdirSync(work, { recursive: true })
 
-if (!existsSync(ROOT)) { console.log(`\n  no such folder: ${ROOT}\n`); process.exit(1) }
+if (!TARGET && !existsSync(ROOT)) { console.log(`\n  no such folder: ${ROOT}\n`); process.exit(1) }
 
 /* ── reading a component out of a file, the same way animate.mjs does ─────────────────────────── */
 const matching = (s, open) => {
@@ -213,7 +217,7 @@ const preview = (o, camera, palette) => {
   const scoped = o.scope ? o.markup.replace(/<(\w+)/, `<$1 ${o.scope}`) : o.markup
   // Tailwind's compiler and the motion sheet both go in head, but the motion sheet is written last so
   // that a keyframe never loses to a utility that happens to set the same property
-  const tw = o.tw ? `<script src="/tailwind.js"></script>
+  const tw = o.tw ? `<script src="/__wall/tailwind.js"></script>
     <style type="text/tailwindcss">${themeMap}</style>` : ''
   const vars = o.tw ? `<style>${themeFor(palette)}</style>` : ''
   /**
@@ -229,7 +233,8 @@ const preview = (o, camera, palette) => {
    */
   const chrome = camera ? STAGE : `html,body{margin:0;height:100%;overflow:hidden;
     background:var(--background,#0b0c0d);color:var(--foreground,#e6e6e6);font:14px ui-sans-serif,system-ui}
-    #fit{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);transform-origin:center center}`
+    #fit{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);transform-origin:center center;
+      width:${o.wide ? o.wide + 'px' : 'max-content'}}`
   const head = `<meta charset="utf-8">${tw}${vars}<style>${o.base}\n${chrome}\n${o.css}</style>`
   /**
    * A dashboard component is eight hundred pixels wide and the card it is being compared in is three
@@ -238,7 +243,21 @@ const preview = (o, camera, palette) => {
    * way to show it: a transform does not touch layout, so the component still believes it has its full
    * width and the motion plays at the timing it was written for, just smaller.
    */
+  /**
+   * An element picked out of a running app is often positioned: a dialog is fixed, a card in a grid is
+   * absolute, a panel is pinned to an edge. Positioned children give their parent no size, so the
+   * wrapper measures zero, there is nothing to scale, and the preview is an empty rectangle. Standing
+   * it back down into normal flow is what previewing something out of its page means, and it is done
+   * on the element rather than in the sheet so that nothing needs !important and the motion's own
+   * transforms are left alone.
+   */
   const FIT = `<script>(function(){var el=document.getElementById('fit');if(!el)return;
+    var kid=el.firstElementChild;
+    if(kid){var cs=getComputedStyle(kid);
+      if(cs.position==='fixed'||cs.position==='absolute'||cs.position==='sticky'){
+        kid.style.position='relative';kid.style.top='auto';kid.style.left='auto';
+        kid.style.right='auto';kid.style.bottom='auto'}
+      if(cs.width==='0px'||parseFloat(cs.height)<2)kid.style.display='inline-block'}
     function fit(){el.style.transform='translate(-50%,-50%)';
       var r=el.getBoundingClientRect();if(!r.width||!r.height)return;
       var s=Math.min(1,(innerWidth-28)/r.width,(innerHeight-28)/r.height);
@@ -257,18 +276,150 @@ const preview = (o, camera, palette) => {
     ${LISTENER}</body></html>`
 }
 
+/* ── pointing at a running app instead of at files ─────────────────────────────────────────────── *
+ *
+ * Reading a component out of a .tsx is guesswork. markupOf strips braces with a brace counter, finds
+ * the outermost tag by counting tags, and hopes there is one `return (`. It survives the components in
+ * this repo because they were written to survive it; a real one with props, a map, and a conditional
+ * class comes out as something the model then writes motion against. Every wrong thing downstream
+ * starts there.
+ *
+ * A running app has no such problem, because the DOM is the answer. Point the studio at a dev server
+ * and it can hand the model the rendered subtree and the rules that actually matched it, after the
+ * framework, after Tailwind, after every conditional resolved. That is not an approximation of the
+ * component, it is the component, and it works the same for React, Svelte, Rails or anything else
+ * that ends up as elements.
+ *
+ * The only difficulty is the browser's, not ours: an iframe on another port is another origin and its
+ * DOM is closed to us. So the app is served through this server rather than linked to. Everything the
+ * studio does not own is forwarded, which means a root-relative asset like /src/main.tsx or
+ * /@vite/client resolves here and gets passed along with no url rewriting at all, and the app believes
+ * it is being served from its own root. Studio routes all sit under /__wall so an app with its own
+ * /api can never collide with ours.
+ */
+const OURS = /^\/(__wall\/|$)/
+
+const hop = new Set(['connection', 'keep-alive', 'transfer-encoding', 'upgrade',
+  'proxy-authenticate', 'proxy-authorization', 'te', 'trailer'])
+
+async function proxy(req, res, url) {
+  const to = TARGET + url.pathname + url.search
+  const headers = {}
+  for (const [k, v] of Object.entries(req.headers)) {
+    if (hop.has(k) || k === 'host' || k === 'accept-encoding') continue
+    headers[k] = v
+  }
+  const body = ['GET', 'HEAD'].includes(req.method) ? undefined
+    : await new Promise((ok) => { const b = []; req.on('data', (d) => b.push(d)); req.on('end', () => ok(Buffer.concat(b))) })
+  let r
+  try { r = await fetch(to, { method: req.method, headers, body, redirect: 'manual' }) } catch (e) {
+    res.writeHead(502, { 'content-type': 'text/html' })
+    return res.end(`<body style="font:14px ui-monospace;color:#8a8f98;background:#0f1011;padding:24px">`
+      + `Cannot reach ${TARGET}. Is the dev server running?<br><br>${String(e.message || e)}</body>`)
+  }
+  const out = {}
+  r.headers.forEach((v, k) => {
+    // fetch has already decompressed, so the original encoding and length would both be lies
+    if (hop.has(k) || k === 'content-encoding' || k === 'content-length') return
+    if (k === 'content-security-policy' || k === 'x-frame-options') return  // we are the frame
+    out[k] = v
+  })
+  const type = r.headers.get('content-type') ?? ''
+  if (!/text\/html/i.test(type)) {
+    res.writeHead(r.status, out)
+    return res.end(Buffer.from(await r.arrayBuffer()))
+  }
+  let html = await r.text()
+  const at = html.search(/<\/body>/i)
+  html = at === -1 ? html + PICKER : html.slice(0, at) + PICKER + html.slice(at)
+  res.writeHead(r.status, { ...out, 'content-type': 'text/html; charset=utf-8' })
+  res.end(html)
+}
+
+/**
+ * The picker, injected into the app's own page.
+ *
+ * Hovering outlines what is under the cursor and clicking sends it up. What goes up is the rendered
+ * subtree and the rules that matched it, gathered by walking the live stylesheets and asking each rule
+ * whether it applies here. That is the real cascade rather than a guess at which file was relevant,
+ * which is the entire reason for doing this against a running app.
+ *
+ * Clicks are taken on the capture phase and stopped, so picking a button does not also press it.
+ */
+const PICKER = `<script>(function(){
+var on=false,box=null,last=null;
+function ensure(){if(box)return box;box=document.createElement('div');
+  box.style.cssText='position:fixed;pointer-events:none;z-index:2147483647;border:2px solid #5e6ad2;'+
+  'background:rgba(94,106,210,.13);border-radius:3px;box-shadow:0 0 0 1px rgba(0,0,0,.4)';
+  document.documentElement.appendChild(box);return box}
+function move(e){if(!on)return;var el=e.target;if(!el||el===document.body||el===document.documentElement)return;
+  last=el;var r=el.getBoundingClientRect(),b=ensure();b.style.display='block';
+  b.style.left=r.left+'px';b.style.top=r.top+'px';b.style.width=r.width+'px';b.style.height=r.height+'px'}
+function hits(el,sel){try{return el.matches(sel)||!!el.querySelector(sel)}catch(_){return false}}
+function rules(el){
+  var roots=[],out=[];
+  for(var i=0;i<document.styleSheets.length;i++){var rs;try{rs=document.styleSheets[i].cssRules}catch(_){continue}
+    for(var j=0;j<rs.length;j++){var r=rs[j];
+      if(r.selectorText){
+        if(/^(:root|html|\\*|body)$/.test(r.selectorText.trim()))roots.push(r.cssText);
+        else if(hits(el,r.selectorText))out.push(r.cssText)}
+      else if(r.cssRules&&r.conditionText!==undefined){var inner=[];
+        for(var k=0;k<r.cssRules.length;k++){var ir=r.cssRules[k];
+          if(ir.selectorText&&hits(el,ir.selectorText))inner.push(ir.cssText)}
+        if(inner.length)out.push('@media '+r.conditionText+'{'+inner.join('')+'}')}
+      else if(r.cssText&&r.cssText.indexOf('@font-face')===0)roots.push(r.cssText)}}
+  var head=[vars(el),context(el)].concat(roots).join('');
+  return (head.slice(0,9000)+out.join('').slice(0,11000))}
+function label(el){var c=typeof el.className==='string'?el.className.trim().split(/\\s+/).filter(Boolean):[];
+  return el.tagName.toLowerCase()+(c.length?'.'+c.slice(0,3).join('.'):'')}
+/* Every custom property in force on this element, frozen as it stands.
+   Collecting the rules that matched is not enough on its own: an app declares its tokens on whatever
+   ancestor it likes, often a .theme or [data-mode] wrapper rather than :root, and those rules match
+   the ancestor and not the element. Lift the element out and every var() it uses resolves to nothing,
+   which renders as a transparent box with invisible text. Reading them off the computed style takes
+   the values the browser actually arrived at, wherever they happened to be declared. */
+function vars(el){var cs=getComputedStyle(el),out=[];
+  for(var i=0;i<cs.length&&out.length<400;i++){var n=cs[i];
+    if(n.slice(0,2)==='--'){var v=cs.getPropertyValue(n);if(v&&v.length<200)out.push(n+':'+v)}}
+  return out.length?':root{'+out.join(';')+'}':''}
+/* and the ground it was standing on, so it is previewed against its own background and not ours */
+function context(el){var n=el.parentElement,bg='';
+  while(n&&!bg){var c=getComputedStyle(n).backgroundColor;
+    if(c&&c!=='transparent'&&c.indexOf('rgba(0, 0, 0, 0)')!==0)bg=c;n=n.parentElement}
+  var cs=getComputedStyle(el);
+  return 'body{background:'+(bg||'#0b0c0d')+';color:'+cs.color+';font-family:'+cs.fontFamily+'}'}
+function pick(e){if(!on)return;e.preventDefault();e.stopPropagation();
+  var el=last||e.target;on=false;if(box)box.style.display='none';
+  var r=el.getBoundingClientRect();
+  parent.postMessage({wall:'picked',html:el.outerHTML.slice(0,14000),css:rules(el),label:label(el),
+    w:Math.round(r.width),h:Math.round(r.height)},'*')}
+addEventListener('mousemove',move,true);addEventListener('click',pick,true);
+addEventListener('message',function(e){var d=e.data||{};
+  if(d.wall==='pick'){on=true}
+  if(d.wall==='nopick'){on=false;if(box)box.style.display='none'}});
+parent.postMessage({wall:'ready'},'*');
+})();<\/script>`
+
 /* ── asking for motion, with every gate the other tools use ───────────────────────────────────── */
 const made = new Map()   // id -> { file, markup, base, css, scope, note, verb }
 let nextId = 0
 
-async function options(file, count) {
-  const read = markupOf(file)
-  const { markup, source } = read
-  const base = rawSheet ? relevant(rawSheet, markup) : read.own
-  const tw = wantsTailwind(markup, base) && !!(await getTailwind()).js
+async function options(src, count) {
+  // a picked element arrives already rendered and already carrying the rules that matched it, so
+  // there is nothing to parse and nothing to guess
+  const picked = !!src.html
+  const markup = picked ? src.html : markupOf(src.file).markup
+  const source = picked ? src.html : markupOf(src.file).source
+  const base = picked ? src.css : (rawSheet ? relevant(rawSheet, markup) : markupOf(src.file).own)
+  const name = picked ? src.label : path.basename(src.file)
+  const wide = picked ? src.w : 0
+  const tw = !picked && wantsTailwind(markup, base) && !!(await getTailwind()).js
   const verbs = dealMotions(count)
   const tried = await Promise.all(verbs.map(async (verb) => {
-    const brief = `The component, as written in ${path.basename(file)}:\n${source.slice(0, 6000)}\n\n`
+    const brief = (picked
+      ? `This element was picked out of a running app. It is the rendered dom, so it is exactly what a
+user sees, and the css below is the rules that actually matched it.\n\n${source.slice(0, 6000)}\n\n`
+      : `The component, as written in ${name}:\n${source.slice(0, 6000)}\n\n`)
       + (base ? `Its stylesheet:\n${base.slice(0, 3000)}\n\n` : '')
       + `Move it by ${verb} Take the timing from that object: it is how the thing behaves.`
     let reply = await runClaude(MOTION_SYSTEM, brief).catch(() => null)
@@ -283,12 +434,14 @@ async function options(file, count) {
     if (faults.length) return { verb, why: faults[0] }
     const id = String(nextId++)
     const scope = scopeOf(css, raw.scope)
-    made.set(id, { file, markup, base, css, scope, tw, note: String(raw.note ?? '').slice(0, 90), verb })
+    made.set(id, { file: name, markup, base, css, scope, tw, wide,
+      note: String(raw.note ?? '').slice(0, 90), verb })
     return { id, verb, scope, note: String(raw.note ?? '').slice(0, 90), css }
   }))
-  const styled = tw ? 'tailwind and a Wall palette'
-    : base ? `${SHEET ? path.basename(SHEET) : 'its own <style>'}`
-      : (await getTailwind()).why ? `nothing: ${(await getTailwind()).why}` : 'nothing, and it needs nothing'
+  const styled = picked ? 'the rules that matched it in your app'
+    : tw ? 'tailwind and a Wall palette'
+      : base ? `${SHEET ? path.basename(SHEET) : 'its own <style>'}`
+        : (await getTailwind()).why ? `nothing: ${(await getTailwind()).why}` : 'nothing, and it needs nothing'
   return { kept: tried.filter((t) => t.id), dropped: tried.filter((t) => !t.id), styled }
 }
 
@@ -341,14 +494,28 @@ figcaption b{font-weight:500}.note{color:var(--dim)}.verb{color:var(--faint);fon
   border:1px solid var(--line2);border-radius:5px;cursor:pointer;font-family:inherit}
 .mini:hover{color:var(--ink)}
 .empty{padding:40px;color:var(--faint);text-align:center;grid-column:1/-1;line-height:1.8}
+.hint{margin:4px 10px;font-size:12px;color:var(--faint);line-height:1.7}
+.hint b{color:var(--dim);font-weight:500}
+.appwrap{grid-column:1/-1;height:calc(100vh - 116px);border:1px solid var(--line);border-radius:8px;
+  overflow:hidden;background:#fff}
+.appwrap iframe{width:100%;height:100%}
+#pick[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff}
+.chip{display:block;margin:10px;padding:8px 10px;background:var(--raised);border:1px solid var(--line2);
+  border-radius:6px;font-size:11.5px;color:var(--ink);word-break:break-all}
+.chip span{color:var(--faint)}
 .drops{padding:0 14px 14px;color:var(--faint);font-size:11.5px;line-height:1.7}
 </style></head><body>
 <aside>
-  <div class="head"><b>${path.basename(path.resolve(ROOT))}</b><span>${path.resolve(ROOT)}</span></div>
-  <div class="files" id="files"></div>
+  <div class="head"><b>${TARGET ? 'your app' : path.basename(path.resolve(ROOT))}</b>
+    <span>${TARGET ?? path.resolve(ROOT)}</span></div>
+  ${TARGET ? `<div class="files"><p class="hint">Press <b>Pick element</b>, then click anything in your
+    app. The studio reads the rendered element and the rules that actually matched it, so there is
+    nothing to parse and nothing to guess.</p><div id="chosen"></div></div>`
+    : '<div class="files" id="files"></div>'}
 </aside>
 <main>
   <header>
+    ${TARGET ? '<button class="btn" id="pick">Pick element</button>' : ''}
     <button class="btn go" id="ask">Give it motion</button>
     <select id="count"><option>2</option><option selected>3</option><option>4</option><option>6</option></select>
     <span class="sep"></span>
@@ -372,8 +539,20 @@ const scrub=document.getElementById('scrub'),at=document.getElementById('at'),li
 const play=document.getElementById('play'),ask=document.getElementById('ask'),cam=document.getElementById('cam')
 const palette=document.getElementById('palette')
 let file=null, opts=[], running=true, t=0, last=performance.now(), held=new Map()
+const APP=${TARGET ? 'true' : 'false'}
+let chosen=null   // {html,css,label} picked out of the running app
 
-fetch('/api/list').then(r=>r.json()).then(fs=>{
+if(APP){
+  render()
+  const pickBtn=document.getElementById('pick')
+  pickBtn.onclick=()=>{
+    const want=pickBtn.getAttribute('aria-pressed')!=='true'
+    pickBtn.setAttribute('aria-pressed',want)
+    const f=document.querySelector('.appwrap iframe')
+    if(f) f.contentWindow.postMessage({wall:want?'pick':'nopick'},'*')
+  }
+}
+fetch('/__wall/list').then(r=>r.json()).then(fs=>{
   document.getElementById('files').innerHTML=fs.map(f=>
     '<button class="file" data-f="'+f+'">'+f.split('/').slice(-2).join('/')+'</button>').join('')
   document.querySelectorAll('.file').forEach(b=>b.onclick=()=>{
@@ -386,19 +565,21 @@ fetch('/api/list').then(r=>r.json()).then(fs=>{
 /** the component as it is, so the left rail is a thing you browse rather than a thing you submit */
 function peek(){
   const q='?file='+encodeURIComponent(file)+'&palette='+encodeURIComponent(palette.value)+(cam.checked?'&camera=1':'')
-  grid.innerHTML='<figure class="solo"><iframe data-i="0" src="/peek'+q+'"></iframe><figcaption>'
+  grid.innerHTML='<figure class="solo"><iframe data-i="0" src="/__wall/peek'+q+'"></iframe><figcaption>'
     +'<b>'+file.split('/').pop()+'</b><span class="verb">as written, nothing added yet. '
     +'Press <b>Give it motion</b> for options.</span></figcaption></figure>'
 }
 
 ask.onclick=async()=>{
-  if(!file) return alert('Pick a component first.')
+  if(APP && !chosen) return alert('Press Pick element, then click something in your app.')
+  if(!APP && !file) return alert('Pick a component first.')
   ask.disabled=true; ask.textContent='Writing…'
   grid.innerHTML='<div class="empty">Asking for '+document.getElementById('count').value+' motions.<br>About thirty seconds.</div>'
   drops.textContent=''
   try{
-    const r=await fetch('/api/motion',{method:'POST',headers:{'content-type':'application/json'},
-      body:JSON.stringify({file,count:Number(document.getElementById('count').value)})}).then(r=>r.json())
+    const r=await fetch('/__wall/motion',{method:'POST',headers:{'content-type':'application/json'},
+      body:JSON.stringify(Object.assign({count:Number(document.getElementById('count').value)},
+        APP?chosen:{file}))}).then(r=>r.json())
     opts=r.kept; held.clear(); render()
     drops.textContent=(r.dropped.length? r.dropped.length+' dropped: '
       +r.dropped.map(d=>d.why.split('.')[0]).join('; ')+'. ' : '')+'Styled with '+r.styled+'.'
@@ -409,11 +590,13 @@ cam.onchange=render
 palette.onchange=render
 
 function render(){
+  if(!opts.length && APP){
+    grid.innerHTML='<div class="appwrap"><iframe src="/__wall/app"></iframe></div>'; return }
   if(!opts.length){ if(file) return peek()
     grid.innerHTML='<div class="empty">Pick a component on the left.</div>'; return }
   const q='?palette='+encodeURIComponent(palette.value)+(cam.checked?'&camera=1':'')
   grid.innerHTML=opts.map((o,i)=>
-    '<figure><iframe data-i="'+i+'" src="/preview/'+o.id+q+'"></iframe>'+
+    '<figure><iframe data-i="'+i+'" src="/__wall/preview/'+o.id+q+'"></iframe>'+
     '<figcaption><b>'+(o.note||'untitled')+'</b>'+
     '<span class="verb">timing from '+o.verb+'</span>'+
     '<span class="note">'+o.scope+'</span>'+
@@ -425,16 +608,26 @@ function render(){
     b.textContent='Copied'; setTimeout(()=>b.textContent='Copy CSS',1200)
   })
   document.querySelectorAll('[data-save]').forEach(b=>b.onclick=async()=>{
-    const r=await fetch('/api/save',{method:'POST',headers:{'content-type':'application/json'},
+    const r=await fetch('/__wall/save',{method:'POST',headers:{'content-type':'application/json'},
       body:JSON.stringify({id:b.dataset.save})}).then(r=>r.json())
     b.textContent=r.at.split('/').pop(); setTimeout(()=>b.textContent='Save file',2200)
   })
 }
 
-addEventListener('message',e=>{const d=e.data||{}; if(d.wall==='held'){held.set(d.i,d.n); paint()}})
+addEventListener('message',e=>{const d=e.data||{}
+  if(d.wall==='held'){held.set(d.i,d.n); paint()}
+  if(d.wall==='picked'){
+    chosen={html:d.html,css:d.css,label:d.label,w:d.w,h:d.h}
+    document.getElementById('pick').setAttribute('aria-pressed','false')
+    document.getElementById('chosen').innerHTML='<b class="chip">'+d.label
+      +'<br><span>'+(d.css.length/1000).toFixed(1)+'kb of matched css, '
+      +(d.html.length/1000).toFixed(1)+'kb of markup, '+d.w+'x'+d.h+'</span></b>'
+    paint()
+  }})
 function paint(){
   const frames=document.querySelectorAll('iframe')
-  if(!opts.length){link.textContent=file?'no motion yet':'—';link.style.color='var(--faint)';return}
+  if(!opts.length){link.textContent=(APP?chosen&&chosen.label:file)?'no motion yet':'—';
+    link.style.color='var(--faint)';return}
   const live=[...held.values()].filter(n=>n>0).length
   link.textContent=live+'/'+frames.length+' driven'
   link.style.color=live===frames.length?'var(--dim)':'#d29d6b'
@@ -460,12 +653,12 @@ addEventListener('keydown',e=>{
 
 const json = (res, v) => { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(v)) }
 
-createServer(async (req, res) => {
+const server = createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x')
   try {
     if (url.pathname === '/') { res.writeHead(200, { 'content-type': 'text/html' }); return res.end(PAGE()) }
-    if (url.pathname === '/api/list') return json(res, list())
-    if (url.pathname === '/tailwind.js') {
+    if (url.pathname === '/__wall/list') return json(res, TARGET ? [] : list())
+    if (url.pathname === '/__wall/tailwind.js') {
       const t = await getTailwind()
       if (!t.js) { res.writeHead(503); return res.end(`// ${t.why}`) }
       res.writeHead(200, { 'content-type': 'text/javascript', 'cache-control': 'max-age=86400' })
@@ -479,7 +672,7 @@ createServer(async (req, res) => {
      * loses the tree gives you a preview of nothing, and you want to know that before you spend
      * thirty seconds and four model calls animating it.
      */
-    if (url.pathname === '/peek') {
+    if (url.pathname === '/__wall/peek') {
       const want = path.resolve(url.searchParams.get('file') ?? '')
       const under = path.resolve(ROOT)
       if (!want.startsWith(under) || !KIND.test(want) || !existsSync(want)) {
@@ -492,41 +685,84 @@ createServer(async (req, res) => {
       return res.end(preview({ markup: read.markup, base, css: '', scope: '', tw },
         url.searchParams.has('camera'), url.searchParams.get('palette')))
     }
-    if (url.pathname.startsWith('/preview/')) {
-      const o = made.get(url.pathname.split('/')[2])
+    if (url.pathname.startsWith('/__wall/preview/')) {
+      const o = made.get(url.pathname.split('/')[3])
       if (!o) { res.writeHead(404); return res.end('gone') }
       res.writeHead(200, { 'content-type': 'text/html' })
       return res.end(preview(o, url.searchParams.has('camera'), url.searchParams.get('palette')))
     }
-    if (url.pathname === '/api/motion' && req.method === 'POST') {
+    if (url.pathname === '/__wall/motion' && req.method === 'POST') {
       const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))
-      console.log(`  ${path.basename(body.file)}: asking for ${body.count}`)
-      const got = await options(body.file, Math.max(1, Math.min(6, body.count || 3)))
+      const src = body.html ? { html: body.html, css: body.css ?? '', label: body.label ?? 'element',
+        w: Number(body.w) || 0 }
+        : { file: body.file }
+      console.log(`  ${src.label ?? path.basename(src.file)}: asking for ${body.count}`)
+      const got = await options(src, Math.max(1, Math.min(6, body.count || 3)))
       console.log(`    ${got.kept.length} kept, ${got.dropped.length} dropped`)
       return json(res, got)
     }
-    if (url.pathname === '/api/save' && req.method === 'POST') {
+    if (url.pathname === '/__wall/save' && req.method === 'POST') {
       const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))
       const o = made.get(body.id)
       if (!o) { res.writeHead(404); return res.end('gone') }
-      const name = path.basename(o.file).replace(/\.[^.]+$/, '')
+      const name = path.basename(o.file).replace(/\.[^.]+$/, '').replace(/[^-\w]/g, '-') || 'element'
       const at = path.resolve(work, `${name}.motion.css`)
-      writeFileSync(at, `/* Motion for ${path.basename(o.file)}\n   ${o.note}\n   timing from ${o.verb}\n`
+      writeFileSync(at, `/* Motion for ${o.file}\n   ${o.note}\n   timing from ${o.verb}\n`
         + `   add ${o.scope} to the component's root element, then import this file. */\n\n${o.css}\n`)
       console.log(`    saved ${at}`)
       return json(res, { at })
     }
+    if (url.pathname === '/__wall/app') {
+      if (!TARGET) { res.writeHead(404); return res.end('no app: start the studio with --app') }
+      return proxy(req, res, new URL('/', 'http://x'))
+    }
+    // anything not ours belongs to the app being proxied, which is how its root-relative assets
+    // resolve without a single url being rewritten
+    if (TARGET && !OURS.test(url.pathname)) return proxy(req, res, url)
     res.writeHead(404); res.end('no')
   } catch (e) {
     res.writeHead(500, { 'content-type': 'application/json' })
     res.end(JSON.stringify({ error: String(e && e.message ? e.message : e).slice(0, 300) }))
   }
-}).listen(PORT, () => {
-  const files = list().length
+})
+
+/**
+ * Hot reload, passed through as raw bytes.
+ *
+ * Vite and Next both keep a websocket open for hot updates, and a proxy that only forwards http
+ * leaves the app working but frozen: you edit a component, nothing happens, and you conclude the
+ * studio broke your dev server. Forwarding the upgrade is a socket to the target, the original request
+ * line written back out verbatim, and then two pipes. Nothing here understands websocket framing,
+ * which is the point, since it does not have to.
+ */
+if (TARGET) {
+  const at = new URL(TARGET)
+  server.on('upgrade', (req, socket, head) => {
+    const up = net.connect(Number(at.port || 80), at.hostname, () => {
+      const lines = [`${req.method} ${req.url} HTTP/1.1`]
+      for (let i = 0; i < req.rawHeaders.length; i += 2) {
+        const k = req.rawHeaders[i]
+        lines.push(`${k}: ${k.toLowerCase() === 'host' ? at.host : req.rawHeaders[i + 1]}`)
+      }
+      up.write(lines.join('\r\n') + '\r\n\r\n')
+      if (head && head.length) up.write(head)
+      up.pipe(socket); socket.pipe(up)
+    })
+    up.on('error', () => socket.destroy())
+    socket.on('error', () => up.destroy())
+  })
+}
+
+server.listen(PORT, () => {
   console.log(`\n  motion studio  http://localhost:${PORT}`)
-  console.log(`  ${files} component${files === 1 ? '' : 's'} under ${path.resolve(ROOT)}`)
-  console.log(rawSheet ? `  styled with ${SHEET}\n`
-    : '  no --css given: utility classes are compiled here and coloured from a Wall palette\n')
+  if (TARGET) console.log(`  proxying ${TARGET}, so its dom is readable and its elements are pickable`)
+  else {
+    const files = list().length
+    console.log(`  ${files} component${files === 1 ? '' : 's'} under ${path.resolve(ROOT)}`)
+  }
+  console.log(TARGET ? '  picked elements bring their own css, so nothing is guessed\n'
+    : rawSheet ? `  styled with ${SHEET}\n`
+      : '  no --css given: utility classes are compiled here and coloured from a Wall palette\n')
   if (!process.env.WALL_NO_OPEN) {
     const [cmd, a] = process.platform === 'darwin' ? ['open', [`http://localhost:${PORT}`]]
       : process.platform === 'win32' ? ['cmd', ['/c', 'start', '', `http://localhost:${PORT}`]]
