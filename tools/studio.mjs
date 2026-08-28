@@ -216,8 +216,20 @@ const preview = (o, camera, palette) => {
   const tw = o.tw ? `<script src="/tailwind.js"></script>
     <style type="text/tailwindcss">${themeMap}</style>` : ''
   const vars = o.tw ? `<style>${themeFor(palette)}</style>` : ''
-  const chrome = camera ? STAGE : `html,body{margin:0;min-height:100%;background:var(--background,#0b0c0d);
-    color:var(--foreground,#e6e6e6);font:14px ui-sans-serif,system-ui;display:grid;place-items:center;padding:22px}`
+  /**
+   * Centring by hand rather than with place-items.
+   *
+   * A grid centres an item it is narrower than by overflowing it equally on both sides, which is not
+   * what you want when the item is eight hundred pixels and the frame is three hundred: the component
+   * ends up mostly off to one side and you are looking at a corner of it. Positioning a wrapper at the
+   * midpoint and pulling it back by half its own size lands the centre on the centre at any size.
+   *
+   * The wrapper also keeps the fit transform off the component itself, so a motion that animates
+   * transform on the root element is no longer fighting the thing that makes it visible.
+   */
+  const chrome = camera ? STAGE : `html,body{margin:0;height:100%;overflow:hidden;
+    background:var(--background,#0b0c0d);color:var(--foreground,#e6e6e6);font:14px ui-sans-serif,system-ui}
+    #fit{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);transform-origin:center center}`
   const head = `<meta charset="utf-8">${tw}${vars}<style>${o.base}\n${chrome}\n${o.css}</style>`
   /**
    * A dashboard component is eight hundred pixels wide and the card it is being compared in is three
@@ -226,13 +238,14 @@ const preview = (o, camera, palette) => {
    * way to show it: a transform does not touch layout, so the component still believes it has its full
    * width and the motion plays at the timing it was written for, just smaller.
    */
-  const FIT = `<script>(function(){var el=document.body.firstElementChild;if(!el)return;
-    function fit(){el.style.transform='none';
-      var w=el.getBoundingClientRect().width,h=el.getBoundingClientRect().height;
-      var s=Math.min(1,(innerWidth-28)/w,(innerHeight-28)/h);
-      el.style.transformOrigin='center center';el.style.transform='scale('+s.toFixed(4)+')'}
+  const FIT = `<script>(function(){var el=document.getElementById('fit');if(!el)return;
+    function fit(){el.style.transform='translate(-50%,-50%)';
+      var r=el.getBoundingClientRect();if(!r.width||!r.height)return;
+      var s=Math.min(1,(innerWidth-28)/r.width,(innerHeight-28)/r.height);
+      el.style.transform='translate(-50%,-50%) scale('+s.toFixed(4)+')'}
     fit();addEventListener('resize',fit);setTimeout(fit,120);setTimeout(fit,600)})();<\/script>`
-  if (!camera) return `<html class="dark"><head>${head}</head><body>${scoped}${FIT}${LISTENER}</body></html>`
+  if (!camera) return `<html class="dark"><head>${head}</head><body>`
+    + `<div id="fit">${scoped}</div>${FIT}${LISTENER}</body></html>`
   return `<html class="dark"><head>${head}</head><body>
     <div class="rig"><div class="dolly"><div class="plate">
       <div class="layer bloom" data-copy></div>
