@@ -133,7 +133,10 @@ const TOKENS = ['background', 'foreground', 'card', 'card-foreground', 'popover'
   'accent', 'accent-foreground', 'destructive', 'destructive-foreground', 'border', 'input', 'ring']
 
 const themeFor = (name) => themeCss(themeOf(PRESETS.find((p) => p.name === name) ?? PRESETS[0]))
-const themeMap = `@import "tailwindcss";\n@theme inline {\n`
+// no `@import "tailwindcss"` here: the browser build injects it, and asking for it by name makes the
+// page fetch a file called tailwindcss next to itself, which fails. Measured identical either way, and
+// the exported file is supposed to make no requests at all
+const themeMap = `@theme inline {\n`
   + TOKENS.map((t) => `  --color-${t}: var(--${t});`).join('\n')
   + `\n  --radius-lg: var(--radius);\n}\n`
 
@@ -461,14 +464,15 @@ async function options(src, count) {
   const name = picked ? src.label : path.basename(src.file)
   const wide = picked ? src.w : 0
   const tw = !picked && wantsTailwind(markup, base) && !!(await getTailwind()).js
-  const verbs = dealMotions(count)
-  const tried = await Promise.all(verbs.map(async (verb) => {
-    const brief = (picked
-      ? `This element was picked out of a running app. It is the rendered dom, so it is exactly what a
+  const about = (picked
+    ? `This element was picked out of a running app. It is the rendered dom, so it is exactly what a
 user sees, and the css below is the rules that actually matched it.\n\n${source.slice(0, 6000)}\n\n`
-      : `The component, as written in ${name}:\n${source.slice(0, 6000)}\n\n`)
-      + (base ? `Its stylesheet:\n${base.slice(0, 3000)}\n\n` : '')
-      + `Move it by ${verb} Take the timing from that object: it is how the thing behaves.`
+    : `The component, as written in ${name}:\n${source.slice(0, 6000)}\n\n`)
+    + (base ? `Its stylesheet:\n${base.slice(0, 3000)}\n\n` : '')
+
+  const attempt = async (verb, told) => {
+    const brief = about + `Move it by ${verb} Take the timing from that object: it is how the thing behaves.`
+      + (told ? `\n\nA previous attempt at this was rejected because ${told} Do not repeat that.` : '')
     let reply = await runClaude(MOTION_SYSTEM, brief).catch(() => null)
     let raw = reply ? grabJson(typeof reply === 'string' ? reply : reply.text ?? '') : null
     if (!raw) {
@@ -484,12 +488,109 @@ user sees, and the css below is the rules that actually matched it.\n\n${source.
     made.set(id, { file: name, markup, base, css, scope, tw, wide,
       note: String(raw.note ?? '').slice(0, 90), verb })
     return { id, verb, scope, note: String(raw.note ?? '').slice(0, 90), css }
-  }))
+  }
+
+  const first = await Promise.all(dealMotions(count).map((verb) => attempt(verb)))
+  /**
+   * One more go at the slots a gate turned down, and this time it is told why.
+   *
+   * Asking for four and being handed one is a bad trade for thirty seconds of waiting, and the
+   * rejections are not mysterious: almost all of them are unmoved saying everything moved at once. That
+   * is a specific, fixable complaint, so it goes back with a fresh verb rather than being counted as a
+   * loss. Only one extra round, because a motion that fails twice is telling you the component has
+   * nothing in it that wants to move separately.
+   */
+  const missed = first.filter((t) => !t.id)
+  const again = missed.length
+    ? await Promise.all(dealMotions(missed.length).map((verb, i) => attempt(verb, missed[i].why)))
+    : []
+  const tried = first.filter((t) => t.id).concat(again)
+  if (missed.length) console.log(`    retried ${missed.length}, recovered ${again.filter((t) => t.id).length}`)
   const styled = picked ? 'the rules that matched it in your app'
     : tw ? 'tailwind and a Wall palette'
       : base ? `${SHEET ? path.basename(SHEET) : 'its own <style>'}`
         : (await getTailwind()).why ? `nothing: ${(await getTailwind()).why}` : 'nothing, and it needs nothing'
   return { kept: tried.filter((t) => t.id), dropped: tried.filter((t) => !t.id), styled }
+}
+
+/**
+ * One file, every option, no requests.
+ *
+ * Playing with motion in a studio is only half of it; the other half is showing somebody. A link to
+ * localhost is not showing somebody, and a screenshot cannot carry motion, so the artifact is a single
+ * html file that opens anywhere with the transport built in. That is Wall's existing promise about
+ * shipped pages applied to motion, and it is the thing you attach to a pull request.
+ *
+ * The options share one document rather than sitting in iframes, which is what makes it one file. They
+ * can only do that because each sheet is already scoped to an attribute, so giving option two the
+ * attribute data-motion-fold-2 and rewriting its selectors to match keeps four sheets from colliding
+ * in the same page. The transport then drives document.getAnimations() directly, with no postMessage
+ * at all, because there is nothing to talk to.
+ */
+const exportable = async (ids, palette) => {
+  const picked = ids.map((id) => made.get(id)).filter(Boolean)
+  if (!picked.length) return null
+  const tw = picked.some((o) => o.tw) ? (await getTailwind()).js : null
+  const parts = picked.map((o, i) => {
+    // one sheet per option in one document, so each is renamed apart from the others
+    const tag = o.scope ? `${o.scope}-${i + 1}` : ''
+    const css = o.scope ? o.css.replaceAll(`[${o.scope}]`, `[${tag}]`) : o.css
+    const markup = tag ? o.markup.replace(/<(\w+)/, `<$1 ${tag}`) : o.markup
+    return { ...o, css, markup, tag }
+  })
+  const width = picked[0].wide ? `${picked[0].wide}px` : 'max-content'
+  return `<!doctype html><html class="dark"><head><meta charset="utf-8">
+<title>${picked[0].file} motion</title>
+${tw ? `<script>${tw}</script><style type="text/tailwindcss">${themeMap}</style>` : ''}
+<style>${picked.some((o) => o.tw) ? themeFor(palette) : ''}
+${parts[0].base}
+${parts.map((p) => p.css).join('\n')}
+:root{--bg:#08090a;--panel:#0f1011;--raised:#141516;--line:rgba(255,255,255,.07);
+  --line2:rgba(255,255,255,.11);--ink:#e6e6e6;--dim:#8a8f98;--faint:#5c6068;--accent:#5e6ad2}
+body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.5 ui-sans-serif,-apple-system,sans-serif}
+header{position:sticky;top:0;z-index:9;display:flex;align-items:center;gap:12px;height:48px;padding:0 16px;
+  border-bottom:1px solid var(--line);background:var(--panel)}
+button{height:28px;padding:0 11px;background:var(--raised);color:var(--ink);border:1px solid var(--line2);
+  border-radius:6px;font:inherit;font-size:12.5px;cursor:pointer}
+#scrub{flex:1;height:3px;-webkit-appearance:none;background:var(--line2);border-radius:2px}
+#scrub::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;
+  background:var(--accent);border:2px solid var(--panel)}
+.clock{font-variant-numeric:tabular-nums;min-width:76px;color:var(--dim);font-size:12.5px}
+.wrap{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;padding:16px}
+figure{margin:0;background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.stage{height:300px;display:grid;place-items:center;overflow:hidden;position:relative}
+.inner{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:${width}}
+figcaption{padding:11px 13px;border-top:1px solid var(--line);font-size:12px}
+figcaption b{display:block;font-weight:500;margin-bottom:3px}
+figcaption span{color:var(--faint);font-size:11px}
+</style></head><body>
+<header><button id="play">Pause</button><span class="clock" id="at">0.00 s</span>
+  <input id="scrub" type="range" min="0" max="4000" value="0" step="10">
+  <span class="clock" style="min-width:auto">${picked[0].file}</span></header>
+<div class="wrap">${parts.map((p) => `<figure><div class="stage"><div class="inner">${p.markup}</div></div>
+  <figcaption><b>${p.note || 'untitled'}</b><span>timing from ${p.verb}</span></figcaption></figure>`).join('')}
+</div>
+<script>
+var running=true,t=0,last=performance.now(),span=4000
+var at=document.getElementById('at'),scrub=document.getElementById('scrub'),play=document.getElementById('play')
+for (var el of document.querySelectorAll('.inner')){
+  var r=el.getBoundingClientRect(), box=el.parentElement.getBoundingClientRect()
+  var s=Math.min(1,(box.width-24)/r.width,(box.height-24)/r.height)
+  el.style.transform='translate(-50%,-50%) scale('+s.toFixed(4)+')'
+}
+function hold(ms){var end=0
+  for (var a of document.getAnimations()){try{a.pause();a.currentTime=ms
+    var e=a.effect&&a.effect.getComputedTiming?a.effect.getComputedTiming().endTime:0
+    if(typeof e==='number'&&isFinite(e)&&e>end)end=e}catch(_){}}
+  if(end>0){var want=Math.max(1200,Math.min(20000,Math.round(end)+300))
+    if(Math.abs(want-span)>60){span=want;scrub.max=span}}
+  scrub.value=ms;at.textContent=(ms/1000).toFixed(2)+' / '+(span/1000).toFixed(1)+' s'}
+requestAnimationFrame(function tick(now){var d=now-last;last=now
+  if(running){t=(t+d)%span;hold(t)} requestAnimationFrame(tick)})
+play.onclick=function(){running=!running;play.textContent=running?'Pause':'Play'}
+scrub.oninput=function(){running=false;play.textContent='Play';t=Number(scrub.value);hold(t)}
+addEventListener('keydown',function(e){if(e.key===' '){e.preventDefault();play.click()}})
+<\/script></body></html>`
 }
 
 /* ── the room ─────────────────────────────────────────────────────────────────────────────────── */
@@ -576,6 +677,7 @@ figcaption b{font-weight:500}.note{color:var(--dim)}.verb{color:var(--faint);fon
       ${PRESETS.map((p, i) => `<option${i === 1 ? ' selected' : ''}>${p.name}</option>`).join('')}
     </select>
     <label class="f"><input type="checkbox" id="cam"> Camera</label>
+    <button class="btn" id="save">Export</button>
     <span class="sep"></span>
     <span class="status" id="driven">—</span>
     <span><kbd>Space</kbd><kbd>←</kbd><kbd>→</kbd></span>
@@ -639,6 +741,15 @@ ask.onclick=async()=>{
 }
 cam.onchange=render
 palette.onchange=render
+document.getElementById('save').onclick=async()=>{
+  if(!opts.length) return
+  const btn=document.getElementById('save'); btn.textContent='Writing…'
+  const r=await fetch('/__wall/export',{method:'POST',headers:{'content-type':'application/json'},
+    body:JSON.stringify({ids:opts.map(o=>o.id),palette:palette.value,
+      name:(APP?(chosen&&chosen.label):file||'').split('/').pop().replace(/\.[^.]+$/,'')})}).then(r=>r.json())
+  btn.textContent='Export'
+  drops.textContent='Wrote '+r.at+' — '+r.kb+'kb, one file, opens anywhere, no requests.'
+}
 document.getElementById('rate').onchange=e=>{rate=parseFloat(e.target.value)}
 
 function render(){
@@ -780,6 +891,16 @@ const server = createServer(async (req, res) => {
       const got = await refine(base, Math.max(1, Math.min(4, body.count || 3)))
       console.log(`    ${got.kept.length} kept, ${got.dropped.length} dropped`)
       return json(res, got)
+    }
+    if (url.pathname === '/__wall/export' && req.method === 'POST') {
+      const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))
+      const html = await exportable(body.ids ?? [], body.palette)
+      if (!html) { res.writeHead(404); return res.end('nothing to export') }
+      const stem = String(body.name ?? 'motion').replace(/[^-\w]/g, '-') || 'motion'
+      const at = path.resolve(work, `${stem}.html`)
+      writeFileSync(at, html)
+      console.log(`    exported ${at} (${Math.round(html.length / 1024)}kb)`)
+      return json(res, { at, kb: Math.round(html.length / 1024) })
     }
     if (url.pathname === '/__wall/save' && req.method === 'POST') {
       const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))
