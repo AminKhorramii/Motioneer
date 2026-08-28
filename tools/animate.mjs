@@ -22,7 +22,7 @@ import { readFileSync, writeFileSync, existsSync, statSync, readdirSync, mkdirSy
 import { spawn } from 'node:child_process'
 import path from 'node:path'
 import { runClaude } from '../shared/cli.mjs'
-import { MOTION_SYSTEM, dealMotions, grabJson, safeStyle, unmoved, brittle } from '../dist-core/core.js'
+import { MOTION_SYSTEM, dealMotions, grabJson, safeStyle, unmoved, brittle, scopeOf } from '../dist-core/core.js'
 
 const args = process.argv.slice(2)
 const cssAt = args.indexOf('--css')
@@ -207,7 +207,7 @@ for (const file of files) {
     }
     const css = raw ? safeStyle(raw.css) : ''
     if (!css) return null
-    const scope = String(raw.scope ?? '').replace(/[^-\w]/g, '').slice(0, 40)
+    const scope = scopeOf(css, raw.scope)
     const faults = [...unmoved({ html: '', css, note: '' }), ...brittle(css)]
     if (faults.length) return { faults, m }
     const seen = await watch(markup, scope, css, base).catch(() => null)

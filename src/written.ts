@@ -310,6 +310,28 @@ export function brittle(css: string): string[] {
     + 'silently. Scope to the attribute you were asked to name and reach the parts by structure.']
 }
 
+/**
+ * Which attribute a motion sheet actually hangs on, read from the sheet rather than from the label.
+ *
+ * A motion reply carries the css and, beside it, the name of the attribute the caller is supposed to
+ * put on the component. Trusting that field is a mistake with a nasty shape: when it comes back empty
+ * or names a different attribute than the selectors do, nothing ever gets the attribute, every rule
+ * matches nothing, and the component renders perfectly still. Nothing else here catches it. The css
+ * has keyframes, it staggers them, it is not pinned to utility classes, so unmoved and brittle both
+ * pass it. It is only wrong about what it is attached to, and the failure appears at render, one
+ * layer past everything that was watching.
+ *
+ * The selectors are what the sheet needs, so they decide. The declared name is used only to pick when
+ * the sheet names more than one, and a sheet that names no attribute at all is left alone, because it
+ * is reaching elements directly and will apply either way.
+ */
+export function scopeOf(css: string, declared?: unknown): string {
+  const used = [...css.matchAll(/\[(data-[-\w]+)\]/g)].map((m) => m[1])
+  const said = String(declared ?? '').replace(/[^-\w]/g, '').slice(0, 40)
+  if (said && used.includes(said)) return said
+  return used[0] ?? ''
+}
+
 export function madeMark(raw: Record<string, unknown>): Written | null {
   const css = safeStyle(raw.css)
   if (!DRAWS.test(css)) return null

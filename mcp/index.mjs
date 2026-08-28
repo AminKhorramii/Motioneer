@@ -476,7 +476,7 @@ async function motion(args) {
     if (!css) return null
     // does it move the parts, and will its selectors still match after somebody edits the markup
     const faults = [...core.unmoved({ html: '', css, note: '' }), ...core.brittle(css)]
-    const scope = String(raw.scope ?? '').replace(/[^-\w]/g, '').slice(0, 40)
+    const scope = core.scopeOf(css, raw.scope)
     return { m, css, scope, note: String(raw.note ?? '').slice(0, 90), faults }
   }))
 
