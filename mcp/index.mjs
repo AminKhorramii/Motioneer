@@ -417,6 +417,44 @@ async function motion(args) {
   const seen = html.slice(0, 6000)
   const styles = args?.css ? `\n\nIts stylesheet, for the timing to fit:\n${String(args.css).slice(0, 4000)}` : ''
 
+  /**
+   * How many distinct frames a component shows over four seconds with a stylesheet applied.
+   *
+   * Distinct rather than merely different: a screenshot is compared by its bytes, so a frame that
+   * differs by one antialiased pixel counts as a change, and that is the honest reading. What is
+   * being asked is whether anything at all is happening on screen, which is the question the css
+   * cannot answer about itself.
+   */
+  async function frames(markup, scope, css) {
+    /**
+     * Only when a browser is actually here.
+     *
+     * playwright is a development dependency and this package ships mcp/ without it, so on a normal
+     * install this import throws and the whole tool would fail on a check rather than on the work.
+     * Missing is not failing: the source gates still ran, and the reply says plainly which options
+     * were watched and which were only read, because a check reported as done when it was skipped
+     * is the one kind of green this repository refuses to print.
+     */
+    const pw = await import('playwright').catch(() => null)
+    if (!pw) return null
+    const { chromium } = pw
+    const browser = await chromium.launch()
+    try {
+      const ctx = await browser.newContext({ viewport: { width: 420, height: 420 } })
+      const tab = await ctx.newPage()
+      const scoped = scope ? markup.replace(/<(\w+)/, `<$1 ${scope}`) : markup
+      await tab.setContent(`<style>${css}</style>${scoped}`, { waitUntil: 'load' })
+      const shots = new Set()
+      for (let i = 0; i < 8; i++) {
+        await tab.waitForTimeout(i === 0 ? 60 : 480)
+        shots.add((await tab.screenshot()).toString('base64'))
+      }
+      return { distinct: shots.size }
+    } finally {
+      await browser.close()
+    }
+  }
+
   const tried = await Promise.all(motions.map(async (m) => {
     const reply = await runClaude(
       core.MOTION_SYSTEM,
@@ -433,13 +471,36 @@ async function motion(args) {
     return { m, css, scope, note: String(raw.note ?? '').slice(0, 90), faults }
   }))
 
-  const kept = tried.filter((t) => t && !t.faults.length)
+  /**
+   * And then watch each one, because reading the css cannot tell you whether anything moved.
+   *
+   * Every gate that has ever gone wrong in this repository went wrong by reading source. An option
+   * with six keyframes and staggered delays reads perfectly and can still be a four hundred
+   * millisecond entrance that is over before anybody looks, or a set of rules whose selectors match
+   * nothing in the component they were written for. Frames settle both questions: the component is
+   * rendered with the stylesheet appended, sampled across four seconds, and an option whose frames
+   * are all identical did not move whatever its css says.
+   */
+  const watched = await Promise.all(tried.map(async (t) => {
+    if (!t || t.faults.length) return t
+    const seen = await frames(html, t.scope, t.css).catch(() => null)
+    if (seen === null) return { ...t, unwatched: true }
+    if (seen.distinct < 2) {
+      return { ...t, faults: [...t.faults, 'rendered, nothing on it changed. Either the selectors match '
+        + 'nothing in this component, or the movement is over before anybody could see it.'] }
+    }
+    return { ...t, distinct: seen.distinct }
+  }))
+
+  const kept = watched.filter((t) => t && !t.faults.length)
   const dropped = tried.filter((t) => t && t.faults.length)
   if (!kept.length) {
     const why = dropped[0]?.faults[0] ?? 'no usable reply came back'
     throw new Error(`No option moved the parts. ${why}`)
   }
   const why = [...new Set(dropped.flatMap((d) => d.faults.map((f) => f.split('.')[0])))]
+  // said out loud, because an option that was only read is a weaker claim than one that was watched
+  const unwatched = kept.some((k) => k.unwatched)
   return kept.map((k, i) =>
     `## ${i + 1}. ${k.note || 'untitled'}\n\n`
     + `Takes its timing from ${k.m}\n\n`
@@ -449,6 +510,12 @@ async function motion(args) {
     ? `\n\n---\n\n${dropped.length} other option${dropped.length === 1 ? ' was' : 's were'} written and dropped: `
       + `${why.join('; ')}.`
     : '')
+    + (unwatched
+      ? '\n\nThese were checked by reading the css rather than by watching them, because no browser '
+        + 'is installed here. Selectors that match nothing, and movement that is over before anybody '
+        + 'sees it, both read as correct and are only visible when rendered.'
+      : '\n\nEach of these was rendered on your component and watched for four seconds, so the '
+        + 'selectors are known to match and the movement is known to be visible.')
 }
 
 async function call(name, args, id) {
