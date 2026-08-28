@@ -33,7 +33,9 @@ import {
 const args = process.argv.slice(2)
 const cssAt = args.indexOf('--css')
 const SHEET = cssAt > -1 ? args[cssAt + 1] : null
-const ROOT = args.find((a, i) => !a.startsWith('--') && !(cssAt > -1 && i === cssAt + 1)) ?? 'examples'
+// with no folder given it opens on the components in this repo, so `npm run studio` is a thing you
+// can run on a clean checkout and immediately have something to animate
+const ROOT = args.find((a, i) => !a.startsWith('--') && !(cssAt > -1 && i === cssAt + 1)) ?? 'examples/components'
 const PORT = Number(process.env.WALL_PORT || 4321)
 const KIND = /\.(tsx|jsx|vue|svelte|astro|html|htm)$/i
 const work = '.studio'
@@ -217,7 +219,20 @@ const preview = (o, camera, palette) => {
   const chrome = camera ? STAGE : `html,body{margin:0;min-height:100%;background:var(--background,#0b0c0d);
     color:var(--foreground,#e6e6e6);font:14px ui-sans-serif,system-ui;display:grid;place-items:center;padding:22px}`
   const head = `<meta charset="utf-8">${tw}${vars}<style>${o.base}\n${chrome}\n${o.css}</style>`
-  if (!camera) return `<html class="dark"><head>${head}</head><body>${scoped}${LISTENER}</body></html>`
+  /**
+   * A dashboard component is eight hundred pixels wide and the card it is being compared in is three
+   * hundred. Left alone you see the first tier of a pricing table and a sliver of the second, which is
+   * no basis for choosing between four motions. Scaling the whole thing down to fit is the only honest
+   * way to show it: a transform does not touch layout, so the component still believes it has its full
+   * width and the motion plays at the timing it was written for, just smaller.
+   */
+  const FIT = `<script>(function(){var el=document.body.firstElementChild;if(!el)return;
+    function fit(){el.style.transform='none';
+      var w=el.getBoundingClientRect().width,h=el.getBoundingClientRect().height;
+      var s=Math.min(1,(innerWidth-28)/w,(innerHeight-28)/h);
+      el.style.transformOrigin='center center';el.style.transform='scale('+s.toFixed(4)+')'}
+    fit();addEventListener('resize',fit);setTimeout(fit,120);setTimeout(fit,600)})();<\/script>`
+  if (!camera) return `<html class="dark"><head>${head}</head><body>${scoped}${FIT}${LISTENER}</body></html>`
   return `<html class="dark"><head>${head}</head><body>
     <div class="rig"><div class="dolly"><div class="plate">
       <div class="layer bloom" data-copy></div>
@@ -305,6 +320,7 @@ kbd{display:inline-flex;align-items:center;justify-content:center;min-width:20px
 figure{margin:0;background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden;
   display:flex;flex-direction:column}
 iframe{width:100%;height:280px;border:0;background:#0b0c0d;display:block}
+.solo{grid-column:1/-1}.solo iframe{height:min(58vh,460px)}
 figcaption{padding:10px 12px;border-top:1px solid var(--line);display:grid;gap:4px;font-size:12px}
 figcaption b{font-weight:500}.note{color:var(--dim)}.verb{color:var(--faint);font-size:11px;line-height:1.5}
 .row{display:flex;gap:6px;margin-top:4px}
@@ -341,6 +357,7 @@ figcaption b{font-weight:500}.note{color:var(--dim)}.verb{color:var(--faint);fon
 const grid=document.getElementById('grid'),drops=document.getElementById('drops')
 const scrub=document.getElementById('scrub'),at=document.getElementById('at'),link=document.getElementById('driven')
 const play=document.getElementById('play'),ask=document.getElementById('ask'),cam=document.getElementById('cam')
+const palette=document.getElementById('palette')
 let file=null, opts=[], running=true, t=0, last=performance.now(), held=new Map()
 
 fetch('/api/list').then(r=>r.json()).then(fs=>{
@@ -349,8 +366,17 @@ fetch('/api/list').then(r=>r.json()).then(fs=>{
   document.querySelectorAll('.file').forEach(b=>b.onclick=()=>{
     file=b.dataset.f
     document.querySelectorAll('.file').forEach(x=>x.setAttribute('aria-current',x===b))
+    opts=[]; held.clear(); drops.textContent=''; render()
   })
 })
+
+/** the component as it is, so the left rail is a thing you browse rather than a thing you submit */
+function peek(){
+  const q='?file='+encodeURIComponent(file)+'&palette='+encodeURIComponent(palette.value)+(cam.checked?'&camera=1':'')
+  grid.innerHTML='<figure class="solo"><iframe data-i="0" src="/peek'+q+'"></iframe><figcaption>'
+    +'<b>'+file.split('/').pop()+'</b><span class="verb">as written, nothing added yet. '
+    +'Press <b>Give it motion</b> for options.</span></figcaption></figure>'
+}
 
 ask.onclick=async()=>{
   if(!file) return alert('Pick a component first.')
@@ -367,11 +393,12 @@ ask.onclick=async()=>{
   ask.disabled=false; ask.innerHTML='Give it motion'
 }
 cam.onchange=render
-document.getElementById('palette').onchange=render
+palette.onchange=render
 
 function render(){
-  if(!opts.length){grid.innerHTML='<div class="empty">Nothing came back that moved its parts.</div>';return}
-  const q='?palette='+encodeURIComponent(document.getElementById('palette').value)+(cam.checked?'&camera=1':'')
+  if(!opts.length){ if(file) return peek()
+    grid.innerHTML='<div class="empty">Pick a component on the left.</div>'; return }
+  const q='?palette='+encodeURIComponent(palette.value)+(cam.checked?'&camera=1':'')
   grid.innerHTML=opts.map((o,i)=>
     '<figure><iframe data-i="'+i+'" src="/preview/'+o.id+q+'"></iframe>'+
     '<figcaption><b>'+(o.note||'untitled')+'</b>'+
@@ -394,8 +421,9 @@ function render(){
 addEventListener('message',e=>{const d=e.data||{}; if(d.wall==='held'){held.set(d.i,d.n); paint()}})
 function paint(){
   const frames=document.querySelectorAll('iframe')
+  if(!opts.length){link.textContent=file?'no motion yet':'—';link.style.color='var(--faint)';return}
   const live=[...held.values()].filter(n=>n>0).length
-  link.textContent=frames.length? live+'/'+frames.length+' driven' : '—'
+  link.textContent=live+'/'+frames.length+' driven'
   link.style.color=live===frames.length?'var(--dim)':'#d29d6b'
 }
 function hold(ms){
@@ -430,6 +458,27 @@ createServer(async (req, res) => {
       res.writeHead(200, { 'content-type': 'text/javascript', 'cache-control': 'max-age=86400' })
       return res.end(t.js)
     }
+    /**
+     * The component as it stands, before anything has been asked of the model.
+     *
+     * Clicking a file should show it, not an empty panel with a button on it. This is also the only
+     * honest way to find out whether the studio can read your component at all: a jsx reader that
+     * loses the tree gives you a preview of nothing, and you want to know that before you spend
+     * thirty seconds and four model calls animating it.
+     */
+    if (url.pathname === '/peek') {
+      const want = path.resolve(url.searchParams.get('file') ?? '')
+      const under = path.resolve(ROOT)
+      if (!want.startsWith(under) || !KIND.test(want) || !existsSync(want)) {
+        res.writeHead(403); return res.end('not a component under the folder this studio was opened on')
+      }
+      const read = markupOf(want)
+      const base = rawSheet ? relevant(rawSheet, read.markup) : read.own
+      const tw = wantsTailwind(read.markup, base) && !!(await getTailwind()).js
+      res.writeHead(200, { 'content-type': 'text/html' })
+      return res.end(preview({ markup: read.markup, base, css: '', scope: '', tw },
+        url.searchParams.has('camera'), url.searchParams.get('palette')))
+    }
     if (url.pathname.startsWith('/preview/')) {
       const o = made.get(url.pathname.split('/')[2])
       if (!o) { res.writeHead(404); return res.end('gone') }
@@ -463,7 +512,8 @@ createServer(async (req, res) => {
   const files = list().length
   console.log(`\n  motion studio  http://localhost:${PORT}`)
   console.log(`  ${files} component${files === 1 ? '' : 's'} under ${path.resolve(ROOT)}`)
-  console.log(rawSheet ? `  styled with ${SHEET}\n` : '  no --css given, so previews are unstyled\n')
+  console.log(rawSheet ? `  styled with ${SHEET}\n`
+    : '  no --css given: utility classes are compiled here and coloured from a Wall palette\n')
   if (!process.env.WALL_NO_OPEN) {
     const [cmd, a] = process.platform === 'darwin' ? ['open', [`http://localhost:${PORT}`]]
       : process.platform === 'win32' ? ['cmd', ['/c', 'start', '', `http://localhost:${PORT}`]]
