@@ -246,6 +246,47 @@ export function undrawn(written: Written): string[] {
  * same detector reads the result. A mark is a written page with a different job, not a second kind
  * of thing needing a second set of defences.
  */
+/**
+ * What a mark asked to move did not do, which is the drawing gate one axis along.
+ *
+ * undrawn asks whether a page drew and whether it drew at size. This asks whether a thing moves and
+ * whether it moves as a mechanism, and the second half is the one that matters: sliding or fading a
+ * finished picture is a transition, and a transition is what every generated interface already does.
+ *
+ * The measure is staggering, and it is not a guess. Across six moving marks the count of
+ * animation-delay predicted the verdict before any of them were looked at: the till roll printing a
+ * line at a time carried eleven and was the best of them, the riso seal being cancelled carried
+ * nine, and the one that barely moved carried none. Things happening at slightly different times
+ * read as mechanism; things happening at once read as a slideshow. That is a real distinction and
+ * it happens to be countable.
+ *
+ * A keyframe on its own is not enough and a keyframe count is not the measure either, because one
+ * long keyframe moving a wrapper scores the same as twenty moving parts.
+ */
+const MOVES = /@keyframes/i
+const STAGGER = /animation-delay\s*:|animation\s*:[^;}]*?\b\d*\.?\d+m?s\b[^;}]*?\b\d*\.?\d+m?s\b/i
+/** the transition on everything, which is the motion the catalogue already knows to distrust */
+const BLANKET = /transition\s*:\s*all\b|\*\s*\{[^}]*transition/i
+
+export function unmoved(written: Written): string[] {
+  const out: string[] = []
+  if (!MOVES.test(written.css)) {
+    out.push('nothing on this mark moves. It was asked for movement and came back a still, so the '
+      + 'whole point of the call was not paid for.')
+    return out
+  }
+  if (!STAGGER.test(written.css)) {
+    out.push('everything moves at once, which is a transition rather than a mechanism. Stagger the '
+      + 'parts with animation-delay so the drawing assembles itself instead of arriving whole: an '
+      + 'object that prints, flips or comes into register does those things to its parts in order.')
+  }
+  if (BLANKET.test(written.css)) {
+    out.push('a transition on everything, which is the house style of every generated interface. '
+      + 'Move the few things that carry the idea and let the rest hold still.')
+  }
+  return out
+}
+
 export function madeMark(raw: Record<string, unknown>): Written | null {
   const css = safeStyle(raw.css)
   if (!DRAWS.test(css)) return null

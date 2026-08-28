@@ -890,6 +890,42 @@ if (houseFlags.length) throw new Error(`the house trips its own detector on ${ho
   if (trips(sans, headline)) throw new Error('the rule fired without a serif display, which is the half that was already fixed once')
 }
 
+// ——— 0s. a mark asked to move has to move its parts, not slide the whole ———
+// undrawn asks whether a page drew and whether it drew at size. This is the same question one axis
+// along, and the half that matters is the second: sliding or fading a finished picture is a
+// transition, and a transition is what every generated interface already does.
+//
+// The measure is staggering, and it was measured rather than chosen. Across six real moving marks
+// the count of delays predicted the verdict before any of them were looked at: the till roll
+// printing a line at a time carried eleven and was the best, the riso seal being cancelled carried
+// nine, and the one that barely moved carried none and was the only one this flags.
+//
+// Both spellings have to count. A delay is written as animation-delay or as the second time in the
+// animation shorthand, and a real mark used the shorthand for all six of its staggers: a gate that
+// only knew the long form would have failed one of the good ones.
+{
+  const m = (css) => core.unmoved({ html: '', css, note: '' })
+  const still = '.a{background:conic-gradient(red,blue)}'
+  const oneLump = '@keyframes m{to{opacity:1}}.a{animation:m 2s ease}'
+  const longForm = '@keyframes m{to{opacity:1}}.a{animation:m 2s}.b{animation:m 2s;animation-delay:.2s}'
+  const shorthand = '@keyframes m{to{opacity:1}}.a{animation:m 2.4s steps(6) 0.05s both}.b{animation:m 2.4s steps(6) 0.65s both}'
+  const blanket = '@keyframes m{to{opacity:1}}.a{animation:m 2s;animation-delay:.2s}*{transition:all .3s}'
+
+  console.log('does the mark move:', JSON.stringify({
+    aStill: m(still).length,
+    everythingAtOnce: m(oneLump).length,
+    staggeredTheLongWay: m(longForm).length,
+    staggeredInTheShorthand: m(shorthand).length,
+    aTransitionOnEverything: m(blanket).length,
+  }))
+  if (!m(still).length) throw new Error('a mark with no keyframes passed a gate about movement')
+  if (!m(still)[0].includes('nothing on this mark moves')) throw new Error('a still was failed for the wrong reason')
+  if (!m(oneLump).length) throw new Error('one animation on one element passed, so a transition counts as a mechanism')
+  if (m(longForm).length) throw new Error('animation-delay was not read as staggering')
+  if (m(shorthand).length) throw new Error('a delay in the animation shorthand was not read, which fails real marks that stagger that way')
+  if (!m(blanket).some((f) => f.includes('transition on everything'))) throw new Error('a transition on everything went unflagged')
+}
+
 // ——— 0m. the ruler reads a written page, and reads a bleed as design ———
 // written.ts opens by saying the detector and the ruler both run over a written page exactly as
 // they run over an arranged one. Only the first half was ever true: strainsIn was reached through

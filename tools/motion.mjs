@@ -28,7 +28,7 @@ import path from 'node:path'
 import { runClaude } from '../shared/cli.mjs'
 import {
   DIRECTIONS, MARK_SYSTEM, MOTION, PRESETS, dealDepictions, dealMotions, directionSeed,
-  grabJson, madeMark, renderPage, starterPage, tasteOf,
+  grabJson, madeMark, renderPage, starterPage, tasteOf, unmoved,
 } from '../dist-core/core.js'
 
 const SUBJECT = process.argv.slice(2).join(' ') || 'a status badge for a service that is holding steady'
@@ -114,8 +114,10 @@ for (const m of made) {
   // does it actually animate, or did it come back a still calling itself moving
   const keyframes = (m.mark.css.match(/@keyframes/gi) ?? []).length
   const delays = (m.mark.css.match(/animation-delay/gi) ?? []).length
-  rows.push({ ...m, slug, frames, kb, keyframes, delays })
-  console.log(`  ${m.ground.name.padEnd(20)} ${String(keyframes).padStart(2)} keyframes, ${String(delays).padStart(2)} staggered  ${String(kb).padStart(4)} KB`)
+  // and the gate's own verdict, which reads the shorthand spelling too
+  const faults = unmoved(m.mark)
+  rows.push({ ...m, slug, frames, kb, keyframes, delays, faults })
+  console.log(`  ${m.ground.name.padEnd(20)} ${String(keyframes).padStart(2)} keyframes  ${String(kb).padStart(4)} KB  ${faults.length ? faults[0].split('.')[0] : 'moves as a mechanism'}`)
   console.log(`     ${m.motion.slice(0, 74)}`)
 }
 await browser.close()
@@ -123,7 +125,7 @@ await browser.close()
 const shown = rows.filter((r) => r.mark)
 const strips = shown.map((r) => `<section>
   <h2>${r.ground.name} · ${(r.mark.note || '').slice(0, 44)}</h2>
-  <p>${r.motion} · ${r.keyframes} keyframes, ${r.delays} staggered</p>
+  <p>${r.motion} · ${r.keyframes} keyframes · ${r.faults.length ? r.faults[0].split('.')[0] : 'moves as a mechanism'}</p>
   <div class="strip">${r.frames.map((f) => `<img src="${f}">`).join('')}</div>
   <video src="${r.slug}.webm" autoplay loop muted playsinline></video>
 </section>`).join('')
