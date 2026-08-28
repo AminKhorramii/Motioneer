@@ -26,6 +26,7 @@ import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { REQUESTS, generateImage, streamText } from '../shared/providers.mjs'
 import { CLI_MODEL, DESIGN_MODEL, INTAKE_MODEL, hasClaude, runClaude } from '../shared/cli.mjs'
+import { listenNear, movedFrom } from '../shared/port.mjs'
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 const DIST = path.join(ROOT, 'dist')
@@ -330,10 +331,17 @@ const server = createServer(async (req, res) => {
 })
 
 // PORT=0 binds whatever is free and reports it, which is what tests use so a leftover process
-// from an earlier run cannot quietly answer in this one
-server.listen(PORT, HOST, () => {
+// from an earlier run cannot quietly answer in this one. A named port that is busy steps to the next
+// one rather than throwing, since somebody serving two walls at once is not doing anything wrong
+const live = await listenNear(server, PORT, HOST).catch((e) => {
+  console.error(`cannot listen on ${PORT}: ${e.message}`)
+  process.exit(1)
+})
+{
   const held = Object.keys(KEYS).filter((k) => KEYS[k])
-  console.log(`wall on http://localhost:${server.address().port}`)
+  console.log(`wall on http://localhost:${live}`)
+  const moved = movedFrom(live, PORT)
+  if (moved) console.log(moved.trim())
   console.log(held.length ? `holding keys for ${held.join(', ')}` : 'holding no keys, so visitors bring their own')
   // said out loud, because the alternative to a model is a wall of stand-ins that reads as real
   console.log(
@@ -346,7 +354,7 @@ server.listen(PORT, HOST, () => {
   if (PER_HOUR) console.log(`limit ${PER_HOUR} walls per address per hour`)
   if (DAILY_TOKENS) console.log(`limit ${DAILY_TOKENS} output tokens per day`)
   if (IDLE_MS) console.log(`stopping after ${Math.round(IDLE_MS / 1000)}s with nobody asking`)
-})
+}
 
 if (IDLE_MS) {
   /**

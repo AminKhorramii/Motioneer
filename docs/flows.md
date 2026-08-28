@@ -643,6 +643,11 @@ The options share a document rather than sitting in iframes, which they can only
 sheet is already scoped to an attribute: option two gets `data-motion-fold-2` and its selectors are
 rewritten to match, so four sheets coexist. That file is the thing you attach to a pull request.
 
+It opens on port 4321, and a port that is already answering steps to the next free one and says so,
+because two studios at once is a reasonable pair to want: one on a folder of components, one on a
+running app. The same is true of `npm run serve` on 8080. `PORT=0` still means whatever is free,
+which is what the suites rely on so a leftover process cannot quietly answer for a new one.
+
 `shot.mjs` and `film.mjs` are the other end of it: a camera pass over a component, then that move
 rendered frame by frame. The frames are the deliverable and mp4 only happens if ffmpeg is installed,
 which is said out loud rather than silently skipped.

@@ -32,6 +32,7 @@ src/
   imagewasm.ts  generated: the crate, inlined as base64
 
 shared/providers.mjs   one model path for every shell
+shared/port.mjs        binds the port asked for, or the next free one, and says which
 mcp/index.mjs          the three tools an agent calls, and how Wall is opened
 src-tauri/             the desktop shell, built but not released yet
 crates/wall-image/     decode, fit, flatten, re-encode. compiled to wasm

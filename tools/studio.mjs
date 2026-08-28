@@ -27,6 +27,7 @@ import { readFileSync, writeFileSync, existsSync, statSync, readdirSync, mkdirSy
 import { spawn } from 'node:child_process'
 import path from 'node:path'
 import { runClaude } from '../shared/cli.mjs'
+import { listenNear, movedFrom } from '../shared/port.mjs'
 import {
   MOTION_SYSTEM, dealMotions, grabJson, safeStyle, unmoved, brittle, scopeOf,
   PRESETS, themeOf, themeCss,
@@ -1027,20 +1028,27 @@ if (TARGET) {
   })
 }
 
-server.listen(PORT, () => {
-  console.log(`\n  motion studio  http://localhost:${PORT}`)
-  if (TARGET) console.log(`  proxying ${TARGET}\n  its dom is readable here, so its elements can be picked`)
-  else {
-    const files = list().length
-    console.log(`  ${files} component${files === 1 ? '' : 's'} under ${path.resolve(ROOT)}`)
-  }
-  console.log(TARGET ? '  picked elements bring their own css, so nothing is guessed\n'
-    : rawSheet ? `  styled with ${SHEET}\n`
-      : '  no --css given: utility classes are compiled here and coloured from a Wall palette\n')
-  if (!process.env.WALL_NO_OPEN) {
-    const [cmd, a] = process.platform === 'darwin' ? ['open', [`http://localhost:${PORT}`]]
-      : process.platform === 'win32' ? ['cmd', ['/c', 'start', '', `http://localhost:${PORT}`]]
-        : ['xdg-open', [`http://localhost:${PORT}`]]
-    spawn(cmd, a, { stdio: 'ignore', detached: true }).unref()
-  }
+// a studio pointed at a folder and another pointed at a running app is a reasonable pair to want
+// open at once, so a busy port moves along rather than ending the process
+const live = await listenNear(server, PORT).catch((e) => {
+  console.log(`\n  cannot listen: ${e.message}\n`)
+  process.exit(1)
 })
+const where = `http://localhost:${live}`
+console.log(`\n  motion studio  ${where}`)
+const moved = movedFrom(live, PORT)
+if (moved) console.log(moved)
+if (TARGET) console.log(`  proxying ${TARGET}\n  its dom is readable here, so its elements can be picked`)
+else {
+  const files = list().length
+  console.log(`  ${files} component${files === 1 ? '' : 's'} under ${path.resolve(ROOT)}`)
+}
+console.log(TARGET ? '  picked elements bring their own css, so nothing is guessed\n'
+  : rawSheet ? `  styled with ${SHEET}\n`
+    : '  no --css given: utility classes are compiled here and coloured from a Wall palette\n')
+if (!process.env.WALL_NO_OPEN) {
+  const [cmd, a] = process.platform === 'darwin' ? ['open', [where]]
+    : process.platform === 'win32' ? ['cmd', ['/c', 'start', '', where]]
+      : ['xdg-open', [where]]
+  spawn(cmd, a, { stdio: 'ignore', detached: true }).unref()
+}
