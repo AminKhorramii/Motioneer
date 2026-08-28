@@ -489,8 +489,85 @@ parent.postMessage({wall:'ready'},'*');
 })();<\/script>`
 
 /* ── asking for motion, with every gate the other tools use ───────────────────────────────────── */
+
+/**
+ * One place where a model call is made, judged, and if it is worth it, made again.
+ *
+ * Three things were wrong with doing this inline at each call site. runClaude resolves with
+ * {error} rather than throwing, so reading reply.text and finding it undefined threw the reason
+ * away: "the claude command was not found on this machine" arrived and was reported as the
+ * uninformative "no usable reply came back". Every failure was retried identically, including the
+ * ones no amount of retrying will fix and the ones that need a pause first. And the retry was
+ * immediate, which for a rate limit is the one thing guaranteed not to work.
+ *
+ * The ceiling is tighter here than the four minutes a whole page is allowed. Somebody is watching a
+ * button, and silence past a minute or so is indistinguishable from a broken one.
+ */
+const TERMINAL = /not found on this machine|not authenticated|no such file|invalid api key|unauthorized/i
+const BUSY = /rate limit|overloaded|429|503|too many requests|temporarily/i
+
+const CALL_MS = Number(process.env.WALL_STUDIO_CALL_MS || 150_000)
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
+async function askModel(brief, tries = 3) {
+  let last = 'no usable reply came back'
+  for (let n = 0; n < tries; n++) {
+    // the first go leaves the thinking budget alone; a retry turns it off, which is both faster and
+    // a genuinely different attempt rather than the same one repeated
+    const reply = await runClaude(MOTION_SYSTEM, brief, {
+      callMs: CALL_MS, ...(n > 0 ? { thinking: undefined } : {}),
+    }).catch((e) => ({ error: String(e && e.message ? e.message : e).slice(0, 160) }))
+
+    if (reply && reply.error) {
+      last = reply.error
+      if (TERMINAL.test(last)) return { why: last, terminal: true }
+      // a busy upstream needs a pause, not another immediate identical request
+      if (n < tries - 1) await sleep(BUSY.test(last) ? 1500 * (n + 1) : 400)
+      continue
+    }
+    const raw = grabJson(typeof reply === 'string' ? reply : (reply && reply.text) || '')
+    if (raw) return { raw }
+    last = 'the reply was not the json this asks for'
+    if (n < tries - 1) await sleep(300)
+  }
+  return { why: last }
+}
+
+/** the gates, in one place, so refine and options cannot drift apart on what they accept */
+function judge(raw, fallbackScope) {
+  const css = safeStyle(raw.css)
+  if (!css) return { why: 'the reply carried no css that is allowed in a sheet' }
+  const faults = [...unmoved({ html: '', css, note: '' }), ...brittle(css)]
+  if (faults.length) return { why: faults[0] }
+  return { css, scope: scopeOf(css, raw.scope ?? fallbackScope), note: String(raw.note ?? '').slice(0, 90) }
+}
+
+/**
+ * Nothing one attempt does may cost the others.
+ *
+ * These run together, and Promise.all rejects the whole batch the moment any single one throws. A
+ * malformed reply that trips safeStyle would therefore lose three good options alongside the bad
+ * one, and the caller would see a 500 rather than the three that worked.
+ */
+const settle = async (jobs) => (await Promise.allSettled(jobs)).map((r) =>
+  (r.status === 'fulfilled' ? r.value
+    : { why: `attempt failed: ${String(r.reason).slice(0, 120)}`, kind: 'model' }))
+
 const made = new Map()   // id -> { file, markup, base, css, scope, note, verb }
 let nextId = 0
+
+/**
+ * Options are remembered so a preview can be re-rendered and an export can gather them, which means
+ * this map only ever grows. A long session on a folder of components, asking four at a time and
+ * refining the good ones, puts markup and css in here a few hundred times over, and nothing ever
+ * takes any of it out. The oldest are dropped once there are more than a session could plausibly be
+ * looking at; a preview for one of those answers honestly that it is gone.
+ */
+const KEEP = 240
+const keep = (id, option) => {
+  made.set(id, option)
+  while (made.size > KEEP) made.delete(made.keys().next().value)
+}
 
 /**
  * Variations on one that nearly worked.
@@ -515,23 +592,16 @@ async function refine(base, count) {
   const brief = `This motion works and is being kept. Here is its sheet:\n\n${base.css}\n\n`
     + `It was described as: ${base.note}\n\nThe markup it moves:\n${base.markup.slice(0, 5000)}\n\n`
   const turns = TURNS.slice(0, count)
-  const tried = await Promise.all(turns.map(async (turn) => {
+  const tried = await settle(turns.map(async (turn) => {
     const ask = brief + `Rewrite it as ${turn} Keep the same scope attribute, ${base.scope || 'the one it already uses'}, `
       + 'and keep it recognisably the same motion rather than a new one.'
-    let reply = await runClaude(MOTION_SYSTEM, ask).catch(() => null)
-    let raw = reply ? grabJson(typeof reply === 'string' ? reply : reply.text ?? '') : null
-    if (!raw) {
-      reply = await runClaude(MOTION_SYSTEM, ask, { thinking: undefined }).catch(() => null)
-      raw = reply ? grabJson(typeof reply === 'string' ? reply : reply.text ?? '') : null
-    }
-    const css = raw ? safeStyle(raw.css) : ''
-    if (!css) return { verb: turn, why: 'no usable reply came back' }
-    const faults = [...unmoved({ html: '', css, note: '' }), ...brittle(css)]
-    if (faults.length) return { verb: turn, why: faults[0] }
+    const got = await askModel(ask)
+    if (!got.raw) return { verb: turn, why: got.why, kind: 'model', terminal: got.terminal }
+    const ok = judge(got.raw, base.scope)
+    if (!ok.css) return { verb: turn, why: ok.why, kind: 'gate' }
     const id = String(nextId++)
-    const scope = scopeOf(css, raw.scope ?? base.scope)
-    made.set(id, { ...base, id, css, scope, note: String(raw.note ?? '').slice(0, 90), verb: turn })
-    return { id, verb: turn, scope, note: String(raw.note ?? '').slice(0, 90), css }
+    keep(id, { ...base, id, css: ok.css, scope: ok.scope, note: ok.note, verb: turn })
+    return { id, verb: turn, scope: ok.scope, note: ok.note, css: ok.css }
   }))
   return { kept: tried.filter((t) => t.id), dropped: tried.filter((t) => !t.id), styled: 'the same as before' }
 }
@@ -555,24 +625,16 @@ user sees, and the css below is the rules that actually matched it.\n\n${source.
   const attempt = async (verb, told) => {
     const brief = about + `Move it by ${verb} Take the timing from that object: it is how the thing behaves.`
       + (told ? `\n\nA previous attempt at this was rejected because ${told} Do not repeat that.` : '')
-    let reply = await runClaude(MOTION_SYSTEM, brief).catch(() => null)
-    let raw = reply ? grabJson(typeof reply === 'string' ? reply : reply.text ?? '') : null
-    if (!raw) {
-      reply = await runClaude(MOTION_SYSTEM, brief, { thinking: undefined }).catch(() => null)
-      raw = reply ? grabJson(typeof reply === 'string' ? reply : reply.text ?? '') : null
-    }
-    const css = raw ? safeStyle(raw.css) : ''
-    if (!css) return { verb, why: 'no usable reply came back' }
-    const faults = [...unmoved({ html: '', css, note: '' }), ...brittle(css)]
-    if (faults.length) return { verb, why: faults[0] }
+    const got = await askModel(brief)
+    if (!got.raw) return { verb, why: got.why, kind: 'model', terminal: got.terminal }
+    const ok = judge(got.raw)
+    if (!ok.css) return { verb, why: ok.why, kind: 'gate' }
     const id = String(nextId++)
-    const scope = scopeOf(css, raw.scope)
-    made.set(id, { file: name, markup, base, css, scope, tw, wide,
-      note: String(raw.note ?? '').slice(0, 90), verb })
-    return { id, verb, scope, note: String(raw.note ?? '').slice(0, 90), css }
+    keep(id, { file: name, markup, base, css: ok.css, scope: ok.scope, tw, wide, note: ok.note, verb })
+    return { id, verb, scope: ok.scope, note: ok.note, css: ok.css }
   }
 
-  const first = await Promise.all(dealMotions(count).map((verb) => attempt(verb)))
+  const first = await settle(dealMotions(count).map((verb) => attempt(verb)))
   /**
    * One more go at the slots a gate turned down, and this time it is told why.
    *
@@ -583,11 +645,16 @@ user sees, and the css below is the rules that actually matched it.\n\n${source.
    * nothing in it that wants to move separately.
    */
   const missed = first.filter((t) => !t.id)
-  const again = missed.length
-    ? await Promise.all(dealMotions(missed.length).map((verb, i) => attempt(verb, missed[i].why)))
+  // a terminal fault is the same answer however many times it is asked, so it is not asked again
+  const worth = missed.filter((m) => !m.terminal && m.kind !== 'model')
+  const again = worth.length
+    ? await settle(dealMotions(worth.length).map((verb, i) => attempt(verb, worth[i].why)))
     : []
-  const tried = first.filter((t) => t.id).concat(again)
-  if (missed.length) console.log(`    retried ${missed.length}, recovered ${again.filter((t) => t.id).length}`)
+  // the ones deliberately not asked again are still failures, and leaving them out of the tally
+  // reported nothing dropped at all, which sent the page to the wrong explanation
+  const settled = missed.filter((m) => !worth.includes(m))
+  const tried = first.filter((t) => t.id).concat(again).concat(settled)
+  if (worth.length) console.log(`    retried ${worth.length}, recovered ${again.filter((t) => t.id).length}`)
   const styled = picked ? 'the rules that matched it in your app'
     : tw ? 'tailwind and a Wall palette'
       : base ? `${SHEET ? path.basename(SHEET) : 'its own <style>'}`
@@ -812,12 +879,14 @@ fetch('/__wall/list').then(r=>r.json()).then(fs=>{
  */
 function explain(){
   const d=verdict.dropped||[]
-  const silent=d.length&&d.every(x=>/no usable reply/i.test(x.why||''))
+  const silent=d.length&&d.every(x=>x.kind==='model')
   let body
   if(verdict.error) body='<b>The studio errored.</b><br>'+verdict.error
   else if(!CAN_WRITE||silent) body='<b>The model did not answer.</b><br>'
     +(CAN_WRITE
-      ? 'The claude command is on PATH here, so this is likely a rate limit or a dropped connection. Worth pressing again.'
+      ? 'Each attempt was made three times with a pause between, and every one came back with:<br><br>'
+        +d.slice(0,3).map(x=>'&middot; '+x.why).join('<br>')
+        +'<br><br>That is upstream rather than about this component. Worth pressing again in a moment.'
       : 'There is no claude command on PATH, so there is nothing for the button to call. '
         +'Start the studio from a shell where <b>claude</b> runs.')
   else body='<b>Every option was turned down by a gate.</b><br>'
@@ -836,24 +905,42 @@ function peek(){
     +'Press <b>Give it motion</b> for options.</span></figcaption></figure>'
 }
 
+/* a request that never comes back would leave the button reading Writing for as long as the tab is
+   open, so every ask carries its own deadline and says so if it runs out */
+let inflight=null
+async function post(where, body, ms){
+  if(inflight) inflight.abort()
+  const c=new AbortController(); inflight=c
+  const bell=setTimeout(()=>c.abort(), ms)
+  try{
+    const r=await fetch(where,{method:'POST',headers:{'content-type':'application/json'},
+      body:JSON.stringify(body),signal:c.signal})
+    if(!r.ok) throw new Error('the studio answered '+r.status)
+    return await r.json()
+  }finally{ clearTimeout(bell); if(inflight===c) inflight=null }
+}
 ask.onclick=async()=>{
   if(APP && !chosen) return alert('Press Pick element, then click something in your app.')
   if(!APP && !file) return alert('Pick a component first.')
+  if(ask.disabled) return
   verdict=null
   ask.disabled=true; ask.textContent='Writing…'
   grid.innerHTML='<div class="empty">Asking for '+document.getElementById('count').value+' motions.<br>About thirty seconds.</div>'
   drops.textContent=''
   try{
-    const r=await fetch('/__wall/motion',{method:'POST',headers:{'content-type':'application/json'},
-      body:JSON.stringify(Object.assign({count:Number(document.getElementById('count').value)},
-        APP?chosen:{file}))}).then(r=>r.json())
+    const r=await post('/__wall/motion',
+      Object.assign({count:Number(document.getElementById('count').value)}, APP?chosen:{file}), 360000)
     opts=r.kept||[]; held.clear(); ends.clear()
     verdict = opts.length ? null : {dropped:r.dropped||[], error:r.error}
     render()
     drops.textContent=(r.dropped&&r.dropped.length&&opts.length? r.dropped.length+' dropped: '
       +r.dropped.map(d=>d.why.split('.')[0]).join('; ')+'. ' : '')
       +(r.styled?'Styled with '+r.styled+'.':'')
-  }catch(e){ verdict={dropped:[],error:String(e)}; opts=[]; render() }
+  }catch(e){
+    verdict={dropped:[],error: e && e.name==='AbortError'
+      ? 'The studio did not answer within six minutes. It may still be working: the terminal says what it is doing.'
+      : String(e && e.message ? e.message : e)}
+    opts=[]; render() }
   ask.disabled=false; ask.innerHTML='Give it motion'
 }
 cam.onchange=render
@@ -888,13 +975,14 @@ function render(){
     const keep=opts.find(x=>x.id===b.dataset.more)
     b.textContent='Varying…'; ask.disabled=true
     try{
-      const r=await fetch('/__wall/refine',{method:'POST',headers:{'content-type':'application/json'},
-        body:JSON.stringify({id:keep.id,count:3})}).then(r=>r.json())
+      const r=await post('/__wall/refine',{id:keep.id,count:3},360000)
       // the one you liked stays on screen, with its variations beside it, so the comparison is real
       opts=[keep].concat(r.kept); held.clear(); ends.clear(); render()
       drops.textContent=r.dropped.length? r.dropped.length+' variation'+(r.dropped.length>1?'s':'')
         +' dropped: '+r.dropped.map(d=>d.why.split('.')[0]).join('; ') : 'Variations of the kept motion.'
-    }catch(e){ drops.textContent=String(e) }
+    }catch(e){ drops.textContent = e && e.name==='AbortError'
+      ? 'That took too long and was given up on. The terminal says what it was doing.'
+      : String(e && e.message ? e.message : e) }
     ask.disabled=false
   })
   document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=async()=>{
@@ -955,6 +1043,23 @@ addEventListener('keydown',e=>{
 <\/script></body></html>`
 
 const json = (res, v) => { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(v)) }
+
+/**
+ * The process stays up whatever one request does.
+ *
+ * Node's default for an unhandled rejection is to end the process, and this one spawns model calls,
+ * proxies somebody else's dev server and parses whatever a page hands back. Ending on the first
+ * surprise would throw away every option in memory and drop the tab, for a fault that was almost
+ * always confined to one request. Logged rather than swallowed, so the terminal still shows it.
+ */
+process.on('unhandledRejection', (e) => {
+  console.log(`  a promise failed and was not caught: ${String(e && e.message ? e.message : e).slice(0, 200)}`)
+})
+process.on('uncaughtException', (e) => {
+  console.log(`  something threw where nothing was catching: ${String(e && e.message ? e.message : e).slice(0, 200)}`)
+})
+// a proxied app that dies mid response is an ECONNRESET on a socket, not a reason to stop serving
+process.on('SIGPIPE', () => {})
 
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x')
@@ -1043,8 +1148,12 @@ const server = createServer(async (req, res) => {
     if (TARGET && !OURS.test(url.pathname)) return proxy(req, res, url)
     res.writeHead(404); res.end('no')
   } catch (e) {
+    const why = String(e && e.message ? e.message : e).slice(0, 300)
+    console.log(`  ${req.method} ${url.pathname} failed: ${why}`)
+    // headersSent means something already started answering, and writing a second head throws
+    if (res.headersSent) return res.end()
     res.writeHead(500, { 'content-type': 'application/json' })
-    res.end(JSON.stringify({ error: String(e && e.message ? e.message : e).slice(0, 300) }))
+    res.end(JSON.stringify({ error: why }))
   }
 })
 

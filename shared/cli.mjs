@@ -130,7 +130,7 @@ function give() {
  * ours to show, but the fact of it is, so it goes to a separate callback that never touches the
  * reply.
  */
-export async function runClaude(system, user, { model = CLI_MODEL(), bin = 'claude', onDelta, onThink, thinking } = {}) {
+export async function runClaude(system, user, { model = CLI_MODEL(), bin = 'claude', onDelta, onThink, thinking, callMs } = {}) {
   const streaming = typeof onDelta === 'function'
   /**
    * How much this call may think, in tokens, or null to leave the model's own budget alone.
@@ -202,7 +202,10 @@ export async function runClaude(system, user, { model = CLI_MODEL(), bin = 'clau
      * Generous rather than tight. A page written whole spends minutes thinking before it writes a
      * character, and killing real work would be a worse bug than the one this fixes.
      */
-    const ceiling = Number(process.env.WALL_CALL_MS || 420_000)
+    // a caller that knows its own job may set a tighter one: a studio option is somebody waiting at
+    // a screen, where four minutes of silence is indistinguishable from a broken button, while a page
+    // written whole is worth waiting out
+    const ceiling = Number(callMs || process.env.WALL_CALL_MS || 420_000)
     const bell = setTimeout(() => {
       child.kill('SIGKILL')
       done({ error: `the session did not answer within ${Math.round(ceiling / 1000)}s` })
