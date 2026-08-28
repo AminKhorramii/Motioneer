@@ -36,7 +36,7 @@ export { BLOCKS, TOKENS, blockContract } from '@/design/blocks'
 // the prompt for one drawn thing rather than a page with one on it. It travels because the mark
 // path is driven from a tool rather than from the window, and because the deck it composes with
 // already lives out here
-export { MARK_SYSTEM, MOTION, WRITTEN_SYSTEM } from '@/design/prompts'
+export { MARK_SYSTEM, MOTION, MOTION_SYSTEM, WRITTEN_SYSTEM } from '@/design/prompts'
 // reading one finished reply, which the mark tool needs for the same reason the app does
 export { grabJson } from '@/reply'
 // a direction said in the token names the rest of the world already uses, with both modes derived

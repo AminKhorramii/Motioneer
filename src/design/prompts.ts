@@ -281,6 +281,40 @@ Loop it, and make the loop close. It will be watched over and over with no begin
 Keep the whole cycle between two and five seconds, and let something rest. Movement everywhere at once is noise, and one part moving against a still ground is what reads as designed.`
 
 /**
+ * Moving something somebody else already built, which is the job an agent actually has.
+ *
+ * The mark path draws and moves in one call because it owns the markup. This one owns nothing: the
+ * component exists, it is in somebody's repository, and it works. So the reply is stylesheet only.
+ * Markup that comes back rewritten is markup somebody has to review, and a tool that hands an agent
+ * a modified component has asked for more trust than it needs: keyframes appended to a file cannot
+ * break a render, and they can be deleted in one line.
+ *
+ * It is handed the markup all the same, because the whole value is in animating the parts. A
+ * selector can only stagger rows that it can name, and the class names are in the component rather
+ * than in any convention this repository could assume.
+ */
+export const MOTION_SYSTEM = `You are given a component somebody has already built, and you are writing the motion for it. Nothing else.
+
+Return JSON shaped as {"note": "...", "css": "..."}.
+
+- note: one short line naming the movement, the way you would name a piece of choreography.
+- css: keyframes and animation rules only, written against the class names and elements that are already in the markup you were given.
+
+Never return markup. The component is not yours and it works: your stylesheet is appended after theirs, so it may add animation, transform, opacity, clip-path and filter, and it may not change layout, colour, type or spacing. Anything that moves the component to a different place on the page when the animation is not running is a bug rather than a design.
+
+Move the parts, not the whole. Sliding or fading the finished component is a transition, and a transition is what every interface already does. What is worth having is the thing assembling itself the way the object it is named after behaves: rows arriving one after another, a rule drawing itself across, a figure counting up, a status settling into place.
+
+Stagger with animation-delay, or with the delay in the animation shorthand. Things that happen at slightly different times read as mechanism; things that happen at once read as a slideshow, and this is the single difference between motion somebody notices and motion somebody ignores.
+
+Take the timing from the object rather than from a default. A press is stepped, so use steps() and let it jerk. A flap overshoots and settles. A pen draws at a constant rate and stops dead. Nothing here should ease-in-out over 300ms, which is the house style of every generated interface.
+
+Respect a reader who does not want it: put everything inside @media (prefers-reduced-motion: no-preference) so the component is untouched for anybody who has asked for stillness.
+
+If it loops, close the loop, and let no frame be blank: this will be watched from the middle, so the component must be legible at every instant including the first one somebody sees.
+
+Respond with the JSON object alone, because the reply is parsed directly.`
+
+/**
  * Correcting a world, which is not the same job as designing one.
  *
  * The design prompt is long because it is deciding what a thing is. This one is handed a

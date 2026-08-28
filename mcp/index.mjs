@@ -128,6 +128,37 @@ const TOOLS = [
       required: ['html'],
     },
   },
+  {
+    name: 'motion',
+    description:
+      'Give a component you already have motion that is not a 300ms fade. Send the markup and get '
+      + 'back stylesheets to append: keyframes written against your own class names, staggering the '
+      + 'parts so the thing assembles itself rather than sliding in whole. Each option takes its '
+      + 'timing from a real object, a split flap turning, paper leaving a printer, a stamp landing, '
+      + 'so several of them disagree rather than all easing the same way. Your markup is never '
+      + 'changed and never returned, everything is wrapped in prefers-reduced-motion, and options '
+      + 'that only move the component as one piece are rejected before you see them.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        html: {
+          type: 'string',
+          description:
+            'The component markup as it stands. The class names matter, because the motion is '
+            + 'written against them, so send the real thing rather than a summary.',
+        },
+        css: {
+          type: 'string',
+          description: 'Its stylesheet, if you have it. Optional, and it makes the timing fit better.',
+        },
+        options: {
+          type: 'number',
+          description: 'How many different motions to write. Three by default, six at most.',
+        },
+      },
+      required: ['html'],
+    },
+  },
 ]
 
 const handoffDir = (dir) => path.join(path.resolve(dir ?? process.cwd()), '.wall')
@@ -360,7 +391,62 @@ async function check(html) {
     : 'Nothing generic found.'
 }
 
+/**
+ * Motion for a component somebody else built, handed back as a stylesheet and nothing else.
+ *
+ * Several at once for the reason the wall exists: asked once, every call reaches for the same
+ * easing, and measured on this repository's own output eight independent calls drew one watch dial
+ * and would fade one way. Each option is dealt a different motion from the deck, taken from what a
+ * real object does, so they disagree by construction rather than by being asked to.
+ *
+ * The gate is the point of returning anything at all. unmoved reads whether the parts arrive at
+ * different times, which is the whole difference between a mechanism and a slideshow, and an option
+ * that only slides the finished component is dropped rather than shown: a caller handed four
+ * options where one is a fade has to do the judging this tool exists to have already done.
+ */
+async function motion(args) {
+  const html = String(args?.html ?? '')
+  if (!html.trim()) throw new Error('motion needs the component markup, so the keyframes can name its parts.')
+  const want = Math.max(1, Math.min(6, Number(args?.options) || 3))
+  const core = await import(pathToFileURL(path.join(ROOT, 'dist-core', 'core.js')).href)
+  const { runClaude } = await import(pathToFileURL(path.join(ROOT, 'shared', 'cli.mjs')).href)
+  const motions = core.dealMotions(want)
+  // the markup is what the selectors have to name, so it goes over whole rather than summarised
+  const seen = html.slice(0, 6000)
+  const styles = args?.css ? `\n\nIts stylesheet, for the timing to fit:\n${String(args.css).slice(0, 4000)}` : ''
+
+  const tried = await Promise.all(motions.map(async (m) => {
+    const reply = await runClaude(
+      core.MOTION_SYSTEM,
+      `The component:\n${seen}${styles}\n\nMove it by ${m} Take the timing from that object: it is `
+      + `how the thing behaves, and it is why this one will not move like the others.`,
+    ).catch(() => null)
+    if (!reply) return null
+    const raw = core.grabJson(typeof reply === 'string' ? reply : reply.text ?? '')
+    const css = raw ? core.safeStyle(raw.css) : ''
+    if (!css) return null
+    const faults = core.unmoved({ html: '', css, note: '' })
+    return { m, css, note: String(raw.note ?? '').slice(0, 90), faults }
+  }))
+
+  const kept = tried.filter((t) => t && !t.faults.length)
+  const dropped = tried.filter((t) => t && t.faults.length)
+  if (!kept.length) {
+    const why = dropped[0]?.faults[0] ?? 'no usable reply came back'
+    throw new Error(`No option moved the parts. ${why}`)
+  }
+  return kept.map((k, i) =>
+    `## ${i + 1}. ${k.note || 'untitled'}\n\nTakes its timing from ${k.m}\n\n\`\`\`css\n${k.css}\n\`\`\``,
+  ).join('\n\n') + (dropped.length
+    ? `\n\n${dropped.length} other option${dropped.length === 1 ? ' was' : 's were'} written and dropped `
+      + `for moving the component as one piece rather than animating its parts.`
+    : '')
+}
+
 async function call(name, args, id) {
+  if (name === 'motion') {
+    return ok(id, await motion(args ?? {}))
+  }
   if (name === 'design') {
     const got = await design(args ?? {})
     if (got?.noShell) {
