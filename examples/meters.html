@@ -1,0 +1,134 @@
+<!--
+  A component built to be filmed: dense, emissive, and repeated.
+
+  The camera pass in tools/shot.mjs needs something to point at, and pointing it at a toolbar taught
+  the lesson quickly: a product film is not a screenshot at an angle, it is a macro lens on an array
+  of things that emit. Bars whose feet are lit, meters made of segments that fill one at a time, a
+  scale in small grey caps beside them. Three or four of those fill the frame and the rest falls into
+  the blur, and what a viewer actually reads is the light rather than the interface.
+
+  Everything glowing here is doing it twice: a colour, and a box-shadow in the same colour spread
+  wide. That second one is what the bloom layer picks up and multiplies, and it is the difference
+  between a bright element and one that looks like it is emitting.
+
+  Plain html so it can be filmed with no build step:
+    node tools/shot.mjs examples/meters.html
+-->
+<div class="panel">
+  <div class="head">
+    <span class="title">ARR Growth Rate</span>
+    <span class="chip">Report</span>
+  </div>
+
+  <div class="meters">
+    <div class="meter">
+      <span class="lab">Net Revenue</span>
+      <span class="segs a"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+      <span class="num">112%</span>
+    </div>
+    <div class="meter">
+      <span class="lab">Expansion</span>
+      <span class="segs b"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+      <span class="num">34%</span>
+    </div>
+    <div class="meter">
+      <span class="lab">Retention</span>
+      <span class="segs c"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+      <span class="num">96%</span>
+    </div>
+  </div>
+
+  <div class="chart">
+    <div class="scale"><span>50K</span><span>25K</span><span>10K</span><span>0</span></div>
+    <div class="bars">
+      <div class="bar" style="--h:86%"><span class="cap"></span><span class="foot"></span></div>
+      <div class="bar" style="--h:72%"><span class="cap"></span><span class="foot"></span></div>
+      <div class="bar" style="--h:61%"><span class="cap"></span><span class="foot"></span></div>
+      <div class="bar" style="--h:49%"><span class="cap"></span><span class="foot"></span></div>
+      <div class="bar" style="--h:38%"><span class="cap"></span><span class="foot"></span></div>
+      <div class="bar" style="--h:27%"><span class="cap"></span><span class="foot"></span></div>
+    </div>
+    <div class="months"><span>FEB</span><span>MAR</span><span>APR</span><span>MAY</span><span>JUN</span><span>JUL</span></div>
+  </div>
+</div>
+
+<style>
+  .panel{
+    --ink:#e9e9ee; --dim:#5f6068; --faint:#33343a;
+    --hot:#ff2d78; --cool:#4d7cff; --violet:#a855f7;
+    width:1000px; padding:56px 60px; background:#0a0a0c;
+    border:1px solid #17181c; border-radius:22px;
+    font:14px/1.4 ui-sans-serif,-apple-system,"Inter","Segoe UI",sans-serif; color:var(--ink);
+    display:grid; gap:44px;
+  }
+  .head{display:flex;align-items:center;justify-content:space-between}
+  .title{font-size:30px;letter-spacing:-.02em;font-weight:500}
+  .chip{font-size:12px;color:var(--dim);border:1px solid #202127;border-radius:999px;padding:6px 14px}
+
+  .meters{display:grid;gap:18px}
+  .meter{display:grid;grid-template-columns:150px 1fr 64px;align-items:center;gap:20px}
+  .lab{font-size:13px;color:var(--dim)}
+  .num{font-size:13px;color:var(--dim);text-align:right;font-variant-numeric:tabular-nums}
+  .segs{display:flex;gap:5px}
+  .segs i{width:15px;height:26px;border-radius:3px;background:#141519;display:block}
+  /* the lit segments carry their colour twice: once as fill and once thrown wide, which is the
+     part the bloom layer multiplies into something that looks emitted */
+  .segs.a i:nth-child(-n+6){background:var(--cool);box-shadow:0 0 14px 2px color-mix(in srgb,var(--cool) 70%,transparent)}
+  .segs.b i:nth-child(-n+3){background:var(--violet);box-shadow:0 0 14px 2px color-mix(in srgb,var(--violet) 70%,transparent)}
+  .segs.c i:nth-child(-n+7){background:var(--cool);box-shadow:0 0 12px 2px color-mix(in srgb,var(--cool) 55%,transparent)}
+
+  .chart{display:grid;grid-template-columns:56px 1fr;grid-template-rows:1fr auto;gap:14px 18px;height:300px}
+  .scale{display:flex;flex-direction:column;justify-content:space-between;
+    font-size:11px;color:var(--faint);letter-spacing:.08em;text-align:right}
+  .bars{display:flex;align-items:flex-end;gap:22px}
+  .months{grid-column:2;display:flex;gap:22px;font-size:11px;color:var(--faint);letter-spacing:.08em}
+  .months span,.bars .bar{flex:1}
+
+  /* a bar is a dark body with a lit foot, which is the shape in the reference: the light is a
+     sliver at the base and the body is almost the ground colour */
+  .bar{position:relative;height:var(--h);border-radius:12px;
+    background:linear-gradient(180deg,#121317 0%,#0d0e11 100%);
+    border:1px solid #191a1f;border-bottom:0}
+  .cap{position:absolute;left:0;right:0;top:0;height:34%;border-radius:11px 11px 0 0;
+    background:repeating-linear-gradient(115deg,#1b1c22 0 3px,#131419 3px 6px)}
+  .foot{position:absolute;left:0;right:0;bottom:-3px;height:9px;border-radius:6px;
+    background:var(--hot);box-shadow:0 0 26px 5px color-mix(in srgb,var(--hot) 85%,transparent),
+      0 0 60px 14px color-mix(in srgb,var(--hot) 45%,transparent)}
+  .bar:nth-child(1) .foot{--hot:#ff2d78}
+  .bar:nth-child(2) .foot{--hot:#ff3a6d}
+  .bar:nth-child(3) .foot{--hot:#ff4a62}
+  .bar:nth-child(4) .foot{--hot:#ff5a58}
+  .bar:nth-child(5) .foot{--hot:#ff6a4e}
+  .bar:nth-child(6) .foot{--hot:#ff7a44}
+
+  /* and it assembles rather than appearing: feet strike first, then the segments fill in order */
+  @media (prefers-reduced-motion: no-preference){
+    .foot{animation:strike 900ms cubic-bezier(.16,1,.3,1) both}
+    .bar:nth-child(1) .foot{animation-delay:.05s}
+    .bar:nth-child(2) .foot{animation-delay:.13s}
+    .bar:nth-child(3) .foot{animation-delay:.21s}
+    .bar:nth-child(4) .foot{animation-delay:.29s}
+    .bar:nth-child(5) .foot{animation-delay:.37s}
+    .bar:nth-child(6) .foot{animation-delay:.45s}
+    .bar{animation:rise 1s cubic-bezier(.16,1,.3,1) both;transform-origin:50% 100%}
+    .bar:nth-child(1){animation-delay:.02s}.bar:nth-child(2){animation-delay:.10s}
+    .bar:nth-child(3){animation-delay:.18s}.bar:nth-child(4){animation-delay:.26s}
+    .bar:nth-child(5){animation-delay:.34s}.bar:nth-child(6){animation-delay:.42s}
+    .segs i{animation:light 420ms steps(1,end) both}
+    .segs.a i:nth-child(1){animation-delay:.60s}.segs.a i:nth-child(2){animation-delay:.66s}
+    .segs.a i:nth-child(3){animation-delay:.72s}.segs.a i:nth-child(4){animation-delay:.78s}
+    .segs.a i:nth-child(5){animation-delay:.84s}.segs.a i:nth-child(6){animation-delay:.90s}
+    .segs.b i:nth-child(1){animation-delay:.98s}.segs.b i:nth-child(2){animation-delay:1.04s}
+    .segs.b i:nth-child(3){animation-delay:1.10s}
+    .segs.c i:nth-child(1){animation-delay:1.18s}.segs.c i:nth-child(2){animation-delay:1.24s}
+    .segs.c i:nth-child(3){animation-delay:1.30s}.segs.c i:nth-child(4){animation-delay:1.36s}
+    .segs.c i:nth-child(5){animation-delay:1.42s}.segs.c i:nth-child(6){animation-delay:1.48s}
+    .segs.c i:nth-child(7){animation-delay:1.54s}
+    .title{animation:settle 700ms cubic-bezier(.16,1,.3,1) both}
+    .num{animation:settle 600ms ease-out both;animation-delay:1.6s}
+  }
+  @keyframes rise{from{transform:scaleY(.06);opacity:0}to{transform:scaleY(1);opacity:1}}
+  @keyframes strike{from{opacity:0;filter:brightness(3)}60%{opacity:1;filter:brightness(1.8)}to{opacity:1;filter:brightness(1)}}
+  @keyframes light{from{opacity:.08}to{opacity:1}}
+  @keyframes settle{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+</style>
