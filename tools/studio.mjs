@@ -509,13 +509,28 @@ const BUSY = /rate limit|overloaded|429|503|too many requests|temporarily/i
 const CALL_MS = Number(process.env.WALL_STUDIO_CALL_MS || 150_000)
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
+/**
+ * These calls do not think, and that is a measurement rather than a preference.
+ *
+ * Writing a motion sheet is a narrow job with a fixed answer shape, which is the kind of work
+ * extended thinking helps least. Measured on one picked chart, four calls each way at once:
+ *
+ *   thinking on    slowest 73.9s, median 72.0s, 2 of 4 passed the gates
+ *   thinking off   slowest  9.2s, median  8.3s, 4 of 4 passed the gates
+ *
+ * Eight times faster and, on this payload, better: both failures were unmoved reporting that
+ * everything moved at once, which is the fault a longer deliberation is supposed to prevent. The cost
+ * compounds, because a gated attempt is asked again with a fresh verb, so a batch where anything
+ * fails was paying that minute twice. WALL_STUDIO_THINKING turns it back on for anyone who wants to
+ * measure it again on their own components rather than take this on faith.
+ */
+const THINK = process.env.WALL_STUDIO_THINKING ? Number(process.env.WALL_STUDIO_THINKING) : 0
+
 async function askModel(brief, tries = 3) {
   let last = 'no usable reply came back'
   for (let n = 0; n < tries; n++) {
-    // the first go leaves the thinking budget alone; a retry turns it off, which is both faster and
-    // a genuinely different attempt rather than the same one repeated
     const reply = await runClaude(MOTION_SYSTEM, brief, {
-      callMs: CALL_MS, ...(n > 0 ? { thinking: undefined } : {}),
+      callMs: CALL_MS, thinking: THINK,
     }).catch((e) => ({ error: String(e && e.message ? e.message : e).slice(0, 160) }))
 
     if (reply && reply.error) {
