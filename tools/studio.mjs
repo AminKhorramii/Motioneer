@@ -363,43 +363,98 @@ function move(e){if(!on)return;var el=e.target;if(!el||el===document.body||el===
   last=el;var r=el.getBoundingClientRect(),b=ensure();b.style.display='block';
   b.style.left=r.left+'px';b.style.top=r.top+'px';b.style.width=r.width+'px';b.style.height=r.height+'px'}
 function hits(el,sel){try{return el.matches(sel)||!!el.querySelector(sel)}catch(_){return false}}
+function ground(t){return t===':root'||t==='html'||t==='body'||t==='*'||t===':host'}
+/* Walking into the grouping rules, which is where nearly all of the css now lives.
+   Tailwind v4 puts its entire utility set inside @layer, and a @layer block has cssRules but no
+   conditionText, so a walk that only knows about media queries steps straight over it. On a real
+   shadcn site that is four and a half thousand rules skipped against a hundred and forty seen, which
+   reads as "this element has almost no styling" and is completely wrong. Layers are flattened, since
+   a preview has nothing to order against; media and supports keep their wrapper because dropping it
+   would apply a narrow-screen rule unconditionally. */
+function collect(rs,el,roots,out,keys,cond){
+  for(var j=0;j<rs.length;j++){var r=rs[j];
+    if(r.selectorText){
+      var t=r.selectorText.trim();
+      var text=cond?cond+'{'+r.cssText+'}':r.cssText;
+      if(ground(t))roots.push(text); else if(hits(el,t))out.push(text)}
+    else if(r.cssRules){
+      var head=r.cssText.slice(0,r.cssText.indexOf('{')).trim();
+      if(head.indexOf('@keyframes')===0){keys.push(r.cssText);continue}
+      collect(r.cssRules,el,roots,out,keys,head.indexOf('@layer')===0?cond:(head||cond))}
+    else if(r.cssText&&r.cssText.indexOf('@font-face')===0)roots.push(r.cssText)}}
+/* Only the custom properties the captured rules actually reach for.
+   An app of this era declares hundreds on :root, and shipping all of them ate the whole budget and
+   left no room for the rules that lay the component out. Two passes: gather the rules, then keep the
+   variables they name, following one level of indirection because a token usually points at a token. */
+function needed(css,el){
+  var cs=getComputedStyle(el),want={},out=[],pass;
+  for(pass=0;pass<2;pass++){
+    var from=pass===0?css:out.join(';'),at=0;
+    while(true){at=from.indexOf('var(--',at);if(at<0)break;
+      var stop=at+4,ch;
+      while(stop<from.length){ch=from.charAt(stop);
+        if(ch===')'||ch===','||ch===' ')break;stop++}
+      var name=from.slice(at+4,stop);
+      if(name&&!want[name]){want[name]=1;
+        var v=cs.getPropertyValue(name);if(v&&v.length<300)out.push(name+':'+v)}
+      at=stop}}
+  return out.length?':root{'+out.join(';')+'}':''}
+/* Filling a budget with whole rules, never half of one.
+   Slicing a stylesheet at a character count lands in the middle of a declaration, and the browser
+   responds by discarding everything from there to the end of the sheet. In the studio that meant the
+   motion's own @keyframes, appended after the captured css, silently never existed and every option
+   rendered still. The other half of the problem is what fills the budget: a preflight reset matching
+   the universal selector is one rule several thousand characters long, so two of those crowd out the
+   hundred utility rules that are the reason for doing any of this. Oversized rules are left behind. */
+function pack(list,cap){
+  var out=[],n=0;
+  for(var i=0;i<list.length;i++){var r=list[i];
+    if(r.length>2200)continue;
+    if(n+r.length>cap)break;
+    out.push(r);n+=r.length}
+  return out.join('')}
+var opaque=0;
 function rules(el){
-  var roots=[],out=[];
-  for(var i=0;i<document.styleSheets.length;i++){var rs;try{rs=document.styleSheets[i].cssRules}catch(_){continue}
-    for(var j=0;j<rs.length;j++){var r=rs[j];
-      if(r.selectorText){
-        if(/^(:root|html|\\*|body)$/.test(r.selectorText.trim()))roots.push(r.cssText);
-        else if(hits(el,r.selectorText))out.push(r.cssText)}
-      else if(r.cssRules&&r.conditionText!==undefined){var inner=[];
-        for(var k=0;k<r.cssRules.length;k++){var ir=r.cssRules[k];
-          if(ir.selectorText&&hits(el,ir.selectorText))inner.push(ir.cssText)}
-        if(inner.length)out.push('@media '+r.conditionText+'{'+inner.join('')+'}')}
-      else if(r.cssText&&r.cssText.indexOf('@font-face')===0)roots.push(r.cssText)}}
-  var head=[vars(el),context(el)].concat(roots).join('');
-  return (head.slice(0,9000)+out.join('').slice(0,11000))}
+  var roots=[],out=[],keys=[];opaque=0;
+  for(var i=0;i<document.styleSheets.length;i++){var rs;
+    /* a sheet served from another origin without cors cannot be read at all. Skipping it quietly
+       would hand over a component with a third of its styling missing and no way to tell */
+    try{rs=document.styleSheets[i].cssRules}catch(_){opaque++;continue}
+    collect(rs,el,roots,out,keys,'')}
+  var body=pack(out,13000);
+  var base=pack(roots,1500);
+  /* keyframes only matter here if something kept actually names them */
+  var used=pack(keys.filter(function(k){var n=k.slice(10,k.indexOf('{')).trim();
+    return n&&body.indexOf(n)>-1}),2000);
+  return needed(body+base,el)+context(el)+base+used+body}
 function label(el){var c=typeof el.className==='string'?el.className.trim().split(/\\s+/).filter(Boolean):[];
   return el.tagName.toLowerCase()+(c.length?'.'+c.slice(0,3).join('.'):'')}
-/* Every custom property in force on this element, frozen as it stands.
-   Collecting the rules that matched is not enough on its own: an app declares its tokens on whatever
-   ancestor it likes, often a .theme or [data-mode] wrapper rather than :root, and those rules match
-   the ancestor and not the element. Lift the element out and every var() it uses resolves to nothing,
-   which renders as a transparent box with invisible text. Reading them off the computed style takes
-   the values the browser actually arrived at, wherever they happened to be declared. */
-function vars(el){var cs=getComputedStyle(el),out=[];
-  for(var i=0;i<cs.length&&out.length<400;i++){var n=cs[i];
-    if(n.slice(0,2)==='--'){var v=cs.getPropertyValue(n);if(v&&v.length<200)out.push(n+':'+v)}}
-  return out.length?':root{'+out.join(';')+'}':''}
 /* and the ground it was standing on, so it is previewed against its own background and not ours */
 function context(el){var n=el.parentElement,bg='';
   while(n&&!bg){var c=getComputedStyle(n).backgroundColor;
     if(c&&c!=='transparent'&&c.indexOf('rgba(0, 0, 0, 0)')!==0)bg=c;n=n.parentElement}
   var cs=getComputedStyle(el);
   return 'body{background:'+(bg||'#0b0c0d')+';color:'+cs.color+';font-family:'+cs.fontFamily+'}'}
+/* Cutting the markup at a character count cuts it in the middle of a tag.
+   The tail of the last pick was the string "</span></span><input", which the browser's parser then
+   recovers from by inventing whatever it likes, so the model is handed a component missing a third of
+   itself and a selector written against the missing part matches nothing. Dropping whole elements off
+   the end instead always leaves valid html, and what goes is the bottom of the component rather than
+   an arbitrary byte. */
+function trimmed(el,cap){
+  if(el.outerHTML.length<=cap)return el.outerHTML;
+  var c=el.cloneNode(true),guard=0;
+  while(c.outerHTML.length>cap&&guard++<400){
+    var all=c.querySelectorAll('*');if(all.length<2)break;
+    var drop=Math.max(1,Math.floor(all.length*0.08));
+    for(var i=0;i<drop;i++){var n=c.querySelectorAll('*');if(n.length<2)break;n[n.length-1].remove()}}
+  return c.outerHTML}
 function pick(e){if(!on)return;e.preventDefault();e.stopPropagation();
   var el=last||e.target;on=false;if(box)box.style.display='none';
-  var r=el.getBoundingClientRect();
-  parent.postMessage({wall:'picked',html:el.outerHTML.slice(0,14000),css:rules(el),label:label(el),
-    w:Math.round(r.width),h:Math.round(r.height)},'*')}
+  var r=el.getBoundingClientRect(),h=trimmed(el,14000);
+  var css=rules(el);
+  parent.postMessage({wall:'picked',html:h,css:css,label:label(el),opaque:opaque,
+    cut:h.length<el.outerHTML.length,w:Math.round(r.width),h:Math.round(r.height)},'*')}
 addEventListener('mousemove',move,true);addEventListener('click',pick,true);
 addEventListener('message',function(e){var d=e.data||{};
   if(d.wall==='pick'){on=true}
@@ -804,7 +859,10 @@ addEventListener('message',e=>{const d=e.data||{}
     document.getElementById('pick').setAttribute('aria-pressed','false')
     document.getElementById('chosen').innerHTML='<b class="chip">'+d.label
       +'<br><span>'+(d.css.length/1000).toFixed(1)+'kb of matched css, '
-      +(d.html.length/1000).toFixed(1)+'kb of markup, '+d.w+'x'+d.h+'</span></b>'
+      +(d.html.length/1000).toFixed(1)+'kb of markup'+(d.cut?' (trimmed to fit)':'')
+      +', '+d.w+'x'+d.h
+      +(d.opaque?'<br>'+d.opaque+' stylesheet'+(d.opaque>1?'s':'')+' could not be read: '
+        +'served from another origin without cors, so some styling is missing':'')+'</span></b>'
     paint()
   }})
 function paint(){
