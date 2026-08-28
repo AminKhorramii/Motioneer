@@ -926,6 +926,33 @@ if (houseFlags.length) throw new Error(`the house trips its own detector on ${ho
   if (!m(blanket).some((f) => f.includes('transition on everything'))) throw new Error('a transition on everything went unflagged')
 }
 
+// ——— 0t. motion written for somebody else's component has to survive them editing it ———
+// The motion tool is handed a component and returns a stylesheet. Given markup written in utility
+// classes, the first thing a model reaches for is the whole stack of them, and the first real test
+// came back with .flex.w-72.flex-col.gap-3.rounded-lg.border.bg-card.p-3 > div.flex.flex-col.gap-2
+// > article. That matches today, and it is pinned to every spacing and width decision in the file:
+// changing gap-3 to gap-4 stops the motion and reports nothing. In a codebase where those classes
+// change weekly it is broken on arrival, and silently, which is the worst way to be broken.
+//
+// The answer is one scoping attribute on the root and structure underneath it, and the gate is what
+// makes the prompt asking for that more than a hope.
+{
+  const utility = '.flex.w-72.flex-col.gap-3 > div.flex.flex-col.gap-2 > article{animation:a 1s}'
+  const scoped = '[data-motion-flap] > div > article:nth-child(2){animation:a 1s;animation-delay:.2s}'
+  const twoClasses = '.card.is-open{animation:a 1s}'
+  const inAList = 'h3, .a.b.c.d {animation:a 1s}'
+  console.log('selectors that survive an edit:', JSON.stringify({
+    aUtilityStack: core.brittle(utility).length,
+    aScopedStructuralSelector: core.brittle(scoped).length,
+    twoClassesTogether: core.brittle(twoClasses).length,
+    aStackInsideASelectorList: core.brittle(inAList).length,
+  }))
+  if (!core.brittle(utility).length) throw new Error('a selector pinned to utility classes passed, so the motion breaks the next time the component is edited')
+  if (core.brittle(scoped).length) throw new Error('a scoped structural selector was called brittle, which is the shape the prompt asks for')
+  if (core.brittle(twoClasses).length) throw new Error('two classes together were called a utility stack, and .card.is-open is a normal thing to write')
+  if (!core.brittle(inAList).length) throw new Error('a stack hiding in a selector list was missed, so the check can be dodged by adding a comma')
+}
+
 // ——— 0m. the ruler reads a written page, and reads a bleed as design ———
 // written.ts opens by saying the detector and the ruler both run over a written page exactly as
 // they run over an arranged one. Only the first half was ever true: strainsIn was reached through

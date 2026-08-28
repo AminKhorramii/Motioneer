@@ -132,20 +132,22 @@ const TOOLS = [
     name: 'motion',
     description:
       'Give a component you already have motion that is not a 300ms fade. Send the markup and get '
-      + 'back stylesheets to append: keyframes written against your own class names, staggering the '
+      + 'back stylesheets to append: keyframes scoped to one data attribute you add to the root, '
+      + 'reaching the parts by structure so they survive a class edit, staggering them so the '
       + 'parts so the thing assembles itself rather than sliding in whole. Each option takes its '
       + 'timing from a real object, a split flap turning, paper leaving a printer, a stamp landing, '
       + 'so several of them disagree rather than all easing the same way. Your markup is never '
       + 'changed and never returned, everything is wrapped in prefers-reduced-motion, and options '
-      + 'that only move the component as one piece are rejected before you see them.',
+      + 'that only move it as one piece, or that pin their selectors to utility classes, are '
+      + 'rejected before you see them.',
     inputSchema: {
       type: 'object',
       properties: {
         html: {
           type: 'string',
           description:
-            'The component markup as it stands. The class names matter, because the motion is '
-            + 'written against them, so send the real thing rather than a summary.',
+            'The component markup as it stands, so the motion can reach its parts by structure. '
+            + 'Send the real thing rather than a summary.',
         },
         css: {
           type: 'string',
@@ -425,8 +427,10 @@ async function motion(args) {
     const raw = core.grabJson(typeof reply === 'string' ? reply : reply.text ?? '')
     const css = raw ? core.safeStyle(raw.css) : ''
     if (!css) return null
-    const faults = core.unmoved({ html: '', css, note: '' })
-    return { m, css, note: String(raw.note ?? '').slice(0, 90), faults }
+    // does it move the parts, and will its selectors still match after somebody edits the markup
+    const faults = [...core.unmoved({ html: '', css, note: '' }), ...core.brittle(css)]
+    const scope = String(raw.scope ?? '').replace(/[^-\w]/g, '').slice(0, 40)
+    return { m, css, scope, note: String(raw.note ?? '').slice(0, 90), faults }
   }))
 
   const kept = tried.filter((t) => t && !t.faults.length)
@@ -435,11 +439,15 @@ async function motion(args) {
     const why = dropped[0]?.faults[0] ?? 'no usable reply came back'
     throw new Error(`No option moved the parts. ${why}`)
   }
+  const why = [...new Set(dropped.flatMap((d) => d.faults.map((f) => f.split('.')[0])))]
   return kept.map((k, i) =>
-    `## ${i + 1}. ${k.note || 'untitled'}\n\nTakes its timing from ${k.m}\n\n\`\`\`css\n${k.css}\n\`\`\``,
+    `## ${i + 1}. ${k.note || 'untitled'}\n\n`
+    + `Takes its timing from ${k.m}\n\n`
+    + (k.scope ? `Put \`${k.scope}\` on the component's outermost element, then append:\n\n` : 'Append:\n\n')
+    + `\`\`\`css\n${k.css}\n\`\`\``,
   ).join('\n\n') + (dropped.length
-    ? `\n\n${dropped.length} other option${dropped.length === 1 ? ' was' : 's were'} written and dropped `
-      + `for moving the component as one piece rather than animating its parts.`
+    ? `\n\n---\n\n${dropped.length} other option${dropped.length === 1 ? ' was' : 's were'} written and dropped: `
+      + `${why.join('; ')}.`
     : '')
 }
 

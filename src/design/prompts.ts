@@ -298,9 +298,12 @@ export const MOTION_SYSTEM = `You are given a component somebody has already bui
 Return JSON shaped as {"note": "...", "css": "..."}.
 
 - note: one short line naming the movement, the way you would name a piece of choreography.
-- css: keyframes and animation rules only, written against the class names and elements that are already in the markup you were given.
+- scope: one data attribute name for the caller to put on the component's outermost element, like "data-motion-flap". Invent it from what the movement is.
+- css: keyframes and animation rules only, scoped to that attribute.
 
 Never return markup. The component is not yours and it works: your stylesheet is appended after theirs, so it may add animation, transform, opacity, clip-path and filter, and it may not change layout, colour, type or spacing. Anything that moves the component to a different place on the page when the animation is not running is a bug rather than a design.
+
+Every selector starts from the scope attribute and then reaches the parts by structure: [data-motion-flap] > div > article:nth-child(2), or [data-motion-flap] h3, or [data-motion-flap] article > span. Never chain the component's own classes. Markup written in utility classes will offer you a stack like .flex .w-72 .flex-col .gap-3 .rounded-lg run together, and a selector built from that is pinned to every spacing and width decision in the file: it matches today and stops matching, silently, the first time somebody changes gap-3 to gap-4. Child combinators, element names, nth-child and roles survive that. Utility stacks do not.
 
 Move the parts, not the whole. Sliding or fading the finished component is a transition, and a transition is what every interface already does. What is worth having is the thing assembling itself the way the object it is named after behaves: rows arriving one after another, a rule drawing itself across, a figure counting up, a status settling into place.
 

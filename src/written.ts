@@ -287,6 +287,29 @@ export function unmoved(written: Written): string[] {
   return out
 }
 
+/**
+ * Selectors that will stop working the next time somebody edits the component.
+ *
+ * Handed a component written in utility classes, the first thing a model reaches for is the whole
+ * stack of them: `.flex.w-72.flex-col.gap-3.rounded-lg.border.bg-card.p-3 > div.flex.flex-col.gap-2
+ * > article`. That matches today and it is pinned to every layout decision in the markup, so
+ * changing gap-3 to gap-4 silently stops the motion and reports nothing. In a codebase where those
+ * classes change weekly it is broken on arrival, and worse, it fails quietly.
+ *
+ * Three chained classes with no combinator between them is the tell. One or two can be deliberate
+ * (`.card.is-open`), and a utility stack is never fewer than three. The answer the prompt asks for
+ * instead is one scoping attribute on the root and structure underneath it, which survives any
+ * edit that does not change the shape of the component.
+ */
+export function brittle(css: string): string[] {
+  const chained = [...css.matchAll(/(?:^|[\s,>+~{}])((?:\.[-\w]+){3,})(?=[\s,>+~{:]|$)/g)]
+    .map((m) => m[1])
+  if (!chained.length) return []
+  return [`the selectors are pinned to the component's utility classes, starting with ${chained[0].slice(0, 60)}. `
+    + 'That matches today and stops matching the first time somebody changes a spacing or a width, '
+    + 'silently. Scope to the attribute you were asked to name and reach the parts by structure.']
+}
+
 export function madeMark(raw: Record<string, unknown>): Written | null {
   const css = safeStyle(raw.css)
   if (!DRAWS.test(css)) return null
