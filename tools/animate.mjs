@@ -53,25 +53,123 @@ if (!files.length) { console.log('  nothing to animate there'); process.exit(1) 
  * a loop, and that is a real limit rather than a bug to fix here, because the answer to it is to
  * paste the rendered output instead.
  */
-const asHtml = (src) => src
-  .replace(/^[\s\S]*?return\s*\(/m, '')        // drop imports and the function head
-  .replace(/\)\s*;?\s*}\s*$/m, '')
-  .replace(/className=/g, 'class=')
-  .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
-  .replace(/=\{`([^`]*)`\}/g, '="$1"')          // class={`a b`} -> class="a b"
-  .replace(/=\{[^}]*\}/g, '=""')                // any other expression attribute
-  .replace(/\{[^<>{}]*\}/g, '')                 // expressions in text
-  .replace(/<>|<\/>/g, '')                      // fragments
-  .trim()
+/**
+ * A rough parse into something a browser will render, with the braces matched properly.
+ *
+ * Only for the preview and the gate: the model gets the file untouched. The first version of this
+ * was regexes, and regexes cannot count braces, so a component with a nested expression leaked its
+ * own source into the preview as visible text. Pointed at this repository's Dock, the preview read
+ * "{flags.length ? [ flags.filter((f) => f.kind === 'design')..." across the panel, which is
+ * unjudgeable: nobody can assess motion on a component busy rendering its implementation.
+ *
+ * So the braces are walked rather than matched. Class expressions keep their string literals, since
+ * that is where the class names are and the selectors are written against them; every other
+ * expression is dropped whole. A component that builds markup in a loop still comes out thin, and
+ * the honest answer there is to paste the rendered html instead of the source.
+ */
+const matching = (src, open) => {
+  let depth = 0
+  for (let i = open; i < src.length; i++) {
+    if (src[i] === '{') depth++
+    else if (src[i] === '}') { depth--; if (!depth) return i }
+  }
+  return -1
+}
 
-const base = SHEET && existsSync(SHEET) ? readFileSync(SHEET, 'utf8').slice(0, 4000) : ''
+const stripBraces = (src, inAttribute) => {
+  let out = '', i = 0
+  while (i < src.length) {
+    const at = src.indexOf('{', i)
+    if (at === -1) { out += src.slice(i); break }
+    const close = matching(src, at)
+    if (close === -1) { out += src.slice(i); break }
+    const inner = src.slice(at + 1, close)
+    out += src.slice(i, at)
+    // a class expression is worth mining: the literals in it are the names selectors will use
+    if (inAttribute) {
+      const literals = [...inner.matchAll(/["'`]([^"'`]*)["'`]/g)].map((m) => m[1]).join(' ')
+      out += literals.trim()
+    }
+    i = close + 1
+  }
+  return out
+}
+
+/**
+ * The outermost element and everything inside it, matched rather than sliced.
+ *
+ * Cutting the return block with a regex ended it at the first line that looked like a close, which
+ * on a real component is somewhere in the middle: the markup came out with unclosed tags, and an
+ * unclosed tree swallows whatever follows it, so the preview rendered the transport script as body
+ * text and the scrubber connected to nothing. Counting the tags is the only way to know where the
+ * element actually ends.
+ */
+const balanced = (src) => {
+  const open = src.search(/<[a-zA-Z][\w.-]*/)
+  if (open === -1) return src
+  const tag = (src.slice(open + 1).match(/^[\w.-]+/) ?? [''])[0]
+  if (!tag) return src.slice(open)
+  let depth = 0, i = open
+  const step = new RegExp(`<(/?)${tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=[\\s/>])|/>`, 'g')
+  step.lastIndex = open
+  for (let m = step.exec(src); m; m = step.exec(src)) {
+    if (m[0] === '/>') { if (depth === 1) return src.slice(open, m.index + 2) ; continue }
+    depth += m[1] ? -1 : 1
+    if (!depth) {
+      const close = src.indexOf('>', m.index)
+      return src.slice(open, close === -1 ? src.length : close + 1)
+    }
+    i = m.index
+  }
+  return src.slice(open, i)
+}
+
+const asHtml = (src) => {
+  let body = balanced(src.replace(/^[\s\S]*?return\s*\(/m, ''))
+    .replace(/className=/g, 'class=')
+    .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+  // attribute expressions first, so class={...} keeps its literals before the general strip
+  body = body.replace(/=\{/g, '=\u0001{')
+  const parts = body.split('\u0001')
+  body = parts.map((chunk, i) => (i === 0 ? chunk : (() => {
+    const close = matching(chunk, 0)
+    if (close === -1) return chunk
+    const lits = [...chunk.slice(1, close).matchAll(/["'`]([^"'`]*)["'`]/g)].map((m) => m[1]).join(' ')
+    return `"${lits.trim()}"` + chunk.slice(close + 1)
+  })())).join('')
+  return stripBraces(body, false).replace(/<>|<\/>/g, '').trim()
+}
+
+/**
+ * The rules that are actually about this component, rather than the first few thousand characters.
+ *
+ * This used to take a flat slice off the front of the stylesheet, and a real one is 32KB: pointed at
+ * this repository's own Dock, the slice ended at character four thousand and the rules for .dock
+ * begin at line one hundred and fifty seven. So the model and the preview both got the variables and
+ * the reset and nothing about the component, which then rendered as an unpositioned nothing and had
+ * every option rejected for not moving. The gate was right and it was being fed a lie.
+ *
+ * Custom properties come whole because everything depends on them, and after that only the blocks
+ * whose selector names a class the markup actually uses. That is both smaller and more relevant than
+ * any slice, which is the usual shape of this kind of fix.
+ */
+const relevant = (css, markup) => {
+  const used = new Set([...markup.matchAll(/class="([^"]*)"/g)]
+    .flatMap((m) => m[1].split(/\s+/)).filter(Boolean))
+  const roots = [...css.matchAll(/(:root|@media[^{]*\{\s*:root)[^{]*\{[^}]*\}/g)].map((m) => m[0])
+  const blocks = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .filter(([, sel]) => [...used].some((c) => sel.includes('.' + c)))
+    .map(([whole]) => whole.trim())
+  return [...roots, ...blocks].join('\n').slice(0, 12000)
+}
+const rawSheet = SHEET && existsSync(SHEET) ? readFileSync(SHEET, 'utf8') : ''
 const out = 'animated'
 if (existsSync(out)) rmSync(out, { recursive: true })
 mkdirSync(out, { recursive: true })
 
 const browser = await chromium.launch()
 /** does anything actually change on screen, which the css cannot say about itself */
-async function watch(markup, scope, css) {
+async function watch(markup, scope, css, base) {
   const ctx = await browser.newContext({ viewport: { width: 460, height: 460 } })
   try {
     const tab = await ctx.newPage()
@@ -92,6 +190,7 @@ const made = []
 for (const file of files) {
   const src = readFileSync(file, 'utf8')
   const markup = asHtml(src)
+  const base = rawSheet ? relevant(rawSheet, markup) : ''
   const name = path.basename(file).replace(KIND, '')
   const motions = dealMotions(OPTIONS)
 
@@ -111,7 +210,7 @@ for (const file of files) {
     const scope = String(raw.scope ?? '').replace(/[^-\w]/g, '').slice(0, 40)
     const faults = [...unmoved({ html: '', css, note: '' }), ...brittle(css)]
     if (faults.length) return { faults, m }
-    const seen = await watch(markup, scope, css).catch(() => null)
+    const seen = await watch(markup, scope, css, base).catch(() => null)
     if (seen !== null && seen < 2) {
       return { m, faults: ['rendered, nothing on it changed: either the selectors match nothing here '
         + 'or the movement is over before anybody sees it'] }
@@ -139,7 +238,7 @@ for (const file of files) {
   }
   if (lost.length) console.log(`    ${lost.length} dropped: ${lost[0].faults[0].split('.')[0]}`)
   console.log(`    -> ${cssFile}\n`)
-  made.push({ name, file, markup, kept })
+  made.push({ name, file, markup, kept, base })
 }
 await browser.close()
 
@@ -156,7 +255,7 @@ const cells = made.flatMap((f) => f.kept.map((k) => {
   writeFileSync(path.join(out, `${slug}.html`), `<html><head><style>
     body{margin:0;background:#0b0c0d;color:#e6e6e6;font:14px ui-sans-serif,system-ui;
       display:grid;place-items:center;min-height:100vh;padding:24px}
-    ${base}${k.css}</style></head><body>${scoped}${listener}</body></html>`)
+    ${f.base}${k.css}</style></head><body>${scoped}${listener}</body></html>`)
   return `<figure><iframe src="${slug}.html" data-i="${n - 1}"></iframe><figcaption>
     <b>${f.name}</b><span class="note">${k.note}</span>
     <span class="verdict">${k.scope} · ${k.frames ?? '?'} distinct frames</span></figcaption></figure>`
