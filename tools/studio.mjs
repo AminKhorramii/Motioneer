@@ -35,6 +35,17 @@ import {
 const args = process.argv.slice(2)
 const appAt = args.indexOf('--app')
 const TARGET = appAt > -1 ? String(args[appAt + 1] ?? '').replace(/\/$/, '') : null
+/**
+ * An origin and a page, kept apart.
+ *
+ * `--app http://localhost:3000` and `--app https://host/projects/abc/preview` are both reasonable
+ * things to type, and they need different handling. The page to open is the whole url, but the assets
+ * underneath it are root relative to the origin: a bundle at /assets/app.js belongs to the host, not
+ * to the folder the page happens to sit in. Appending every request to the full url turns that into
+ * /projects/abc/preview/assets/app.js, which is a 404 and a blank frame.
+ */
+const HOST = TARGET ? new URL(TARGET).origin : null
+const ENTRY = TARGET ? (new URL(TARGET).pathname + new URL(TARGET).search) : '/'
 const cssAt = args.indexOf('--css')
 const SHEET = cssAt > -1 ? args[cssAt + 1] : null
 // with no folder given it opens on the components in this repo, so `npm run studio` is a thing you
@@ -310,7 +321,7 @@ const hop = new Set(['connection', 'keep-alive', 'transfer-encoding', 'upgrade',
   'proxy-authenticate', 'proxy-authorization', 'te', 'trailer'])
 
 async function proxy(req, res, url) {
-  const to = TARGET + url.pathname + url.search
+  const to = HOST + url.pathname + url.search
   const headers = {}
   for (const [k, v] of Object.entries(req.headers)) {
     if (hop.has(k) || k === 'host' || k === 'accept-encoding') continue
@@ -329,6 +340,9 @@ async function proxy(req, res, url) {
     // fetch has already decompressed, so the original encoding and length would both be lies
     if (hop.has(k) || k === 'content-encoding' || k === 'content-length') return
     if (k === 'content-security-policy' || k === 'x-frame-options') return  // we are the frame
+    // a Location back to the target's own origin has to stay inside the proxy, or the browser
+    // navigates to the real site and the frame is cross origin again with nothing to say why
+    if (k === 'location' && v.startsWith(HOST)) { out[k] = v.slice(HOST.length) || '/'; return }
     out[k] = v
   })
   const type = r.headers.get('content-type') ?? ''
@@ -974,7 +988,7 @@ const server = createServer(async (req, res) => {
     }
     if (url.pathname === '/__wall/app') {
       if (!TARGET) { res.writeHead(404); return res.end('no app: start the studio with --app') }
-      return proxy(req, res, new URL('/', 'http://x'))
+      return proxy(req, res, new URL(ENTRY, 'http://x'))
     }
     // anything not ours belongs to the app being proxied, which is how its root-relative assets
     // resolve without a single url being rewritten
@@ -1015,7 +1029,7 @@ if (TARGET) {
 
 server.listen(PORT, () => {
   console.log(`\n  motion studio  http://localhost:${PORT}`)
-  if (TARGET) console.log(`  proxying ${TARGET}, so its dom is readable and its elements are pickable`)
+  if (TARGET) console.log(`  proxying ${TARGET}\n  its dom is readable here, so its elements can be picked`)
   else {
     const files = list().length
     console.log(`  ${files} component${files === 1 ? '' : 's'} under ${path.resolve(ROOT)}`)
