@@ -456,13 +456,22 @@ async function motion(args) {
   }
 
   const tried = await Promise.all(motions.map(async (m) => {
-    const reply = await runClaude(
-      core.MOTION_SYSTEM,
-      `The component:\n${seen}${styles}\n\nMove it by ${m} Take the timing from that object: it is `
-      + `how the thing behaves, and it is why this one will not move like the others.`,
-    ).catch(() => null)
-    if (!reply) return null
-    const raw = core.grabJson(typeof reply === 'string' ? reply : reply.text ?? '')
+    const brief = `The component:\n${seen}${styles}\n\nMove it by ${m} Take the timing from that `
+      + `object: it is how the thing behaves, and it is why this one will not move like the others.`
+    /**
+     * One retry, because a dropped reply is not an opinion about the component.
+     *
+     * Run over eight real components, the only outright failure was a reply that came back
+     * unparseable, and a caller told "no option moved the parts" for that reason has been given a
+     * verdict where there was only a hiccup. The second attempt is allowed to think, since the
+     * first was probably running under the fast dial, and thinking is the thing that was skipped.
+     */
+    let reply = await runClaude(core.MOTION_SYSTEM, brief).catch(() => null)
+    let raw = reply ? core.grabJson(typeof reply === 'string' ? reply : reply.text ?? '') : null
+    if (!raw) {
+      reply = await runClaude(core.MOTION_SYSTEM, brief, { thinking: undefined }).catch(() => null)
+      raw = reply ? core.grabJson(typeof reply === 'string' ? reply : reply.text ?? '') : null
+    }
     const css = raw ? core.safeStyle(raw.css) : ''
     if (!css) return null
     // does it move the parts, and will its selectors still match after somebody edits the markup
