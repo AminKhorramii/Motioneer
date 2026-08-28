@@ -256,6 +256,31 @@ What this must not become is an icon. An icon is a small simple symbol that stan
 Respond with the JSON object alone, because the reply is parsed directly.`
 
 /**
+ * The same drawing, moving, which is a different instruction rather than an extra one.
+ *
+ * Appended to the mark prompt rather than replacing it, because everything above still holds: the
+ * thing has to be drawn before there is anything to move, and a page that animates a hollow box is
+ * worse than a still one. What this adds is the part a video model cannot do, which is move the
+ * exact drawing in the exact palette with no artefact and a source somebody can edit afterwards.
+ *
+ * The parts, not the whole. A wrapper can slide a finished picture around and that is a transition;
+ * moving what the picture is made of is the thing worth having, and it is only available to whoever
+ * wrote the markup, which on this path is the same call. That is the entire argument for asking for
+ * the drawing and the movement together rather than animating a mark afterwards.
+ */
+export const MOTION = `Then move it, and move the parts rather than the whole.
+
+Sliding or fading the finished picture is a transition, and a transition is what everything already does. What is worth having is the drawing assembling itself the way the object it came from actually behaves: rows turning one after another, a line extending to the label it points at, a second ink closing onto the first, a needle sweeping while the dial holds still.
+
+Write it as CSS keyframes on the elements inside your drawing. Stagger them with animation-delay rather than animating a parent, because things that happen at slightly different times read as mechanism and things that happen at once read as a slideshow.
+
+Take the timing from the object and not from a default. A press is stepped, so use steps() and let it jerk. A flap overshoots and settles. A pen draws at a constant rate and stops dead. An ink lands once. Nothing here should ease-in-out over 300ms, which is the house style of every generated interface.
+
+Loop it, and make the loop close. It will be watched over and over with no beginning, so the last frame has to hand back to the first without a jump, and no moment in it should be blank: a viewer arriving mid loop must find the thing already there and already legible.
+
+Keep the whole cycle between two and five seconds, and let something rest. Movement everywhere at once is noise, and one part moving against a still ground is what reads as designed.`
+
+/**
  * Correcting a world, which is not the same job as designing one.
  *
  * The design prompt is long because it is deciding what a thing is. This one is handed a

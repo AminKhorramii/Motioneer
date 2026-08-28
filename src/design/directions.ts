@@ -613,6 +613,40 @@ const DEPICTIONS = [
   'ghosted, the outer shell drawn faintly so an inner part reads through it',
 ]
 
+/**
+ * How the thing moves, taken from what the object does rather than from a library of easings.
+ *
+ * The looks already carry motion as still, soft or lively, which is an intensity: it says how much
+ * and never says what. What an object does is specific and it is already written into the deck. A
+ * departures board flips. A till roll prints a line at a time and the machine jerks between them. A
+ * riso lays a second ink over the first and comes into register. A terminal types. A stamp is
+ * cancelled once and stays cancelled. None of those is a fade, and a fade is what eight independent
+ * calls will otherwise produce, for the same reason eight of them drew one watch dial.
+ *
+ * Written as what happens rather than as a curve, because a caller that is handed cubic-bezier has
+ * been given a knob and a caller handed "the way a second ink lands on the first" has been given
+ * the reason for one. The timing follows from the object: a press is stepped, a settle overshoots.
+ */
+const MOTIONS = [
+  'printing out a line at a time, the way paper leaves a machine, stepped rather than smooth',
+  'flipping over on its own axis and settling past true, the way a split flap turns',
+  'arriving in two passes that come into register, the second ink offset and closing on the first',
+  'drawing itself, the way a leader line extends to the part it names and stops there',
+  'typing, a character at a time, with something still blinking on the last one',
+  'being cancelled: one mark landing across it, once, and staying',
+  'scanning: a single bar crossing it and leaving what it passed lit',
+  'winding: one part turning at its own rate while everything around it holds still',
+]
+
+export function dealMotions(n: number): string[] {
+  const deck = [...MOTIONS]
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[deck[i], deck[j]] = [deck[j], deck[i]]
+  }
+  return Array.from({ length: n }, (_, i) => deck[i % deck.length])
+}
+
 export function dealDepictions(n: number): string[] {
   const deck = [...DEPICTIONS]
   for (let i = deck.length - 1; i > 0; i--) {

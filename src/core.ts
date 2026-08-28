@@ -22,7 +22,7 @@ export {
   type Asked, type Essence, type Judged, type Kept, type Killed, type Lean, type Seen,
   type TasteLog, type WallStory, type WallTaste,
 } from '@/taste'
-export { DIRECTIONS, dealDirections, dealShapes, dealDepictions, directionSeed, tasteOf, type Direction, type Look } from '@/design/directions'
+export { DIRECTIONS, dealDirections, dealShapes, dealDepictions, dealMotions, directionSeed, tasteOf, type Direction, type Look } from '@/design/directions'
 // the page a model wrote whole, and the filter standing between its markup and the wall
 export { madeWritten, madeMark, safeMarkup, safeStyle, undrawn, type Written } from '@/written'
 // what a world left unspent, which is the question the slop detector never asked
@@ -36,7 +36,7 @@ export { BLOCKS, TOKENS, blockContract } from '@/design/blocks'
 // the prompt for one drawn thing rather than a page with one on it. It travels because the mark
 // path is driven from a tool rather than from the window, and because the deck it composes with
 // already lives out here
-export { MARK_SYSTEM, WRITTEN_SYSTEM } from '@/design/prompts'
+export { MARK_SYSTEM, MOTION, WRITTEN_SYSTEM } from '@/design/prompts'
 // reading one finished reply, which the mark tool needs for the same reason the app does
 export { grabJson } from '@/reply'
 // a direction said in the token names the rest of the world already uses, with both modes derived
