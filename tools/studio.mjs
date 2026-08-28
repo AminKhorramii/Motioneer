@@ -210,8 +210,11 @@ const LISTENER = `<script>
 requestAnimationFrame(function(){document.getAnimations().forEach(function(a){
   try{a.pause();a.currentTime=0}catch(_){}})});
 addEventListener('message',function(e){var d=e.data||{};if(d.wall!=='hold')return;
-var a=document.getAnimations();a.forEach(function(x){try{x.pause();x.currentTime=d.t}catch(_){}});
-(e.source||parent).postMessage({wall:'held',n:a.length,i:d.i},'*');});<\/script>`
+var a=document.getAnimations(),end=0;
+a.forEach(function(x){try{x.pause();x.currentTime=d.t;
+  var t=x.effect&&x.effect.getComputedTiming?x.effect.getComputedTiming().endTime:0;
+  if(typeof t==='number'&&isFinite(t)&&t>end)end=t}catch(_){}});
+(e.source||parent).postMessage({wall:'held',n:a.length,i:d.i,end:Math.round(end)},'*');});<\/script>`
 
 const preview = (o, camera, palette) => {
   const scoped = o.scope ? o.markup.replace(/<(\w+)/, `<$1 ${o.scope}`) : o.markup
@@ -404,6 +407,50 @@ parent.postMessage({wall:'ready'},'*');
 const made = new Map()   // id -> { file, markup, base, css, scope, note, verb }
 let nextId = 0
 
+/**
+ * Variations on one that nearly worked.
+ *
+ * The deck deals a different verb to every option so they disagree, which is the right way to start
+ * and the wrong way to finish. Once one of them is close, what you want is not four more unrelated
+ * ideas, it is that one with the stagger opened up, or landing harder, or half the speed. Generating a
+ * fresh batch throws away the thing you liked and rolls the dice again.
+ *
+ * So the motion that works is handed back as the brief, with an instruction to keep its idea and
+ * change how it is carried out. The gates are the same ones: a variation that stops moving its parts,
+ * or that pins itself to utility classes, is dropped exactly like a first attempt.
+ */
+const TURNS = [
+  'the same idea, but the parts should arrive further apart, so the order is unmistakable',
+  'the same idea at about half the speed, with the weight at the end of each move rather than the start',
+  'the same idea, but one element should lead and the rest follow it rather than all being equal',
+  'the same idea, tightened to about two thirds the duration, with nothing overlapping',
+]
+
+async function refine(base, count) {
+  const brief = `This motion works and is being kept. Here is its sheet:\n\n${base.css}\n\n`
+    + `It was described as: ${base.note}\n\nThe markup it moves:\n${base.markup.slice(0, 5000)}\n\n`
+  const turns = TURNS.slice(0, count)
+  const tried = await Promise.all(turns.map(async (turn) => {
+    const ask = brief + `Rewrite it as ${turn} Keep the same scope attribute, ${base.scope || 'the one it already uses'}, `
+      + 'and keep it recognisably the same motion rather than a new one.'
+    let reply = await runClaude(MOTION_SYSTEM, ask).catch(() => null)
+    let raw = reply ? grabJson(typeof reply === 'string' ? reply : reply.text ?? '') : null
+    if (!raw) {
+      reply = await runClaude(MOTION_SYSTEM, ask, { thinking: undefined }).catch(() => null)
+      raw = reply ? grabJson(typeof reply === 'string' ? reply : reply.text ?? '') : null
+    }
+    const css = raw ? safeStyle(raw.css) : ''
+    if (!css) return { verb: turn, why: 'no usable reply came back' }
+    const faults = [...unmoved({ html: '', css, note: '' }), ...brittle(css)]
+    if (faults.length) return { verb: turn, why: faults[0] }
+    const id = String(nextId++)
+    const scope = scopeOf(css, raw.scope ?? base.scope)
+    made.set(id, { ...base, id, css, scope, note: String(raw.note ?? '').slice(0, 90), verb: turn })
+    return { id, verb: turn, scope, note: String(raw.note ?? '').slice(0, 90), css }
+  }))
+  return { kept: tried.filter((t) => t.id), dropped: tried.filter((t) => !t.id), styled: 'the same as before' }
+}
+
 async function options(src, count) {
   // a picked element arrives already rendered and already carrying the rules that matched it, so
   // there is nothing to parse and nothing to guess
@@ -471,7 +518,7 @@ header{display:flex;align-items:center;gap:12px;height:48px;padding:0 14px;
 .btn.go{border-color:rgba(94,106,210,.55)}
 .sep{width:1px;height:18px;background:var(--line)}
 .clock{font-variant-numeric:tabular-nums;min-width:38px;text-align:right;font-size:12.5px}
-.unit{color:var(--faint);font-size:11px;margin-left:-3px}
+.unit{color:var(--faint);font-size:11px;margin-left:1px}.unit b{font-weight:400}
 #scrub{flex:1;height:3px;-webkit-appearance:none;background:var(--line2);border-radius:2px;cursor:pointer}
 #scrub::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;
   background:var(--accent);border:2px solid var(--panel)}
@@ -493,6 +540,7 @@ figcaption b{font-weight:500}.note{color:var(--dim)}.verb{color:var(--faint);fon
 .mini{height:24px;padding:0 9px;font-size:11.5px;background:var(--raised);color:var(--dim);
   border:1px solid var(--line2);border-radius:5px;cursor:pointer;font-family:inherit}
 .mini:hover{color:var(--ink)}
+.mini.keep{border-color:rgba(94,106,210,.5);color:var(--ink)}
 .empty{padding:40px;color:var(--faint);text-align:center;grid-column:1/-1;line-height:1.8}
 .hint{margin:4px 10px;font-size:12px;color:var(--faint);line-height:1.7}
 .hint b{color:var(--dim);font-weight:500}
@@ -520,8 +568,10 @@ figcaption b{font-weight:500}.note{color:var(--dim)}.verb{color:var(--faint);fon
     <select id="count"><option>2</option><option selected>3</option><option>4</option><option>6</option></select>
     <span class="sep"></span>
     <button class="btn" id="play"><span id="glyph">❚❚</span><span id="word">Pause</span></button>
-    <span class="clock" id="at">0.00</span><span class="unit">s</span>
+    <span class="clock" id="at">0.00</span><span class="unit">/ <b id="span">4.2s</b></span>
     <input id="scrub" type="range" min="0" max="4200" value="0" step="10">
+    <select id="rate" title="playback speed"><option>0.25x</option><option>0.5x</option>
+      <option selected>1x</option><option>2x</option></select>
     <select id="palette" title="the palette the component is rendered in">
       ${PRESETS.map((p, i) => `<option${i === 1 ? ' selected' : ''}>${p.name}</option>`).join('')}
     </select>
@@ -539,6 +589,7 @@ const scrub=document.getElementById('scrub'),at=document.getElementById('at'),li
 const play=document.getElementById('play'),ask=document.getElementById('ask'),cam=document.getElementById('cam')
 const palette=document.getElementById('palette')
 let file=null, opts=[], running=true, t=0, last=performance.now(), held=new Map()
+let ends=new Map(), span=4200, rate=1
 const APP=${TARGET ? 'true' : 'false'}
 let chosen=null   // {html,css,label} picked out of the running app
 
@@ -580,7 +631,7 @@ ask.onclick=async()=>{
     const r=await fetch('/__wall/motion',{method:'POST',headers:{'content-type':'application/json'},
       body:JSON.stringify(Object.assign({count:Number(document.getElementById('count').value)},
         APP?chosen:{file}))}).then(r=>r.json())
-    opts=r.kept; held.clear(); render()
+    opts=r.kept; held.clear(); ends.clear(); render()
     drops.textContent=(r.dropped.length? r.dropped.length+' dropped: '
       +r.dropped.map(d=>d.why.split('.')[0]).join('; ')+'. ' : '')+'Styled with '+r.styled+'.'
   }catch(e){ grid.innerHTML='<div class="empty">'+e+'</div>' }
@@ -588,6 +639,7 @@ ask.onclick=async()=>{
 }
 cam.onchange=render
 palette.onchange=render
+document.getElementById('rate').onchange=e=>{rate=parseFloat(e.target.value)}
 
 function render(){
   if(!opts.length && APP){
@@ -600,8 +652,22 @@ function render(){
     '<figcaption><b>'+(o.note||'untitled')+'</b>'+
     '<span class="verb">timing from '+o.verb+'</span>'+
     '<span class="note">'+o.scope+'</span>'+
-    '<span class="row"><button class="mini" data-copy="'+o.id+'">Copy CSS</button>'+
+    '<span class="row"><button class="mini keep" data-more="'+o.id+'">More like this</button>'+
+    '<button class="mini" data-copy="'+o.id+'">Copy CSS</button>'+
     '<button class="mini" data-save="'+o.id+'">Save file</button></span></figcaption></figure>').join('')
+  document.querySelectorAll('[data-more]').forEach(b=>b.onclick=async()=>{
+    const keep=opts.find(x=>x.id===b.dataset.more)
+    b.textContent='Varying…'; ask.disabled=true
+    try{
+      const r=await fetch('/__wall/refine',{method:'POST',headers:{'content-type':'application/json'},
+        body:JSON.stringify({id:keep.id,count:3})}).then(r=>r.json())
+      // the one you liked stays on screen, with its variations beside it, so the comparison is real
+      opts=[keep].concat(r.kept); held.clear(); ends.clear(); render()
+      drops.textContent=r.dropped.length? r.dropped.length+' variation'+(r.dropped.length>1?'s':'')
+        +' dropped: '+r.dropped.map(d=>d.why.split('.')[0]).join('; ') : 'Variations of the kept motion.'
+    }catch(e){ drops.textContent=String(e) }
+    ask.disabled=false
+  })
   document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=async()=>{
     const o=opts.find(x=>x.id===b.dataset.copy)
     await navigator.clipboard.writeText('/* add '+o.scope+' to the root element */\\n'+o.css)
@@ -615,7 +681,12 @@ function render(){
 }
 
 addEventListener('message',e=>{const d=e.data||{}
-  if(d.wall==='held'){held.set(d.i,d.n); paint()}
+  if(d.wall==='held'){held.set(d.i,d.n)
+    // a motion that runs six seconds cannot be scrubbed to its end on a four second ruler, and the
+    // only thing that knows how long it runs is the animation itself
+    if(d.end>0){ends.set(d.i,d.end); const want=Math.max(1200,Math.min(20000,Math.max(...ends.values())+300))
+      if(Math.abs(want-span)>60){span=want;scrub.max=span;document.getElementById('span').textContent=(span/1000).toFixed(1)+'s'}}
+    paint()}
   if(d.wall==='picked'){
     chosen={html:d.html,css:d.css,label:d.label,w:d.w,h:d.h}
     document.getElementById('pick').setAttribute('aria-pressed','false')
@@ -641,14 +712,14 @@ function hold(ms){
 function face(){document.getElementById('glyph').textContent=running?'❚❚':'▶'
   document.getElementById('word').textContent=running?'Pause':'Play'}
 requestAnimationFrame(function tick(now){const s=now-last;last=now
-  if(running){t=(t+s)%4200;hold(t)} requestAnimationFrame(tick)})
+  if(running){t=(t+s*rate)%span;hold(t)} requestAnimationFrame(tick)})
 play.onclick=()=>{running=!running;face()}
 scrub.oninput=()=>{running=false;face();t=Number(scrub.value);hold(t)}
 addEventListener('keydown',e=>{
   if(e.target.tagName==='INPUT'&&e.target.type==='range')return
   if(e.key===' '){e.preventDefault();play.click()}
   if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();running=false;face()
-    t=Math.max(0,Math.min(4200,t+(e.key==='ArrowRight'?100:-100)));hold(t)}})
+    t=Math.max(0,Math.min(span,t+(e.key==='ArrowRight'?100:-100)));hold(t)}})
 <\/script></body></html>`
 
 const json = (res, v) => { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(v)) }
@@ -698,6 +769,15 @@ const server = createServer(async (req, res) => {
         : { file: body.file }
       console.log(`  ${src.label ?? path.basename(src.file)}: asking for ${body.count}`)
       const got = await options(src, Math.max(1, Math.min(6, body.count || 3)))
+      console.log(`    ${got.kept.length} kept, ${got.dropped.length} dropped`)
+      return json(res, got)
+    }
+    if (url.pathname === '/__wall/refine' && req.method === 'POST') {
+      const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))
+      const base = made.get(body.id)
+      if (!base) { res.writeHead(404); return res.end('gone') }
+      console.log(`  refining "${base.note}"`)
+      const got = await refine(base, Math.max(1, Math.min(4, body.count || 3)))
       console.log(`    ${got.kept.length} kept, ${got.dropped.length} dropped`)
       return json(res, got)
     }
