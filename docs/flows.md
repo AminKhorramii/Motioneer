@@ -596,6 +596,59 @@ the picker.
 
 ---
 
+## 8b. The motion studio
+
+Everything above makes whole pages. This is the other half: motion for a component that already
+exists, either one of yours on disk or one in an app that is running right now.
+
+```
+npm run studio                                            opens on examples/components
+npm run studio -- ~/app/src/components --css ~/app/src/globals.css
+npm run studio -- --app http://localhost:3000             your dev server, elements picked by hand
+```
+
+The loop is try several and keep one, which is why it is a room rather than a command. Pick a
+component and it renders straight away; ask for motion and `dealMotions` deals a different verb from
+the deck to each slot, so the options disagree by construction rather than being four takes on a
+fade. Every option is held at the same instant by one transport, so comparing them is a real
+comparison. `More like this` keeps the one that nearly worked and varies how it is carried out,
+because four fresh unrelated ideas is the right way to start and the wrong way to finish.
+
+Four gates stand between a reply and a card on screen, and they are the same ones the MCP `motion`
+tool uses: `safeStyle` for what is allowed in a sheet at all, `unmoved` for a motion that is really
+one transition wearing a costume, `brittle` for selectors pinned to utility classes that will stop
+matching the first time somebody changes a width, and `scopeOf`, which reads the attribute the sheet
+hangs on out of the sheet rather than believing the field beside it. A slot a gate turns down is
+retried once, told what was wrong, because being handed one option after asking for four is a bad
+trade when the complaint was specific.
+
+Two things make it work on real components rather than only on toys:
+
+- **shadcn needs Tailwind to be shadcn.** Rendered without it a card is a column of unstyled text,
+  and motion written against a component with no cards is motion for a layout that does not exist.
+  The browser build is fetched once into `.studio/` and served from there, so every preview after the
+  first makes no network request. Colours come from `themeOf`, so the component can be seen in eight
+  palettes that have already passed a contrast gate.
+- **A running app is better input than a file.** Reading a component out of a `.tsx` is a brace
+  counter and a hope. With `--app` the dev server is served through the studio's own origin, which
+  makes the iframe same origin, which makes its dom readable. Clicking an element sends up the
+  rendered subtree, the rules that actually matched it, and the custom properties in force on it,
+  since an app declares its tokens on whatever ancestor it likes and those rules match the ancestor
+  rather than the element. Studio routes live under `/__wall` so an app with its own `/api` cannot
+  collide, everything else is forwarded, and the websocket upgrade is passed through so hot reload
+  survives.
+
+`Export` writes one html file with every option in it, the transport included, no requests at all.
+The options share a document rather than sitting in iframes, which they can only do because each
+sheet is already scoped to an attribute: option two gets `data-motion-fold-2` and its selectors are
+rewritten to match, so four sheets coexist. That file is the thing you attach to a pull request.
+
+`shot.mjs` and `film.mjs` are the other end of it: a camera pass over a component, then that move
+rendered frame by frame. The frames are the deliverable and mp4 only happens if ffmpeg is installed,
+which is said out loud rather than silently skipped.
+
+---
+
 ## 9. Development flows
 
 ```
@@ -606,6 +659,7 @@ npm run serve          # the built app behind the server, with its own keys
 npm run try            # what an agent run does, without needing an agent: brief, server, browser
 npm run watch          # rebuild dist on every change, so try and the suites are never stale
 npm run wallclock      # how long a whole wall takes, measured through the real app
+npm run studio         # motion for components you have, or for an app that is running
 npm run build:wasm     # rebuild the image crate and inline it, needs Rust
 ```
 

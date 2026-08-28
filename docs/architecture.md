@@ -54,11 +54,18 @@ verify/                the suites, in order of how much they prove
 
 tools/                 run by hand or at author time, never at run time
   try.mjs              the loop for working on Wall itself
+  studio.mjs           motion for components you already have, or for a running app
+  animate.mjs          the same job as one command, for a file rather than a room
+  motion.mjs           moving marks, drawn and animated in one call
+  shot.mjs             a camera pass over a component: macro, tilted, shallow focus
+  film.mjs             renders a folder of shots frame by frame, mp4 if ffmpeg is there
   capture.mjs          record real streams into fixtures/
   shots.mjs            screenshots into shots/
   wallclock.mjs        how long a whole wall takes, measured through the real app
   fonts.mjs            generates src/typefaces.ts, committed
   wasm.mjs             generates src/imagewasm.ts from the crate, committed
+
+examples/components/   shadcn shaped components with repeated parts, what the studio opens on
 ```
 
 ## The data model

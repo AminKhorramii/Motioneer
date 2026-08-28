@@ -1,8 +1,9 @@
 /**
- * The studio: point it at a folder of components and play with their motion.
+ * The studio: point it at components you already have and play with their motion.
  *
- *   node tools/studio.mjs ~/your-app/src/components --css ~/your-app/src/app.css
- *   node tools/studio.mjs examples
+ *   npm run studio                                  the components in examples/
+ *   npm run studio -- ~/app/src/ui --css ~/app/src/globals.css
+ *   npm run studio -- --app http://localhost:3000   your dev server, elements picked by hand
  *
  * Everything up to here has been a command that runs once and prints a path. That is the wrong shape
  * for the actual job, which is not "generate motion" but "try several and keep one": you want the
@@ -748,7 +749,7 @@ document.getElementById('save').onclick=async()=>{
     body:JSON.stringify({ids:opts.map(o=>o.id),palette:palette.value,
       name:(APP?(chosen&&chosen.label):file||'').split('/').pop().replace(/\.[^.]+$/,'')})}).then(r=>r.json())
   btn.textContent='Export'
-  drops.textContent='Wrote '+r.at+' — '+r.kb+'kb, one file, opens anywhere, no requests.'
+  drops.textContent='Wrote '+r.at+', '+r.kb+'kb. One file, opens anywhere, no requests.'
 }
 document.getElementById('rate').onchange=e=>{rate=parseFloat(e.target.value)}
 
