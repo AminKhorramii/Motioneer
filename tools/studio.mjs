@@ -26,7 +26,7 @@ import net from 'node:net'
 import { readFileSync, writeFileSync, existsSync, statSync, readdirSync, mkdirSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import path from 'node:path'
-import { runClaude } from '../shared/cli.mjs'
+import { hasClaude, runClaude } from '../shared/cli.mjs'
 import { listenNear, movedFrom } from '../shared/port.mjs'
 import {
   MOTION_SYSTEM, dealMotions, grabJson, safeStyle, unmoved, brittle, scopeOf,
@@ -55,6 +55,17 @@ const ROOT = args.find((a, i) => !a.startsWith('--')
   && !(cssAt > -1 && i === cssAt + 1) && !(appAt > -1 && i === appAt + 1)) ?? 'examples/components'
 const PORT = Number(process.env.WALL_PORT || 4321)
 const KIND = /\.(tsx|jsx|vue|svelte|astro|html|htm)$/i
+/**
+ * Whether there is anything here that can write.
+ *
+ * Every option in this studio comes from a model call, and the call goes through the claude command.
+ * Without it on PATH every attempt returns nothing, all of them are dropped, and the grid quietly goes
+ * back to showing the component exactly as it was before the button was pressed. That reads as "the
+ * button does nothing" after forty seconds of waiting, when the real answer is one sentence long and
+ * could have been said before any waiting happened.
+ */
+const CAN_WRITE = hasClaude()
+
 const work = '.studio'
 mkdirSync(work, { recursive: true })
 
@@ -753,7 +764,10 @@ figcaption b{font-weight:500}.note{color:var(--dim)}.verb{color:var(--faint);fon
     <span class="status" id="driven">—</span>
     <span><kbd>Space</kbd><kbd>←</kbd><kbd>→</kbd></span>
   </header>
-  <div class="grid" id="grid"><div class="empty">Pick a component on the left, then press <b>Give it motion</b>.</div></div>
+  <div class="grid" id="grid"><div class="empty">${CAN_WRITE
+    ? 'Pick a component on the left, then press <b>Give it motion</b>.'
+    : 'No <b>claude</b> command on PATH, so nothing can be written here.<br>'
+      + 'Start the studio from a shell where <b>claude</b> runs.'}</div></div>
   <div class="drops" id="drops"></div>
 </main>
 <script>
@@ -763,8 +777,9 @@ const play=document.getElementById('play'),ask=document.getElementById('ask'),ca
 const palette=document.getElementById('palette')
 let file=null, opts=[], running=true, t=0, last=performance.now(), held=new Map()
 let ends=new Map(), span=4200, rate=1
-const APP=${TARGET ? 'true' : 'false'}
+const APP=${TARGET ? 'true' : 'false'}, CAN_WRITE=${CAN_WRITE ? 'true' : 'false'}
 let chosen=null   // {html,css,label} picked out of the running app
+let verdict=null  // why the last ask produced nothing, so the grid can say so
 
 if(APP){
   render()
@@ -782,9 +797,36 @@ fetch('/__wall/list').then(r=>r.json()).then(fs=>{
   document.querySelectorAll('.file').forEach(b=>b.onclick=()=>{
     file=b.dataset.f
     document.querySelectorAll('.file').forEach(x=>x.setAttribute('aria-current',x===b))
-    opts=[]; held.clear(); drops.textContent=''; render()
+    opts=[]; verdict=null; held.clear(); drops.textContent=''; render()
   })
 })
+
+/**
+ * Why nothing came back.
+ *
+ * Falling back to the untouched preview is the worst thing this could do, because it looks exactly
+ * like the state before the button was pressed. The two reasons are entirely different problems: a
+ * model that never answered is usually the claude command missing, which no amount of trying again
+ * will fix, while a gate rejecting every attempt is about this particular component and is worth
+ * another go with a different verb.
+ */
+function explain(){
+  const d=verdict.dropped||[]
+  const silent=d.length&&d.every(x=>/no usable reply/i.test(x.why||''))
+  let body
+  if(verdict.error) body='<b>The studio errored.</b><br>'+verdict.error
+  else if(!CAN_WRITE||silent) body='<b>The model did not answer.</b><br>'
+    +(CAN_WRITE
+      ? 'The claude command is on PATH here, so this is likely a rate limit or a dropped connection. Worth pressing again.'
+      : 'There is no claude command on PATH, so there is nothing for the button to call. '
+        +'Start the studio from a shell where <b>claude</b> runs.')
+  else body='<b>Every option was turned down by a gate.</b><br>'
+    +d.map(x=>'&middot; '+x.why).join('<br>')
+    +'<br><br>That is usually a component with nothing in it that wants to move separately. '
+    +'Try one with repeated parts, or press again for different verbs.'
+  grid.innerHTML='<div class="empty" style="text-align:left;max-width:640px;margin:24px auto">'+body+'</div>'
+  paint()
+}
 
 /** the component as it is, so the left rail is a thing you browse rather than a thing you submit */
 function peek(){
@@ -797,6 +839,7 @@ function peek(){
 ask.onclick=async()=>{
   if(APP && !chosen) return alert('Press Pick element, then click something in your app.')
   if(!APP && !file) return alert('Pick a component first.')
+  verdict=null
   ask.disabled=true; ask.textContent='Writing…'
   grid.innerHTML='<div class="empty">Asking for '+document.getElementById('count').value+' motions.<br>About thirty seconds.</div>'
   drops.textContent=''
@@ -804,10 +847,13 @@ ask.onclick=async()=>{
     const r=await fetch('/__wall/motion',{method:'POST',headers:{'content-type':'application/json'},
       body:JSON.stringify(Object.assign({count:Number(document.getElementById('count').value)},
         APP?chosen:{file}))}).then(r=>r.json())
-    opts=r.kept; held.clear(); ends.clear(); render()
-    drops.textContent=(r.dropped.length? r.dropped.length+' dropped: '
-      +r.dropped.map(d=>d.why.split('.')[0]).join('; ')+'. ' : '')+'Styled with '+r.styled+'.'
-  }catch(e){ grid.innerHTML='<div class="empty">'+e+'</div>' }
+    opts=r.kept||[]; held.clear(); ends.clear()
+    verdict = opts.length ? null : {dropped:r.dropped||[], error:r.error}
+    render()
+    drops.textContent=(r.dropped&&r.dropped.length&&opts.length? r.dropped.length+' dropped: '
+      +r.dropped.map(d=>d.why.split('.')[0]).join('; ')+'. ' : '')
+      +(r.styled?'Styled with '+r.styled+'.':'')
+  }catch(e){ verdict={dropped:[],error:String(e)}; opts=[]; render() }
   ask.disabled=false; ask.innerHTML='Give it motion'
 }
 cam.onchange=render
@@ -824,6 +870,7 @@ document.getElementById('save').onclick=async()=>{
 document.getElementById('rate').onchange=e=>{rate=parseFloat(e.target.value)}
 
 function render(){
+  if(!opts.length && verdict) return explain()
   if(!opts.length && APP){
     grid.innerHTML='<div class="appwrap"><iframe src="/__wall/app"></iframe></div>'; return }
   if(!opts.length){ if(file) return peek()
@@ -1043,9 +1090,12 @@ else {
   const files = list().length
   console.log(`  ${files} component${files === 1 ? '' : 's'} under ${path.resolve(ROOT)}`)
 }
-console.log(TARGET ? '  picked elements bring their own css, so nothing is guessed\n'
-  : rawSheet ? `  styled with ${SHEET}\n`
-    : '  no --css given: utility classes are compiled here and coloured from a Wall palette\n')
+console.log(TARGET ? '  picked elements bring their own css, so nothing is guessed'
+  : rawSheet ? `  styled with ${SHEET}`
+    : '  no --css given: utility classes are compiled here and coloured from a Wall palette')
+console.log(CAN_WRITE ? '  the claude command is here, so motion can be written\n'
+  : '  no claude command on PATH, so nothing can be written. Install it, or start the studio\n'
+    + '  from a shell where `claude` runs, and the button will have something to call.\n')
 if (!process.env.WALL_NO_OPEN) {
   const [cmd, a] = process.platform === 'darwin' ? ['open', [where]]
     : process.platform === 'win32' ? ['cmd', ['/c', 'start', '', where]]
