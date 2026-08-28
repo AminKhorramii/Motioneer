@@ -160,36 +160,94 @@ const shown = rows.filter((r) => r.mark)
 const CYCLE = 4200
 const cells = shown.map((r, i) => `<figure>
   <iframe src="${r.slug}.html" loading="eager" data-i="${i}"></iframe>
-  <figcaption><b>${r.ground.name}</b> · ${(r.mark.note || '').slice(0, 40)}
-  <br>${r.faults.length ? r.faults[0].split('.')[0] : 'moves as a mechanism'}
-  <br><a href="${r.slug}.webm">clip</a> · <a href="${r.slug}.html">page</a></figcaption>
+  <figcaption>
+    <b>${r.ground.name}</b>
+    <span class="note">${(r.mark.note || '').slice(0, 46)}</span>
+    <span class="verdict">${r.faults.length ? r.faults[0].split('.')[0] : 'moves as a mechanism'}</span>
+    <span><a href="${r.slug}.webm">clip</a> &nbsp;<a href="${r.slug}.html">page</a></span>
+  </figcaption>
 </figure>`).join('')
 
 const sheet = path.resolve(out, 'sheet.html')
 writeFileSync(sheet, `<html><head><meta charset="utf-8"><title>${SUBJECT}</title></head>
 <body>
 <header>
-  <button id="play">pause</button>
+  <div class="left">
+    <button id="play" class="btn primary"><span id="glyph">❚❚</span><span id="word">Pause</span></button>
+    <span class="sep"></span>
+    <span id="at" class="clock">0.00</span><span class="unit">s</span>
+  </div>
   <input id="scrub" type="range" min="0" max="${CYCLE}" value="0" step="10">
-  <span id="at">0.00s</span>
-  <label>speed <select id="rate"><option value="0.25">quarter</option><option value="0.5">half</option><option value="1" selected>full</option></select></label>
-  <span id="driven" class="hint">connecting</span>
-  <span class="hint">space to play, arrows to step</span>
+  <div class="right">
+    <label class="field">Speed
+      <select id="rate"><option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="1" selected>1×</option></select>
+    </label>
+    <span class="sep"></span>
+    <span id="driven" class="status">connecting</span>
+    <span class="keys"><kbd>Space</kbd><kbd>←</kbd><kbd>→</kbd></span>
+  </div>
 </header>
 <div class="grid">${cells}</div>
 <style>
-  body{margin:0;background:#0e0e0f;font:11px ui-monospace,monospace;color:#8b8b8b}
-  header{position:sticky;top:0;z-index:2;display:flex;gap:14px;align-items:center;
-    padding:12px 16px;background:#141416;border-bottom:1px solid #232326}
-  button,select{background:#232326;color:#ddd;border:1px solid #34343a;border-radius:4px;
-    padding:5px 12px;font:inherit;cursor:pointer}
-  #scrub{flex:1;accent-color:#7aa2f7}
-  #at{min-width:52px;color:#ddd}
-  .hint{color:#5a5a60}
-  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:14px}
-  figure{margin:0;display:grid;gap:6px}
-  iframe{width:100%;aspect-ratio:1;border:0;border-radius:4px;background:#1a1a1c;display:block}
-  figcaption{line-height:1.6}b{color:#ddd;font-weight:500}a{color:#7aa2f7}
+  /**
+   * Restraint, borrowed from the tools this sits beside all day.
+   *
+   * Near black rather than black, borders at seven percent white rather than a visible grey, one
+   * muted indigo used on the single control that matters, and thirteen pixel type with tabular
+   * figures so the clock does not shuffle as it counts. Nothing here should pull the eye: the panel
+   * is furniture and the six moving things above it are the work.
+   */
+  :root{
+    --bg:#08090a; --panel:#0f1011; --raised:#141516;
+    --line:rgba(255,255,255,.07); --line-strong:rgba(255,255,255,.11);
+    --ink:#e6e6e6; --dim:#8a8f98; --faint:#5c6068; --accent:#5e6ad2;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:13px/1.5 ui-sans-serif,-apple-system,"Inter","Segoe UI",sans-serif;
+    -webkit-font-smoothing:antialiased}
+  header{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:16px;
+    height:48px;padding:0 14px;background:var(--panel);
+    border-bottom:1px solid var(--line);backdrop-filter:blur(8px)}
+  .left,.right{display:flex;align-items:center;gap:10px;flex:none}
+  .sep{width:1px;height:18px;background:var(--line)}
+  .btn{display:inline-flex;align-items:center;gap:7px;height:28px;padding:0 11px;
+    background:var(--raised);color:var(--ink);border:1px solid var(--line-strong);
+    border-radius:6px;font:inherit;font-size:12.5px;cursor:pointer;
+    transition:background 100ms ease,border-color 100ms ease}
+  .btn:hover{background:#1a1b1d;border-color:rgba(255,255,255,.16)}
+  .btn:active{background:#111213}
+  .btn.primary{border-color:rgba(94,106,210,.5)}
+  #glyph{font-size:9px;color:var(--accent);letter-spacing:1px}
+  .clock{font-variant-numeric:tabular-nums;font-feature-settings:"tnum";
+    font-size:12.5px;color:var(--ink);min-width:38px;text-align:right}
+  .unit{color:var(--faint);font-size:11px;margin-left:-4px}
+  #scrub{flex:1;height:3px;-webkit-appearance:none;appearance:none;
+    background:var(--line-strong);border-radius:2px;cursor:pointer}
+  #scrub::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;
+    background:var(--accent);border:2px solid var(--panel);
+    box-shadow:0 0 0 1px rgba(94,106,210,.35);transition:transform 100ms ease}
+  #scrub:hover::-webkit-slider-thumb{transform:scale(1.15)}
+  .field{display:inline-flex;align-items:center;gap:7px;color:var(--dim);font-size:12px}
+  select{height:28px;padding:0 7px;background:var(--raised);color:var(--ink);
+    border:1px solid var(--line-strong);border-radius:6px;font:inherit;font-size:12.5px;cursor:pointer}
+  .status{font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
+  .keys{display:inline-flex;gap:4px}
+  kbd{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:19px;
+    padding:0 5px;background:var(--raised);border:1px solid var(--line-strong);
+    border-radius:4px;font-size:10.5px;color:var(--faint);font-family:inherit}
+  .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;padding:14px}
+  figure{margin:0;display:grid;gap:0;background:var(--panel);border:1px solid var(--line);
+    border-radius:8px;overflow:hidden;transition:border-color 100ms ease}
+  figure:hover{border-color:var(--line-strong)}
+  iframe{width:100%;aspect-ratio:1;border:0;background:#0b0c0d;display:block}
+  figcaption{padding:10px 12px;border-top:1px solid var(--line);line-height:1.6;
+    display:grid;gap:3px;font-size:12px}
+  figcaption b{color:var(--ink);font-weight:500}
+  figcaption .note{color:var(--dim)}
+  figcaption .verdict{color:var(--faint);font-size:11px}
+  figcaption a{color:var(--faint);text-decoration:none;font-size:11px}
+  figcaption a:hover{color:var(--dim)}
 </style>
 <script>
   const frames = [...document.querySelectorAll('iframe')]
@@ -208,15 +266,15 @@ writeFileSync(sheet, `<html><head><meta charset="utf-8"><title>${SUBJECT}</title
   })
   const paint = () => {
     const live = [...held.values()].filter((n) => n > 0).length
-    link.textContent = live + ' of ' + frames.length + ' driven'
-    link.style.color = live === frames.length ? '#7ab88a' : '#c98b5e'
+    link.textContent = live + '/' + frames.length + ' driven'
+    link.style.color = live === frames.length ? '#8a8f98' : '#d29d6b'
   }
   const hold = (ms) => {
     frames.forEach((f, i) => {
       try { f.contentWindow.postMessage({ wall: 'hold', t: ms, i }, '*') } catch {}
     })
     scrub.value = ms
-    at.textContent = (ms / 1000).toFixed(2) + 's'
+    at.textContent = (ms / 1000).toFixed(2)
   }
   const tick = (now) => {
     const step = now - last
@@ -226,13 +284,17 @@ writeFileSync(sheet, `<html><head><meta charset="utf-8"><title>${SUBJECT}</title
   }
   requestAnimationFrame(tick)
 
-  play.onclick = () => { running = !running; play.textContent = running ? 'pause' : 'play' }
-  scrub.oninput = () => { running = false; play.textContent = 'play'; t = Number(scrub.value); hold(t) }
+  const face = () => {
+    document.getElementById('glyph').textContent = running ? '❚❚' : '▶'
+    document.getElementById('word').textContent = running ? 'Pause' : 'Play'
+  }
+  play.onclick = () => { running = !running; face() }
+  scrub.oninput = () => { running = false; face(); t = Number(scrub.value); hold(t) }
   rate.onchange = () => { last = performance.now() }
   addEventListener('keydown', (e) => {
     if (e.key === ' ') { e.preventDefault(); play.click() }
     if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-      e.preventDefault(); running = false; play.textContent = 'play'
+      e.preventDefault(); running = false; face()
       t = Math.max(0, Math.min(${CYCLE}, t + (e.key === 'ArrowRight' ? 100 : -100))); hold(t)
     }
   })

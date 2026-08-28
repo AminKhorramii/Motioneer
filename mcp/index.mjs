@@ -495,7 +495,24 @@ async function motion(args) {
   const kept = watched.filter((t) => t && !t.faults.length)
   const dropped = tried.filter((t) => t && t.faults.length)
   if (!kept.length) {
+    /**
+     * A component with one part cannot have a mechanism, and saying otherwise is unhelpful.
+     *
+     * Run over eight real shadcn components, six got staggered motion and the button did not: it is
+     * an icon and a label, so there is nothing to arrive in sequence and every option correctly came
+     * back as a transition. The gate was right and the message was wrong, because it blamed the
+     * options for a property of the component. Counting the elements separates "this did not work"
+     * from "there is nothing here to stagger", and only the first is worth retrying.
+     */
+    const parts = (html.match(/<(?!\/)(?!br|hr|img|input|meta|link)[a-zA-Z]/g) ?? []).length
     const why = dropped[0]?.faults[0] ?? 'no usable reply came back'
+    if (parts < 5 && dropped.some((d) => d.faults.some((f) => f.includes('at once')))) {
+      throw new Error(
+        `This component has ${parts} element${parts === 1 ? '' : 's'}, so there is nothing to `
+        + 'stagger: motion on it can only be the whole thing moving, which is the transition you '
+        + 'already have. Send a component with parts that can arrive in sequence, rows, cards, '
+        + 'fields, cells, and the motion has something to be made of.')
+    }
     throw new Error(`No option moved the parts. ${why}`)
   }
   const why = [...new Set(dropped.flatMap((d) => d.faults.map((f) => f.split('.')[0])))]
