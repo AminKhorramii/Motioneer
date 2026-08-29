@@ -46,7 +46,8 @@ motions arrive at once, each dealt a different verb and a different errand from 
 disagree by construction rather than being five takes on a fade. One scrubber holds all of them
 at the same instant, which is the only way comparing them is real.
 
-**Pointing at a running app** is better than pointing at a file. Reading a component out of a
+**Type an address into the sidebar** and that page is proxied and pickable, with the five most recent
+kept in the rail. **Pointing at a running app** is better than pointing at a file. Reading a component out of a
 `.tsx` is a brace counter and a hope; a rendered dom is the answer. The dev server is proxied
 through the studio's own origin so the frame is same origin and its dom can be read, studio
 routes live under `/__wall` so an app with its own `/api` cannot collide, and the websocket
@@ -55,13 +56,19 @@ rules that matched it for the model, because a selector against real class names
 something next month, and a snapshot with every computed value written onto it for the preview,
 because a reconstruction leaks and the leak was measurable.
 
-**Five gates**, four of which read the sheet and one of which looks at it. `safeStyle` bounds
+**Seven gates**, six of which read the sheet and one of which looks at it. `safeStyle` bounds
 what a sheet may contain, `unmoved` rejects a transition wearing a costume, `brittle` rejects
-selectors pinned to utility classes, `janky` rejects keyframes that move layout properties, and
-`unstill` requires a reduced motion query. The fifth renders the option twice, once held past
-the end of its motion and once without the motion at all, and compares every element's box and
-opacity: a sheet can satisfy every reading of the text and still leave the component twelve
-pixels down forever, or invisible, or animating nothing at all.
+selectors pinned to utility classes, `janky` rejects keyframes that move layout properties,
+`unstill` requires a reduced motion query, and `leaks` rejects a selector that does not start from
+the scope attribute and would therefore animate everything matching it in the host application. The
+seventh renders the option twice, once held past the end of its motion and once without the motion at
+all, and compares every element's box and opacity: a sheet can satisfy every reading of the text and
+still leave the component twelve pixels down forever, or invisible, or animating nothing at all.
+
+**Ordered by what the rendering saw.** The same pass measures how much of the component takes part,
+how far anything strays outside its box, and how much is invisible at the first frame, and options are
+sorted by the last two. Keyframe names are rewritten to carry the scope, since `@keyframes` is one
+global namespace and a sheet defining `rise` replaces the host's own.
 
 **Adjusting beats regenerating.** Slower, further apart, land harder: each is arithmetic on
 numbers already in the sheet, so `retimed` rewrites them in place and the original stays.

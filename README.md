@@ -40,22 +40,28 @@ npm run studio -- ~/app/src/ui --css ~/app/globals.css
 npm run studio -- --app http://localhost:3000      your dev server
 ```
 
-Point it at a running app, click any element, and get several motions for it at once. Each
-is dealt a different verb and a different errand from the deck, so they disagree by
-construction rather than being five takes on a fade. One scrubber holds them all at the same
-instant, which is the only way comparing them is real.
+Or open it with no arguments and **type an address into the sidebar**: `localhost:3000`,
+`stripe.com`, anything reachable. The five most recent stay in the rail with their favicons.
+
+Click any element and get several motions for it at once. Each is dealt a different verb and
+a different errand from the deck, so they disagree by construction rather than being five
+takes on a fade. One scrubber holds them all at the same instant, which is the only way
+comparing them is real. **Open** fills the screen with one; **More like this** varies the one
+that nearly worked; the inspector makes it slower or wider apart without asking again.
 
 Reading a component out of a `.tsx` is guesswork, so it does not: with `--app` your dev
 server is proxied through the studio's own origin, which makes the frame same origin, which
 makes its dom readable. A picked element brings the rules that actually matched it.
 
 What comes out is a `.motion.css` scoped to one attribute, which ships in your product.
-Five gates stand between a reply and the screen, and the fifth one renders: a sheet that
-leaves the component twelve pixels down forever, or invisible, or that animates nothing at
-all, passes every reading of the text and fails on sight.
+Six gates read that sheet and a seventh renders it: one that leaves the component twelve
+pixels down forever, or invisible, or animating nothing at all, passes every reading of the
+text and fails on sight. Options are then ordered by what the rendering saw, so the ones you
+can actually see from the first frame come first.
 
 Select several elements and they become a rail: one motion each, played on one timeline, a
-beat apart.
+beat apart. A camera pass puts any of it on a locked, pushing, drifting or orbiting shot, and
+**Export** writes the lot to one html file that makes no requests.
 
 ## From a clone
 

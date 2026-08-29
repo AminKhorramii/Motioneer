@@ -33,6 +33,11 @@ src/
 
 shared/providers.mjs   one model path for every shell
 shared/port.mjs        binds the port asked for, or the next free one, and says which
+
+src/written.ts         everything that judges model written css, and the two that repair it:
+                       safeStyle, unmoved, brittle, janky, unstill, leaks, scopeOf,
+                       tempo, retimed, namespaced. Never in the studio page, which is a
+                       template literal that eats a backslash before the browser sees it
 mcp/index.mjs          the three tools an agent calls, and how Wall is opened
 src-tauri/             the desktop shell, built but not released yet
 crates/wall-image/     decode, fit, flatten, re-encode. compiled to wasm
@@ -57,7 +62,7 @@ verify/                the suites, in order of how much they prove
 
 tools/                 run by hand or at author time, never at run time
   try.mjs              the loop for working on Wall itself
-  studio.mjs           motion for components you already have, or for a running app
+  studio.mjs           the motion studio: proxy, picker, transport, rail, camera, export
   animate.mjs          the same job as one command, for a file rather than a room
   motion.mjs           moving marks, drawn and animated in one call
   shot.mjs             a camera pass over a component: macro, tilted, shallow focus

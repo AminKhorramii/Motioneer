@@ -598,130 +598,144 @@ the picker.
 
 ## 8b. The motion studio
 
-Everything above makes whole pages. This is the other half: motion for a component that already
-exists, either one of yours on disk or one in an app that is running right now.
+Everything above makes whole pages. This is the other half, and the same act: motion for a component
+that already exists, several at once, compared side by side.
 
 ```
 npm run studio                                            opens on examples/components
-npm run studio -- ~/app/src/components --css ~/app/src/globals.css
-npm run studio -- --app http://localhost:3000             your dev server, elements picked by hand
+npm run studio -- ~/app/src/ui --css ~/app/src/globals.css
+npm run studio -- --app http://localhost:3000             or just type the address once it is open
 ```
 
-The loop is try several and keep one, which is why it is a room rather than a command. Pick a
-component and it renders straight away; ask for motion and `dealMotions` deals a different verb from
-the deck to each slot, so the options disagree by construction rather than being four takes on a
-fade. Every option is held at the same instant by one transport, so comparing them is a real
-comparison. `More like this` keeps the one that nearly worked and varies how it is carried out,
-because four fresh unrelated ideas is the right way to start and the wrong way to finish.
+### Pointing it somewhere
 
-Four gates stand between a reply and a card on screen, and they are the same ones the MCP `motion`
-tool uses: `safeStyle` for what is allowed in a sheet at all, `unmoved` for a motion that is really
-one transition wearing a costume, `brittle` for selectors pinned to utility classes that will stop
-matching the first time somebody changes a width, and `scopeOf`, which reads the attribute the sheet
-hangs on out of the sheet rather than believing the field beside it. A slot a gate turns down is
-retried once, told what was wrong, because being handed one option after asking for four is a bad
-trade when the complaint was specific.
+The sidebar begins with an address bar. Type `localhost:3000` or `stripe.com`, press return, and that
+page is proxied and pickable; the five most recent addresses stay in the rail with their own favicons
+and survive a restart, because retyping the same host every morning is a tax a tool should not charge.
+A bare host gets `https` unless it is this machine, since everything else redirects to it and the
+redirect used to walk the browser out of the proxy.
 
-Two things make it work on real components rather than only on toys:
+Proxying rather than linking is the whole trick. An iframe on another port is another origin and its
+dom is closed, so the dev server is served through the studio's own origin: routes under `/__wall` so
+an app with its own `/api` cannot collide, everything else forwarded, the websocket upgrade passed
+through so hot reload survives, and stylesheets named by absolute url pulled back onto this origin so
+they can be read. Two sites defend themselves and are handled rather than hidden: one that navigates
+its own frame back to its canonical host is reloaded with scripts refused, since the picker wants the
+rendered dom and not their javascript, and one behind a bot check is reported as unreachable because a
+proxy cannot pass one.
 
-- **shadcn needs Tailwind to be shadcn.** Rendered without it a card is a column of unstyled text,
-  and motion written against a component with no cards is motion for a layout that does not exist.
-  The browser build is fetched once into `.studio/` and served from there, so every preview after the
-  first makes no network request. Colours come from `themeOf`, so the component can be seen in eight
-  palettes that have already passed a contrast gate.
-- **A running app is better input than a file.** Reading a component out of a `.tsx` is a brace
-  counter and a hope. With `--app` the dev server is served through the studio's own origin, which
-  makes the iframe same origin, which makes its dom readable. Clicking an element sends up the
-  rendered subtree, the rules that actually matched it, and the custom properties in force on it,
-  since an app declares its tokens on whatever ancestor it likes and those rules match the ancestor
-  rather than the element. Studio routes live under `/__wall` so an app with its own `/api` cannot
-  collide, everything else is forwarded, and the websocket upgrade is passed through so hot reload
-  survives.
+Reading a component out of a `.tsx` is a brace counter and a hope. A rendered dom is the answer, which
+is why pointing at something running beats pointing at a file.
 
-Detection is calibrated rather than assumed. `tempo` measures what a sheet actually does: how long
-each part moves, how far apart consecutive parts start, how long the whole thing takes, which
-properties are painted, and whether stillness is respected. Measured across 23 real options, every
-single one already wrapped itself in a reduced-motion query, so `unstill` is enforced and costs
-nothing. The timings are not enforced, because only 70 to 74 percent land inside the numbers the
-prompt asks for and the long tail is the errands that are supposed to be slow: a motion whose job is
-to keep something alive has no business finishing in 400ms. Enforcing those would reject a third of
-the good work for failing to be an entrance, so they are reported on the card and left to a person.
-That distinction came out of the measurements, not out of taste.
+### What a pick captures
 
-Legality has a floor and no ceiling, so the rendered pass also measures three things nothing rejects
-on. How much of the component takes part, how far anything strays outside its own box, and how much of
-it is invisible at the very first frame. Options are then ordered by the last two, because a component
-that cannot be seen when you first look at it is worse than one that can and a part that leaves the
-box risks being clipped, and both are faults of degree rather than kind. How much takes part is shown
-and deliberately not scored: an emphasis motion stirs three percent because it is about one thing and
-an entrance stirs ninety because it is about all of them, and neither is better.
+Two captures, for two readers. The model gets the markup and the rules that actually matched it, so a
+selector written against real class names still means something after somebody edits the component.
+The preview gets a snapshot: a clone with every computed value written onto it, which needs no
+collected rules and cannot be let down by one that was missed. Measured across four sites, a heading
+that laid out at 31 percent of its height came back at 100, a button at 57 came back at 100, and
+nothing got worse.
 
-Two measurements were wrong before they were right, and both were caught by calibrating rather than by
-reading. Displacement of the bounding box reported that fifteen of twenty one motions barely moved,
-including one described as rows typing onto the page, because a clip-path reveal and a scaleX move
-nothing. And sampling only real elements reported that nothing at all took part in a border tracing
-its own outline, because that is a pseudo element and querySelectorAll cannot see one.
+The picker stays armed until Escape, since a rail is built from several picks and disarming after each
+one made the second click look broken. Each pick reports its own size and node count, and says when it
+is a poor subject: a strip too thin to stagger, an element with nothing inside it, an svg cut short,
+or most of the page rather than a component.
 
-Two hazards are about the page this sheet gets pasted into rather than about the component.
-`leaks` rejects a selector that does not start from the scope attribute, because `.card {}` looks
-correct in a preview where the only card on screen is the one being previewed and then animates every
-card in the host application. It is rare, about one option in thirty, which is what makes it safe to
-enforce. `namespaced` renames every keyframe to carry the scope, because @keyframes is one flat
-namespace shared by every stylesheet on a page: a sheet defining `rise` replaces whatever the host
-already called `rise`, and the thing that breaks is somewhere else entirely. That one renames rather
-than complains, since unlike a selector there is no ambiguity about what was meant.
+### Asking
 
-Six gates read the css and a seventh one looks. `unmoved`, `brittle`, `janky`, `unstill`, `leaks` and `scopeOf` all take a
-string, which leaves the hardest promise in the prompt unchecked: a component has to be exactly where
-it started once the animation is over. A sheet can stagger properly, use a named curve, animate only
-transform, and still end on `translateY(12px)` or `opacity: 0`, which nudges somebody's layout for
-good or leaves the component invisible. So each option is also rendered twice, once with the motion
-held past its end and once without it at all, and every element's box and opacity are compared. Both
-of those failures were reproduced first and confirmed to pass all four textual gates.
+`dealMotions` and `dealErrands` deal each option a different manner and a different job, which is
+forty eight combinations from sixteen lines and the reason five options disagree rather than being
+five takes on a fade. The errand matters as much as the verb: revealing something is an entrance, but
+singling one part out means the rest holds still, and keeping something alive means nothing arrives at
+all. Errands that are about one thing say so, and the stagger requirement is lifted for them.
 
-A pick is captured twice, for two readers. The model gets the markup and the rules that matched it,
-because a selector written against real class names still means something after somebody edits the
-component. A preview gets a snapshot: a clone with every computed value written onto it, which needs
-no collected rules and cannot be let down by one that was missed. Measured across four sites, a
-heading that laid out at 31 percent of its height came back at 100, a button at 57 came back at 100,
-a list at 62 came back at 100, and nothing got worse. It costs a kilobyte or three.
+### What judges it
 
-`node verify/studio-capture.mjs --deep` asks what survives being picked: twenty sites by ten kinds of
-element, each capture re-rendered on its own and measured against the element it came from. It found
-that captures kept every node and still collapsed, because font size and line height are inherited and
-so live on an ancestor no matched rule mentions. Stripe's heading came back at 18 percent of its
-height before that was fixed and 100 percent after. Svg is the weakest kind at 5 of 11 and is the
-obvious next thing to chase.
+Six gates read the sheet and a seventh renders it.
 
-`node verify/studio-sites.mjs` aims the studio at twenty real sites in turn and checks four things
-for each: that the frame stays inside the proxy, that its dom arrives, that its stylesheets can be
-read, and that clicking something hands back an element with css attached. Every proxy bug so far was
-found this way and none of them appear against a fixture. Nineteen of the twenty work; npm sits behind
-a bot check, which a proxy cannot pass and which the studio says out loud rather than showing a blank
-frame.
+- `safeStyle` bounds what a sheet may contain at all.
+- `unmoved` rejects a transition wearing a costume: no keyframes, or no stagger where the errand
+  implies parts arriving.
+- `brittle` rejects selectors pinned to utility classes, which stop matching the first time somebody
+  changes a spacing.
+- `janky` rejects keyframes that animate layout properties, because every one of them has a transform
+  spelling that looks identical and costs nothing.
+- `unstill` requires a reduced motion query.
+- `leaks` rejects a selector that does not start from the scope attribute, because `.card {}` looks
+  right in a preview where the only card on screen is the one being previewed and then animates every
+  card in the host application.
+- The seventh renders the option twice, once held past the end of its motion and once without the
+  motion at all, and compares every element's box and opacity. A sheet can satisfy every reading of
+  the text and still leave the component twelve pixels down for good, or invisible, or animating
+  nothing whatever. Both of those were built and confirmed to pass all six before this was written.
 
-The camera is four shots on the same clock as the motion: locked off, a slow push, a drift and an
-orbit, with a lens dial that moves the defocus, the bloom and the vignette together because a shallow
-lens and a strong bloom are the same decision. It used to be one twelve second move set to infinite,
-and infinite was the fault: an animation with no end has an endTime of Infinity, the transport filters
-that when sizing the scrubber, so a component with a 1.5 second motion gave a 1.5 second ruler and
-dragging it end to end played the first eighth of the camera. Every move is finite now and the
-scrubber sizes itself to whichever runs longer, which is what lets a shot be composed rather than
-only watched.
+`namespaced` fixes rather than complains: every keyframe is renamed to carry the scope, because
+`@keyframes` is one flat namespace shared by every stylesheet on a page and a sheet defining `rise`
+replaces whatever the host already called `rise`.
+
+Everything here was calibrated against real output before it was enforced. Over 23 options every one
+already respected reduced motion, so requiring it costs nothing; only 70 percent landed inside the
+timings the prompt asks for and the tail was the errands that are supposed to be slow, so `tempo`
+reports and does not enforce. Unscoped selectors turned up about once in thirty, which is what makes
+them safe to reject.
+
+### Choosing
+
+Legality has a floor and no ceiling, so the rendered pass also measures three things it does not
+reject on: how much of the component takes part, how far anything strays outside its own box, and how
+much is invisible at the very first frame. Options are ordered by the last two, because a component
+that cannot be seen when you first look at it is worse than one that can. How much takes part is shown
+and deliberately not scored, since an emphasis motion stirs three percent and an entrance stirs ninety
+and neither is better.
+
+Two of those measurements were wrong before they were right, and calibration caught both. Bounding box
+displacement reported that fifteen of twenty one motions barely moved, including rows typing onto a
+page, because a clip-path reveal and a scaleX move no box. And sampling only real elements reported
+that nothing took part in a border tracing its own outline, because that is a pseudo element.
+
+`Open` fills the room with one option, since a card three hundred pixels wide is a thumbnail of a
+decision rather than the decision. `More like this` keeps the one that nearly worked and varies how it
+is carried out. The inspector adjusts a chosen option without asking again: slower, further apart,
+landing harder are all arithmetic on numbers already in the sheet, so `retimed` rewrites them and the
+original stays beside it.
+
+### Several elements, and the camera
+
+Picks accumulate into a rail: one motion each, played on one timeline, each starting a beat after the
+one above it. The sequencing costs nothing because the transport already exists, so each element is
+held at `t` minus its own offset rather than having its delays rewritten.
+
+The camera is four shots on that same clock: locked off, a slow push, a drift and an orbit, with a
+lens dial that moves the defocus, the bloom and the vignette together. It used to be one twelve second
+move set to infinite, and infinite was the fault: an animation with no end has an endTime of Infinity,
+the transport filters that when sizing the scrubber, and dragging it end to end played an eighth of
+the move. Every move is finite now and the ruler sizes itself to whichever runs longer.
+
+### Handing it over
 
 `Export` writes one html file with every option in it, the transport included, no requests at all.
-The options share a document rather than sitting in iframes, which they can only do because each
-sheet is already scoped to an attribute: option two gets `data-motion-fold-2` and its selectors are
-rewritten to match, so four sheets coexist. That file is the thing you attach to a pull request.
-
-It opens on port 4321, and a port that is already answering steps to the next free one and says so,
-because two studios at once is a reasonable pair to want: one on a folder of components, one on a
-running app. The same is true of `npm run serve` on 8080. `PORT=0` still means whatever is free,
-which is what the suites rely on so a leftover process cannot quietly answer for a new one.
+The options share a document rather than sitting in iframes, which they can only do because each sheet
+is already scoped: option two gets `data-motion-fold-2` and its selectors are rewritten to match.
 
 `shot.mjs` and `film.mjs` are the other end of it: a camera pass over a component, then that move
 rendered frame by frame. The frames are the deliverable and mp4 only happens if ffmpeg is installed,
 which is said out loud rather than silently skipped.
+
+### Proving it
+
+```
+node verify/studio-sites.mjs            twenty real sites: reachable, readable, pickable
+node verify/studio-capture.mjs --deep   what survives being picked, by kind of element
+```
+
+Both need the network and both are worth the minutes, because every proxy bug so far was invisible to
+a fixture. Nineteen of twenty sites work end to end; npm sits behind a bot check. Capture keeps tree
+and shape for 67 of 89 elements, and svg is the weakest kind at 5 of 11, which is the next thing to
+chase.
+
+It opens on port 4321, and a port already answering steps to the next free one and says so, because
+two studios at once is a reasonable pair to want. `PORT=0` still means whatever is free, which the
+suites rely on. Kill by port rather than by name when scripting against it.
 
 ---
 
