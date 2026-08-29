@@ -268,14 +268,26 @@ const STAGGER = /animation-delay\s*:|animation\s*:[^;}]*?\b\d*\.?\d+m?s\b[^;}]*?
 /** the transition on everything, which is the motion the catalogue already knows to distrust */
 const BLANKET = /transition\s*:\s*all\b|\*\s*\{[^}]*transition/i
 
-export function unmoved(written: Written): string[] {
+/**
+ * @param parts whether this movement is supposed to have parts arriving in order.
+ *
+ * Stagger is the difference between mechanism and slideshow when several things are arriving, and it
+ * is meaningless when they are not. A motion whose job is to single out one figure, or to keep a
+ * badge alive, or to acknowledge a press, has exactly one thing moving on purpose, and demanding a
+ * second delay from it produces movement invented to satisfy a check.
+ *
+ * That is not hypothetical. Asked for five motions on a bar chart with the errand varied every time,
+ * all five still came back as staggered entrances, because this gate and the prompt together left no
+ * other kind of answer standing. Defaults to true, so every existing caller is unchanged.
+ */
+export function unmoved(written: Written, { parts = true }: { parts?: boolean } = {}): string[] {
   const out: string[] = []
   if (!MOVES.test(written.css)) {
     out.push('nothing on this mark moves. It was asked for movement and came back a still, so the '
       + 'whole point of the call was not paid for.')
     return out
   }
-  if (!STAGGER.test(written.css)) {
+  if (parts && !STAGGER.test(written.css)) {
     out.push('everything moves at once, which is a transition rather than a mechanism. Stagger the '
       + 'parts with animation-delay so the drawing assembles itself instead of arriving whole: an '
       + 'object that prints, flips or comes into register does those things to its parts in order.')

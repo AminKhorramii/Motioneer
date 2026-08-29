@@ -638,6 +638,47 @@ const MOTIONS = [
   'winding: one part turning at its own rate while everything around it holds still',
 ]
 
+/**
+ * What the motion is for, which is a different question from how it moves.
+ *
+ * MOTIONS answers "in what manner", and every one of its entries is a way of a thing revealing
+ * itself: printing, typing, drawing, flipping, registering. That is one axis, and against a component
+ * with an obvious reading it collapses. Measured on a five bar chart picked out of a running app,
+ * five options came back as "bars growing up from the baseline", "bars rising from the baseline",
+ * "bars printing up off the baseline" and two more of the same, because every verb in the deck was
+ * asking the same question and a bar chart only assembles one way.
+ *
+ * So this is the second axis. Paired with a verb it gives forty eight combinations out of eight
+ * entries, the same multiplication directions already gets from shapes and depictions, and the pairs
+ * genuinely disagree: scanning to reveal lights the bars in turn, scanning to single one out leaves
+ * the rest alone, scanning to keep it alive never finishes at all.
+ *
+ * It also answers the complaint that this only works on big things. A toolbar has nothing to assemble
+ * and everything to emphasise, and an errand is what lets it be given motion that suits it rather
+ * than a slower version of what a dashboard gets.
+ */
+/** parts says whether this errand has several things arriving in order, which is the only case
+    where a stagger is the point rather than an invention to satisfy a check */
+const ERRANDS: { does: string; parts: boolean }[] = [
+  { does: 'to reveal it, as though this is the first moment it exists', parts: true },
+  { does: 'to walk the eye through it in the order it should be read', parts: true },
+  { does: 'to settle it, as though it arrived a moment ago and is still coming to rest', parts: true },
+  { does: 'to single out the one part that matters most and leave everything else still', parts: false },
+  { does: 'to keep it alive: nothing arrives and nothing leaves, it simply is not dead', parts: false },
+  { does: 'to show one value changing: the old one leaving and the new one taking its place', parts: false },
+  { does: 'to answer a press, the way a real control acknowledges being used and then stops', parts: false },
+  { does: 'to mark it as the current one among several of its kind', parts: false },
+]
+
+export function dealErrands(n: number): { does: string; parts: boolean }[] {
+  const deck = [...ERRANDS]
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[deck[i], deck[j]] = [deck[j], deck[i]]
+  }
+  return Array.from({ length: n }, (_, i) => deck[i % deck.length])
+}
+
 export function dealMotions(n: number): string[] {
   const deck = [...MOTIONS]
   for (let i = deck.length - 1; i > 0; i--) {

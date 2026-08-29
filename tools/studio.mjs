@@ -29,7 +29,7 @@ import path from 'node:path'
 import { hasClaude, runClaude } from '../shared/cli.mjs'
 import { listenNear, movedFrom } from '../shared/port.mjs'
 import {
-  MOTION_SYSTEM, dealMotions, grabJson, safeStyle, unmoved, brittle, janky, scopeOf,
+  MOTION_SYSTEM, dealMotions, dealErrands, grabJson, safeStyle, unmoved, brittle, janky, scopeOf,
   PRESETS, themeOf, themeCss,
 } from '../dist-core/core.js'
 
@@ -556,10 +556,10 @@ async function askModel(brief, tries = 3) {
 }
 
 /** the gates, in one place, so refine and options cannot drift apart on what they accept */
-function judge(raw, fallbackScope) {
+function judge(raw, fallbackScope, parts = true) {
   const css = safeStyle(raw.css)
   if (!css) return { why: 'the reply carried no css that is allowed in a sheet' }
-  const faults = [...unmoved({ html: '', css, note: '' }), ...brittle(css), ...janky(css)]
+  const faults = [...unmoved({ html: '', css, note: '' }, { parts }), ...brittle(css), ...janky(css)]
   if (faults.length) return { why: faults[0] }
   return { css, scope: scopeOf(css, raw.scope ?? fallbackScope), note: String(raw.note ?? '').slice(0, 90) }
 }
@@ -644,19 +644,26 @@ user sees, and the css below is the rules that actually matched it.\n\n${source.
     : `The component, as written in ${name}:\n${source.slice(0, 6000)}\n\n`)
     + (base ? `Its stylesheet:\n${base.slice(0, 3000)}\n\n` : '')
 
-  const attempt = async (verb, told) => {
+  const attempt = async (verb, told, errand) => {
     const brief = about + `Move it by ${verb} Take the timing from that object: it is how the thing behaves.`
+      + (errand ? `\n\nAnd do it ${errand.does} That is what this movement is for, so if the manner and `
+        + 'the errand pull in different directions, the errand wins.'
+        + (errand.parts ? '' : ' This errand is about one thing rather than many, so there is nothing '
+          + 'to stagger: one movement, done well, and the rest of the component holds still.') : '')
       + (told ? `\n\nA previous attempt at this was rejected because ${told} Do not repeat that.` : '')
     const got = await askModel(brief)
     if (!got.raw) return { verb, why: got.why, kind: 'model', terminal: got.terminal }
-    const ok = judge(got.raw)
+    const ok = judge(got.raw, undefined, errand ? errand.parts : true)
     if (!ok.css) return { verb, why: ok.why, kind: 'gate' }
     const id = String(nextId++)
-    keep(id, { file: name, markup, base, css: ok.css, scope: ok.scope, tw, wide, note: ok.note, verb })
+    keep(id, { file: name, markup, base, css: ok.css, scope: ok.scope, tw, wide, note: ok.note,
+      verb: errand ? `${verb.replace(/,.*/, '')}, ${errand.does.replace(/^to /, '')}` : verb })
     return { id, verb, scope: ok.scope, note: ok.note, css: ok.css }
   }
 
-  const first = await settle(dealMotions(count).map((verb) => attempt(verb)))
+  // a manner and an errand each, so two options sharing a verb still have different jobs
+  const errands = dealErrands(count)
+  const first = await settle(dealMotions(count).map((verb, i) => attempt(verb, null, errands[i])))
   /**
    * One more go at the slots a gate turned down, and this time it is told why.
    *
@@ -670,7 +677,7 @@ user sees, and the css below is the rules that actually matched it.\n\n${source.
   // a terminal fault is the same answer however many times it is asked, so it is not asked again
   const worth = missed.filter((m) => !m.terminal && m.kind !== 'model')
   const again = worth.length
-    ? await settle(dealMotions(worth.length).map((verb, i) => attempt(verb, worth[i].why)))
+    ? await settle(dealMotions(worth.length).map((verb, i) => attempt(verb, worth[i].why, dealErrands(worth.length)[i])))
     : []
   // the ones deliberately not asked again are still failures, and leaving them out of the tally
   // reported nothing dropped at all, which sent the page to the wrong explanation
