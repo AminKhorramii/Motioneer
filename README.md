@@ -7,8 +7,11 @@
 [![Node](https://img.shields.io/node/v/wall-mcp?logo=nodedotjs&logoColor=fff&color=5FA04E)](package.json)
 [![License](https://img.shields.io/npm/l/wall-mcp?color=blue)](LICENSE)
 
-Generating a page is solved. What nobody gives you is *many at once*, live, side by side —
+Generating a page is solved. What nobody gives you is *many at once*, live, side by side,
 which is how design decisions are actually made. Wall's one act is **compare and choose**.
+
+It does that twice. A **wall** of complete landing pages, and a **studio** where several
+motions for one component play on a single timeline. Same act, different material.
 
 ## From your agent
 
@@ -29,13 +32,39 @@ Three tools: `design` opens Wall and answers within seconds, so your agent is fr
 read · `collect` hands it the page you chose, whenever you choose it · `check` names the
 patterns that make a page look generated.
 
+## Motion, for components you already have
+
+```
+npm run studio                                     the components in examples/
+npm run studio -- ~/app/src/ui --css ~/app/globals.css
+npm run studio -- --app http://localhost:3000      your dev server
+```
+
+Point it at a running app, click any element, and get several motions for it at once. Each
+is dealt a different verb and a different errand from the deck, so they disagree by
+construction rather than being five takes on a fade. One scrubber holds them all at the same
+instant, which is the only way comparing them is real.
+
+Reading a component out of a `.tsx` is guesswork, so it does not: with `--app` your dev
+server is proxied through the studio's own origin, which makes the frame same origin, which
+makes its dom readable. A picked element brings the rules that actually matched it.
+
+What comes out is a `.motion.css` scoped to one attribute, which ships in your product.
+Five gates stand between a reply and the screen, and the fifth one renders: a sheet that
+leaves the component twelve pixels down forever, or invisible, or that animates nothing at
+all, passes every reading of the text and fails on sight.
+
+Select several elements and they become a rail: one motion each, played on one timeline, a
+beat apart.
+
 ## From a clone
 
 ```
 npm install
-npm run web     # browser — the same code the MCP server opens
+npm run web     # browser, the same code the MCP server opens
 npm run serve   # self-hosted; ANTHROPIC_API_KEY stays on the server
 npm run app     # the desktop shell, not released yet
+npm run studio  # motion for components you have, or for an app that is running
 ```
 
 Model keys are optional. Layouts, variants, and export all run locally with no key;
@@ -51,6 +80,8 @@ a key is used only for model-written copy, and it never leaves your machine.
   other's typography.
 - **Ship a real file** — a self-contained `index.html` you own: inlined CSS, no
   framework, no runtime of ours.
+- **Give it motion** — several motions for one component, compared on one timeline,
+  adjusted without asking again, exported as one file that makes no requests.
 
 ## Docs
 
@@ -62,6 +93,10 @@ a key is used only for model-written copy, and it never leaves your machine.
 - [Original design doc](docs/design-original.md) — the first sketch, kept as a record
 
 Verify everything with `npm run verify:all` — real browsers, recorded streams, no key
-and no tokens spent.
+and no tokens spent. The studio has two suites of its own, both of which run against real
+sites because every bug the proxy has had was found by pointing it at one:
+`node verify/studio-sites.mjs` asks whether twenty of them can be reached and picked from,
+and `node verify/studio-capture.mjs --deep` asks what survives being picked, by kind of
+element.
 
 MIT © [Amin Khorramii](https://github.com/AminKhorramii)

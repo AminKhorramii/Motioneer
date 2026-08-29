@@ -6,7 +6,7 @@ built, verified, and run; the README stays minimal on purpose.
 What ships today is the MCP server: an agent calls `design`, Wall opens in the browser, and
 the chosen page returns as a spec. The desktop shell is built and verified in this repo but
 is not released yet, so where these notes describe it, read them as how it works rather than
-as how anyone reaches it. The studio below is the same code either way, which is the point of
+as how anyone reaches it. The wall below is the same code either way, which is the point of
 the `host.ts` boundary.
 
 ## The look
@@ -17,7 +17,7 @@ invisible until hovered, a floating dock over the canvas rather than docked tool
 130ms transitions. The header is the window drag handle (controls opt out) rather than an
 overlay strip.
 
-## The studio
+## The wall
 
 Brief on the left, **the paper in the middle**, sections on the right. Alternatives sit
 either side of the paper — scroll sideways (or ← →) and the next one slides into the
@@ -37,6 +37,38 @@ or a designer's inbox.
 
 **Direct manipulation.** Click any text *on the paper itself* and type — the edit flows
 back into the page model, not just the pixels.
+
+## The motion studio
+
+A second room, and the same act. `npm run studio` opens on the components in `examples/`, or on
+a folder you name, or on a running dev server with `--app`. Pick a component and ask, and five
+motions arrive at once, each dealt a different verb and a different errand from the deck so they
+disagree by construction rather than being five takes on a fade. One scrubber holds all of them
+at the same instant, which is the only way comparing them is real.
+
+**Pointing at a running app** is better than pointing at a file. Reading a component out of a
+`.tsx` is a brace counter and a hope; a rendered dom is the answer. The dev server is proxied
+through the studio's own origin so the frame is same origin and its dom can be read, studio
+routes live under `/__wall` so an app with its own `/api` cannot collide, and the websocket
+upgrade is passed through so hot reload survives. A pick is captured twice: the markup and the
+rules that matched it for the model, because a selector against real class names still means
+something next month, and a snapshot with every computed value written onto it for the preview,
+because a reconstruction leaks and the leak was measurable.
+
+**Five gates**, four of which read the sheet and one of which looks at it. `safeStyle` bounds
+what a sheet may contain, `unmoved` rejects a transition wearing a costume, `brittle` rejects
+selectors pinned to utility classes, `janky` rejects keyframes that move layout properties, and
+`unstill` requires a reduced motion query. The fifth renders the option twice, once held past
+the end of its motion and once without the motion at all, and compares every element's box and
+opacity: a sheet can satisfy every reading of the text and still leave the component twelve
+pixels down forever, or invisible, or animating nothing at all.
+
+**Adjusting beats regenerating.** Slower, further apart, land harder: each is arithmetic on
+numbers already in the sheet, so `retimed` rewrites them in place and the original stays.
+
+**Several elements make a rail**: one motion each on a single timeline, each starting a beat
+after the one above it, sequenced by holding each at `t` minus its own offset rather than by
+rewriting anybody's delays.
 
 ## How it works
 

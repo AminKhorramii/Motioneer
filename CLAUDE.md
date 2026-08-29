@@ -1,8 +1,10 @@
 # Working on Wall
 
-Wall makes a wall of complete landing pages to compare, choose from, and hand back to your
-agent as a spec. Read `docs/flows.md` for every path through the app and the code that
-carries it, and `docs/architecture.md` for the module map.
+Wall does one thing twice. It makes a wall of complete landing pages to compare, choose from,
+and hand back to your agent as a spec, and it runs a studio that gives several motions to a
+component you already have so they can be compared on one timeline. Same act, different
+material. Read `docs/flows.md` for every path through both and the code that carries it, and
+`docs/architecture.md` for the module map.
 
 ## Where things live
 
@@ -12,6 +14,12 @@ carries it, and `docs/architecture.md` for the module map.
 - Everything opinionated is data in `src/design/`, one file per kind of knowledge: faces,
   presets, worlds, angles, craft rules, the slop catalogue, the direction library, the
   system prompts. Tune taste there without touching machinery.
+- The studio is `tools/studio.mjs`: the proxy, the picker, the transport, the rail. It is one
+  file because it is one room, and nothing else imports from it.
+- What judges model written css lives in `src/written.ts` beside the other gates, never in the
+  studio page: `unmoved`, `brittle`, `janky`, `unstill`, `scopeOf`, `tempo`, `retimed`. The page
+  is a template literal, so a regex written there loses its backslashes before the browser sees
+  it, and a second copy of a measurement is how `3.2s` came to be read as `2s`.
 
 ## House rules
 
@@ -19,6 +27,11 @@ carries it, and `docs/architecture.md` for the module map.
   reason. The suite asserts this against the onboarding card.
 - Code: keep logic in the file that owns the data it reads, keep every file far from 1k
   lines, and prefer deleting complexity to rearranging it.
+- Gates are calibrated against real output before they are enforced, never against an imagined
+  distribution. Measured over 23 real motions, every one already respected reduced motion, so
+  requiring it costs nothing; only 70 percent landed inside the timings the prompt asks for, and
+  the tail was the errands that are supposed to be slow, so those are reported and not enforced.
+  A gate tuned by taste is how a field guide gets rejected for the italics its subject requires.
 - The house obeys its own detector: `verify/app.mjs` renders every built-in world on every look
   and fails if Wall's own output trips the slop catalogue. Those pages wear placeholder copy on
   purpose, so the gate judges the design half, and the copy half of the defaults is asserted
@@ -28,7 +41,15 @@ carries it, and `docs/architecture.md` for the module map.
 ## Before pushing
 
 Run `npm run build && node verify/app.mjs` at minimum; run `verify:stream` when the model path
-or renderer changed, and `verify:oneline` when the handoff format changed. Commit straight
+or renderer changed, and `verify:oneline` when the handoff format changed. When the studio
+changed, drive it: `node verify/studio-sites.mjs` for the proxy and the picker,
+`node verify/studio-capture.mjs` for what survives being picked. Both need the network and
+both are worth the minutes, because every proxy bug so far was invisible to a fixture.
+
+Kill the old studio by port before starting a new one. A busy port makes it roam to 4322 and
+say so, which is right for a person and a trap for a script: `for p in 4321 4322 4323; do
+lsof -ti tcp:$p | xargs -r kill -9; done`. Testing a stale process cost four wrong diagnoses
+in one session. Commit straight
 to master with a one-line sentence subject that says why, not what. No pull requests.
 
 ## More than one session at once

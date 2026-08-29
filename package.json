@@ -1,6 +1,6 @@
 {
   "name": "wall-mcp",
-  "description": "A wall of complete landing pages to compare, choose from, and hand back to your agent as a spec. Runs on the Claude you already have.",
+  "description": "A wall of complete landing pages to compare, choose from, and hand back to your agent as a spec, and a studio that gives motion to components you already have. Runs on the Claude you already have.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/AminKhorramii/Wall.git"
