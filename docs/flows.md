@@ -686,6 +686,15 @@ found this way and none of them appear against a fixture. Nineteen of the twenty
 a bot check, which a proxy cannot pass and which the studio says out loud rather than showing a blank
 frame.
 
+The camera is four shots on the same clock as the motion: locked off, a slow push, a drift and an
+orbit, with a lens dial that moves the defocus, the bloom and the vignette together because a shallow
+lens and a strong bloom are the same decision. It used to be one twelve second move set to infinite,
+and infinite was the fault: an animation with no end has an endTime of Infinity, the transport filters
+that when sizing the scrubber, so a component with a 1.5 second motion gave a 1.5 second ruler and
+dragging it end to end played the first eighth of the camera. Every move is finite now and the
+scrubber sizes itself to whichever runs longer, which is what lets a shot be composed rather than
+only watched.
+
 `Export` writes one html file with every option in it, the transport included, no requests at all.
 The options share a document rather than sitting in iframes, which they can only do because each
 sheet is already scoped to an attribute: option two gets `data-motion-fold-2` and its selectors are

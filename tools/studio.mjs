@@ -232,28 +232,78 @@ const list = () => {
 }
 
 /* ── the camera, lifted from shot.mjs so both agree about what a shot looks like ──────────────── */
-const STAGE = `
-  html,body{margin:0;height:100%;background:#050506;overflow:hidden}
-  .rig{position:fixed;inset:0;display:grid;place-items:center;perspective:1500px;perspective-origin:50% 45%}
-  .dolly{transform-style:preserve-3d;animation:dolly 12s cubic-bezier(.4,0,.55,1) infinite alternate}
-  .plate{position:relative;width:1000px;transform-style:preserve-3d;filter:brightness(1.18) contrast(1.06)}
-  .layer{position:absolute;inset:0;display:grid;place-items:center}.layer>*{width:100%}
-  .sharp{position:relative}
-  .blur{filter:blur(9px) saturate(1.1);
-    -webkit-mask-image:linear-gradient(168deg,#000 0%,rgba(0,0,0,.9) 14%,transparent 34%,transparent 66%,rgba(0,0,0,.9) 86%,#000 100%);
-    mask-image:linear-gradient(168deg,#000 0%,rgba(0,0,0,.9) 14%,transparent 34%,transparent 66%,rgba(0,0,0,.9) 86%,#000 100%)}
-  .bloom{filter:blur(22px) saturate(2.2) brightness(1.35);mix-blend-mode:screen;opacity:.6;pointer-events:none}
-  @keyframes dolly{
-    0%{transform:rotateX(15deg) rotateY(-24deg) rotateZ(-9deg) scale(2.15) translate3d(6%,4%,0)}
-    100%{transform:rotateX(9deg) rotateY(-13deg) rotateZ(-5deg) scale(1.72) translate3d(-5%,-3%,0)}}
-  .vignette{position:fixed;inset:0;pointer-events:none;z-index:5;
-    background:radial-gradient(135% 105% at 50% 46%,transparent 48%,rgba(5,5,6,.55) 82%,rgba(5,5,6,.92) 100%)}
-  .grain{position:fixed;inset:-50%;pointer-events:none;z-index:6;opacity:.055;
-    background-image:repeating-conic-gradient(#fff 0% 0.0009%,transparent 0% 0.0018%);
-    animation:grain 1.2s steps(6) infinite}
-  @keyframes grain{0%{transform:translate3d(0,0,0)}20%{transform:translate3d(-1.5%,1%,0)}
-    40%{transform:translate3d(1%,-1.5%,0)}60%{transform:translate3d(-1%,-1%,0)}
-    80%{transform:translate3d(1.5%,1.5%,0)}100%{transform:translate3d(0,0,0)}}`
+/**
+ * The camera, as four shots on the same clock as the motion.
+ *
+ * It used to be one move, twelve seconds long, and infinite. Infinite is the part that mattered: an
+ * animation with no end has an endTime of Infinity, the transport filters that out when it sizes the
+ * scrubber, and the ruler therefore measured only the motion. A component whose motion lasts 1.5
+ * seconds gave a 1.5 second scrubber, so dragging it end to end played the first eighth of the camera
+ * move and no more. The camera could not be composed, only watched.
+ *
+ * So every move is finite and long enough to read, and the transport sizes itself to whichever of the
+ * two runs longer. Scrubbing now walks the camera and the motion together, which is what composing a
+ * shot means.
+ *
+ * Four moves rather than one, because they answer different questions. Locked off asks what the
+ * motion looks like; the other three ask what it looks like in a film.
+ */
+const SHOTS = {
+  locked: {
+    from: 'rotateX(6deg) rotateY(-9deg) rotateZ(-2deg) scale(1.6) translate3d(0,0,0)',
+    to: 'rotateX(6deg) rotateY(-9deg) rotateZ(-2deg) scale(1.6) translate3d(0,0,0)',
+    ease: 'linear',
+  },
+  push: {
+    from: 'rotateX(9deg) rotateY(-11deg) rotateZ(-3deg) scale(1.34) translate3d(0,2%,0)',
+    to: 'rotateX(6deg) rotateY(-7deg) rotateZ(-2deg) scale(1.92) translate3d(0,-2%,0)',
+    ease: 'cubic-bezier(.33,0,.2,1)',
+  },
+  drift: {
+    from: 'rotateX(15deg) rotateY(-24deg) rotateZ(-9deg) scale(2.15) translate3d(6%,4%,0)',
+    to: 'rotateX(9deg) rotateY(-13deg) rotateZ(-5deg) scale(1.72) translate3d(-5%,-3%,0)',
+    ease: 'cubic-bezier(.4,0,.55,1)',
+  },
+  orbit: {
+    from: 'rotateX(11deg) rotateY(-30deg) rotateZ(-4deg) scale(1.66) translate3d(4%,0,0)',
+    to: 'rotateX(11deg) rotateY(12deg) rotateZ(2deg) scale(1.66) translate3d(-4%,0,0)',
+    ease: 'cubic-bezier(.45,0,.55,1)',
+  },
+}
+
+/**
+ * @param shot which of the four
+ * @param ms   how long the move runs, taken from the motion so the two share a ruler
+ * @param depth how much lens: the blur, the bloom and the vignette move together, because a shallow
+ *              lens and a strong bloom are the same decision about how much this is a photograph
+ */
+const STAGE = (shot = 'drift', ms = 3200, depth = 1) => {
+  const move = SHOTS[shot] || SHOTS.drift
+  const blur = (7 * depth).toFixed(1)
+  const bloom = (0.5 * depth).toFixed(2)
+  const band = 34 - 10 * depth
+  return `
+    html,body{margin:0;height:100%;background:#050506;overflow:hidden}
+    .rig{position:fixed;inset:0;display:grid;place-items:center;perspective:1500px;perspective-origin:50% 45%}
+    .dolly{transform-style:preserve-3d;transform:${move.from};
+      animation:dolly ${ms}ms ${move.ease} both}
+    .plate{position:relative;width:1000px;transform-style:preserve-3d;filter:brightness(1.18) contrast(1.06)}
+    .layer{position:absolute;inset:0;display:grid;place-items:center}.layer>*{width:100%}
+    .sharp{position:relative}
+    .blur{filter:blur(${blur}px) saturate(1.1);
+      -webkit-mask-image:linear-gradient(168deg,#000 0%,rgba(0,0,0,.9) ${band - 20}%,transparent ${band}%,transparent ${100 - band}%,rgba(0,0,0,.9) ${120 - band}%,#000 100%);
+      mask-image:linear-gradient(168deg,#000 0%,rgba(0,0,0,.9) ${band - 20}%,transparent ${band}%,transparent ${100 - band}%,rgba(0,0,0,.9) ${120 - band}%,#000 100%)}
+    .bloom{filter:blur(22px) saturate(2.2) brightness(1.35);mix-blend-mode:screen;opacity:${bloom};pointer-events:none}
+    @keyframes dolly{from{transform:${move.from}}to{transform:${move.to}}}
+    .vignette{position:fixed;inset:0;pointer-events:none;z-index:5;
+      background:radial-gradient(135% 105% at 50% 46%,transparent ${52 - 8 * depth}%,rgba(5,5,6,${(0.5 * depth).toFixed(2)}) 82%,rgba(5,5,6,${(0.86 * depth).toFixed(2)}) 100%)}
+    .grain{position:fixed;inset:-50%;pointer-events:none;z-index:6;opacity:${(0.05 * depth).toFixed(3)};
+      background-image:repeating-conic-gradient(#fff 0% 0.0009%,transparent 0% 0.0018%);
+      animation:grain 1.2s steps(6) infinite}
+    @keyframes grain{0%{transform:translate3d(0,0,0)}20%{transform:translate3d(-1.5%,1%,0)}
+      40%{transform:translate3d(1%,-1.5%,0)}60%{transform:translate3d(-1%,-1%,0)}
+      80%{transform:translate3d(1.5%,1.5%,0)}100%{transform:translate3d(0,0,0)}}`
+}
 
 /**
  * The transport, plus the one line that makes it reliable.
@@ -275,7 +325,7 @@ a.forEach(function(x){try{x.pause();x.currentTime=d.t;
   if(typeof t==='number'&&isFinite(t)&&t>end)end=t}catch(_){}});
 (e.source||parent).postMessage({wall:'held',n:a.length,i:d.i,end:Math.round(end)},'*');});<\/script>`
 
-const preview = (o, camera, palette) => {
+const preview = (o, camera, palette, depth = 1) => {
   /**
    * A snapshot carries every computed value on the element itself, so it needs none of the collected
    * rules and cannot be let down by one I failed to collect. Measured against the reconstruction on
@@ -302,7 +352,16 @@ const preview = (o, camera, palette) => {
    * The wrapper also keeps the fit transform off the component itself, so a motion that animates
    * transform on the root element is no longer fighting the thing that makes it visible.
    */
-  const chrome = camera ? STAGE : `html,body{margin:0;height:100%;overflow:hidden;
+  /**
+   * The camera runs at least as long as the motion and never so briefly that it whips.
+   *
+   * Tied to the motion so the two share a ruler, floored at two and a half seconds because a
+   * component whose motion lasts 400ms would otherwise get a camera move that reads as a flinch, and
+   * capped so a slow ambient loop does not drag the shot out to nothing.
+   */
+  const span = tempo(o.css).span || 1200
+  const shotMs = Math.max(2500, Math.min(6000, Math.round(span * 1.6)))
+  const chrome = camera ? STAGE(camera, shotMs, depth) : `html,body{margin:0;height:100%;overflow:hidden;
     background:var(--background,#0b0c0d);color:var(--foreground,#e6e6e6);font:14px ui-sans-serif,system-ui}
     #fit{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);transform-origin:center center;
       width:${o.wide ? o.wide + 'px' : 'max-content'}}`
@@ -1478,7 +1537,15 @@ figcaption b{font-weight:500}.note{color:var(--dim)}.verb{color:var(--faint);fon
       <label>Palette<select id="palette">
         ${PRESETS.map((p, i) => `<option${i === 1 ? ' selected' : ''}>${p.name}</option>`).join('')}
       </select></label>
-      <label class="row"><input type="checkbox" id="cam"> Camera pass</label>
+      <label>Shot<select id="cam">
+        <option value="">no camera</option>
+        <option value="locked">locked off</option>
+        <option value="push">slow push</option>
+        <option value="drift">drift</option>
+        <option value="orbit">orbit</option></select></label>
+      <label>Lens<select id="depth">
+        <option value="0.4">shallow</option><option value="1" selected>as shot</option>
+        <option value="1.6">heavy</option></select></label>
       <p class="keys"><kbd>Space</kbd> play <kbd>&larr;</kbd><kbd>&rarr;</kbd> step <kbd>Esc</kbd> stop picking</p>
     </div>
   </header>
@@ -1719,7 +1786,9 @@ const factLine = (o)=>{
 
 /** the component as it is, so the left rail is a thing you browse rather than a thing you submit */
 function peek(){
-  const q='?file='+encodeURIComponent(file)+'&palette='+encodeURIComponent(palette.value)+(cam.checked?'&camera=1':'')
+  const lens=document.getElementById('depth').value
+  const q='?file='+encodeURIComponent(file)+'&palette='+encodeURIComponent(palette.value)
+    +(cam.value?'&camera='+cam.value+'&depth='+lens:'')
   grid.innerHTML='<figure class="solo"><iframe data-i="0" src="/__wall/peek'+q+'"></iframe><figcaption>'
     +'<b>'+file.split('/').pop()+'</b><span class="verb">as written, nothing added yet. '
     +'Press <b>Give it motion</b> for options.</span></figcaption></figure>'
@@ -1779,6 +1848,7 @@ ask.onclick=async()=>{
   ask.disabled=false; ask.innerHTML='Give it motion'
 }
 cam.onchange=render
+document.getElementById('depth').onchange=render
 palette.onchange=render
 const menu=document.getElementById('menu'), moreBtn=document.getElementById('more')
 const insp=document.getElementById('inspector'), inspBtn=document.getElementById('inspect')
@@ -1846,7 +1916,9 @@ function render(){
     return }
   if(!opts.length){ if(file) return peek()
     grid.innerHTML='<div class="empty">Pick a component on the left.</div>'; return }
-  const q='?palette='+encodeURIComponent(palette.value)+(cam.checked?'&camera=1':'')
+  const lens=document.getElementById('depth').value
+  const q='?palette='+encodeURIComponent(palette.value)
+    +(cam.value?'&camera='+cam.value+'&depth='+lens:'')
   grid.innerHTML=opts.map((o,i)=>
     '<figure><iframe data-i="'+i+'" src="/__wall/preview/'+o.id+q+'"></iframe>'+
     '<figcaption><b>'+(o.note||'untitled')+'</b>'+
@@ -2089,13 +2161,15 @@ const server = createServer(async (req, res) => {
       const tw = wantsTailwind(read.markup, base) && !!(await getTailwind()).js
       res.writeHead(200, { 'content-type': 'text/html' })
       return res.end(preview({ markup: read.markup, base, css: '', scope: '', tw },
-        url.searchParams.has('camera'), url.searchParams.get('palette')))
+        url.searchParams.get('camera'), url.searchParams.get('palette'),
+        Number(url.searchParams.get('depth')) || 1))
     }
     if (url.pathname.startsWith('/__wall/preview/')) {
       const o = made.get(url.pathname.split('/')[3])
       if (!o) { res.writeHead(404); return res.end('gone') }
       res.writeHead(200, { 'content-type': 'text/html' })
-      return res.end(preview(o, url.searchParams.has('camera'), url.searchParams.get('palette')))
+      return res.end(preview(o, url.searchParams.get('camera'), url.searchParams.get('palette'),
+        Number(url.searchParams.get('depth')) || 1))
     }
     if (url.pathname === '/__wall/motion' && req.method === 'POST') {
       const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))
