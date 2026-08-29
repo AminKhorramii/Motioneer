@@ -420,6 +420,25 @@ async function proxy(req, res, url, quiet) {
     return res.end(Buffer.from(await r.arrayBuffer()))
   }
   let html = await r.text()
+  /**
+   * Stylesheets on another host, pulled back onto this one.
+   *
+   * The proxy catches root relative urls, which covers a site that serves its own assets. It does not
+   * catch a link that names a cdn outright, and that sheet then loads straight from the cdn, stays
+   * cross origin, and cannot be read: measured on linear, 24 sheets readable and 54 not, every one of
+   * them from the same static.linear.app, the difference being only whether the tag happened to ask
+   * for cors. A picked element there came back missing most of its styling.
+   *
+   * Only stylesheets are moved. Scripts and images are fine where they are, and fetching a site's
+   * whole asset tree through here would make this a mirror rather than a lens.
+   */
+  html = html.replace(/<link\b[^>]*>/gi, (tag) => {
+    if (!/rel\s*=\s*["']?[^"'>]*stylesheet/i.test(tag)) return tag
+    return tag.replace(/href\s*=\s*["']([^"']+)["']/i, (whole, href) => {
+      if (!/^https?:\/\//i.test(href) || href.startsWith(HOST)) return whole
+      return `href="/__wall/asset?u=${encodeURIComponent(href)}"`
+    })
+  })
   const at = html.search(/<\/body>/i)
   html = at === -1 ? html + PICKER : html.slice(0, at) + PICKER + html.slice(at)
   /**
@@ -567,10 +586,18 @@ function pick(e){if(!on)return;e.preventDefault();e.stopPropagation();
      option written for it comes back a variation on "slide in". Worth saying at the moment of the
      pick rather than sixty seconds later when five weak options are already on screen. */
   var kids=el.children.length, thin=r.height<60||r.width<60;
-  /* short, because this is read on a pill beside a picture of the element and the long version was
-     a sentence nobody needed twice. Which of the two it is matters: a wide flat strip and a box with
-     one child are both poor picks for different reasons */
-  var weak = thin ? 'too thin to stagger' : kids<3 ? 'only ' + kids + ' part' + (kids===1?'':'s') : '';
+  var huge=r.height>innerHeight*1.5;
+  var svg=el.tagName.toLowerCase()==='svg';
+  /* Short, because this is read on a pill beside a picture of the element. Which fault it is matters,
+     and there are four worth telling apart. A page taller than one and a half screens is the whole
+     document rather than a component, and clicking a link or an outer div on a long marketing page
+     catches one every time: measured on linear, both came back 1160 by 9084. An svg that had to be
+     trimmed has lost part of its own drawing, which no other element does when it loses a child. */
+  var weak = huge ? 'most of the page, not a component'
+    : svg && h.length < el.outerHTML.length ? 'an svg cut short is a broken drawing'
+    : thin ? 'too thin to stagger'
+    : kids === 0 ? 'nothing inside it to move separately'
+    : kids < 3 ? 'only ' + kids + ' part' + (kids === 1 ? '' : 's') : '';
   parent.postMessage({wall:'picked',html:h,css:css,label:label(el),opaque:opaque,weak:weak,
     cut:h.length<el.outerHTML.length,w:Math.round(r.width),h:Math.round(r.height)},'*')}
 function arm(v){on=v;
@@ -1899,6 +1926,18 @@ const server = createServer(async (req, res) => {
      * one, and this is already proxying that site, so it costs nothing to ask it directly. A site
      * with no icon gets nothing rather than a placeholder that pretends.
      */
+    /** a stylesheet from somewhere else, served from here so the page can read its own rules */
+    if (url.pathname === '/__wall/asset') {
+      const want = url.searchParams.get('u') ?? ''
+      if (!/^https?:\/\//i.test(want)) { res.writeHead(400); return res.end('') }
+      try {
+        const r = await fetch(want, { signal: AbortSignal.timeout(12000) })
+        const body = Buffer.from(await r.arrayBuffer())
+        res.writeHead(r.status, { 'content-type': r.headers.get('content-type') ?? 'text/css',
+          'cache-control': 'max-age=600' })
+        return res.end(body)
+      } catch (e) { res.writeHead(502); return res.end('') }
+    }
     if (url.pathname === '/__wall/favicon') {
       const from = url.searchParams.get('host') || HOST
       if (!from) { res.writeHead(404); return res.end('') }
