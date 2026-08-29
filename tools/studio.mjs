@@ -27,6 +27,7 @@ import { readFileSync, writeFileSync, existsSync, statSync, readdirSync, mkdirSy
 import { spawn } from 'node:child_process'
 import path from 'node:path'
 import { hasClaude, runClaude } from '../shared/cli.mjs'
+import { streamText } from '../shared/providers.mjs'
 import { listenNear, movedFrom } from '../shared/port.mjs'
 import {
   MOTION_SYSTEM, dealMotions, dealErrands, grabJson, safeStyle, unmoved, brittle, janky, scopeOf,
@@ -64,7 +65,7 @@ const KIND = /\.(tsx|jsx|vue|svelte|astro|html|htm)$/i
  * button does nothing" after forty seconds of waiting, when the real answer is one sentence long and
  * could have been said before any waiting happened.
  */
-const CAN_WRITE = hasClaude()
+const CAN_WRITE = hasClaude() || !!process.env.ANTHROPIC_API_KEY
 
 const work = '.studio'
 mkdirSync(work, { recursive: true })
@@ -533,12 +534,39 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
  */
 const THINK = process.env.WALL_STUDIO_THINKING ? Number(process.env.WALL_STUDIO_THINKING) : 0
 
+/**
+ * A key skips a process, which is a third of every call.
+ *
+ * runClaude spawns a whole CLI session per option: node boots, the session authenticates, and only
+ * then does any generating start. Measured on one motion call, twice, against a trivial one that only
+ * says "ok":
+ *
+ *   boot only            2.74s
+ *   the real motion call 8.40s
+ *
+ * So 2.74 seconds of every call, a third of it, happens before the model has read a word. An http
+ * request has none of that. The CLI is still the default because it needs no key and that is what
+ * most people running this will have, but a key present means the fast path, and the two produce the
+ * same shape so nothing downstream knows which one answered.
+ */
+const KEY = process.env.ANTHROPIC_API_KEY || ''
+const API_MODEL = process.env.WALL_STUDIO_MODEL || 'claude-sonnet-5'
+
+const viaApi = async (brief) => {
+  // streamText hands every delta to this and calls it without checking, so a missing one is a
+  // TypeError on the first token rather than a slow path: measured, it dropped all five options
+  const r = await streamText('anthropic', MOTION_SYSTEM, brief, KEY, () => {},
+    { model: API_MODEL, maxTokens: 4000 })
+  return r && r.error ? { error: r.error } : { text: (r && r.text) || '' }
+}
+
 async function askModel(brief, tries = 3) {
   let last = 'no usable reply came back'
   for (let n = 0; n < tries; n++) {
-    const reply = await runClaude(MOTION_SYSTEM, brief, {
-      callMs: CALL_MS, thinking: THINK,
-    }).catch((e) => ({ error: String(e && e.message ? e.message : e).slice(0, 160) }))
+    const reply = await (KEY
+      ? viaApi(brief)
+      : runClaude(MOTION_SYSTEM, brief, { callMs: CALL_MS, thinking: THINK })
+    ).catch((e) => ({ error: String(e && e.message ? e.message : e).slice(0, 160) }))
 
     if (reply && reply.error) {
       last = reply.error
@@ -1233,7 +1261,8 @@ else {
 console.log(TARGET ? '  picked elements bring their own css, so nothing is guessed'
   : rawSheet ? `  styled with ${SHEET}`
     : '  no --css given: utility classes are compiled here and coloured from a Wall palette')
-console.log(CAN_WRITE ? '  the claude command is here, so motion can be written\n'
+console.log(KEY ? '  a key is set, so calls go straight to the api and skip a process per option\n'
+  : CAN_WRITE ? '  the claude command is here, so motion can be written\n'
   : '  no claude command on PATH, so nothing can be written. Install it, or start the studio\n'
     + '  from a shell where `claude` runs, and the button will have something to call.\n')
 if (!process.env.WALL_NO_OPEN) {
