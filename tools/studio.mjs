@@ -46,8 +46,31 @@ const TARGET = appAt > -1 ? String(args[appAt + 1] ?? '').replace(/\/$/, '') : n
  * to the folder the page happens to sit in. Appending every request to the full url turns that into
  * /projects/abc/preview/assets/app.js, which is a 404 and a blank frame.
  */
-const HOST = TARGET ? new URL(TARGET).origin : null
-const ENTRY = TARGET ? (new URL(TARGET).pathname + new URL(TARGET).search) : '/'
+let HOST = null
+let ENTRY = '/'
+let AIM = null   // the address as typed, for the sidebar to show
+
+/**
+ * Where the studio is pointed, changed while it runs.
+ *
+ * This began as a flag, which meant every new site was a restart: kill it, retype the command, wait
+ * for the port, find the tab again. An address bar is the obvious shape for "what am I looking at",
+ * and having one means `npm run studio` is the entire command and the flag is only a shortcut for
+ * starting somewhere particular.
+ *
+ * A bare host is allowed because that is what people type. localhost:3000 is not a url and every
+ * browser has forgiven that for twenty years, so this does too.
+ */
+function aimAt(raw) {
+  const said = String(raw ?? '').trim()
+  if (!said) return null
+  const url = new URL(/^https?:\/\//i.test(said) ? said : `http://${said}`)
+  HOST = url.origin
+  ENTRY = url.pathname + url.search
+  AIM = url.href
+  return AIM
+}
+if (TARGET) aimAt(TARGET)
 const cssAt = args.indexOf('--css')
 const SHEET = cssAt > -1 ? args[cssAt + 1] : null
 // with no folder given it opens on the components in this repo, so `npm run studio` is a thing you
@@ -70,7 +93,7 @@ const CAN_WRITE = hasClaude() || !!process.env.ANTHROPIC_API_KEY
 const work = '.studio'
 mkdirSync(work, { recursive: true })
 
-if (!TARGET && !existsSync(ROOT)) { console.log(`\n  no such folder: ${ROOT}\n`); process.exit(1) }
+const HAS_FOLDER = existsSync(ROOT)
 
 /* ── reading a component out of a file, the same way animate.mjs does ─────────────────────────── */
 const matching = (s, open) => {
@@ -266,7 +289,9 @@ const preview = (o, camera, palette) => {
     background:var(--background,#0b0c0d);color:var(--foreground,#e6e6e6);font:14px ui-sans-serif,system-ui}
     #fit{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);transform-origin:center center;
       width:${o.wide ? o.wide + 'px' : 'max-content'}}`
-  const head = `<meta charset="utf-8">${tw}${vars}<style>${o.base}\n${chrome}\n${o.css}</style>`
+  // chrome first, then the ground the element was standing on, or ours would overrule the page's
+  // own background and a light site would be previewed on black with black text
+  const head = `<meta charset="utf-8">${tw}${vars}<style>${chrome}\n${o.base}\n${o.css}</style>`
   /**
    * A dashboard component is eight hundred pixels wide and the card it is being compared in is three
    * hundred. Left alone you see the first tier of a pricing table and a sliver of the second, which is
@@ -799,6 +824,74 @@ addEventListener('keydown',function(e){if(e.key===' '){e.preventDefault();play.c
 <\/script></body></html>`
 }
 
+/**
+ * Several elements, each with its own motion, on one timeline.
+ *
+ * Picking replaced the last pick, which makes the studio a tool for one component at a time. That is
+ * not how a page is experienced: a dashboard has a header, a row of figures and a chart, and the
+ * question worth answering is what happens when they all move, in what order. So picks accumulate
+ * and a rail is what they turn into.
+ *
+ * The sequencing costs nothing because the transport already exists. Rather than rewriting anybody's
+ * delays, each element is held at t minus its own offset, so the second element is still at zero
+ * while the first is half a second in. One scrubber, several clocks, no css touched.
+ */
+async function railOf(picks, palette) {
+  const made = await Promise.all(picks.map(async (pick, i) => {
+    const got = await options({ html: pick.html, css: pick.css ?? '', label: pick.label, w: pick.w }, 1)
+    return got.kept.length ? { ...got.kept[0], label: pick.label, i } : { label: pick.label, i, why: (got.dropped[0] || {}).why }
+  }))
+  return made
+}
+
+const railView = (ids, palette, beat = 420) => {
+  const parts = ids.map((id, i) => made.get(id)).filter(Boolean).map((o, i) => {
+    const tag = o.scope ? `${o.scope}-r${i + 1}` : ''
+    const css = o.scope ? o.css.replaceAll(`[${o.scope}]`, `[${tag}]`) : o.css
+    const markup = tag ? o.markup.replace(/<(\w+)/, `<$1 ${tag}`) : o.markup
+    return { ...o, css, markup, tag, i }
+  })
+  if (!parts.length) return null
+  const tw = parts.some((o) => o.tw)
+  return `<html class="dark"><head><meta charset="utf-8">
+${tw ? `<script src="/__wall/tailwind.js"></script><style type="text/tailwindcss">${themeMap}</style>` : ''}
+${tw ? `<style>${themeFor(palette)}</style>` : ''}
+<style>html,body{margin:0;height:100%;overflow:hidden;background:#0b0c0d;color:#e6e6e6;
+  font:13px ui-sans-serif,system-ui}
+.rail{height:100%;display:flex;flex-direction:column;justify-content:center;gap:10px;padding:14px}
+.car{flex:1 1 0;display:grid;place-items:center;min-height:0;position:relative}
+${parts[0].base}
+${parts.map((p) => p.css).join('\n')}
+.car > .in{transform-origin:center center}
+.tag{position:absolute;left:0;top:0;font:10px ui-monospace,monospace;color:#5c6068;letter-spacing:.04em}
+</style></head><body>
+<div class="rail">${parts.map((p) => `<div class="car" data-rail="${p.i}">
+  <span class="tag">${p.i + 1}. ${String(p.file || p.note || '').slice(0, 44)}</span>
+  <div class="in" style="width:${p.wide ? p.wide + 'px' : 'max-content'}">${p.markup}</div></div>`).join('')}</div>
+<script>
+var BEAT=${beat}
+for (var car of document.querySelectorAll('.car')){
+  var el=car.querySelector('.in'), r=el.getBoundingClientRect(), box=car.getBoundingClientRect()
+  var s=Math.min(1,(box.width-20)/r.width,(box.height-8)/r.height)
+  if(s<1) el.style.transform='scale('+s.toFixed(4)+')'
+}
+/* which element an animation belongs to decides which clock it is on */
+function seat(a){ try{ var n=a.effect&&a.effect.target; while(n&&n!==document.body){
+  if(n.dataset&&n.dataset.rail!==undefined) return Number(n.dataset.rail); n=n.parentElement } }catch(_){}
+  return 0 }
+requestAnimationFrame(function(){document.getAnimations().forEach(function(a){
+  try{a.pause();a.currentTime=0}catch(_){}})})
+addEventListener('message',function(e){var d=e.data||{};if(d.wall!=='hold')return
+  var a=document.getAnimations(),end=0
+  a.forEach(function(x){try{
+    var at=Math.max(0,d.t-seat(x)*BEAT); x.pause(); x.currentTime=at
+    var t=x.effect&&x.effect.getComputedTiming?x.effect.getComputedTiming().endTime:0
+    if(typeof t==='number'&&isFinite(t)&&t+seat(x)*BEAT>end)end=t+seat(x)*BEAT
+  }catch(_){}})
+  ;(e.source||parent).postMessage({wall:'held',n:a.length,i:d.i,end:Math.round(end)},'*')})
+<\/script></body></html>`
+}
+
 /* ── the room ─────────────────────────────────────────────────────────────────────────────────── */
 const PAGE = () => `<html><head><meta charset="utf-8"><title>motion studio</title><style>
 :root{--bg:#08090a;--panel:#0f1011;--raised:#141516;--line:rgba(255,255,255,.07);
@@ -807,8 +900,21 @@ const PAGE = () => `<html><head><meta charset="utf-8"><title>motion studio</titl
 body{margin:0;height:100vh;display:grid;grid-template-columns:250px 1fr;background:var(--bg);
   color:var(--ink);font:13px/1.5 ui-sans-serif,-apple-system,"Inter",sans-serif}
 aside{border-right:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;min-height:0}
-.head{padding:13px 14px;border-bottom:1px solid var(--line);display:grid;gap:3px}
-.head b{font-weight:500}.head span{color:var(--faint);font-size:11px;word-break:break-all}
+.head{padding:11px 11px 12px;border-bottom:1px solid var(--line);display:grid;gap:7px}
+.head span{color:var(--faint);font-size:11px;word-break:break-all;padding:0 3px;line-height:1.5}
+.aim{display:flex;align-items:center;gap:6px;height:30px;padding:0 4px 0 8px;background:var(--bg);
+  border:1px solid var(--line2);border-radius:7px;transition:border-color 120ms ease,box-shadow 120ms ease}
+.aim:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(94,106,210,.18)}
+.aim img{width:14px;height:14px;border-radius:3px;flex:none;display:none}
+.aim img[src]{display:block}
+.aim input{flex:1;min-width:0;background:none;border:0;outline:none;color:var(--ink);
+  font:inherit;font-size:12.5px;padding:0}
+.aim input::placeholder{color:var(--faint)}
+.enter{display:grid;place-items:center;width:22px;height:22px;flex:none;background:var(--raised);
+  color:var(--dim);border:1px solid var(--line2);border-radius:5px;font-size:12px;cursor:pointer;
+  padding:0;line-height:1;transition:color 120ms ease,background 120ms ease}
+.enter:hover{color:var(--ink);background:#1a1b1d}
+.aim:focus-within .enter{border-color:rgba(94,106,210,.5);color:var(--ink)}
 .files{overflow:auto;padding:6px;flex:1}
 .file{display:block;width:100%;text-align:left;background:none;border:0;color:var(--dim);
   padding:6px 9px;border-radius:5px;font:inherit;font-size:12px;cursor:pointer;
@@ -850,6 +956,14 @@ figcaption b{font-weight:500}.note{color:var(--dim)}.verb{color:var(--faint);fon
 .mini.keep{border-color:rgba(94,106,210,.5);color:var(--ink)}
 .empty{padding:40px;color:var(--faint);text-align:center;grid-column:1/-1;line-height:1.8}
 .hint{margin:4px 10px;font-size:12px;color:var(--faint);line-height:1.7}
+.selhead{margin:12px 12px 6px;font-size:10.5px;text-transform:none;letter-spacing:.06em;color:var(--faint)}
+.pill{display:flex;align-items:center;gap:7px;margin:4px 10px;padding:5px 6px 5px 8px;background:var(--raised);
+  border:1px solid var(--line);border-radius:6px;font-size:11.5px;color:var(--dim)}
+.pill b{display:grid;place-items:center;width:15px;height:15px;flex:none;border-radius:4px;
+  background:var(--accent);color:#fff;font-size:9.5px;font-weight:500}
+.pill button{margin-left:auto;background:none;border:0;color:var(--faint);cursor:pointer;
+  font-size:14px;line-height:1;padding:0 2px}
+.pill button:hover{color:var(--ink)}
 .hint b{color:var(--dim);font-weight:500}
 .appwrap{grid-column:1/-1;height:calc(100vh - 116px);border:1px solid var(--line);border-radius:8px;
   overflow:hidden;background:#fff}
@@ -861,16 +975,21 @@ figcaption b{font-weight:500}.note{color:var(--dim)}.verb{color:var(--faint);fon
 .drops{padding:0 14px 14px;color:var(--faint);font-size:11.5px;line-height:1.7}
 </style></head><body>
 <aside>
-  <div class="head"><b>${TARGET ? 'your app' : path.basename(path.resolve(ROOT))}</b>
-    <span>${TARGET ?? path.resolve(ROOT)}</span></div>
-  ${TARGET ? `<div class="files"><p class="hint">Press <b>Pick element</b>, then click anything in your
-    app. The studio reads the rendered element and the rules that actually matched it, so there is
-    nothing to parse and nothing to guess.</p><div id="chosen"></div></div>`
-    : '<div class="files" id="files"></div>'}
+  <div class="head">
+    <form class="aim" id="aimform" autocomplete="off">
+      <img id="fav" alt="" width="14" height="14">
+      <input id="url" spellcheck="false" placeholder="localhost:3000" value="${AIM ?? ''}">
+      <button class="enter" id="go" title="Aim the studio here" type="submit">&#9166;</button>
+    </form>
+    <span id="aimnote">${AIM ? 'proxied here, so its elements can be picked'
+      : HAS_FOLDER ? 'or pick a component below' : 'type where your app is running'}</span>
+  </div>
+  <div class="files" id="files"></div>
+  <div id="sel"></div>
 </aside>
 <main>
   <header>
-    ${TARGET ? '<button class="btn" id="pick">Pick element</button>' : ''}
+    <button class="btn" id="pick">Pick element</button>
     <button class="btn go" id="ask">Give it motion</button>
     <select id="count"><option>3</option><option>4</option><option selected>5</option><option>6</option></select>
     <span class="sep"></span>
@@ -901,27 +1020,47 @@ const play=document.getElementById('play'),ask=document.getElementById('ask'),ca
 const palette=document.getElementById('palette')
 let file=null, opts=[], running=true, t=0, last=performance.now(), held=new Map()
 let ends=new Map(), span=4200, rate=1
-const APP=${TARGET ? 'true' : 'false'}, CAN_WRITE=${CAN_WRITE ? 'true' : 'false'}
-let chosen=null   // {html,css,label} picked out of the running app
+let APP=${AIM ? 'true' : 'false'}
+const CAN_WRITE=${CAN_WRITE ? 'true' : 'false'}
+let chosen=null   // the most recent pick
+let picks=[]      // everything selected, in the order it was picked
+let cars=null     // the rail, once each element has been given a motion
 let verdict=null  // why the last ask produced nothing, so the grid can say so
 
-if(APP){
-  render()
-  const pickBtn=document.getElementById('pick')
-  pickBtn.onclick=()=>{
-    const want=pickBtn.getAttribute('aria-pressed')!=='true'
-    pickBtn.setAttribute('aria-pressed',want)
-    const f=document.querySelector('.appwrap iframe')
-    if(f) f.contentWindow.postMessage({wall:want?'pick':'nopick'},'*')
-  }
+const pickBtn=document.getElementById('pick')
+pickBtn.onclick=()=>{
+  const want=pickBtn.getAttribute('aria-pressed')!=='true'
+  pickBtn.setAttribute('aria-pressed',want)
+  const f=document.querySelector('.appwrap iframe')
+  if(f) f.contentWindow.postMessage({wall:want?'pick':'nopick'},'*')
 }
+/* aiming somewhere new: the frame reloads, the selection is somebody else's page now, and the
+   favicon is asked for once the target has actually changed rather than optimistically */
+const aimform=document.getElementById('aimform'), urlbox=document.getElementById('url')
+aimform.onsubmit=async e=>{
+  e.preventDefault()
+  const said=urlbox.value.trim(); if(!said) return
+  document.getElementById('aimnote').textContent='reaching it…'
+  const r=await fetch('/__wall/target',{method:'POST',headers:{'content-type':'application/json'},
+    body:JSON.stringify({url:said})}).then(x=>x.json()).catch(e=>({error:String(e)}))
+  if(r.error){ document.getElementById('aimnote').textContent=r.error; return }
+  urlbox.value=r.at; APP=true; picks=[]; opts=[]; verdict=null; chosen=null; cars=null
+  // the folder list is about somewhere else now
+  document.getElementById('files').innerHTML=''
+  document.getElementById('aimnote').textContent='proxied here, so its elements can be picked'
+  document.getElementById('fav').src='/__wall/favicon?t='+Date.now()
+  pickBtn.style.display=''
+  drawSel(); render()
+}
+if(APP){ document.getElementById('fav').src='/__wall/favicon' } else { pickBtn.style.display='none' }
+render()
 fetch('/__wall/list').then(r=>r.json()).then(fs=>{
   document.getElementById('files').innerHTML=fs.map(f=>
     '<button class="file" data-f="'+f+'">'+f.split('/').slice(-2).join('/')+'</button>').join('')
   document.querySelectorAll('.file').forEach(b=>b.onclick=()=>{
     file=b.dataset.f
     document.querySelectorAll('.file').forEach(x=>x.setAttribute('aria-current',x===b))
-    opts=[]; verdict=null; held.clear(); drops.textContent=''; render()
+    opts=[]; verdict=null; cars=null; held.clear(); drops.textContent=''; render()
   })
 })
 
@@ -977,17 +1116,30 @@ async function post(where, body, ms){
   }finally{ clearTimeout(bell); if(inflight===c) inflight=null }
 }
 ask.onclick=async()=>{
-  if(APP && !chosen) return alert('Press Pick element, then click something in your app.')
+  if(APP && !picks.length) return alert('Press Pick element, then click something in your app.')
   if(!APP && !file) return alert('Pick a component first.')
   if(ask.disabled) return
   verdict=null
   ask.disabled=true; ask.textContent='Writing…'
+  if(APP && picks.length>1){
+    grid.innerHTML='<div class="empty">Giving '+picks.length+' elements a motion each.</div>'
+    drops.textContent=''
+    try{
+      const r=await post('/__wall/rail',{picks,palette:palette.value},420000)
+      cars=r.cars||[]; opts=[]; held.clear(); ends.clear(); render()
+      const moved=cars.filter(c=>c.id).length
+      drops.textContent=moved+' of '+cars.length+' moved. Each starts a beat after the one above it.'
+        +(moved<cars.length?' Missing: '+cars.filter(c=>!c.id).map(c=>c.label).join(', '):'')
+    }catch(e){ verdict={dropped:[],error:String(e && e.message||e)}; render() }
+    ask.disabled=false; drawSel(); return
+  }
+  chosen=picks[picks.length-1]||chosen
   grid.innerHTML='<div class="empty">Asking for '+document.getElementById('count').value+' motions.<br>About thirty seconds.</div>'
   drops.textContent=''
   try{
     const r=await post('/__wall/motion',
       Object.assign({count:Number(document.getElementById('count').value)}, APP?chosen:{file}), 360000)
-    opts=r.kept||[]; held.clear(); ends.clear()
+    opts=r.kept||[]; cars=null; held.clear(); ends.clear()
     verdict = opts.length ? null : {dropped:r.dropped||[], error:r.error}
     render()
     drops.textContent=(r.dropped&&r.dropped.length&&opts.length? r.dropped.length+' dropped: '
@@ -1014,6 +1166,12 @@ document.getElementById('save').onclick=async()=>{
 document.getElementById('rate').onchange=e=>{rate=parseFloat(e.target.value)}
 
 function render(){
+  if(cars && cars.some(c=>c.id)){
+    const ids=cars.filter(c=>c.id).map(c=>c.id).join(',')
+    grid.innerHTML='<div class="appwrap"><iframe data-i="0" src="/__wall/railview?ids='+ids
+      +'&palette='+encodeURIComponent(palette.value)+'"></iframe></div>'
+    return
+  }
   if(!opts.length && verdict) return explain()
   if(!opts.length && APP){
     grid.innerHTML='<div class="appwrap"><iframe src="/__wall/app"></iframe></div>'; return }
@@ -1062,21 +1220,40 @@ addEventListener('message',e=>{const d=e.data||{}
       if(Math.abs(want-span)>60){span=want;scrub.max=span;document.getElementById('span').textContent=(span/1000).toFixed(1)+'s'}}
     paint()}
   if(d.wall==='picked'){
-    chosen={html:d.html,css:d.css,label:d.label,w:d.w,h:d.h}
+    chosen={html:d.html,css:d.css,label:d.label,w:d.w,h:d.h,
+      cut:d.cut,opaque:d.opaque,weak:d.weak}
+    picks.push(chosen)
     document.getElementById('pick').setAttribute('aria-pressed','false')
-    document.getElementById('chosen').innerHTML='<b class="chip">'+d.label
+    drawSel()
+    document.getElementById('sel').insertAdjacentHTML('beforeend','<b class="chip">'+d.label
       +'<br><span>'+(d.css.length/1000).toFixed(1)+'kb of matched css, '
       +(d.html.length/1000).toFixed(1)+'kb of markup'+(d.cut?' (trimmed to fit)':'')
       +', '+d.w+'x'+d.h
       +(d.weak?'<br><b style="color:#d29d6b">Weak pick:</b> '+d.weak
         +'. Try a container with several sibling parts, like a row of cards or a list.':'')
       +(d.opaque?'<br>'+d.opaque+' stylesheet'+(d.opaque>1?'s':'')+' could not be read: '
-        +'served from another origin without cors, so some styling is missing':'')+'</span></b>'
+        +'served from another origin without cors, so some styling is missing':'')+'</span></b>')
     paint()
   }})
+
+/* the selection, which is the thing a rail is built out of */
+function drawSel(){
+  const el=document.getElementById('sel')
+  if(!picks.length){ el.innerHTML=''; ask.textContent='Give it motion'; return }
+  el.innerHTML='<p class="selhead">Selection'+(picks.length>1?' &middot; '+picks.length:'')+'</p>'
+    +picks.map((p,i)=>'<span class="pill"><b>'+(i+1)+'</b>'+p.label.slice(0,26)
+      +'<button data-drop="'+i+'" title="remove">&times;</button></span>').join('')
+    +(picks.length>1?'<p class="hint">These will be given one motion each and played on one '
+      +'timeline, each starting a beat after the one above it.</p>':'')
+  el.querySelectorAll('[data-drop]').forEach(b=>b.onclick=()=>{
+    picks.splice(Number(b.dataset.drop),1); chosen=picks[picks.length-1]||null
+    cars=null; opts=[]; drawSel(); render() })
+  ask.textContent=picks.length>1?'Give them motion':'Give it motion'
+}
 function paint(){
   const frames=document.querySelectorAll('iframe')
-  if(!opts.length){link.textContent=(APP?chosen&&chosen.label:file)?'no motion yet':'—';
+  if(!opts.length&&!(cars&&cars.some(c=>c.id))){
+    link.textContent=(APP?picks.length:file)?'no motion yet':'—'
     link.style.color='var(--faint)';return}
   const live=[...held.values()].filter(n=>n>0).length
   link.textContent=live+'/'+frames.length+' driven'
@@ -1124,7 +1301,7 @@ const server = createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x')
   try {
     if (url.pathname === '/') { res.writeHead(200, { 'content-type': 'text/html' }); return res.end(PAGE()) }
-    if (url.pathname === '/__wall/list') return json(res, TARGET ? [] : list())
+    if (url.pathname === '/__wall/list') return json(res, HOST || !HAS_FOLDER ? [] : list())
     if (url.pathname === '/__wall/tailwind.js') {
       const t = await getTailwind()
       if (!t.js) { res.writeHead(503); return res.end(`// ${t.why}`) }
@@ -1187,6 +1364,21 @@ const server = createServer(async (req, res) => {
       console.log(`    exported ${at} (${Math.round(html.length / 1024)}kb)`)
       return json(res, { at, kb: Math.round(html.length / 1024) })
     }
+    if (url.pathname === '/__wall/rail' && req.method === 'POST') {
+      const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))
+      const picks = (body.picks ?? []).slice(0, 8)
+      console.log(`  rail of ${picks.length}: ${picks.map((p) => p.label).join(', ').slice(0, 90)}`)
+      const cars = await railOf(picks, body.palette)
+      console.log(`    ${cars.filter((c) => c.id).length} of ${picks.length} moved`)
+      return json(res, { cars })
+    }
+    if (url.pathname === '/__wall/railview') {
+      const ids = (url.searchParams.get('ids') ?? '').split(',').filter(Boolean)
+      const html = railView(ids, url.searchParams.get('palette'), Number(url.searchParams.get('beat')) || 420)
+      if (!html) { res.writeHead(404); return res.end('gone') }
+      res.writeHead(200, { 'content-type': 'text/html' })
+      return res.end(html)
+    }
     if (url.pathname === '/__wall/save' && req.method === 'POST') {
       const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))
       const o = made.get(body.id)
@@ -1199,12 +1391,37 @@ const server = createServer(async (req, res) => {
       return json(res, { at })
     }
     if (url.pathname === '/__wall/app') {
-      if (!TARGET) { res.writeHead(404); return res.end('no app: start the studio with --app') }
+      if (!HOST) { res.writeHead(404); return res.end('nothing aimed at yet: type an address') }
       return proxy(req, res, new URL(ENTRY, 'http://x'))
+    }
+    if (url.pathname === '/__wall/target' && req.method === 'POST') {
+      const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))
+      try {
+        const at = aimAt(body.url)
+        console.log(`  aimed at ${at}`)
+        return json(res, { at, host: HOST })
+      } catch (e) { return json(res, { error: `that is not an address I can reach: ${e.message}` }) }
+    }
+    /**
+     * The site's own mark, fetched through here rather than linked.
+     *
+     * A favicon from a third party service would be a request the studio makes about a page you are
+     * looking at, which is somebody else learning what you are working on. The site already serves
+     * one, and this is already proxying that site, so it costs nothing to ask it directly. A site
+     * with no icon gets nothing rather than a placeholder that pretends.
+     */
+    if (url.pathname === '/__wall/favicon') {
+      if (!HOST) { res.writeHead(404); return res.end('') }
+      try {
+        const r = await fetch(`${HOST}/favicon.ico`, { signal: AbortSignal.timeout(4000) })
+        if (!r.ok || !/image|icon/i.test(r.headers.get('content-type') ?? '')) throw new Error('none')
+        res.writeHead(200, { 'content-type': r.headers.get('content-type'), 'cache-control': 'max-age=600' })
+        return res.end(Buffer.from(await r.arrayBuffer()))
+      } catch { res.writeHead(404); return res.end('') }
     }
     // anything not ours belongs to the app being proxied, which is how its root-relative assets
     // resolve without a single url being rewritten
-    if (TARGET && !OURS.test(url.pathname)) return proxy(req, res, url)
+    if (HOST && !OURS.test(url.pathname)) return proxy(req, res, url)
     res.writeHead(404); res.end('no')
   } catch (e) {
     const why = String(e && e.message ? e.message : e).slice(0, 300)
