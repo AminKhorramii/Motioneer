@@ -883,7 +883,8 @@ const remember = (href) => {
   try {
     const at = new URL(href)
     recent = [{ href: at.href, host: at.host, path: at.pathname === '/' ? '' : at.pathname },
-      ...recent.filter((r) => r.href !== at.href)].slice(0, 12)
+      // five, because the rail is for the handful you are moving between rather than a history
+      ...recent.filter((r) => r.href !== at.href)].slice(0, 5)
     writeFileSync(RECENT_AT, JSON.stringify(recent))
   } catch { /* an address that will not parse is not worth remembering */ }
 }
@@ -1366,10 +1367,10 @@ figcaption b{font-weight:500}.note{color:var(--dim)}.verb{color:var(--faint);fon
 .mini:hover{color:var(--ink)}
 .mini.keep{border-color:rgba(94,106,210,.5);color:var(--ink)}
 .empty{padding:40px;color:var(--faint);text-align:center;grid-column:1/-1;line-height:1.8}
-.wait{grid-column:1/-1;display:grid;justify-items:center;padding:18vh 0 0}
-.waith{margin:22px 0 0;font-size:12px;color:var(--faint);letter-spacing:.04em}
-.field{margin:0;font:11px/1.05 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--dim);
-  letter-spacing:2.5px;white-space:pre;user-select:none}
+.wait{grid-column:1/-1;display:grid;place-items:center;padding:16vh 0 0}
+.field{font:11px/1.15 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink);
+  letter-spacing:3px;user-select:none;white-space:nowrap}
+.field i{font-style:normal;opacity:0}
 
 .hint{margin:4px 10px;font-size:12px;color:var(--faint);line-height:1.7}
 .selhead{margin:12px 12px 6px;font-size:10.5px;text-transform:none;letter-spacing:.06em;color:var(--faint)}
@@ -1610,10 +1611,7 @@ function explain(){
  * mechanism does rather than easing the way a default does. The glyph is animated through the content
  * property, which is the only honest way to do ascii in css.
  */
-const WAITER = (line) => '<div class="wait">'
-  + '<pre class="field" id="field"></pre>'
-  + '<p class="waith">' + line + '</p>'
-  + '</div>'
+const WAITER = () => '<div class="wait"><div class="field" id="field"></div></div>'
 
 /**
  * The waiting state is a small shader written in characters.
@@ -1629,24 +1627,43 @@ const WAITER = (line) => '<div class="wait">'
  */
 const SHADER = [
   '(function(){',
-  "var el=document.getElementById('field'); if(!el) return",
-   // eight blank steps out of twelve: measured, that inks a quarter of the grid, so what is left is
-  // a drifting suggestion rather than the wall of glyphs a full ramp gives
-  "var COLS=54, ROWS=11, RAMP='        \u00b7-=+'",
+  "var host=document.getElementById('field'); if(!host) return",
+  'var COLS=64, ROWS=16, N=COLS*ROWS',
+  /* Built once and then only its opacity changes.
+     A ramp of glyphs steps between characters, and steps are what made the last one read as a
+     terminal animation rather than a field. One glyph everywhere with a continuous brightness is the
+     smooth version of the same idea, and opacity is the one property that costs nothing to change. */
+  "var frag=document.createDocumentFragment(), cells=[]",
+  'for(var i=0;i<N;i++){',
+  "  var c=document.createElement('i')",
+  "  c.textContent='\u00b7'",
+  '  frag.appendChild(c); cells.push(c)',
+  "  if(i%COLS===COLS-1) frag.appendChild(document.createElement('br'))",
+  '}',
+  'host.appendChild(frag)',
   'var t=0',
   'function frame(){',
-  '  if(!document.body.contains(el)) return',
-  '  t+=0.045',
-  "  var out=''",
+  '  if(!document.body.contains(host)) return',
+  '  t+=0.016',
   '  for(var y=0;y<ROWS;y++){',
   '    for(var x=0;x<COLS;x++){',
-  '      var v=Math.sin(x*0.22+t)+Math.sin(y*0.5-t*0.7)+Math.sin((x+y)*0.14+t*1.3)',
-  '      var i=Math.floor((v+3)/6*RAMP.length)',
-  '      out+=RAMP[Math.max(0,Math.min(RAMP.length-1,i))]',
+  /* one field folded into the next, which is what stops it looking like a grid of sine waves */
+  '      var q=Math.sin(x*0.13+t*0.9)+Math.cos(y*0.21-t*0.6)',
+  '      var r=Math.sin((x*0.07+y*0.11)+q*0.8+t*0.5)',
+  '      var v=Math.sin(x*0.05-y*0.08+r*1.6+t*0.35)',
+  '      var a=(v+1)/2',
+  '      a=a*a*(3-2*a)',
+  /* raised to a power so most of the grid falls away and only the crests are lit: a field where
+     every cell is half on reads as a grey rectangle rather than as something moving through */
+  '      a=a*a*a',
+  /* and a soft round falloff, because the edge of the grid is not part of the picture */
+  '      var dx=(x/COLS-0.5)*2.05, dy=(y/ROWS-0.5)*2.05',
+  '      var d=Math.sqrt(dx*dx+dy*dy)',
+  '      var m=1-Math.min(1,Math.max(0,(d-0.25)/0.85))',
+  '      m=m*m*(3-2*m)',
+  '      cells[y*COLS+x].style.opacity=(a*m).toFixed(3)',
   '    }',
-  "    out+=String.fromCharCode(10)",
   '  }',
-  '  el.textContent=out',
   '  requestAnimationFrame(frame)',
   '}',
   'frame()',
@@ -1712,7 +1729,7 @@ ask.onclick=async()=>{
   verdict=null
   ask.disabled=true; ask.textContent='Writing…'
   if(APP && picks.length>1){
-    grid.innerHTML=WAITER('one each, a beat apart'); runShader()
+    grid.innerHTML=WAITER(); runShader()
     drops.textContent=''
     try{
       const r=await post('/__wall/rail',{picks,palette:palette.value},420000)
@@ -1726,7 +1743,7 @@ ask.onclick=async()=>{
     ask.disabled=false; drawSel(); return
   }
   chosen=picks[picks.length-1]||chosen
-  grid.innerHTML=WAITER('no two of these will agree'); runShader()
+  grid.innerHTML=WAITER(); runShader()
   drops.textContent=''
   try{
     const r=await post('/__wall/motion',
