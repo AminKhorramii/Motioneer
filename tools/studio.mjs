@@ -604,8 +604,16 @@ var DULL={'display':'block','position':'static','top':'auto','right':'auto','bot
 
 function inked(el){
   var cs=getComputedStyle(el),bits=[]
+  /* A border is three properties that only mean anything together.
+     Tailwind's preflight sets a zero width solid border on every element, so everything computes
+     border-style solid with border-width 0px. Writing down the style and skipping the width as a
+     default leaves border-style solid with nothing to size it, and an undeclared border-width
+     falls back to medium, which is three pixels. That is the box that appeared around every
+     element. If there is no width there is no border, so none of the three is worth writing. */
+  var noBorder=parseFloat(cs.getPropertyValue('border-width'))===0
   for(var i=0;i<PROPS.length;i++){var k=PROPS[i],v=cs.getPropertyValue(k)
     if(!v||v===DULL[k])continue
+    if(noBorder&&k.indexOf('border-')===0&&k!=='border-radius')continue
     bits.push(k+':'+v)}
   return bits.join(';')
 }
@@ -2025,6 +2033,31 @@ process.on('uncaughtException', (e) => {
 // a proxied app that dies mid response is an ECONNRESET on a socket, not a reason to stop serving
 process.on('SIGPIPE', () => {})
 
+/**
+ * The page and the picker are both built inside template literals, and a backtick or a stray brace in
+ * a comment ends one silently. It has happened five times: a comment mentioning a css shorthand in
+ * backticks terminated the picker, a duplicated block declared SHADER twice, and each time the studio
+ * started, served, and answered every request while the page itself was broken in the browser.
+ *
+ * new Function is the cheapest parser there is. It compiles the script and throws on a syntax error
+ * without running a line of it, so a page that cannot parse is caught here rather than by a person
+ * wondering why the sidebar is empty.
+ */
+function scriptsParse() {
+  const page = PAGE()
+  const blocks = [...page.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)].map((m) => m[1])
+  for (const [i, code] of blocks.entries()) {
+    if (!code.trim()) continue
+    try { new Function(code) } catch (e) {
+      return `script ${i + 1} of ${blocks.length} in the studio page does not parse: ${e.message}`
+    }
+  }
+  // the picker is assembled separately and injected into somebody else's document
+  const inner = PICKER.replace(/^<script>/, '').replace(/<\/script>$/, '').replace(/<\\\/script>/g, '')
+  try { new Function(inner) } catch (e) { return `the picker does not parse: ${e.message}` }
+  return ''
+}
+
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x')
   try {
@@ -2252,6 +2285,12 @@ const live = await listenNear(server, PORT).catch((e) => {
   console.log(`\n  cannot listen: ${e.message}\n`)
   process.exit(1)
 })
+const broke = scriptsParse()
+if (broke) {
+  console.log(`\n  ${broke}`)
+  console.log('  the server would run and every page it served would be dead, so it stops here\n')
+  process.exit(1)
+}
 const where = `http://localhost:${live}`
 console.log(`\n  motion studio  ${where}`)
 const moved = movedFrom(live, PORT)
