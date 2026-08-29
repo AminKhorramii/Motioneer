@@ -646,6 +646,29 @@ const THINK = process.env.WALL_STUDIO_THINKING ? Number(process.env.WALL_STUDIO_
 let KEY = process.env.ANTHROPIC_API_KEY || ''
 /* the environment the command is given, with a refused key taken out of it rather than inherited */
 const CLEAN_ENV = (() => { const e = { ...process.env }; delete e.ANTHROPIC_API_KEY; return e })()
+
+/**
+ * Where this has been pointed, kept between runs.
+ *
+ * The sidebar listed the components in this repository, which is the right thing to see for about
+ * one minute and then never again: once you are aiming at your own app, a folder of examples is
+ * somebody else's furniture taking up the whole rail. What you actually return to is the last few
+ * addresses, and retyping localhost:3000 every restart is the sort of small tax a tool should not
+ * charge. Kept in .studio next to the tailwind cache, since it is the same kind of thing: local, not
+ * worth committing, and harmless to delete.
+ */
+const RECENT_AT = path.join(work, 'recent.json')
+let recent = []
+try { recent = JSON.parse(readFileSync(RECENT_AT, 'utf8')) } catch { recent = [] }
+
+const remember = (href) => {
+  try {
+    const at = new URL(href)
+    recent = [{ href: at.href, host: at.host, path: at.pathname === '/' ? '' : at.pathname },
+      ...recent.filter((r) => r.href !== at.href)].slice(0, 12)
+    writeFileSync(RECENT_AT, JSON.stringify(recent))
+  } catch { /* an address that will not parse is not worth remembering */ }
+}
 const API_MODEL = process.env.WALL_STUDIO_MODEL || 'claude-sonnet-5'
 
 const viaApi = async (brief) => {
@@ -1030,6 +1053,17 @@ aside{border-right:1px solid var(--line);background:var(--panel);display:flex;fl
 .file{display:block;width:100%;text-align:left;background:none;border:0;color:var(--dim);
   padding:6px 9px;border-radius:5px;font:inherit;font-size:12px;cursor:pointer;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.railhead{margin:10px 9px 4px;font-size:10.5px;letter-spacing:.06em;color:var(--faint)}
+.railhead:first-child{margin-top:4px}
+.site{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:none;border:0;
+  color:var(--dim);padding:6px 9px;border-radius:5px;font:inherit;cursor:pointer;min-width:0}
+.site:hover{background:var(--raised);color:var(--ink)}
+.site img{width:13px;height:13px;border-radius:3px;flex:none;opacity:0}
+.site img[src]{opacity:1}
+.site span{display:grid;min-width:0;gap:1px}
+.site b{font-weight:400;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.site i{font-style:normal;font-size:10.5px;color:var(--faint);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
 .file:hover{background:var(--raised);color:var(--ink)}
 .file[aria-current=true]{background:var(--raised);color:var(--ink)}
 main{display:flex;flex-direction:column;min-width:0;min-height:0}
@@ -1098,25 +1132,17 @@ figcaption b{font-weight:500}.note{color:var(--dim)}.verb{color:var(--faint);fon
 .mini:hover{color:var(--ink)}
 .mini.keep{border-color:rgba(94,106,210,.5);color:var(--ink)}
 .empty{padding:40px;color:var(--faint);text-align:center;grid-column:1/-1;line-height:1.8}
-.wait{grid-column:1/-1;display:grid;justify-items:center;gap:0;padding:18vh 0 0}
-.waith{margin:22px 0 0;font-size:12.5px;color:var(--dim);letter-spacing:.01em}
-.waits{margin:5px 0 0;font-size:11.5px;color:var(--faint)}
-.turn{font:13px ui-monospace,monospace;color:var(--accent);height:18px;line-height:1}
-.turn::before{content:"⠇"}
-.wave{display:flex;align-items:flex-end;gap:3px;height:26px;margin-top:14px}
-.wave i{width:3px;height:100%;background:var(--line2);border-radius:1px;transform-origin:50% 100%;
-  transform:scaleY(.18)}
+.wait{grid-column:1/-1;display:grid;justify-items:center;padding:20vh 0 0}
+.waith{margin:26px 0 0;font-size:12px;color:var(--faint);letter-spacing:.04em}
+.wave{display:flex;align-items:flex-end;gap:5px;height:64px}
+.wave i{width:5px;height:100%;background:var(--dim);border-radius:2px;transform-origin:50% 100%;
+  transform:scaleY(.12)}
 @media (prefers-reduced-motion: no-preference){
-  .turn::before{animation:glyph 800ms steps(1,end) infinite}
-  .wave i{animation:swell 1400ms cubic-bezier(.4,0,.55,1) infinite;
+  .wave i{animation:swell 1500ms cubic-bezier(.4,0,.55,1) infinite;
     animation-delay:calc(var(--i) * 40ms)}
 }
-/* the glyphs themselves rather than css escapes: a backslash sequence in a template literal is
-   read as an octal escape by javascript before css ever sees it */
-@keyframes glyph{
-  0%{content:"⠇"}12.5%{content:"⠋"}25%{content:"⠙"}37.5%{content:"⠸"}50%{content:"⢰"}62.5%{content:"⢠"}75%{content:"⢄"}87.5%{content:"⡆"}}
 @keyframes swell{
-  0%,100%{transform:scaleY(.18);opacity:.5}
+  0%,100%{transform:scaleY(.12);opacity:.35}
   45%{transform:scaleY(1);opacity:1}}
 .hint{margin:4px 10px;font-size:12px;color:var(--faint);line-height:1.7}
 .selhead{margin:12px 12px 6px;font-size:10.5px;text-transform:none;letter-spacing:.06em;color:var(--faint)}
@@ -1279,7 +1305,7 @@ aimform.onsubmit=async e=>{
   if(r.error){ document.getElementById('aimnote').textContent=r.error; return }
   urlbox.value=r.at; APP=true; aimN++; quietMode=false; picks=[]; opts=[]; verdict=null; chosen=null; cars=null
   // the folder list is about somewhere else now
-  document.getElementById('files').innerHTML=''
+  drawRail(r.recent||[])
   document.getElementById('aimnote').textContent='proxied here, so its elements can be picked'
   document.getElementById('fav').src='/__wall/favicon?t='+Date.now()
   pickBtn.style.display=''
@@ -1287,15 +1313,33 @@ aimform.onsubmit=async e=>{
 }
 if(APP){ document.getElementById('fav').src='/__wall/favicon' } else { pickBtn.style.display='none' }
 render()
-fetch('/__wall/list').then(r=>r.json()).then(fs=>{
-  document.getElementById('files').innerHTML=fs.map(f=>
-    '<button class="file" data-f="'+f+'">'+f.split('/').slice(-2).join('/')+'</button>').join('')
-  document.querySelectorAll('.file').forEach(b=>b.onclick=()=>{
+/**
+ * The rail lists where this has been, and falls back to the components in the repo when it has been
+ * nowhere yet. Both are labelled, because a list of addresses and a list of files are different
+ * things and an unlabelled mixture of the two would be worse than either.
+ */
+let files=[]
+function drawRail(recent){
+  const rail=document.getElementById('files')
+  const rows=[]
+  if(recent.length) rows.push('<p class="railhead">Recent</p>'
+    +recent.map(r=>'<button class="site" data-go="'+r.href+'">'
+      +'<img src="/__wall/favicon?host='+encodeURIComponent(r.href)+'" alt="" width="13" height="13">'
+      +'<span><b>'+r.host+'</b>'+(r.path?'<i>'+r.path.slice(0,26)+'</i>':'')+'</span></button>').join(''))
+  if(files.length && !recent.length) rows.push('<p class="railhead">In this repo</p>'
+    +files.map(f=>'<button class="file" data-f="'+f+'">'+f.split('/').slice(-2).join('/')+'</button>').join(''))
+  rail.innerHTML=rows.join('')
+  rail.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{
+    urlbox.value=b.dataset.go; aimform.requestSubmit()
+  })
+  rail.querySelectorAll('.file').forEach(b=>b.onclick=()=>{
     file=b.dataset.f
-    document.querySelectorAll('.file').forEach(x=>x.setAttribute('aria-current',x===b))
+    rail.querySelectorAll('.file').forEach(x=>x.setAttribute('aria-current',x===b))
     opts=[]; verdict=null; cars=null; held.clear(); drops.textContent=''; render()
   })
-})
+}
+Promise.all([fetch('/__wall/list').then(r=>r.json()), fetch('/__wall/recent').then(r=>r.json())])
+  .then(([fs,rs])=>{ files=fs; drawRail(rs) })
 
 /**
  * Why nothing came back.
@@ -1339,11 +1383,9 @@ function explain(){
  * mechanism does rather than easing the way a default does. The glyph is animated through the content
  * property, which is the only honest way to do ascii in css.
  */
-const WAITER = (title, sub) => '<div class="wait">'
-  + '<div class="turn"></div>'
-  + '<div class="wave">' + Array.from({length:19},(_,i)=>'<i style="--i:'+i+'"></i>').join('') + '</div>'
-  + '<p class="waith">' + title + '</p>'
-  + (sub ? '<p class="waits">' + sub + '</p>' : '')
+const WAITER = (line) => '<div class="wait">'
+  + '<div class="wave">' + Array.from({length:27},(_,i)=>'<i style="--i:'+i+'"></i>').join('') + '</div>'
+  + '<p class="waith">' + line + '</p>'
   + '</div>'
 
 /**
@@ -1418,8 +1460,7 @@ ask.onclick=async()=>{
   verdict=null
   ask.disabled=true; ask.textContent='Writing…'
   if(APP && picks.length>1){
-    grid.innerHTML=WAITER('writing a motion for each of '+picks.length,
-      'they will play on one timeline, a beat apart')
+    grid.innerHTML=WAITER('one each, a beat apart')
     drops.textContent=''
     try{
       const r=await post('/__wall/rail',{picks,palette:palette.value},420000)
@@ -1433,8 +1474,7 @@ ask.onclick=async()=>{
     ask.disabled=false; drawSel(); return
   }
   chosen=picks[picks.length-1]||chosen
-  grid.innerHTML=WAITER('writing '+document.getElementById('count').value+' motions',
-    'each one is dealt a different verb, so they disagree by construction')
+  grid.innerHTML=WAITER('no two of these will agree')
   drops.textContent=''
   try{
     const r=await post('/__wall/motion',
@@ -1705,7 +1745,8 @@ const server = createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x')
   try {
     if (url.pathname === '/') { res.writeHead(200, { 'content-type': 'text/html' }); return res.end(PAGE()) }
-    if (url.pathname === '/__wall/list') return json(res, HOST || !HAS_FOLDER ? [] : list())
+    if (url.pathname === '/__wall/list') return json(res, HAS_FOLDER ? list() : [])
+    if (url.pathname === '/__wall/recent') return json(res, recent)
     if (url.pathname === '/__wall/tailwind.js') {
       const t = await getTailwind()
       if (!t.js) { res.writeHead(503); return res.end(`// ${t.why}`) }
@@ -1846,7 +1887,8 @@ const server = createServer(async (req, res) => {
         const bad = await settleEntry()
         if (bad) return json(res, { error: bad.error })
         console.log(`  aimed at ${AIM}`)
-        return json(res, { at: AIM, host: HOST })
+        remember(AIM)
+        return json(res, { at: AIM, host: HOST, recent })
       } catch (e) { return json(res, { error: `that is not an address I can reach: ${e.message}` }) }
     }
     /**
@@ -1858,9 +1900,10 @@ const server = createServer(async (req, res) => {
      * with no icon gets nothing rather than a placeholder that pretends.
      */
     if (url.pathname === '/__wall/favicon') {
-      if (!HOST) { res.writeHead(404); return res.end('') }
+      const from = url.searchParams.get('host') || HOST
+      if (!from) { res.writeHead(404); return res.end('') }
       try {
-        const r = await fetch(`${HOST}/favicon.ico`, { signal: AbortSignal.timeout(4000) })
+        const r = await fetch(`${new URL(from).origin}/favicon.ico`, { signal: AbortSignal.timeout(4000) })
         if (!r.ok || !/image|icon/i.test(r.headers.get('content-type') ?? '')) throw new Error('none')
         res.writeHead(200, { 'content-type': r.headers.get('content-type'), 'cache-control': 'max-age=600' })
         return res.end(Buffer.from(await r.arrayBuffer()))
