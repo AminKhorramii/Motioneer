@@ -53,6 +53,7 @@ verify/                the suites, in order of how much they prove
   oneline.mjs          the handoff format, and its format number
   update.mjs           the update channel: publishable, complete, never stranded
   studio-sites.mjs     twenty real sites through the proxy, picked one at a time
+  studio-capture.mjs   what survives being picked, by site and by kind of element
 
 tools/                 run by hand or at author time, never at run time
   try.mjs              the loop for working on Wall itself

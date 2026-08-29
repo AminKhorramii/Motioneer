@@ -638,6 +638,21 @@ Two things make it work on real components rather than only on toys:
   collide, everything else is forwarded, and the websocket upgrade is passed through so hot reload
   survives.
 
+Four gates read the css and a fifth one looks. `unmoved`, `brittle`, `janky` and `scopeOf` all take a
+string, which leaves the hardest promise in the prompt unchecked: a component has to be exactly where
+it started once the animation is over. A sheet can stagger properly, use a named curve, animate only
+transform, and still end on `translateY(12px)` or `opacity: 0`, which nudges somebody's layout for
+good or leaves the component invisible. So each option is also rendered twice, once with the motion
+held past its end and once without it at all, and every element's box and opacity are compared. Both
+of those failures were reproduced first and confirmed to pass all four textual gates.
+
+`node verify/studio-capture.mjs --deep` asks what survives being picked: twenty sites by ten kinds of
+element, each capture re-rendered on its own and measured against the element it came from. It found
+that captures kept every node and still collapsed, because font size and line height are inherited and
+so live on an ancestor no matched rule mentions. Stripe's heading came back at 18 percent of its
+height before that was fixed and 100 percent after. Svg is the weakest kind at 5 of 11 and is the
+obvious next thing to chase.
+
 `node verify/studio-sites.mjs` aims the studio at twenty real sites in turn and checks four things
 for each: that the frame stays inside the proxy, that its dom arrives, that its stylesheets can be
 read, and that clicking something hands back an element with css attached. Every proxy bug so far was

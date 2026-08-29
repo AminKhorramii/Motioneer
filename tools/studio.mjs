@@ -624,6 +624,94 @@ addEventListener('message',function(e){var d=e.data||{};
 parent.postMessage({wall:'ready'},'*');
 })();<\/script>`
 
+/**
+ * The gate that looks instead of reading.
+ *
+ * unmoved, brittle, janky and scopeOf all take a css string. Not one of them renders anything, which
+ * means the hardest promise in the prompt is unchecked: "anything that moves the component to a
+ * different place on the page when the animation is not running is a bug rather than a design".
+ * A sheet can satisfy every textual rule and still leave the component eight pixels down forever,
+ * because a keyframe ended on a transform instead of returning to none, or because `both` held the
+ * last frame. That ships into somebody's product and nudges their layout for good.
+ *
+ * So it is rendered twice: once with the motion and held past its end, once with the motion absent.
+ * The two resting boxes have to agree. Nothing else in here can catch that, because the fault is not
+ * in the text, it is in where the text leaves things.
+ *
+ * playwright is a devDependency of this repo and absent from the published package, so it is imported
+ * only when reached and its absence is a skipped check rather than a crash.
+ */
+let lens = null
+async function eyes() {
+  if (lens !== null) return lens
+  try {
+    const { chromium } = await import('playwright')
+    lens = { browser: await chromium.launch() }
+  } catch { lens = { why: 'playwright is not installed here, so the rendered check did not run' } }
+  // said once, because a check that quietly does not run is worse than one that is not there
+  console.log(lens.browser ? '  rendering each option once to check it comes to rest where it started'
+    : `  ${lens.why}`)
+  return lens
+}
+
+const restPage = (o, css) => `<html><head><meta charset="utf-8"><style>
+  html,body{margin:0;padding:0}
+  #r{position:absolute;left:0;top:0;width:${o.wide ? o.wide + 'px' : 'max-content'}}
+  ${o.base}
+  ${css}</style></head><body><div id="r">${o.scope ? o.markup.replace(/<(\w+)/, `<$1 ${o.scope}`) : o.markup}</div></body></html>`
+
+async function drifts(o) {
+  const eye = await eyes()
+  if (!eye.browser) return { skipped: eye.why }
+  let page
+  try {
+    page = await eye.browser.newPage({ viewport: { width: 1280, height: 900 } })
+    const measure = async (css, settle) => {
+      await page.setContent(restPage(o, css), { waitUntil: 'load' })
+      if (settle) {
+        // held well past the end, which is where the component comes to rest and stays
+        await page.evaluate(() => {
+          for (const a of document.getAnimations()) { try { a.pause(); a.currentTime = 60_000 } catch {} }
+        })
+      }
+      await page.waitForTimeout(70)
+      // every element, because a transform on a child never moves its parent's box and the drift
+      // this is looking for is almost always in the parts rather than in the whole
+      return page.evaluate(() => [...document.querySelectorAll('#r, #r *')].slice(0, 400).map((e) => {
+        const b = e.getBoundingClientRect(), c = getComputedStyle(e)
+        return [Math.round(b.x), Math.round(b.y), Math.round(b.width), Math.round(b.height),
+          Math.round(parseFloat(c.opacity) * 100)]
+      }))
+    }
+    const still = await measure('', false)
+    const after = await measure(o.css, true)
+    if (!still.length || !after.length) return { skipped: 'nothing rendered to measure' }
+    let off = 0, ghost = 0
+    still.forEach((a, i) => {
+      const b = after[i] || a
+      off = Math.max(off, Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]),
+        Math.abs(a[2] - b[2]), Math.abs(a[3] - b[3]))
+      ghost = Math.max(ghost, a[4] - b[4])
+    })
+    return { off, ghost }
+  } catch (e) {
+    return { skipped: String(e && e.message ? e.message : e).slice(0, 90) }
+  } finally { if (page) await page.close().catch(() => {}) }
+}
+
+/** the two ways a sheet can pass every reading and still be wrong once it stops */
+function resting({ off, ghost, skipped }) {
+  if (skipped) return []
+  const out = []
+  if (off > 2) out.push(`when the animation is over the component sits ${off}px from where it started, `
+    + 'permanently. A keyframe that ends on a transform rather than returning to none does this, and '
+    + 'it nudges the layout of whatever ships it for good.')
+  if (ghost > 8) out.push(`when the animation is over the component is ${ghost}% more transparent than `
+    + 'it was, so it stays faded or invisible. An entrance has to end at the component, not at a ghost '
+    + 'of it.')
+  return out
+}
+
 /* ── asking for motion, with every gate the other tools use ───────────────────────────────────── */
 
 /**
@@ -866,6 +954,9 @@ user sees, and the css below is the rules that actually matched it.\n\n${source.
     if (!got.raw) return { verb, why: got.why, kind: 'model', terminal: got.terminal }
     const ok = judge(got.raw, undefined, errand ? errand.parts : true)
     if (!ok.css) return { verb, why: ok.why, kind: 'gate' }
+    const rest = await drifts({ markup, base, css: ok.css, scope: ok.scope, wide })
+    const settled = resting(rest)
+    if (settled.length) return { verb, why: settled[0], kind: 'gate' }
     const id = String(nextId++)
     keep(id, { file: name, markup, base, css: ok.css, scope: ok.scope, tw, wide, note: ok.note,
       verb: errand ? `${verb.replace(/,.*/, '')}, ${errand.does.replace(/^to /, '')}` : verb })
@@ -892,8 +983,8 @@ user sees, and the css below is the rules that actually matched it.\n\n${source.
     : []
   // the ones deliberately not asked again are still failures, and leaving them out of the tally
   // reported nothing dropped at all, which sent the page to the wrong explanation
-  const settled = missed.filter((m) => !worth.includes(m))
-  const tried = first.filter((t) => t.id).concat(again).concat(settled)
+  const notAsked = missed.filter((m) => !worth.includes(m))
+  const tried = first.filter((t) => t.id).concat(again).concat(notAsked)
   if (worth.length) console.log(`    retried ${worth.length}, recovered ${again.filter((t) => t.id).length}`)
   const styled = picked ? 'the rules that matched it in your app'
     : tw ? 'tailwind and a Wall palette'
