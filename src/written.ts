@@ -415,6 +415,79 @@ export function retimed(css: string, { duration = 1, stagger = 1, ease }: Retime
   return out
 }
 
+/**
+ * The shape of a motion, measured rather than described.
+ *
+ * MOTION_SYSTEM asks for six things by name: a reduced-motion wrapper, parts that move for 240 to
+ * 520ms, consecutive parts 40 to 90ms apart, the whole thing over inside 1.4 seconds, no blank first
+ * frame, and transform and opacity only. Four of those six were prose with nothing behind them, and
+ * this repository already learned that lesson once: prose changed a palette count from six to five,
+ * and turning the same intent into values changed it to thirty-nine.
+ *
+ * These are measurements, not verdicts. What counts as too slow depends on what the model actually
+ * produces, and a gate calibrated against an imagined distribution is how you end up rejecting a
+ * field guide for the italics its own subject requires.
+ */
+export interface Tempo {
+  durations: number[]
+  gaps: number[]
+  span: number
+  stillness: 'wrapped' | 'guarded' | 'ignored'
+  paints: string[]
+}
+
+const asMs = (raw: string) => {
+  const n = parseFloat(raw)
+  return /ms\s*$/.test(raw) ? n : n * 1000
+}
+
+export function tempo(css: string): Tempo {
+  const times = (re: RegExp, pick: number) =>
+    [...css.matchAll(re)].map((m) => asMs(m[pick])).filter((n) => Number.isFinite(n) && n > 0)
+
+  // the shorthand gives duration then delay in that order, so they are counted rather than guessed
+  const shorthand = [...css.matchAll(/animation:\s*([^;}]+)/gi)].map((m) => m[1])
+  const shortDur: number[] = []
+  const shortDelay: number[] = []
+  for (const body of shorthand) {
+    const found = [...body.matchAll(/(\d*\.?\d+)\s*(ms|s)\b/g)].map((m) => asMs(m[1] + m[2]))
+    if (found[0] !== undefined) shortDur.push(found[0])
+    if (found[1] !== undefined) shortDelay.push(found[1])
+  }
+  const durations = [...times(/animation-duration:\s*(\d*\.?\d+\s*m?s)/gi, 1), ...shortDur]
+    .filter((d) => d >= 16)
+  const delays = [...new Set([...times(/animation-delay:\s*(\d*\.?\d+\s*m?s)/gi, 1), ...shortDelay]
+    .map((d) => Math.round(d)))].sort((a, b) => a - b)
+  const gaps = delays.slice(1).map((d, i) => d - delays[i]).filter((g) => g > 0)
+  const span = (delays.length ? Math.max(...delays) : 0) + (durations.length ? Math.max(...durations) : 0)
+
+  /**
+   * Three postures towards somebody who asked for stillness, and only one of them is wrong.
+   * Everything inside a no-preference block is the shape the prompt asks for; a reduce block that
+   * turns animation off is the same promise written the other way round. Neither present means the
+   * component moves for a reader who asked it not to, which is an accessibility fault rather than a
+   * matter of taste.
+   */
+  const wrapped = /@media[^{]*prefers-reduced-motion\s*:\s*no-preference/i.test(css)
+  const guarded = /@media[^{]*prefers-reduced-motion\s*:\s*reduce/i.test(css)
+  const paints = [...new Set([...css.matchAll(/@keyframes[^{]*\{((?:[^{}]|\{[^{}]*\})*)\}/gi)]
+    .flatMap((m) => [...m[1].matchAll(/([a-z-]+)\s*:/gi)].map((d) => d[1].toLowerCase())))]
+
+  return {
+    durations, gaps, span,
+    stillness: wrapped ? 'wrapped' : guarded ? 'guarded' : 'ignored',
+    paints,
+  }
+}
+
+/** the one part of the shape that is not a matter of degree: it either respects stillness or it does not */
+export function unstill(css: string): string[] {
+  if (tempo(css).stillness !== 'ignored') return []
+  return ['nothing here is wrapped in a prefers-reduced-motion query, so this moves for somebody who '
+    + 'has asked their machine not to move things. That is an accessibility fault rather than a matter '
+    + 'of taste, and it is one media query.']
+}
+
 export function scopeOf(css: string, declared?: unknown): string {
   const used = [...css.matchAll(/\[(data-[-\w]+)\]/g)].map((m) => m[1])
   const said = String(declared ?? '').replace(/[^-\w]/g, '').slice(0, 40)

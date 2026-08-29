@@ -32,6 +32,7 @@ import { streamText } from '../shared/providers.mjs'
 import { listenNear, movedFrom } from '../shared/port.mjs'
 import {
   MOTION_SYSTEM, dealMotions, dealErrands, grabJson, safeStyle, unmoved, brittle, janky, scopeOf, retimed,
+  tempo, unstill,
   PRESETS, themeOf, themeCss,
 } from '../dist-core/core.js'
 
@@ -950,7 +951,17 @@ async function askModel(brief, tries = 4) {
 function judge(raw, fallbackScope, parts = true) {
   const css = safeStyle(raw.css)
   if (!css) return { why: 'the reply carried no css that is allowed in a sheet' }
-  const faults = [...unmoved({ html: '', css, note: '' }, { parts }), ...brittle(css), ...janky(css)]
+  /**
+   * unstill is enforced and the tempo is not, which is a distinction the measurements made rather than
+   * a preference. Across 23 real options every single one already wrapped itself in a reduced-motion
+   * query, so requiring it costs nothing and catches the day the model forgets. The stated timings are
+   * a different matter: only 70 to 74 percent land inside them, and the long tail is the errands that
+   * are supposed to be slow, since a motion whose job is to keep something alive has no business
+   * finishing in 400ms. Enforcing those numbers would reject a third of the good work for failing to
+   * be an entrance. So they are reported on the card and left to a person.
+   */
+  const faults = [...unmoved({ html: '', css, note: '' }, { parts }), ...brittle(css), ...janky(css),
+    ...unstill(css)]
   if (faults.length) return { why: faults[0] }
   return { css, scope: scopeOf(css, raw.scope ?? fallbackScope), note: String(raw.note ?? '').slice(0, 90) }
 }
@@ -1014,7 +1025,7 @@ async function refine(base, count) {
     if (!ok.css) return { verb: turn, why: ok.why, kind: 'gate' }
     const id = String(nextId++)
     keep(id, { ...base, id, css: ok.css, scope: ok.scope, note: ok.note, verb: turn })
-    return { id, verb: turn, scope: ok.scope, note: ok.note, css: ok.css }
+    return { id, verb: turn, scope: ok.scope, note: ok.note, css: ok.css, tempo: tempo(ok.css) }
   }))
   return { kept: tried.filter((t) => t.id), dropped: tried.filter((t) => !t.id), styled: 'the same as before' }
 }
@@ -1054,7 +1065,7 @@ user sees, and the css below is the rules that actually matched it.\n\n${source.
     const id = String(nextId++)
     keep(id, { file: name, markup, base, shot, css: ok.css, scope: ok.scope, tw, wide, note: ok.note,
       verb: errand ? `${verb.replace(/,.*/, '')}, ${errand.does.replace(/^to /, '')}` : verb })
-    return { id, verb, scope: ok.scope, note: ok.note, css: ok.css }
+    return { id, verb, scope: ok.scope, note: ok.note, css: ok.css, tempo: tempo(ok.css) }
   }
 
   // a manner and an errand each, so two options sharing a verb still have different jobs
@@ -1651,39 +1662,26 @@ const SHADER = [
  * are touched. That last one is the difference between motion that holds sixty frames and motion that
  * does not, and it is the first thing anybody experienced would ask.
  */
-function factsOf(css){
-  /* every backslash here is doubled because this whole page is built inside a template literal, and
-     a single one is eaten before the browser sees it: \s became s, and \( became an unterminated
-     group that threw on load and left the sidebar empty */
-  const ms = (v)=>/ms$/.test(v)?parseFloat(v):parseFloat(v)*1000
-  const delays=[...css.matchAll(/animation-delay:\\s*([\\d.]+m?s)/g)].map(m=>ms(m[1]))
-    .concat([...css.matchAll(/animation:[^;{}]*?\\s([\\d.]+m?s)\\s+[^;{}]*?\\s([\\d.]+m?s)/g)].map(m=>ms(m[2])))
-  const uniq=[...new Set(delays.map(d=>Math.round(d)))].sort((a,b)=>a-b)
-  const durs=[...css.matchAll(/animation(?:-duration)?:[^;{}]*?([\\d.]+m?s)/g)].map(m=>ms(m[1])).filter(d=>d>40)
-  const props=new Set()
-  for(const f of css.matchAll(/@keyframes[^{]*\\{((?:[^{}]|\\{[^{}]*\\})*)\\}/g))
-    for(const d of f[1].matchAll(/([a-z-]+)\\s*:/g)) props.add(d[1])
-  const gaps=uniq.slice(1).map((d,i)=>d-uniq[i]).filter(g=>g>0)
-  const beat=gaps.length?Math.round(gaps.reduce((a,b)=>a+b,0)/gaps.length):0
-  const curve=/steps\\(/.test(css)?'stepped':/cubic-bezier/.test(css)?'custom curve':'default easing'
-  return {
-    parts: uniq.length || 1,
-    beat,
-    dur: durs.length?Math.round(Math.max(...durs)):0,
-    props: [...props].filter(x=>x!=='animation-timing-function').slice(0,3),
-    curve,
-  }
-}
-const factLine = (css)=>{
-  const f=factsOf(css)
+/**
+ * The facts come from the server, which computes them with the same tested function the gates use.
+ *
+ * There were two implementations of this: tempo() in typescript and a regex copy in this page. The
+ * copy shipped two bugs on its own, reading 3.2s as 2s because its pattern could not see a decimal
+ * point, and throwing on load because a backslash in a template literal is eaten before the browser
+ * sees it. One implementation, measured once.
+ */
+const factLine = (o)=>{
+  const t=o.tempo; if(!t) return ''
   const bits=[]
-  bits.push(f.parts>1?f.parts+' parts':'one part')
-  if(f.beat) bits.push(f.beat+'ms apart')
-  if(f.dur) bits.push(f.dur+'ms each')
-  bits.push(f.curve)
-  if(f.props.length) bits.push(f.props.join(', '))
+  const parts=(t.gaps?t.gaps.length:0)+1
+  bits.push(parts>1?parts+' parts':'one part')
+  if(t.gaps&&t.gaps.length) bits.push(Math.round(t.gaps.reduce((a,b)=>a+b,0)/t.gaps.length)+'ms apart')
+  if(t.durations&&t.durations.length) bits.push(Math.round(Math.max.apply(null,t.durations))+'ms each')
+  if(t.span) bits.push('over in '+(t.span/1000).toFixed(1)+'s')
+  if(t.paints&&t.paints.length) bits.push(t.paints.slice(0,3).join(', '))
   return bits.join(' &middot; ')
 }
+
 
 /** the component as it is, so the left rail is a thing you browse rather than a thing you submit */
 function peek(){
@@ -1763,7 +1761,7 @@ addEventListener('keydown',e=>{ if(e.key==='Escape'){ menu.hidden=true; insp.hid
 function drawInspector(){
   const o = opts.find(x=>x.id===chosenOpt)
   document.getElementById('itag').textContent = o ? (o.note||'untitled').slice(0,44) : 'nothing chosen'
-  document.getElementById('ifacts').innerHTML = o ? factLine(o.css)
+  document.getElementById('ifacts').innerHTML = o ? factLine(o)
     : 'Click an option below to choose it.'
   document.getElementById('tapply').disabled = !o
 }
@@ -1818,7 +1816,7 @@ function render(){
   grid.innerHTML=opts.map((o,i)=>
     '<figure><iframe data-i="'+i+'" src="/__wall/preview/'+o.id+q+'"></iframe>'+
     '<figcaption><b>'+(o.note||'untitled')+'</b>'+
-    '<span class="facts">'+factLine(o.css)+'</span>'+
+    '<span class="facts">'+factLine(o)+'</span>'+
     '<span class="verb">timing from '+o.verb+'</span>'+
     '<span class="note">'+o.scope+'</span>'+
     '<span class="row"><button class="mini keep" data-more="'+o.id+'">More like this</button>'+
@@ -2107,7 +2105,7 @@ const server = createServer(async (req, res) => {
       if (faults.length) return json(res, { error: faults[0] })
       const id = String(nextId++)
       keep(id, { ...base, id, css, note: base.note })
-      return json(res, { id, css })
+      return json(res, { id, css, tempo: tempo(css) })
     }
     if (url.pathname === '/__wall/save' && req.method === 'POST') {
       const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))

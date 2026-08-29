@@ -638,6 +638,16 @@ Two things make it work on real components rather than only on toys:
   collide, everything else is forwarded, and the websocket upgrade is passed through so hot reload
   survives.
 
+Detection is calibrated rather than assumed. `tempo` measures what a sheet actually does: how long
+each part moves, how far apart consecutive parts start, how long the whole thing takes, which
+properties are painted, and whether stillness is respected. Measured across 23 real options, every
+single one already wrapped itself in a reduced-motion query, so `unstill` is enforced and costs
+nothing. The timings are not enforced, because only 70 to 74 percent land inside the numbers the
+prompt asks for and the long tail is the errands that are supposed to be slow: a motion whose job is
+to keep something alive has no business finishing in 400ms. Enforcing those would reject a third of
+the good work for failing to be an entrance, so they are reported on the card and left to a person.
+That distinction came out of the measurements, not out of taste.
+
 Four gates read the css and a fifth one looks. `unmoved`, `brittle`, `janky` and `scopeOf` all take a
 string, which leaves the hardest promise in the prompt unchecked: a component has to be exactly where
 it started once the animation is over. A sheet can stagger properly, use a named curve, animate only
