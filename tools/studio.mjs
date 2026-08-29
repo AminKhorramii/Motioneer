@@ -552,12 +552,21 @@ function rules(el){
   return needed(body+base,el)+context(el)+base+used+body}
 function label(el){var c=typeof el.className==='string'?el.className.trim().split(/\\s+/).filter(Boolean):[];
   return el.tagName.toLowerCase()+(c.length?'.'+c.slice(0,3).join('.'):'')}
-/* and the ground it was standing on, so it is previewed against its own background and not ours */
+/* The ground it stood on, and the typography it was given rather than the typography it declared.
+   Font size, line height, weight and tracking are inherited, so they usually live on an ancestor and
+   none of the rules that matched this element mention them. Lifted out, a heading falls back to the
+   browser default and lays out at a fraction of its real height: measured, stripe's h1 came back at
+   18 percent and linear's at 31. Reading them off the computed style takes what the browser actually
+   arrived at, which is the only place the answer exists. */
+var INHERIT=['font-family','font-size','font-weight','font-style','line-height','letter-spacing',
+  'text-transform','text-align','white-space','word-spacing','font-variant','text-indent'];
 function context(el){var n=el.parentElement,bg='';
   while(n&&!bg){var c=getComputedStyle(n).backgroundColor;
     if(c&&c!=='transparent'&&c.indexOf('rgba(0, 0, 0, 0)')!==0)bg=c;n=n.parentElement}
-  var cs=getComputedStyle(el);
-  return 'body{background:'+(bg||'#0b0c0d')+';color:'+cs.color+';font-family:'+cs.fontFamily+'}'}
+  var cs=getComputedStyle(el),out=[];
+  for(var i=0;i<INHERIT.length;i++){var v=cs.getPropertyValue(INHERIT[i]);
+    if(v)out.push(INHERIT[i]+':'+v)}
+  return 'body{background:'+(bg||'#0b0c0d')+';color:'+cs.color+';'+out.join(';')+'}'}
 /* Cutting the markup at a character count cuts it in the middle of a tag.
    The tail of the last pick was the string "</span></span><input", which the browser's parser then
    recovers from by inventing whatever it likes, so the model is handed a component missing a third of
