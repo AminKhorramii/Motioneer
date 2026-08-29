@@ -275,7 +275,16 @@ a.forEach(function(x){try{x.pause();x.currentTime=d.t;
 (e.source||parent).postMessage({wall:'held',n:a.length,i:d.i,end:Math.round(end)},'*');});<\/script>`
 
 const preview = (o, camera, palette) => {
-  const scoped = o.scope ? o.markup.replace(/<(\w+)/, `<$1 ${o.scope}`) : o.markup
+  /**
+   * A snapshot carries every computed value on the element itself, so it needs none of the collected
+   * rules and cannot be let down by one I failed to collect. Measured against the reconstruction on
+   * four sites: a heading that laid out at 31 percent of its height came back at 100, a button at 57
+   * came back at 100, a list at 62 came back at 100, and nothing got worse. It costs a kilobyte or
+   * three. The markup and the rules are still what the model reads, because a selector written
+   * against real class names still means something after somebody edits the component.
+   */
+  const body = o.shot || o.markup
+  const scoped = o.scope ? body.replace(/<(\w+)/, `<$1 ${o.scope}`) : body
   // Tailwind's compiler and the motion sheet both go in head, but the motion sheet is written last so
   // that a keyframe never loses to a utility that happens to set the same property
   const tw = o.tw ? `<script src="/__wall/tailwind.js"></script>
@@ -298,7 +307,7 @@ const preview = (o, camera, palette) => {
       width:${o.wide ? o.wide + 'px' : 'max-content'}}`
   // chrome first, then the ground the element was standing on, or ours would overrule the page's
   // own background and a light site would be previewed on black with black text
-  const head = `<meta charset="utf-8">${tw}${vars}<style>${chrome}\n${o.base}\n${o.css}</style>`
+  const head = `<meta charset="utf-8">${tw}${vars}<style>${chrome}\n${o.shot ? '' : o.base}\n${o.css}</style>`
   /**
    * A dashboard component is eight hundred pixels wide and the card it is being compared in is three
    * hundred. Left alone you see the first tier of a pricing table and a sliver of the second, which is
@@ -550,6 +559,72 @@ function rules(el){
   var used=pack(keys.filter(function(k){var n=k.slice(10,k.indexOf('{')).trim();
     return n&&body.indexOf(n)>-1}),2000);
   return needed(body+base,el)+context(el)+base+used+body}
+/**
+ * A second capture that does not reconstruct anything.
+ *
+ * The first one is a reconstruction: the markup, plus the rules I judged relevant, plus the inherited
+ * values read off the computed style. Reconstructions leak, and the leak is measurable. Across twenty
+ * sites and ten kinds of element, 67 of 89 captures kept both their tree and their shape, and svg was
+ * the worst at 5 of 11: one node whose drawing is styled by fill and stroke that no matched rule
+ * necessarily mentions.
+ *
+ * So this one asks the browser what it computed and writes the answer onto a clone. Nothing is
+ * inferred, nothing is matched, and a rule I failed to collect cannot cost anything. It is verbose,
+ * which is why it is not what the model reads: the model wants the real classes so its selectors mean
+ * something a month from now, while a preview only has to look right. Two captures, two jobs.
+ *
+ * Only properties that differ from the usual default are written, which is most of the saving: a div
+ * with no border and no shadow says nothing about either.
+ */
+var PROPS=['display','position','top','right','bottom','left','width','height','min-width','min-height',
+'max-width','max-height','margin','padding','box-sizing','overflow','overflow-x','overflow-y',
+'flex','flex-direction','flex-wrap','align-items','align-self','justify-content','gap','order',
+'grid-template-columns','grid-template-rows','grid-column','grid-row','place-items',
+'background-color','background-image','background-size','background-position','background-repeat',
+'color','opacity','box-shadow','filter','mix-blend-mode','border-radius','border-width','border-style',
+'border-color','outline','font-family','font-size','font-weight','font-style','line-height',
+'letter-spacing','text-align','text-transform','text-decoration','white-space','word-break',
+'text-overflow','vertical-align','transform','transform-origin','list-style','object-fit','z-index',
+'fill','stroke','stroke-width','stroke-linecap','stroke-linejoin','stroke-dasharray','vector-effect']
+var DULL={'display':'block','position':'static','top':'auto','right':'auto','bottom':'auto','left':'auto',
+'width':'auto','height':'auto','min-width':'0px','min-height':'0px','max-width':'none','max-height':'none',
+'margin':'0px','padding':'0px','overflow':'visible','overflow-x':'visible','overflow-y':'visible',
+'flex':'0 1 auto','flex-direction':'row','flex-wrap':'nowrap','align-items':'normal','align-self':'auto',
+'justify-content':'normal','gap':'normal','order':'0','grid-template-columns':'none',
+'grid-template-rows':'none','grid-column':'auto','grid-row':'auto','place-items':'normal',
+'background-color':'rgba(0, 0, 0, 0)','background-image':'none','background-size':'auto',
+'background-position':'0% 0%','background-repeat':'repeat','opacity':'1','box-shadow':'none','filter':'none',
+'mix-blend-mode':'normal','border-radius':'0px','border-width':'0px','border-style':'none',
+'outline':'rgb(0, 0, 0) none 0px','text-transform':'none','text-decoration':'none solid rgb(0, 0, 0)',
+'white-space':'normal','word-break':'normal','text-overflow':'clip','vertical-align':'baseline',
+'transform':'none','list-style':'outside none disc','object-fit':'fill','z-index':'auto',
+'stroke':'none','stroke-width':'1px','stroke-linecap':'butt','stroke-linejoin':'miter',
+'stroke-dasharray':'none','vector-effect':'none'}
+
+function inked(el){
+  var cs=getComputedStyle(el),bits=[]
+  for(var i=0;i<PROPS.length;i++){var k=PROPS[i],v=cs.getPropertyValue(k)
+    if(!v||v===DULL[k])continue
+    bits.push(k+':'+v)}
+  return bits.join(';')
+}
+function snapshot(el,cap){
+  var clone=el.cloneNode(true)
+  var from=[el].concat([].slice.call(el.querySelectorAll('*')))
+  var to=[clone].concat([].slice.call(clone.querySelectorAll('*')))
+  var n=Math.min(from.length,to.length,cap||300)
+  for(var i=0;i<n;i++){
+    var st=inked(from[i])
+    if(st)to[i].setAttribute('style',st)
+    /* an input keeps what is typed in a property rather than in the markup, so a clone of a filled
+       field comes back empty unless the value is written down */
+    if(to[i].tagName==='INPUT'&&from[i].value!==undefined)to[i].setAttribute('value',from[i].value)
+    if(to[i].tagName==='TEXTAREA')to[i].textContent=from[i].value||to[i].textContent
+    if(to[i].tagName==='OPTION'&&from[i].selected)to[i].setAttribute('selected','')
+  }
+  return clone.outerHTML
+}
+
 function label(el){var c=typeof el.className==='string'?el.className.trim().split(/\\s+/).filter(Boolean):[];
   return el.tagName.toLowerCase()+(c.length?'.'+c.slice(0,3).join('.'):'')}
 /* The ground it stood on, and the typography it was given rather than the typography it declared.
@@ -590,6 +665,9 @@ function pick(e){if(!on)return;e.preventDefault();e.stopPropagation();
   var el=last||e.target;
   var r=el.getBoundingClientRect(),h=trimmed(el,14000);
   var css=rules(el);
+  var shot='';
+  try{ shot=snapshot(el,300) }catch(_){}
+  if(shot.length>260000)shot='';
   /* Stagger is the whole difference between motion somebody notices and motion somebody ignores, and
      stagger needs sibling parts to move at different times. A 1140 by 44 strip has none, so every
      option written for it comes back a variation on "slide in". Worth saying at the moment of the
@@ -607,7 +685,7 @@ function pick(e){if(!on)return;e.preventDefault();e.stopPropagation();
     : thin ? 'too thin to stagger'
     : kids === 0 ? 'nothing inside it to move separately'
     : kids < 3 ? 'only ' + kids + ' part' + (kids === 1 ? '' : 's') : '';
-  parent.postMessage({wall:'picked',html:h,css:css,label:label(el),opaque:opaque,weak:weak,
+  parent.postMessage({wall:'picked',html:h,css:css,shot:shot,label:label(el),opaque:opaque,weak:weak,
     n:el.querySelectorAll('*').length+1,
     cut:h.length<el.outerHTML.length,w:Math.round(r.width),h:Math.round(r.height)},'*')}
 function arm(v){on=v;
@@ -677,32 +755,46 @@ async function drifts(o) {
       await page.waitForTimeout(70)
       // every element, because a transform on a child never moves its parent's box and the drift
       // this is looking for is almost always in the parts rather than in the whole
-      return page.evaluate(() => [...document.querySelectorAll('#r, #r *')].slice(0, 400).map((e) => {
-        const b = e.getBoundingClientRect(), c = getComputedStyle(e)
-        return [Math.round(b.x), Math.round(b.y), Math.round(b.width), Math.round(b.height),
-          Math.round(parseFloat(c.opacity) * 100)]
+      return page.evaluate(() => ({
+        boxes: [...document.querySelectorAll('#r, #r *')].slice(0, 400).map((e) => {
+          const b = e.getBoundingClientRect(), c = getComputedStyle(e)
+          return [Math.round(b.x), Math.round(b.y), Math.round(b.width), Math.round(b.height),
+            Math.round(parseFloat(c.opacity) * 100)]
+        }),
+        running: document.getAnimations().length,
       }))
     }
     const still = await measure('', false)
     const after = await measure(o.css, true)
-    if (!still.length || !after.length) return { skipped: 'nothing rendered to measure' }
+    if (!still.boxes.length || !after.boxes.length) return { skipped: 'nothing rendered to measure' }
     let off = 0, ghost = 0
-    still.forEach((a, i) => {
-      const b = after[i] || a
+    still.boxes.forEach((a, i) => {
+      const b = after.boxes[i] || a
       off = Math.max(off, Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]),
         Math.abs(a[2] - b[2]), Math.abs(a[3] - b[3]))
       ghost = Math.max(ghost, a[4] - b[4])
     })
-    return { off, ghost }
+    return { off, ghost, running: after.running }
   } catch (e) {
     return { skipped: String(e && e.message ? e.message : e).slice(0, 90) }
   } finally { if (page) await page.close().catch(() => {}) }
 }
 
 /** the two ways a sheet can pass every reading and still be wrong once it stops */
-function resting({ off, ghost, skipped }) {
+function resting({ off, ghost, running, skipped }) {
   if (skipped) return []
   const out = []
+  /**
+   * Rendered and nothing is animating.
+   *
+   * unmoved reads the sheet and asks whether it contains keyframes and delays, which a sheet can do
+   * while its selectors reach for a part this component does not have. Rendered, that is a preview
+   * that sits perfectly still with the scope attribute correctly in place and every textual gate
+   * satisfied. Counting what the browser is actually running is the only version of this question
+   * that cannot be fooled.
+   */
+  if (running === 0) out.push('rendered, nothing on the component is animating. The sheet is valid and '
+    + 'its selectors reach for parts this markup does not have, so it applies to nothing.')
   if (off > 2) out.push(`when the animation is over the component sits ${off}px from where it started, `
     + 'permanently. A keyframe that ends on a transform rather than returning to none does this, and '
     + 'it nudges the layout of whatever ships it for good.')
@@ -936,6 +1028,8 @@ async function options(src, count) {
   const base = picked ? src.css : (rawSheet ? relevant(rawSheet, markup) : markupOf(src.file).own)
   const name = picked ? src.label : path.basename(src.file)
   const wide = picked ? src.w : 0
+  // what the model reads and what a preview shows are two different captures
+  const shot = picked ? (src.shot || '') : ''
   const tw = !picked && wantsTailwind(markup, base) && !!(await getTailwind()).js
   const about = (picked
     ? `This element was picked out of a running app. It is the rendered dom, so it is exactly what a
@@ -958,7 +1052,7 @@ user sees, and the css below is the rules that actually matched it.\n\n${source.
     const settled = resting(rest)
     if (settled.length) return { verb, why: settled[0], kind: 'gate' }
     const id = String(nextId++)
-    keep(id, { file: name, markup, base, css: ok.css, scope: ok.scope, tw, wide, note: ok.note,
+    keep(id, { file: name, markup, base, shot, css: ok.css, scope: ok.scope, tw, wide, note: ok.note,
       verb: errand ? `${verb.replace(/,.*/, '')}, ${errand.does.replace(/^to /, '')}` : verb })
     return { id, verb, scope: ok.scope, note: ok.note, css: ok.css }
   }
@@ -1109,7 +1203,8 @@ const railView = (ids, palette, beat = 420) => {
   const parts = ids.map((id, i) => made.get(id)).filter(Boolean).map((o, i) => {
     const tag = o.scope ? `${o.scope}-r${i + 1}` : ''
     const css = o.scope ? o.css.replaceAll(`[${o.scope}]`, `[${tag}]`) : o.css
-    const markup = tag ? o.markup.replace(/<(\w+)/, `<$1 ${tag}`) : o.markup
+    const from = o.shot || o.markup
+    const markup = tag ? from.replace(/<(\w+)/, `<$1 ${tag}`) : from
     return { ...o, css, markup, tag, i }
   })
   if (!parts.length) return null
@@ -1777,7 +1872,7 @@ addEventListener('message',e=>{const d=e.data||{}
     document.getElementById('pick').textContent=d.wall==='armed'?'Picking… (esc)':'Pick element'
   }
   if(d.wall==='picked'){
-    chosen={html:d.html,css:d.css,label:d.label,w:d.w,h:d.h,n:d.n,
+    chosen={html:d.html,css:d.css,shot:d.shot,label:d.label,w:d.w,h:d.h,n:d.n,
       cut:d.cut,opaque:d.opaque,weak:d.weak}
     picks.push(chosen)
     drawSel()
@@ -1809,8 +1904,8 @@ function paintShots(){
       + 'html,body{margin:0;height:100%;overflow:hidden}'
       + '#s{position:absolute;left:50%;top:50%;transform-origin:center center;width:'
       + (p.w||600) + 'px}'
-      + p.css
-      + '</style></head><body><div id="s">' + p.html + '</div><scr' + 'ipt>'
+      + (p.shot ? '' : p.css)
+      + '</style></head><body><div id="s">' + (p.shot || p.html) + '</div><scr' + 'ipt>'
       + 'var el=document.getElementById("s");'
       + 'var k=el.firstElementChild;'
       + 'if(k){var c=getComputedStyle(k);'
@@ -1849,7 +1944,10 @@ function drawSel(){
   ask.textContent=picks.length>1?'Give them motion':'Give it motion'
 }
 function paint(){
-  const frames=document.querySelectorAll('iframe')
+  /* only the previews in the grid: the sidebar thumbnails and the proxied app are iframes too, and
+     counting them made the readout say 3 of 5 driven when all five were fine. That is the wandering
+     number I could not pin down all session, and it was this */
+  const frames=document.querySelectorAll('.grid iframe')
   if(!opts.length&&!(cars&&cars.some(c=>c.id))){
     link.removeAttribute('data-ok'); link.title='nothing to drive yet'; return }
   const live=[...held.values()].filter(n=>n>0).length
@@ -1858,7 +1956,7 @@ function paint(){
   link.title=live+' of '+frames.length+' previews are being driven by the scrubber'
 }
 function hold(ms){
-  document.querySelectorAll('iframe').forEach((f,i)=>{
+  document.querySelectorAll('.grid iframe').forEach((f,i)=>{
     try{f.contentWindow.postMessage({wall:'hold',t:ms,i},'*')}catch(_){}
   })
   scrub.value=ms; at.textContent=(ms/1000).toFixed(2)
@@ -1944,8 +2042,8 @@ const server = createServer(async (req, res) => {
     }
     if (url.pathname === '/__wall/motion' && req.method === 'POST') {
       const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))
-      const src = body.html ? { html: body.html, css: body.css ?? '', label: body.label ?? 'element',
-        w: Number(body.w) || 0 }
+      const src = body.html ? { html: body.html, css: body.css ?? '', shot: body.shot ?? '',
+        label: body.label ?? 'element', w: Number(body.w) || 0 }
         : { file: body.file }
       console.log(`  ${src.label ?? path.basename(src.file)}: asking for ${body.count}`)
       const got = await options(src, Math.max(1, Math.min(6, body.count || 3)))

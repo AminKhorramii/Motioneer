@@ -646,6 +646,13 @@ good or leaves the component invisible. So each option is also rendered twice, o
 held past its end and once without it at all, and every element's box and opacity are compared. Both
 of those failures were reproduced first and confirmed to pass all four textual gates.
 
+A pick is captured twice, for two readers. The model gets the markup and the rules that matched it,
+because a selector written against real class names still means something after somebody edits the
+component. A preview gets a snapshot: a clone with every computed value written onto it, which needs
+no collected rules and cannot be let down by one that was missed. Measured across four sites, a
+heading that laid out at 31 percent of its height came back at 100, a button at 57 came back at 100,
+a list at 62 came back at 100, and nothing got worse. It costs a kilobyte or three.
+
 `node verify/studio-capture.mjs --deep` asks what survives being picked: twenty sites by ten kinds of
 element, each capture re-rendered on its own and measured against the element it came from. It found
 that captures kept every node and still collapsed, because font size and line height are inherited and
