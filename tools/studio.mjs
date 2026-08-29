@@ -23,6 +23,7 @@
 
 import { createServer } from 'node:http'
 import net from 'node:net'
+import { randomUUID } from 'node:crypto'
 import { readFileSync, writeFileSync, existsSync, statSync, readdirSync, mkdirSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import path from 'node:path'
@@ -363,7 +364,31 @@ const OURS = /^\/(__wall\/|$)/
 const hop = new Set(['connection', 'keep-alive', 'transfer-encoding', 'upgrade',
   'proxy-authenticate', 'proxy-authorization', 'te', 'trailer'])
 
-async function proxy(req, res, url) {
+/** ask for the entry once, following redirects, and move HOST to wherever it actually ended up */
+async function settleEntry() {
+  try {
+    const r = await fetch(HOST + ENTRY, { redirect: 'follow', signal: AbortSignal.timeout(15000),
+      headers: { 'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 '
+        + '(KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36' } })
+    if (r.status === 403 || r.status === 429) {
+      const body = (await r.text()).slice(0, 4000)
+      const wall = /just a moment|cf-browser-verification|cloudflare|captcha|are you a robot/i.test(body)
+      return { error: wall
+        ? 'that site is behind a bot check, which a proxy cannot pass. Nothing here can fix that.'
+        : `that site answered ${r.status} to this request` }
+    }
+    const at = new URL(r.url)
+    if (at.origin !== HOST || at.pathname + at.search !== ENTRY) {
+      HOST = at.origin
+      ENTRY = at.pathname + at.search
+      AIM = at.href
+      console.log(`  it redirected, so now aimed at ${AIM}`)
+    }
+    return null
+  } catch (e) { return { error: String(e && e.message ? e.message : e).slice(0, 200) } }
+}
+
+async function proxy(req, res, url, quiet) {
   const to = HOST + url.pathname + url.search
   const headers = {}
   for (const [k, v] of Object.entries(req.headers)) {
@@ -396,7 +421,28 @@ async function proxy(req, res, url) {
   let html = await r.text()
   const at = html.search(/<\/body>/i)
   html = at === -1 ? html + PICKER : html.slice(0, at) + PICKER + html.slice(at)
-  res.writeHead(r.status, { ...out, 'content-type': 'text/html; charset=utf-8' })
+  /**
+   * Some sites navigate their own frame back to their canonical host.
+   *
+   * vercel.com and nextjs.org both do it: a script reads location.host, finds it is not theirs, and
+   * sets it, which keeps the path and lands the frame on vercel.com/__wall/app. window.location
+   * cannot be overridden, so there is no shim that beats it from inside the page.
+   *
+   * But their javascript is not what any of this needs. The picker wants the rendered dom and the
+   * rules that matched it, and a server rendered page has both before a line of script runs. So the
+   * second attempt serves the same html with scripts refused, which leaves the markup and the
+   * stylesheets and takes away the one line that was throwing us out. A page that draws itself
+   * entirely on the client will come back empty, and that is said rather than hidden.
+   */
+  const head = { ...out, 'content-type': 'text/html; charset=utf-8' }
+  if (quiet) {
+    // a nonce rather than 'none', because refusing every script refused the picker too and left a
+    // page that renders perfectly and cannot be clicked. This lets exactly one script run: ours
+    const nonce = randomUUID().replace(/-/g, '')
+    html = html.replace('<script>(function(){', `<script nonce="${nonce}">(function(){`)
+    head['content-security-policy'] = `script-src 'nonce-${nonce}'`
+  }
+  res.writeHead(r.status, head)
   res.end(html)
 }
 
@@ -1051,6 +1097,35 @@ const play=document.getElementById('play'),ask=document.getElementById('ask'),ca
 const palette=document.getElementById('palette')
 let file=null, opts=[], running=true, t=0, last=performance.now(), held=new Map()
 let ends=new Map(), span=4200, rate=1
+let aimN=0   // bumped on every aim so the frame refetches instead of reusing the last page
+let quietMode=false
+/* a frame that has navigated to somebody else's origin is one we can no longer read, and the only
+   answer that works is to load it again with its scripts refused */
+function watchFrame(){
+  const f=grid.querySelector('.appwrap iframe'); if(!f) return
+  let tries=0
+  const check=()=>{
+    if(!document.contains(f)) return
+    let ours=true, alive=0
+    try{ ours = f.contentWindow.location.host===location.host
+      const d=f.contentWindow.document
+      alive = d && d.documentElement ? d.querySelectorAll('*').length : 0
+    }catch(_){ ours=false }
+    /* two ways a page refuses to be looked at: it takes the frame somewhere else, or it destroys its
+       own document where it stands. railway does the second, deciding it has hit a server error and
+       emptying itself, which leaves the frame ours and completely blank. Both want the same answer */
+    if((!ours || (tries>2 && alive<20)) && !quietMode){
+      quietMode=true; aimN++
+      document.getElementById('aimnote').innerHTML=(ours
+        ? 'that page emptied itself when its own scripts ran, '
+        : 'that site moves its own frame back to its origin, ')
+        +'so it is loaded again with <b>scripts refused</b>: the markup and styles are still there'
+      render(); return
+    }
+    if(++tries<14) setTimeout(check,700)
+  }
+  setTimeout(check,1400)
+}
 let APP=${AIM ? 'true' : 'false'}
 const CAN_WRITE=${CAN_WRITE ? 'true' : 'false'}
 let chosen=null   // the most recent pick
@@ -1075,7 +1150,7 @@ aimform.onsubmit=async e=>{
   const r=await fetch('/__wall/target',{method:'POST',headers:{'content-type':'application/json'},
     body:JSON.stringify({url:said})}).then(x=>x.json()).catch(e=>({error:String(e)}))
   if(r.error){ document.getElementById('aimnote').textContent=r.error; return }
-  urlbox.value=r.at; APP=true; picks=[]; opts=[]; verdict=null; chosen=null; cars=null
+  urlbox.value=r.at; APP=true; aimN++; quietMode=false; picks=[]; opts=[]; verdict=null; chosen=null; cars=null
   // the folder list is about somewhere else now
   document.getElementById('files').innerHTML=''
   document.getElementById('aimnote').textContent='proxied here, so its elements can be picked'
@@ -1207,7 +1282,16 @@ function render(){
   }
   if(!opts.length && verdict) return explain()
   if(!opts.length && APP){
-    grid.innerHTML='<div class="appwrap"><iframe src="/__wall/app"></iframe></div>'; return }
+    /* Rebuilding this markup restarts the navigation, and a heavy site loading two hundred assets
+       responds to that by aborting all of them: measured on vercel, three navigations in a row left
+       the frame on chrome's error page. So the frame is only replaced when the aim has actually
+       changed, and every other render leaves it loading in peace. */
+    const have=grid.querySelector('.appwrap iframe')
+    if(have && have.dataset.n===String(aimN)) return
+    grid.innerHTML='<div class="appwrap"><iframe data-n="'+aimN+'" src="/__wall/app?n='+aimN
+      +(quietMode?'&quiet=1':'')+'"></iframe></div>'
+    watchFrame()
+    return }
   if(!opts.length){ if(file) return peek()
     grid.innerHTML='<div class="empty">Pick a component on the left.</div>'; return }
   const q='?palette='+encodeURIComponent(palette.value)+(cam.checked?'&camera=1':'')
@@ -1438,14 +1522,32 @@ const server = createServer(async (req, res) => {
     }
     if (url.pathname === '/__wall/app') {
       if (!HOST) { res.writeHead(404); return res.end('nothing aimed at yet: type an address') }
-      return proxy(req, res, new URL(ENTRY, 'http://x'))
+      /**
+       * The entry page follows its redirects here rather than in the browser.
+       *
+       * google.com answers 301 to www.google.com, which is a different host, so rewriting the
+       * Location to a path would point at the wrong site and passing it through sends the browser to
+       * the real one. Either way the frame stops being ours and its dom closes. Following it on this
+       * side and re-aiming at wherever it landed keeps everything inside the proxy, and apex to www is
+       * the single most common thing an address a person types will do.
+       */
+      const quiet = url.searchParams.has('quiet')
+      const landed = await settleEntry()
+      if (landed && landed.error) {
+        res.writeHead(502, { 'content-type': 'text/html' })
+        return res.end(`<body style="font:14px ui-monospace;color:#8a8f98;background:#0f1011;padding:24px">`
+          + `Cannot reach ${HOST}.<br><br>${landed.error}</body>`)
+      }
+      return proxy(req, res, new URL(ENTRY, 'http://x'), quiet)
     }
     if (url.pathname === '/__wall/target' && req.method === 'POST') {
       const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))
       try {
-        const at = aimAt(body.url)
-        console.log(`  aimed at ${at}`)
-        return json(res, { at, host: HOST })
+        aimAt(body.url)
+        const bad = await settleEntry()
+        if (bad) return json(res, { error: bad.error })
+        console.log(`  aimed at ${AIM}`)
+        return json(res, { at: AIM, host: HOST })
       } catch (e) { return json(res, { error: `that is not an address I can reach: ${e.message}` }) }
     }
     /**
