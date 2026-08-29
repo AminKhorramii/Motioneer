@@ -130,7 +130,7 @@ function give() {
  * ours to show, but the fact of it is, so it goes to a separate callback that never touches the
  * reply.
  */
-export async function runClaude(system, user, { model = CLI_MODEL(), bin = 'claude', onDelta, onThink, thinking, callMs } = {}) {
+export async function runClaude(system, user, { model = CLI_MODEL(), bin = 'claude', onDelta, onThink, thinking, callMs, env } = {}) {
   const streaming = typeof onDelta === 'function'
   /**
    * How much this call may think, in tokens, or null to leave the model's own budget alone.
@@ -186,7 +186,16 @@ export async function runClaude(system, user, { model = CLI_MODEL(), bin = 'clau
         // run can buy back most of the speed without giving up the whole of the design. Unset
         // leaves the model's own budget alone, which is what every measurement above was taken
         // with, and WALL_FAST still means none at all.
-        env: budget === null ? process.env : { ...process.env, MAX_THINKING_TOKENS: budget },
+        /**
+         * The environment, which a caller may need to change.
+         *
+         * The one case that exists is an ANTHROPIC_API_KEY gone stale. The CLI picks it up and then
+         * does not fail: measured, it simply never answers, and the only sign is this call hitting
+         * its ceiling. 25 seconds and a timeout with the bad key present, 2.5 seconds and a reply
+         * without it. So a caller falling back from a refused key to the command has to be able to
+         * take the key away first, or the fallback inherits the exact thing it fell back from.
+         */
+        env: budget === null ? (env ?? process.env) : { ...(env ?? process.env), MAX_THINKING_TOKENS: budget },
       },
     )
     /**

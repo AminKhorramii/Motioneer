@@ -94,7 +94,8 @@ const KIND = /\.(tsx|jsx|vue|svelte|astro|html|htm)$/i
  * button does nothing" after forty seconds of waiting, when the real answer is one sentence long and
  * could have been said before any waiting happened.
  */
-const CAN_WRITE = hasClaude() || !!process.env.ANTHROPIC_API_KEY
+const CAN_CLI = hasClaude()
+const CAN_WRITE = CAN_CLI || !!process.env.ANTHROPIC_API_KEY
 
 const work = '.studio'
 mkdirSync(work, { recursive: true })
@@ -599,7 +600,10 @@ parent.postMessage({wall:'ready'},'*');
  * The ceiling is tighter here than the four minutes a whole page is allowed. Somebody is watching a
  * button, and silence past a minute or so is indistinguishable from a broken one.
  */
-const TERMINAL = /not found on this machine|not authenticated|no such file|invalid api key|unauthorized/i
+// word order matters and mine was wrong: the api says "API key is invalid", not "invalid api key",
+// so a dead key was retried three times with pauses before reporting the same thing three ways
+const TERMINAL = /not found on this machine|not authenticated|no such file|api key|unauthorized|401|403/i
+const AUTH = /401|403|api key|authentication|unauthorized/i
 const BUSY = /rate limit|overloaded|429|503|too many requests|temporarily/i
 
 const CALL_MS = Number(process.env.WALL_STUDIO_CALL_MS || 150_000)
@@ -637,7 +641,9 @@ const THINK = process.env.WALL_STUDIO_THINKING ? Number(process.env.WALL_STUDIO_
  * most people running this will have, but a key present means the fast path, and the two produce the
  * same shape so nothing downstream knows which one answered.
  */
-const KEY = process.env.ANTHROPIC_API_KEY || ''
+let KEY = process.env.ANTHROPIC_API_KEY || ''
+/* the environment the command is given, with a refused key taken out of it rather than inherited */
+const CLEAN_ENV = (() => { const e = { ...process.env }; delete e.ANTHROPIC_API_KEY; return e })()
 const API_MODEL = process.env.WALL_STUDIO_MODEL || 'claude-sonnet-5'
 
 const viaApi = async (brief) => {
@@ -648,16 +654,43 @@ const viaApi = async (brief) => {
   return r && r.error ? { error: r.error } : { text: (r && r.text) || '' }
 }
 
-async function askModel(brief, tries = 3) {
+let refused = false   // said once, however many calls discover it at the same moment
+
+async function askModel(brief, tries = 4) {
   let last = 'no usable reply came back'
   for (let n = 0; n < tries; n++) {
-    const reply = await (KEY
+    let reply = await (KEY
       ? viaApi(brief)
-      : runClaude(MOTION_SYSTEM, brief, { callMs: CALL_MS, thinking: THINK })
+      : runClaude(MOTION_SYSTEM, brief, { callMs: CALL_MS, thinking: THINK, env: CLEAN_ENV })
     ).catch((e) => ({ error: String(e && e.message ? e.message : e).slice(0, 160) }))
 
     if (reply && reply.error) {
       last = reply.error
+      /**
+       * A key that does not work is worse than no key at all.
+       *
+       * ANTHROPIC_API_KEY is often set to something stale, and preferring it over a claude command
+       * that works turns a studio that was fine into one that answers 401 and gives up. The key is
+       * only a shortcut around a process spawn, so a refusal drops the shortcut for the rest of the
+       * session and the loop goes round again on the path that works.
+       *
+       * Going round again rather than retrying inline is what makes this survive five options at
+       * once. They all reach for the key together and all get the same 401, so an inline retry
+       * rescues whichever call noticed first and leaves the others holding a terminal error. Every
+       * one of them continues here, and by their next turn the key is already gone.
+       */
+      // not `KEY && ...`: whichever call notices first clears it, and the rest would then fail this
+      // test and fall through to the terminal branch holding the same 401. Measured, that kept one
+      // option out of five. What matters is that the fault was authentication and there is a command
+      if (AUTH.test(last) && CAN_CLI && n < tries - 1) {
+        if (!refused) {
+          refused = true
+          console.log(`  the api key was refused (${String(last).slice(0, 56)})`)
+          console.log('  falling back to the claude command for the rest of this session')
+        }
+        KEY = ''
+        continue
+      }
       if (TERMINAL.test(last)) return { why: last, terminal: true }
       // a busy upstream needs a pause, not another immediate identical request
       if (n < tries - 1) await sleep(BUSY.test(last) ? 1500 * (n + 1) : 400)
@@ -1626,7 +1659,8 @@ else {
 console.log(TARGET ? '  picked elements bring their own css, so nothing is guessed'
   : rawSheet ? `  styled with ${SHEET}`
     : '  no --css given: utility classes are compiled here and coloured from a Wall palette')
-console.log(KEY ? '  a key is set, so calls go straight to the api and skip a process per option\n'
+console.log(KEY ? '  a key is set, so calls go straight to the api and skip a process per option.'
+    + (CAN_CLI ? ' If it is refused, the claude command takes over\n' : '\n')
   : CAN_WRITE ? '  the claude command is here, so motion can be written\n'
   : '  no claude command on PATH, so nothing can be written. Install it, or start the studio\n'
     + '  from a shell where `claude` runs, and the button will have something to call.\n')
