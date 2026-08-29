@@ -1041,7 +1041,29 @@ header{display:flex;align-items:center;gap:12px;height:48px;padding:0 14px;
 .btn:hover{background:#1a1b1d}.btn:disabled{opacity:.45;cursor:default}
 .btn.go{border-color:rgba(94,106,210,.55)}
 .sep{width:1px;height:18px;background:var(--line)}
-.clock{font-variant-numeric:tabular-nums;min-width:38px;text-align:right;font-size:12.5px}
+.clock{display:inline-flex;align-items:baseline;gap:5px;font-variant-numeric:tabular-nums;font-size:12.5px}
+.clock b{font-weight:400;min-width:34px;text-align:right}
+.clock i{font-style:normal;color:var(--faint);font-size:11px}
+.clock em{font-style:normal;width:5px;height:5px;border-radius:50%;background:var(--line2);
+  align-self:center;transition:background 160ms ease}
+.clock em[data-ok=yes]{background:#4f9d69}.clock em[data-ok=no]{background:#d29d6b}
+.icon{display:grid;place-items:center;width:28px;height:28px;padding:0;background:var(--raised);
+  color:var(--dim);border:1px solid var(--line2);border-radius:6px;font:inherit;font-size:11px;
+  cursor:pointer;transition:color 120ms ease,background 120ms ease}
+.icon:hover{color:var(--ink);background:#1a1b1d}
+.split{display:inline-flex;align-items:stretch}
+.split .go{border-radius:6px 0 0 6px;border-right:0}
+.split select{border-radius:0 6px 6px 0;padding:0 4px 0 7px;color:var(--dim)}
+.menu{position:absolute;top:44px;right:14px;z-index:20;display:grid;gap:9px;padding:12px;width:214px;
+  background:var(--panel);border:1px solid var(--line2);border-radius:9px;
+  box-shadow:0 12px 34px rgba(0,0,0,.5)}
+.menu label{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  font-size:12px;color:var(--dim)}
+.menu label.row{justify-content:flex-start;gap:8px}
+.menu select{flex:1;max-width:118px}
+.menu .keys{margin:2px 0 0;padding-top:9px;border-top:1px solid var(--line);
+  font-size:10.5px;color:var(--faint);line-height:2}
+header{position:relative}
 .unit{color:var(--faint);font-size:11px;margin-left:1px}.unit b{font-weight:400}
 #scrub{flex:1;height:3px;-webkit-appearance:none;background:var(--line2);border-radius:2px;cursor:pointer}
 #scrub::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;
@@ -1060,12 +1082,33 @@ iframe{width:100%;height:280px;border:0;background:#0b0c0d;display:block}
 .solo{grid-column:1/-1}.solo iframe{height:min(58vh,460px)}
 figcaption{padding:10px 12px;border-top:1px solid var(--line);display:grid;gap:4px;font-size:12px}
 figcaption b{font-weight:500}.note{color:var(--dim)}.verb{color:var(--faint);font-size:11px;line-height:1.5}
+.facts{color:var(--dim);font-size:11px;font-variant-numeric:tabular-nums;letter-spacing:.01em}
 .row{display:flex;gap:6px;margin-top:4px}
 .mini{height:24px;padding:0 9px;font-size:11.5px;background:var(--raised);color:var(--dim);
   border:1px solid var(--line2);border-radius:5px;cursor:pointer;font-family:inherit}
 .mini:hover{color:var(--ink)}
 .mini.keep{border-color:rgba(94,106,210,.5);color:var(--ink)}
 .empty{padding:40px;color:var(--faint);text-align:center;grid-column:1/-1;line-height:1.8}
+.wait{grid-column:1/-1;display:grid;justify-items:center;gap:0;padding:18vh 0 0}
+.waith{margin:22px 0 0;font-size:12.5px;color:var(--dim);letter-spacing:.01em}
+.waits{margin:5px 0 0;font-size:11.5px;color:var(--faint)}
+.turn{font:13px ui-monospace,monospace;color:var(--accent);height:18px;line-height:1}
+.turn::before{content:"⠇"}
+.wave{display:flex;align-items:flex-end;gap:3px;height:26px;margin-top:14px}
+.wave i{width:3px;height:100%;background:var(--line2);border-radius:1px;transform-origin:50% 100%;
+  transform:scaleY(.18)}
+@media (prefers-reduced-motion: no-preference){
+  .turn::before{animation:glyph 800ms steps(1,end) infinite}
+  .wave i{animation:swell 1400ms cubic-bezier(.4,0,.55,1) infinite;
+    animation-delay:calc(var(--i) * 40ms)}
+}
+/* the glyphs themselves rather than css escapes: a backslash sequence in a template literal is
+   read as an octal escape by javascript before css ever sees it */
+@keyframes glyph{
+  0%{content:"⠇"}12.5%{content:"⠋"}25%{content:"⠙"}37.5%{content:"⠸"}50%{content:"⢰"}62.5%{content:"⢠"}75%{content:"⢄"}87.5%{content:"⡆"}}
+@keyframes swell{
+  0%,100%{transform:scaleY(.18);opacity:.5}
+  45%{transform:scaleY(1);opacity:1}}
 .hint{margin:4px 10px;font-size:12px;color:var(--faint);line-height:1.7}
 .selhead{margin:12px 12px 6px;font-size:10.5px;text-transform:none;letter-spacing:.06em;color:var(--faint)}
 .pill{display:flex;align-items:center;gap:8px;margin:5px 10px;padding:6px 6px 6px 7px;background:var(--raised);
@@ -1106,24 +1149,38 @@ figcaption b{font-weight:500}.note{color:var(--dim)}.verb{color:var(--faint);fon
   <div id="sel"></div>
 </aside>
 <main>
+  <!--
+    Four things, grouped by what they act on: the source on the left, the transport in the middle,
+    everything occasional behind one button on the right.
+
+    It held eleven controls in a row before, three of them dropdowns, and a diagnostic readout and a
+    permanent row of keyboard hints. Scrubbing is what this tool does all day and it was competing
+    with a palette picker for attention. The occasional settings are still one click away, and the
+    keyboard hints moved in there with them, where they are read once rather than looked past
+    constantly.
+  -->
   <header>
-    <button class="btn" id="pick">Pick element</button>
-    <button class="btn go" id="ask">Give it motion</button>
-    <select id="count"><option>3</option><option>4</option><option selected>5</option><option>6</option></select>
+    <button class="btn" id="pick">Pick</button>
+    <span class="split">
+      <button class="btn go" id="ask">Give it motion</button>
+      <select id="count" title="how many to ask for"><option>3</option><option>4</option><option selected>5</option><option>6</option></select>
+    </span>
     <span class="sep"></span>
-    <button class="btn" id="play"><span id="glyph">❚❚</span><span id="word">Pause</span></button>
-    <span class="clock" id="at">0.00</span><span class="unit">/ <b id="span">4.2s</b></span>
+    <button class="icon" id="play" title="Play or pause (space)"><span id="glyph">❚❚</span><span id="word" hidden></span></button>
+    <span class="clock"><b id="at">0.00</b><i id="span">4.2s</i><em id="driven" title="how many previews the scrubber is driving"></em></span>
     <input id="scrub" type="range" min="0" max="4200" value="0" step="10">
-    <select id="rate" title="playback speed"><option>0.25x</option><option>0.5x</option>
-      <option selected>1x</option><option>2x</option></select>
-    <select id="palette" title="the palette the component is rendered in">
-      ${PRESETS.map((p, i) => `<option${i === 1 ? ' selected' : ''}>${p.name}</option>`).join('')}
-    </select>
-    <label class="f"><input type="checkbox" id="cam"> Camera</label>
-    <button class="btn" id="save">Export</button>
     <span class="sep"></span>
-    <span class="status" id="driven">—</span>
-    <span><kbd>Space</kbd><kbd>←</kbd><kbd>→</kbd></span>
+    <button class="icon" id="more" title="Speed, palette, camera">&#183;&#183;&#183;</button>
+    <button class="btn" id="save">Export</button>
+    <div class="menu" id="menu" hidden>
+      <label>Speed<select id="rate"><option>0.25x</option><option>0.5x</option>
+        <option selected>1x</option><option>2x</option></select></label>
+      <label>Palette<select id="palette">
+        ${PRESETS.map((p, i) => `<option${i === 1 ? ' selected' : ''}>${p.name}</option>`).join('')}
+      </select></label>
+      <label class="row"><input type="checkbox" id="cam"> Camera pass</label>
+      <p class="keys"><kbd>Space</kbd> play <kbd>&larr;</kbd><kbd>&rarr;</kbd> step <kbd>Esc</kbd> stop picking</p>
+    </div>
   </header>
   <div class="grid" id="grid"><div class="empty">${CAN_WRITE
     ? 'Pick a component on the left, then press <b>Give it motion</b>.'
@@ -1240,6 +1297,69 @@ function explain(){
   paint()
 }
 
+/**
+ * The waiting state, which is the one piece of motion in here the studio wrote itself.
+ *
+ * "Asking for 5 motions. About thirty seconds." was a sentence in a large empty room, and it broke
+ * two of the rules this tool enforces on everything else: nothing moved, and what little it said was
+ * a guess at a duration rather than a report of anything. A tool about motion showing a still while
+ * it works is the wrong advertisement.
+ *
+ * So it is a stepped wave and a braille turn, and it obeys the same craft the gates demand: only
+ * transform and opacity, delays forty milliseconds apart, a steps() timing that jerks the way a
+ * mechanism does rather than easing the way a default does. The glyph is animated through the content
+ * property, which is the only honest way to do ascii in css.
+ */
+const WAITER = (title, sub) => '<div class="wait">'
+  + '<div class="turn"></div>'
+  + '<div class="wave">' + Array.from({length:19},(_,i)=>'<i style="--i:'+i+'"></i>').join('') + '</div>'
+  + '<p class="waith">' + title + '</p>'
+  + (sub ? '<p class="waits">' + sub + '</p>' : '')
+  + '</div>'
+
+/**
+ * What a motion is actually made of, read off its own stylesheet.
+ *
+ * The note names the idea and the card showed nothing else, so choosing between five of them meant
+ * watching each in turn and holding the differences in your head. Every fact worth knowing is already
+ * in the css: how many parts move, how far apart they start, how long one takes, and which properties
+ * are touched. That last one is the difference between motion that holds sixty frames and motion that
+ * does not, and it is the first thing anybody experienced would ask.
+ */
+function factsOf(css){
+  /* every backslash here is doubled because this whole page is built inside a template literal, and
+     a single one is eaten before the browser sees it: \s became s, and \( became an unterminated
+     group that threw on load and left the sidebar empty */
+  const ms = (v)=>/ms$/.test(v)?parseFloat(v):parseFloat(v)*1000
+  const delays=[...css.matchAll(/animation-delay:\\s*([\\d.]+m?s)/g)].map(m=>ms(m[1]))
+    .concat([...css.matchAll(/animation:[^;{}]*?\\s([\\d.]+m?s)\\s+[^;{}]*?\\s([\\d.]+m?s)/g)].map(m=>ms(m[2])))
+  const uniq=[...new Set(delays.map(d=>Math.round(d)))].sort((a,b)=>a-b)
+  const durs=[...css.matchAll(/animation(?:-duration)?:[^;{}]*?(\\d+m?s)/g)].map(m=>ms(m[1])).filter(d=>d>40)
+  const props=new Set()
+  for(const f of css.matchAll(/@keyframes[^{]*\\{((?:[^{}]|\\{[^{}]*\\})*)\\}/g))
+    for(const d of f[1].matchAll(/([a-z-]+)\\s*:/g)) props.add(d[1])
+  const gaps=uniq.slice(1).map((d,i)=>d-uniq[i]).filter(g=>g>0)
+  const beat=gaps.length?Math.round(gaps.reduce((a,b)=>a+b,0)/gaps.length):0
+  const curve=/steps\\(/.test(css)?'stepped':/cubic-bezier/.test(css)?'custom curve':'default easing'
+  return {
+    parts: uniq.length || 1,
+    beat,
+    dur: durs.length?Math.round(Math.max(...durs)):0,
+    props: [...props].filter(x=>x!=='animation-timing-function').slice(0,3),
+    curve,
+  }
+}
+const factLine = (css)=>{
+  const f=factsOf(css)
+  const bits=[]
+  bits.push(f.parts>1?f.parts+' parts':'one part')
+  if(f.beat) bits.push(f.beat+'ms apart')
+  if(f.dur) bits.push(f.dur+'ms each')
+  bits.push(f.curve)
+  if(f.props.length) bits.push(f.props.join(', '))
+  return bits.join(' &middot; ')
+}
+
 /** the component as it is, so the left rail is a thing you browse rather than a thing you submit */
 function peek(){
   const q='?file='+encodeURIComponent(file)+'&palette='+encodeURIComponent(palette.value)+(cam.checked?'&camera=1':'')
@@ -1269,7 +1389,8 @@ ask.onclick=async()=>{
   verdict=null
   ask.disabled=true; ask.textContent='Writing…'
   if(APP && picks.length>1){
-    grid.innerHTML='<div class="empty">Giving '+picks.length+' elements a motion each.</div>'
+    grid.innerHTML=WAITER('writing a motion for each of '+picks.length,
+      'they will play on one timeline, a beat apart')
     drops.textContent=''
     try{
       const r=await post('/__wall/rail',{picks,palette:palette.value},420000)
@@ -1283,7 +1404,8 @@ ask.onclick=async()=>{
     ask.disabled=false; drawSel(); return
   }
   chosen=picks[picks.length-1]||chosen
-  grid.innerHTML='<div class="empty">Asking for '+document.getElementById('count').value+' motions.<br>About thirty seconds.</div>'
+  grid.innerHTML=WAITER('writing '+document.getElementById('count').value+' motions',
+    'each one is dealt a different verb, so they disagree by construction')
   drops.textContent=''
   try{
     const r=await post('/__wall/motion',
@@ -1303,6 +1425,11 @@ ask.onclick=async()=>{
 }
 cam.onchange=render
 palette.onchange=render
+const menu=document.getElementById('menu'), moreBtn=document.getElementById('more')
+moreBtn.onclick=e=>{ e.stopPropagation(); menu.hidden=!menu.hidden }
+menu.onclick=e=>e.stopPropagation()
+addEventListener('click',()=>{ menu.hidden=true })
+addEventListener('keydown',e=>{ if(e.key==='Escape'&&!menu.hidden) menu.hidden=true })
 document.getElementById('save').onclick=async()=>{
   if(!opts.length) return
   const btn=document.getElementById('save'); btn.textContent='Writing…'
@@ -1339,6 +1466,7 @@ function render(){
   grid.innerHTML=opts.map((o,i)=>
     '<figure><iframe data-i="'+i+'" src="/__wall/preview/'+o.id+q+'"></iframe>'+
     '<figcaption><b>'+(o.note||'untitled')+'</b>'+
+    '<span class="facts">'+factLine(o.css)+'</span>'+
     '<span class="verb">timing from '+o.verb+'</span>'+
     '<span class="note">'+o.scope+'</span>'+
     '<span class="row"><button class="mini keep" data-more="'+o.id+'">More like this</button>'+
@@ -1453,11 +1581,11 @@ function drawSel(){
 function paint(){
   const frames=document.querySelectorAll('iframe')
   if(!opts.length&&!(cars&&cars.some(c=>c.id))){
-    link.textContent=(APP?picks.length:file)?'no motion yet':'—'
-    link.style.color='var(--faint)';return}
+    link.removeAttribute('data-ok'); link.title='nothing to drive yet'; return }
   const live=[...held.values()].filter(n=>n>0).length
-  link.textContent=live+'/'+frames.length+' driven'
-  link.style.color=live===frames.length?'var(--dim)':'#d29d6b'
+  const all=live===frames.length
+  link.setAttribute('data-ok', all?'yes':'no')
+  link.title=live+' of '+frames.length+' previews are being driven by the scrubber'
 }
 function hold(ms){
   document.querySelectorAll('iframe').forEach((f,i)=>{
@@ -1466,7 +1594,7 @@ function hold(ms){
   scrub.value=ms; at.textContent=(ms/1000).toFixed(2)
 }
 function face(){document.getElementById('glyph').textContent=running?'❚❚':'▶'
-  document.getElementById('word').textContent=running?'Pause':'Play'}
+  play.title=running?'Pause (space)':'Play (space)'}
 requestAnimationFrame(function tick(now){const s=now-last;last=now
   if(running){t=(t+s*rate)%span;hold(t)} requestAnimationFrame(tick)})
 play.onclick=()=>{running=!running;face()}
