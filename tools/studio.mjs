@@ -599,6 +599,7 @@ function pick(e){if(!on)return;e.preventDefault();e.stopPropagation();
     : kids === 0 ? 'nothing inside it to move separately'
     : kids < 3 ? 'only ' + kids + ' part' + (kids === 1 ? '' : 's') : '';
   parent.postMessage({wall:'picked',html:h,css:css,label:label(el),opaque:opaque,weak:weak,
+    n:el.querySelectorAll('*').length+1,
     cut:h.length<el.outerHTML.length,w:Math.round(r.width),h:Math.round(r.height)},'*')}
 function arm(v){on=v;
   document.documentElement.style.cursor=v?'crosshair':'';
@@ -1159,18 +1160,11 @@ figcaption b{font-weight:500}.note{color:var(--dim)}.verb{color:var(--faint);fon
 .mini:hover{color:var(--ink)}
 .mini.keep{border-color:rgba(94,106,210,.5);color:var(--ink)}
 .empty{padding:40px;color:var(--faint);text-align:center;grid-column:1/-1;line-height:1.8}
-.wait{grid-column:1/-1;display:grid;justify-items:center;padding:20vh 0 0}
-.waith{margin:26px 0 0;font-size:12px;color:var(--faint);letter-spacing:.04em}
-.wave{display:flex;align-items:flex-end;gap:5px;height:64px}
-.wave i{width:5px;height:100%;background:var(--dim);border-radius:2px;transform-origin:50% 100%;
-  transform:scaleY(.12)}
-@media (prefers-reduced-motion: no-preference){
-  .wave i{animation:swell 1500ms cubic-bezier(.4,0,.55,1) infinite;
-    animation-delay:calc(var(--i) * 40ms)}
-}
-@keyframes swell{
-  0%,100%{transform:scaleY(.12);opacity:.35}
-  45%{transform:scaleY(1);opacity:1}}
+.wait{grid-column:1/-1;display:grid;justify-items:center;padding:18vh 0 0}
+.waith{margin:22px 0 0;font-size:12px;color:var(--faint);letter-spacing:.04em}
+.field{margin:0;font:11px/1.05 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--dim);
+  letter-spacing:2.5px;white-space:pre;user-select:none}
+
 .hint{margin:4px 10px;font-size:12px;color:var(--faint);line-height:1.7}
 .selhead{margin:12px 12px 6px;font-size:10.5px;text-transform:none;letter-spacing:.06em;color:var(--faint)}
 .pill{display:flex;align-items:center;gap:8px;margin:5px 10px;padding:6px 6px 6px 7px;background:var(--raised);
@@ -1411,9 +1405,47 @@ function explain(){
  * property, which is the only honest way to do ascii in css.
  */
 const WAITER = (line) => '<div class="wait">'
-  + '<div class="wave">' + Array.from({length:27},(_,i)=>'<i style="--i:'+i+'"></i>').join('') + '</div>'
+  + '<pre class="field" id="field"></pre>'
   + '<p class="waith">' + line + '</p>'
   + '</div>'
+
+/**
+ * The waiting state is a small shader written in characters.
+ *
+ * Two sine fields crossing at different rates, sampled per cell, mapped onto a ramp that runs from
+ * nothing to a full block. It is the oldest trick in graphics and it still reads better than a
+ * spinner, because a spinner says only that something is happening while a field says the thing
+ * happening is continuous and has a shape.
+ *
+ * Sparse on purpose. The ramp starts with two blank steps so most of the grid is empty at any moment
+ * and what remains is a drifting suggestion rather than a wall of glyphs, which is the difference
+ * between this and every terminal loading animation.
+ */
+const SHADER = [
+  '(function(){',
+  "var el=document.getElementById('field'); if(!el) return",
+   // eight blank steps out of twelve: measured, that inks a quarter of the grid, so what is left is
+  // a drifting suggestion rather than the wall of glyphs a full ramp gives
+  "var COLS=54, ROWS=11, RAMP='        \u00b7-=+'",
+  'var t=0',
+  'function frame(){',
+  '  if(!document.body.contains(el)) return',
+  '  t+=0.045',
+  "  var out=''",
+  '  for(var y=0;y<ROWS;y++){',
+  '    for(var x=0;x<COLS;x++){',
+  '      var v=Math.sin(x*0.22+t)+Math.sin(y*0.5-t*0.7)+Math.sin((x+y)*0.14+t*1.3)',
+  '      var i=Math.floor((v+3)/6*RAMP.length)',
+  '      out+=RAMP[Math.max(0,Math.min(RAMP.length-1,i))]',
+  '    }',
+  "    out+=String.fromCharCode(10)",
+  '  }',
+  '  el.textContent=out',
+  '  requestAnimationFrame(frame)',
+  '}',
+  'frame()',
+  '})()',
+].join(String.fromCharCode(10))
 
 /**
  * What a motion is actually made of, read off its own stylesheet.
@@ -1487,7 +1519,7 @@ ask.onclick=async()=>{
   verdict=null
   ask.disabled=true; ask.textContent='Writing…'
   if(APP && picks.length>1){
-    grid.innerHTML=WAITER('one each, a beat apart')
+    grid.innerHTML=WAITER('one each, a beat apart'); runShader()
     drops.textContent=''
     try{
       const r=await post('/__wall/rail',{picks,palette:palette.value},420000)
@@ -1501,7 +1533,7 @@ ask.onclick=async()=>{
     ask.disabled=false; drawSel(); return
   }
   chosen=picks[picks.length-1]||chosen
-  grid.innerHTML=WAITER('no two of these will agree')
+  grid.innerHTML=WAITER('no two of these will agree'); runShader()
   drops.textContent=''
   try{
     const r=await post('/__wall/motion',
@@ -1645,7 +1677,7 @@ addEventListener('message',e=>{const d=e.data||{}
     document.getElementById('pick').textContent=d.wall==='armed'?'Picking… (esc)':'Pick element'
   }
   if(d.wall==='picked'){
-    chosen={html:d.html,css:d.css,label:d.label,w:d.w,h:d.h,
+    chosen={html:d.html,css:d.css,label:d.label,w:d.w,h:d.h,n:d.n,
       cut:d.cut,opaque:d.opaque,weak:d.weak}
     picks.push(chosen)
     drawSel()
@@ -1664,6 +1696,9 @@ addEventListener('message',e=>{const d=e.data||{}
  * escaping it into an attribute is a bug waiting for the first component with a data attribute in it.
  */
 const tagOf = (label) => String(label || '').split('.')[0] || 'element'
+
+/* innerHTML does not run a script tag, so the field is driven by a function the page already has */
+function runShader(){ try { eval(SHADER) } catch(e) { /* the wait is cosmetic, never fatal */ } }
 
 function paintShots(){
   for (const f of document.querySelectorAll('[data-shot]')){
