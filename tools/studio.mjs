@@ -842,11 +842,23 @@ addEventListener('keydown',function(e){if(e.key===' '){e.preventDefault();play.c
  * while the first is half a second in. One scrubber, several clocks, no css touched.
  */
 async function railOf(picks, palette) {
-  const made = await Promise.all(picks.map(async (pick, i) => {
-    const got = await options({ html: pick.html, css: pick.css ?? '', label: pick.label, w: pick.w }, 1)
-    return got.kept.length ? { ...got.kept[0], label: pick.label, i } : { label: pick.label, i, why: (got.dropped[0] || {}).why }
+  /**
+   * Two goes per car, not one.
+   *
+   * A car is a single element and it either moves or the rail has a hole in it, which is a harsher
+   * standard than the options grid where four of five surviving is fine. Asking for two and keeping
+   * whichever passes turns one gate rejection from a missing car into a shrug. They still run
+   * together, so the wall clock is unchanged; it is the number of calls that doubles.
+   */
+  return Promise.all(picks.map(async (pick, i) => {
+    const src = { html: pick.html, css: pick.css ?? '', label: pick.label, w: pick.w }
+    const got = await options(src, 2).catch((e) => ({ kept: [], dropped: [{ why: String(e && e.message || e) }] }))
+    if (got.kept.length) return { ...got.kept[0], label: pick.label, i }
+    // every reason, not just the first, because two attempts failing the same way says something
+    // different from two failing differently
+    const why = [...new Set((got.dropped || []).map((d) => String(d.why || '')).filter(Boolean))].join('; ')
+    return { label: pick.label, i, why: why || 'nothing came back' }
   }))
-  return made
 }
 
 const railView = (ids, palette, beat = 420) => {
@@ -1133,8 +1145,10 @@ ask.onclick=async()=>{
       const r=await post('/__wall/rail',{picks,palette:palette.value},420000)
       cars=r.cars||[]; opts=[]; held.clear(); ends.clear(); render()
       const moved=cars.filter(c=>c.id).length
-      drops.textContent=moved+' of '+cars.length+' moved. Each starts a beat after the one above it.'
-        +(moved<cars.length?' Missing: '+cars.filter(c=>!c.id).map(c=>c.label).join(', '):'')
+      const lost=cars.filter(c=>!c.id)
+      drops.innerHTML=moved+' of '+cars.length+' moved.'
+        +(moved?' Each starts a beat after the one above it.':'')
+        +(lost.length?'<br>'+lost.map(c=>'<b>'+c.label+'</b> did not: '+String(c.why||'')).join('<br>'):'')
     }catch(e){ verdict={dropped:[],error:String(e && e.message||e)}; render() }
     ask.disabled=false; drawSel(); return
   }
@@ -1375,6 +1389,7 @@ const server = createServer(async (req, res) => {
       console.log(`  rail of ${picks.length}: ${picks.map((p) => p.label).join(', ').slice(0, 90)}`)
       const cars = await railOf(picks, body.palette)
       console.log(`    ${cars.filter((c) => c.id).length} of ${picks.length} moved`)
+      for (const c of cars.filter((c) => !c.id)) console.log(`      ${c.label}: ${String(c.why).slice(0, 120)}`)
       return json(res, { cars })
     }
     if (url.pathname === '/__wall/railview') {
