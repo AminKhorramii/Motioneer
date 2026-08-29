@@ -567,8 +567,10 @@ function pick(e){if(!on)return;e.preventDefault();e.stopPropagation();
      option written for it comes back a variation on "slide in". Worth saying at the moment of the
      pick rather than sixty seconds later when five weak options are already on screen. */
   var kids=el.children.length, thin=r.height<60||r.width<60;
-  var weak = thin ? 'a strip this thin has no room for parts to arrive separately'
-    : kids<3 ? 'this has fewer than three children, so there is little to stagger' : '';
+  /* short, because this is read on a pill beside a picture of the element and the long version was
+     a sentence nobody needed twice. Which of the two it is matters: a wide flat strip and a box with
+     one child are both poor picks for different reasons */
+  var weak = thin ? 'too thin to stagger' : kids<3 ? 'only ' + kids + ' part' + (kids===1?'':'s') : '';
   parent.postMessage({wall:'picked',html:h,css:css,label:label(el),opaque:opaque,weak:weak,
     cut:h.length<el.outerHTML.length,w:Math.round(r.width),h:Math.round(r.height)},'*')}
 function arm(v){on=v;
@@ -1023,7 +1025,8 @@ aside{border-right:1px solid var(--line);background:var(--panel);display:flex;fl
   padding:0;line-height:1;transition:color 120ms ease,background 120ms ease}
 .enter:hover{color:var(--ink);background:#1a1b1d}
 .aim:focus-within .enter{border-color:rgba(94,106,210,.5);color:var(--ink)}
-.files{overflow:auto;padding:6px;flex:1}
+.files{overflow:auto;padding:6px;flex:0 1 auto}.files:empty{padding:0}
+#sel{overflow:auto;padding-bottom:10px}
 .file{display:block;width:100%;text-align:left;background:none;border:0;color:var(--dim);
   padding:6px 9px;border-radius:5px;font:inherit;font-size:12px;cursor:pointer;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1065,11 +1068,16 @@ figcaption b{font-weight:500}.note{color:var(--dim)}.verb{color:var(--faint);fon
 .empty{padding:40px;color:var(--faint);text-align:center;grid-column:1/-1;line-height:1.8}
 .hint{margin:4px 10px;font-size:12px;color:var(--faint);line-height:1.7}
 .selhead{margin:12px 12px 6px;font-size:10.5px;text-transform:none;letter-spacing:.06em;color:var(--faint)}
-.pill{display:flex;align-items:center;gap:7px;margin:4px 10px;padding:5px 6px 5px 8px;background:var(--raised);
-  border:1px solid var(--line);border-radius:6px;font-size:11.5px;color:var(--dim)}
+.pill{display:flex;align-items:center;gap:8px;margin:5px 10px;padding:6px 6px 6px 7px;background:var(--raised);
+  border:1px solid var(--line);border-radius:7px;font-size:11.5px;color:var(--dim)}
+.shot{flex:none;width:86px;height:52px;border-radius:4px;overflow:hidden;background:#0b0c0d;
+  border:1px solid var(--line);position:relative}
+.shot iframe{width:100%;height:100%;border:0;display:block;pointer-events:none}
+.pill .who em{font-style:normal;color:var(--ink);font-size:11.5px}
+.pill .who u{text-decoration:none;color:#d29d6b;font-size:10px;line-height:1.35}
 .pill b{display:grid;place-items:center;width:15px;height:15px;flex:none;border-radius:4px;
   background:var(--accent);color:#fff;font-size:9.5px;font-weight:500}
-.pill .who{display:grid;gap:1px;min-width:0;overflow:hidden}
+.pill .who{display:grid;gap:2px;min-width:0;overflow:hidden;flex:1}
 .pill .who i{font-style:normal;color:var(--faint);font-size:10px;font-variant-numeric:tabular-nums}
 .pill button{margin-left:auto;background:none;border:0;color:var(--faint);cursor:pointer;
   font-size:14px;line-height:1;padding:0 2px}
@@ -1378,27 +1386,65 @@ addEventListener('message',e=>{const d=e.data||{}
       cut:d.cut,opaque:d.opaque,weak:d.weak}
     picks.push(chosen)
     drawSel()
-    document.getElementById('sel').insertAdjacentHTML('beforeend','<b class="chip">'+d.label
-      +'<br><span>'+(d.css.length/1000).toFixed(1)+'kb of matched css, '
-      +(d.html.length/1000).toFixed(1)+'kb of markup'+(d.cut?' (trimmed to fit)':'')
-      +', '+d.w+'x'+d.h
-      +(d.weak?'<br><b style="color:#d29d6b">Weak pick:</b> '+d.weak
-        +'. Try a container with several sibling parts, like a row of cards or a list.':'')
-      +(d.opaque?'<br>'+d.opaque+' stylesheet'+(d.opaque>1?'s':'')+' could not be read: '
-        +'served from another origin without cors, so some styling is missing':'')+'</span></b>')
     paint()
   }})
+
+/**
+ * The pill shows the element rather than naming it.
+ *
+ * A generated class name is not a description of anything: div.MwJdiW_container.qM tells you which
+ * element the studio thinks you meant only if you happen to know that hash, and on a site built with
+ * css modules or styled components every name looks like that. The element itself is unambiguous, it
+ * is already here with the rules that matched it, and it costs one small frame each.
+ *
+ * Written into the frame rather than handed over as srcdoc, because the markup is full of quotes and
+ * escaping it into an attribute is a bug waiting for the first component with a data attribute in it.
+ */
+const tagOf = (label) => String(label || '').split('.')[0] || 'element'
+
+function paintShots(){
+  for (const f of document.querySelectorAll('[data-shot]')){
+    const p = picks[Number(f.dataset.shot)]; if(!p) continue
+    const d = f.contentDocument; if(!d) continue
+    d.open()
+    d.write('<html><head><meta charset="utf-8"><style>'
+      + 'html,body{margin:0;height:100%;overflow:hidden}'
+      + '#s{position:absolute;left:50%;top:50%;transform-origin:center center;width:'
+      + (p.w||600) + 'px}'
+      + p.css
+      + '</style></head><body><div id="s">' + p.html + '</div><scr' + 'ipt>'
+      + 'var el=document.getElementById("s");'
+      + 'var k=el.firstElementChild;'
+      + 'if(k){var c=getComputedStyle(k);'
+      + 'if(c.position==="fixed"||c.position==="absolute"||c.position==="sticky"){'
+      + 'k.style.position="relative";k.style.inset="auto"}}'
+      + 'var r=el.getBoundingClientRect();'
+      + 'var s=Math.min(1,(innerWidth-4)/Math.max(r.width,1),(innerHeight-4)/Math.max(r.height,1));'
+      + 'el.style.transform="translate(-50%,-50%) scale("+s.toFixed(4)+")";'
+      + '</scr' + 'ipt></body></html>')
+    d.close()
+  }
+}
 
 /* the selection, which is the thing a rail is built out of */
 function drawSel(){
   const el=document.getElementById('sel')
   if(!picks.length){ el.innerHTML=''; ask.textContent='Give it motion'; return }
   el.innerHTML='<p class="selhead">Selection'+(picks.length>1?' &middot; '+picks.length:'')+'</p>'
-    +picks.map((p,i)=>'<span class="pill"><b>'+(i+1)+'</b><span class="who">'+p.label.slice(0,24)
-      +'<i>'+p.w+'&times;'+p.h+(p.weak?' &middot; thin':'')+'</i></span>'
+    +picks.map((p,i)=>'<span class="pill"><b>'+(i+1)+'</b>'
+      +'<span class="shot"><iframe data-shot="'+i+'" scrolling="no" tabindex="-1"></iframe></span>'
+      +'<span class="who"><em>'+tagOf(p.label)+'</em><i>'+p.w+'&times;'+p.h
+      +(p.cut?' &middot; trimmed':'')+'</i>'
+      +(p.weak?'<u>'+p.weak+'</u>':'')
+      +(p.opaque?'<u>'+p.opaque+' sheet'+(p.opaque>1?'s':'')+' unreadable</u>':'')+'</span>'
       +'<button data-drop="'+i+'" title="remove">&times;</button></span>').join('')
     +(picks.length>1?'<p class="hint">These will be given one motion each and played on one '
       +'timeline, each starting a beat after the one above it.</p>':'')
+    +(picks.some(x=>x.weak)?'<p class="hint">A pick with little inside it has nothing to stagger. '
+      +'A container with several sibling parts, like a row of cards or a list, gives motion more to '
+      +'work with.</p>':'')
+  // after the markup exists, not in the middle of building it
+  paintShots()
   el.querySelectorAll('[data-drop]').forEach(b=>b.onclick=()=>{
     picks.splice(Number(b.dataset.drop),1); chosen=picks[picks.length-1]||null
     cars=null; opts=[]; drawSel(); render() })
