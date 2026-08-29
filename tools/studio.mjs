@@ -61,10 +61,15 @@ let AIM = null   // the address as typed, for the sidebar to show
  * A bare host is allowed because that is what people type. localhost:3000 is not a url and every
  * browser has forgiven that for twenty years, so this does too.
  */
+/** a bare host is http only when it is this machine: everywhere else redirects to https, and the
+    redirect leaves the proxy, which puts the real site in the frame and closes its dom again */
+const localish = (host) => /^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|.*\.local)(:\d+)?$/i.test(host)
+
 function aimAt(raw) {
   const said = String(raw ?? '').trim()
   if (!said) return null
-  const url = new URL(/^https?:\/\//i.test(said) ? said : `http://${said}`)
+  const scheme = /^https?:\/\//i.test(said) ? '' : (localish(said.split('/')[0]) ? 'http://' : 'https://')
+  const url = new URL(scheme + said)
   HOST = url.origin
   ENTRY = url.pathname + url.search
   AIM = url.href
