@@ -479,7 +479,14 @@ function pick(e){if(!on)return;e.preventDefault();e.stopPropagation();
   var el=last||e.target;on=false;if(box)box.style.display='none';
   var r=el.getBoundingClientRect(),h=trimmed(el,14000);
   var css=rules(el);
-  parent.postMessage({wall:'picked',html:h,css:css,label:label(el),opaque:opaque,
+  /* Stagger is the whole difference between motion somebody notices and motion somebody ignores, and
+     stagger needs sibling parts to move at different times. A 1140 by 44 strip has none, so every
+     option written for it comes back a variation on "slide in". Worth saying at the moment of the
+     pick rather than sixty seconds later when five weak options are already on screen. */
+  var kids=el.children.length, thin=r.height<60||r.width<60;
+  var weak = thin ? 'a strip this thin has no room for parts to arrive separately'
+    : kids<3 ? 'this has fewer than three children, so there is little to stagger' : '';
+  parent.postMessage({wall:'picked',html:h,css:css,label:label(el),opaque:opaque,weak:weak,
     cut:h.length<el.outerHTML.length,w:Math.round(r.width),h:Math.round(r.height)},'*')}
 addEventListener('mousemove',move,true);addEventListener('click',pick,true);
 addEventListener('message',function(e){var d=e.data||{};
@@ -1026,6 +1033,8 @@ addEventListener('message',e=>{const d=e.data||{}
       +'<br><span>'+(d.css.length/1000).toFixed(1)+'kb of matched css, '
       +(d.html.length/1000).toFixed(1)+'kb of markup'+(d.cut?' (trimmed to fit)':'')
       +', '+d.w+'x'+d.h
+      +(d.weak?'<br><b style="color:#d29d6b">Weak pick:</b> '+d.weak
+        +'. Try a container with several sibling parts, like a row of cards or a list.':'')
       +(d.opaque?'<br>'+d.opaque+' stylesheet'+(d.opaque>1?'s':'')+' could not be read: '
         +'served from another origin without cors, so some styling is missing':'')+'</span></b>'
     paint()
