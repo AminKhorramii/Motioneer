@@ -1644,7 +1644,7 @@ const SHADER = [
   'var t=0',
   'function frame(){',
   '  if(!document.body.contains(host)) return',
-  '  t+=0.016',
+  '  t+=0.055',
   '  for(var y=0;y<ROWS;y++){',
   '    for(var x=0;x<COLS;x++){',
   /* one field folded into the next, which is what stops it looking like a grid of sine waves */
