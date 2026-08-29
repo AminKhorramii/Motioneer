@@ -32,7 +32,7 @@ import { streamText } from '../shared/providers.mjs'
 import { listenNear, movedFrom } from '../shared/port.mjs'
 import {
   MOTION_SYSTEM, dealMotions, dealErrands, grabJson, safeStyle, unmoved, brittle, janky, scopeOf, retimed,
-  tempo, unstill,
+  tempo, unstill, leaks, namespaced,
   PRESETS, themeOf, themeCss,
 } from '../dist-core/core.js'
 
@@ -950,8 +950,17 @@ async function askModel(brief, tries = 4) {
 
 /** the gates, in one place, so refine and options cannot drift apart on what they accept */
 function judge(raw, fallbackScope, parts = true) {
-  const css = safeStyle(raw.css)
-  if (!css) return { why: 'the reply carried no css that is allowed in a sheet' }
+  const clean = safeStyle(raw.css)
+  if (!clean) return { why: 'the reply carried no css that is allowed in a sheet' }
+  const scope = scopeOf(clean, raw.scope ?? fallbackScope)
+  /**
+   * Keyframe names are renamed before anything judges the sheet, because the name is private to it
+   * and only has to be unique. There is one flat namespace for @keyframes across every stylesheet on
+   * a page, so a sheet defining `rise` replaces whatever the host application already called `rise`,
+   * and the thing that breaks is somewhere else entirely. Measured over 18 real options, none used a
+   * name plain enough to be obvious about it, which is exactly why it would not be found by reading.
+   */
+  const css = namespaced(clean, scope)
   /**
    * unstill is enforced and the tempo is not, which is a distinction the measurements made rather than
    * a preference. Across 23 real options every single one already wrapped itself in a reduced-motion
@@ -962,9 +971,9 @@ function judge(raw, fallbackScope, parts = true) {
    * be an entrance. So they are reported on the card and left to a person.
    */
   const faults = [...unmoved({ html: '', css, note: '' }, { parts }), ...brittle(css), ...janky(css),
-    ...unstill(css)]
+    ...unstill(css), ...leaks(css, scope)]
   if (faults.length) return { why: faults[0] }
-  return { css, scope: scopeOf(css, raw.scope ?? fallbackScope), note: String(raw.note ?? '').slice(0, 90) }
+  return { css, scope, note: String(raw.note ?? '').slice(0, 90) }
 }
 
 /**

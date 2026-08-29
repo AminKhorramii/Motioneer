@@ -648,7 +648,16 @@ to keep something alive has no business finishing in 400ms. Enforcing those woul
 the good work for failing to be an entrance, so they are reported on the card and left to a person.
 That distinction came out of the measurements, not out of taste.
 
-Four gates read the css and a fifth one looks. `unmoved`, `brittle`, `janky` and `scopeOf` all take a
+Two hazards are about the page this sheet gets pasted into rather than about the component.
+`leaks` rejects a selector that does not start from the scope attribute, because `.card {}` looks
+correct in a preview where the only card on screen is the one being previewed and then animates every
+card in the host application. It is rare, about one option in thirty, which is what makes it safe to
+enforce. `namespaced` renames every keyframe to carry the scope, because @keyframes is one flat
+namespace shared by every stylesheet on a page: a sheet defining `rise` replaces whatever the host
+already called `rise`, and the thing that breaks is somewhere else entirely. That one renames rather
+than complains, since unlike a selector there is no ambiguity about what was meant.
+
+Six gates read the css and a seventh one looks. `unmoved`, `brittle`, `janky`, `unstill`, `leaks` and `scopeOf` all take a
 string, which leaves the hardest promise in the prompt unchecked: a component has to be exactly where
 it started once the animation is over. A sheet can stagger properly, use a named curve, animate only
 transform, and still end on `translateY(12px)` or `opacity: 0`, which nudges somebody's layout for

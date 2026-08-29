@@ -17,7 +17,7 @@ material. Read `docs/flows.md` for every path through both and the code that car
 - The studio is `tools/studio.mjs`: the proxy, the picker, the transport, the rail. It is one
   file because it is one room, and nothing else imports from it.
 - What judges model written css lives in `src/written.ts` beside the other gates, never in the
-  studio page: `unmoved`, `brittle`, `janky`, `unstill`, `scopeOf`, `tempo`, `retimed`. The page
+  studio page: `unmoved`, `brittle`, `janky`, `unstill`, `leaks`, `scopeOf`, `tempo`, `retimed`, `namespaced`. The page
   is a template literal, so a regex written there loses its backslashes before the browser sees
   it, and a second copy of a measurement is how `3.2s` came to be read as `2s`.
 

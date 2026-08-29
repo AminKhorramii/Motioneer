@@ -488,6 +488,66 @@ export function unstill(css: string): string[] {
     + 'of taste, and it is one media query.']
 }
 
+/**
+ * Rules that would apply to the whole page this sheet is pasted into.
+ *
+ * MOTION_SYSTEM asks for every selector to start from the scope attribute, and nothing checked it.
+ * A sheet that also carries `.card { animation: ... }` looks fine in a preview, where the only card
+ * on the page is the one being previewed, and then animates every card in the host application the
+ * moment somebody pastes it. That is not a matter of taste: it is a stylesheet reaching outside the
+ * component it was written for.
+ *
+ * Keyframe steps are skipped because `from`, `to` and `40%` are not selectors, and a sheet with no
+ * scope at all is left to scopeOf, which has its own account of that.
+ */
+export function leaks(css: string, scope: string): string[] {
+  if (!scope) return []
+  const outside: string[] = []
+  // strip the keyframe bodies first, or their steps read as unscoped selectors
+  const flat = css.replace(/@keyframes[^{]*\{(?:[^{}]|\{[^{}]*\})*\}/gi, '')
+  for (const [, selector] of flat.matchAll(/([^{}]+)\{[^{}]*\}/g)) {
+    for (const one of selector.split(',')) {
+      const t = one.trim()
+      if (!t || t.startsWith('@') || t.startsWith('%')) continue
+      if (t.includes(`[${scope}]`)) continue
+      outside.push(t.slice(0, 48))
+    }
+  }
+  if (!outside.length) return []
+  return [`${outside.length} selector${outside.length > 1 ? 's' : ''} here do not start from `
+    + `[${scope}], beginning with ${outside[0]}. Pasted into a real page that applies to everything `
+    + 'matching, not to this component, which is a stylesheet reaching outside what it was written for.']
+}
+
+/**
+ * Keyframe names are global, so a sheet naming one `fade` redefines the host's `fade`.
+ *
+ * There is no scoping mechanism for @keyframes: the name is one flat namespace shared by every
+ * stylesheet on the page. A motion sheet that defines `@keyframes slide` and gets pasted into an
+ * application that already has a `slide` silently replaces it, and the thing that breaks is somewhere
+ * else entirely. Nothing about that is visible in a preview, where this sheet is the only one.
+ *
+ * This renames rather than complains, because unlike an unscoped selector there is no ambiguity about
+ * what was meant: the name is private to this sheet and only has to be unique. Both the definition
+ * and every animation that references it move together, and a name that already carries the scope is
+ * left alone so running this twice changes nothing.
+ */
+export function namespaced(css: string, scope: string): string {
+  const tail = (scope || '').replace(/^data-motion-?/, '').replace(/[^-\w]/g, '')
+  if (!tail) return css
+  const names = [...new Set([...css.matchAll(/@keyframes\s+([-\w]+)/gi)].map((m) => m[1]))]
+  let out = css
+  for (const name of names) {
+    // a name that already carries the scope's identity is unique enough, and appending it twice
+    // produces splitflap-card-splitflap, which is uglier than the collision it is preventing
+    if (name.includes(tail)) continue
+    const safe = `${name}-${tail}`
+    const word = new RegExp(`(^|[^-\\w])${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![-\\w])`, 'g')
+    out = out.replace(word, (_a, lead: string) => `${lead}${safe}`)
+  }
+  return out
+}
+
 export function scopeOf(css: string, declared?: unknown): string {
   const used = [...css.matchAll(/\[(data-[-\w]+)\]/g)].map((m) => m[1])
   const said = String(declared ?? '').replace(/[^-\w]/g, '').slice(0, 40)
