@@ -31,7 +31,7 @@ import { hasClaude, runClaude } from '../shared/cli.mjs'
 import { streamText } from '../shared/providers.mjs'
 import { listenNear, movedFrom } from '../shared/port.mjs'
 import {
-  MOTION_SYSTEM, dealMotions, dealErrands, grabJson, safeStyle, unmoved, brittle, janky, scopeOf,
+  MOTION_SYSTEM, dealMotions, dealErrands, grabJson, safeStyle, unmoved, brittle, janky, scopeOf, retimed,
   PRESETS, themeOf, themeCss,
 } from '../dist-core/core.js'
 
@@ -1054,6 +1054,7 @@ header{display:flex;align-items:center;gap:12px;height:48px;padding:0 14px;
 .split{display:inline-flex;align-items:stretch}
 .split .go{border-radius:6px 0 0 6px;border-right:0}
 .split select{border-radius:0 6px 6px 0;padding:0 4px 0 7px;color:var(--dim)}
+.menu[hidden]{display:none}
 .menu{position:absolute;top:44px;right:14px;z-index:20;display:grid;gap:9px;padding:12px;width:214px;
   background:var(--panel);border:1px solid var(--line2);border-radius:9px;
   box-shadow:0 12px 34px rgba(0,0,0,.5)}
@@ -1062,7 +1063,15 @@ header{display:flex;align-items:center;gap:12px;height:48px;padding:0 14px;
 .menu label.row{justify-content:flex-start;gap:8px}
 .menu select{flex:1;max-width:118px}
 .menu .keys{margin:2px 0 0;padding-top:9px;border-top:1px solid var(--line);
-  font-size:10.5px;color:var(--faint);line-height:2}
+  font-size:10.5px;color:var(--faint);line-height:1.7}
+.menu.wide{width:262px}
+.ihead{margin:0;font-size:12px;color:var(--dim)}
+.ihead em{font-style:normal;color:var(--ink)}
+.ifacts{margin:-3px 0 3px;font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums;line-height:1.6}
+#tapply{width:100%;justify-content:center;margin-top:2px}
+figure.chosen{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+figure{cursor:pointer}
+figure .row button{cursor:pointer}
 header{position:relative}
 .unit{color:var(--faint);font-size:11px;margin-left:1px}.unit b{font-weight:400}
 #scrub{flex:1;height:3px;-webkit-appearance:none;background:var(--line2);border-radius:2px;cursor:pointer}
@@ -1170,8 +1179,28 @@ figcaption b{font-weight:500}.note{color:var(--dim)}.verb{color:var(--faint);fon
     <span class="clock"><b id="at">0.00</b><i id="span">4.2s</i><em id="driven" title="how many previews the scrubber is driving"></em></span>
     <input id="scrub" type="range" min="0" max="4200" value="0" step="10">
     <span class="sep"></span>
+    <button class="icon" id="inspect" title="Inspect and adjust the chosen option">&#9707;</button>
     <button class="icon" id="more" title="Speed, palette, camera">&#183;&#183;&#183;</button>
     <button class="btn" id="save">Export</button>
+    <div class="menu wide" id="inspector" hidden>
+      <p class="ihead">Adjust <em id="itag">nothing chosen</em></p>
+      <p class="ifacts" id="ifacts">Click an option below to choose it.</p>
+      <label>Speed<select id="tdur">
+        <option value="0.5">twice as fast</option><option value="0.75">a little faster</option>
+        <option value="1" selected>as written</option><option value="1.5">a little slower</option>
+        <option value="2">half speed</option></select></label>
+      <label>Spacing<select id="tstag">
+        <option value="0.5">tighter</option><option value="1" selected>as written</option>
+        <option value="1.5">looser</option><option value="2">twice as far apart</option></select></label>
+      <label>Easing<select id="tease">
+        <option value="">as written</option>
+        <option value="cubic-bezier(.16,1,.3,1)">arrive and settle</option>
+        <option value="cubic-bezier(.34,1.56,.64,1)">overshoot</option>
+        <option value="steps(6,end)">stepped</option>
+        <option value="cubic-bezier(.4,0,1,1)">leave</option></select></label>
+      <button class="btn go" id="tapply">Add as a new option</button>
+      <p class="keys" id="inote">The original stays. Adjusting makes another one beside it.</p>
+    </div>
     <div class="menu" id="menu" hidden>
       <label>Speed<select id="rate"><option>0.25x</option><option>0.5x</option>
         <option selected>1x</option><option>2x</option></select></label>
@@ -1334,7 +1363,7 @@ function factsOf(css){
   const delays=[...css.matchAll(/animation-delay:\\s*([\\d.]+m?s)/g)].map(m=>ms(m[1]))
     .concat([...css.matchAll(/animation:[^;{}]*?\\s([\\d.]+m?s)\\s+[^;{}]*?\\s([\\d.]+m?s)/g)].map(m=>ms(m[2])))
   const uniq=[...new Set(delays.map(d=>Math.round(d)))].sort((a,b)=>a-b)
-  const durs=[...css.matchAll(/animation(?:-duration)?:[^;{}]*?(\\d+m?s)/g)].map(m=>ms(m[1])).filter(d=>d>40)
+  const durs=[...css.matchAll(/animation(?:-duration)?:[^;{}]*?([\\d.]+m?s)/g)].map(m=>ms(m[1])).filter(d=>d>40)
   const props=new Set()
   for(const f of css.matchAll(/@keyframes[^{]*\\{((?:[^{}]|\\{[^{}]*\\})*)\\}/g))
     for(const d of f[1].matchAll(/([a-z-]+)\\s*:/g)) props.add(d[1])
@@ -1426,10 +1455,39 @@ ask.onclick=async()=>{
 cam.onchange=render
 palette.onchange=render
 const menu=document.getElementById('menu'), moreBtn=document.getElementById('more')
-moreBtn.onclick=e=>{ e.stopPropagation(); menu.hidden=!menu.hidden }
+const insp=document.getElementById('inspector'), inspBtn=document.getElementById('inspect')
+let chosenOpt=null   // the option the inspector is pointed at
+const pop=(panel)=>{ for(const q of [menu,insp]) q.hidden = q!==panel || !q.hidden }
+moreBtn.onclick=e=>{ e.stopPropagation(); pop(menu) }
+inspBtn.onclick=e=>{ e.stopPropagation(); pop(insp); drawInspector() }
 menu.onclick=e=>e.stopPropagation()
-addEventListener('click',()=>{ menu.hidden=true })
-addEventListener('keydown',e=>{ if(e.key==='Escape'&&!menu.hidden) menu.hidden=true })
+insp.onclick=e=>e.stopPropagation()
+addEventListener('click',()=>{ menu.hidden=true; insp.hidden=true })
+addEventListener('keydown',e=>{ if(e.key==='Escape'){ menu.hidden=true; insp.hidden=true } })
+
+/* what the inspector is looking at, which is whichever option was clicked last */
+function drawInspector(){
+  const o = opts.find(x=>x.id===chosenOpt)
+  document.getElementById('itag').textContent = o ? (o.note||'untitled').slice(0,44) : 'nothing chosen'
+  document.getElementById('ifacts').innerHTML = o ? factLine(o.css)
+    : 'Click an option below to choose it.'
+  document.getElementById('tapply').disabled = !o
+}
+document.getElementById('tapply').onclick=async()=>{
+  const o = opts.find(x=>x.id===chosenOpt); if(!o) return
+  const btn=document.getElementById('tapply'); btn.disabled=true; btn.textContent='Adjusting…'
+  const r = await post('/__wall/tune',{ id:o.id,
+    duration:Number(document.getElementById('tdur').value),
+    stagger:Number(document.getElementById('tstag').value),
+    ease:document.getElementById('tease').value }, 20000).catch(e=>({error:String(e.message||e)}))
+  btn.disabled=false; btn.textContent='Add as a new option'
+  if(r.error){ document.getElementById('inote').textContent=r.error.slice(0,120); return }
+  // beside the one it came from, so the two can be held at the same instant and compared
+  const at = opts.findIndex(x=>x.id===o.id)
+  opts.splice(at+1, 0, { ...o, id:r.id, css:r.css, note:o.note+' (adjusted)' })
+  chosenOpt=r.id; held.clear(); ends.clear(); render(); drawInspector()
+  document.getElementById('inote').textContent='Added beside the original, which is untouched.'
+}
 document.getElementById('save').onclick=async()=>{
   if(!opts.length) return
   const btn=document.getElementById('save'); btn.textContent='Writing…'
@@ -1472,6 +1530,16 @@ function render(){
     '<span class="row"><button class="mini keep" data-more="'+o.id+'">More like this</button>'+
     '<button class="mini" data-copy="'+o.id+'">Copy CSS</button>'+
     '<button class="mini" data-save="'+o.id+'">Save file</button></span></figcaption></figure>').join('')
+  document.querySelectorAll('figure').forEach((f,i)=>{
+    if(opts[i] && opts[i].id===chosenOpt) f.classList.add('chosen')
+    f.onclick=e=>{
+      if(e.target.closest('button')) return
+      chosenOpt = opts[i] ? opts[i].id : null
+      document.querySelectorAll('figure').forEach(x=>x.classList.remove('chosen'))
+      f.classList.add('chosen')
+      drawInspector()
+    }
+  })
   document.querySelectorAll('[data-more]').forEach(b=>b.onclick=async()=>{
     const keep=opts.find(x=>x.id===b.dataset.more)
     b.textContent='Varying…'; ask.disabled=true
@@ -1715,6 +1783,30 @@ const server = createServer(async (req, res) => {
       if (!html) { res.writeHead(404); return res.end('gone') }
       res.writeHead(200, { 'content-type': 'text/html' })
       return res.end(html)
+    }
+    /**
+     * Changing an option that already works, without asking for another one.
+     *
+     * Slower, further apart, land harder: every one of those is arithmetic on numbers already in the
+     * sheet. Going back to the model costs ten seconds and returns something that is not quite the
+     * thing you liked, so this rewrites the times in place and hands back a new option beside the
+     * original. The original stays, because an adjustment you cannot undo is not an adjustment.
+     */
+    if (url.pathname === '/__wall/tune' && req.method === 'POST') {
+      const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))
+      const base = made.get(body.id)
+      if (!base) { res.writeHead(404); return res.end('gone') }
+      const css = retimed(base.css, {
+        duration: Number(body.duration) || 1,
+        stagger: Number(body.stagger) || 1,
+        ease: body.ease || undefined,
+      })
+      // the gates still apply: a retime that flattens a stagger to nothing is not an improvement
+      const faults = [...unmoved({ html: '', css, note: '' }, { parts: false }), ...brittle(css), ...janky(css)]
+      if (faults.length) return json(res, { error: faults[0] })
+      const id = String(nextId++)
+      keep(id, { ...base, id, css, note: base.note })
+      return json(res, { id, css })
     }
     if (url.pathname === '/__wall/save' && req.method === 'POST') {
       const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))

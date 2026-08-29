@@ -364,6 +364,57 @@ export function janky(css: string): string[] {
     + 'scaleX with a transform-origin, a thing that grows is scale, a thing that moves is translate.']
 }
 
+/**
+ * Changing how a motion is executed without asking for it again.
+ *
+ * Every adjustment somebody wants to make after seeing an option is arithmetic on numbers that are
+ * already in the sheet: slower, more space between the parts, land harder. Going back to the model
+ * for that costs ten seconds, returns something that is not quite the thing you liked, and cannot be
+ * undone. None of it needs a model at all.
+ *
+ * Durations and delays are separated rather than scaled together, because they are different
+ * decisions: a slower move is not the same as a longer wait between moves, and confusing the two is
+ * why "make it slower" usually ruins a stagger. The shorthand is the fiddly case, since
+ * `animation: rise 420ms 40ms both` gives duration then delay in that order and both look alike, so
+ * the times inside a shorthand are counted rather than pattern matched.
+ */
+export interface Retime { duration?: number; stagger?: number; ease?: string }
+
+const TIME = /(\d*\.?\d+)(ms|s)/g
+const scale = (value: string, by: number) => {
+  const n = parseFloat(value)
+  const ms = /ms$/.test(value) ? n : n * 1000
+  const out = Math.max(0, Math.round(ms * by))
+  return `${out}ms`
+}
+
+export function retimed(css: string, { duration = 1, stagger = 1, ease }: Retime = {}): string {
+  // asking for nothing returns the sheet untouched rather than a reformatted copy of it, so a caller
+  // can hand every option through here without wondering whether it changed something
+  if (duration === 1 && stagger === 1 && !ease) return css
+  let out = css
+
+  // the explicit properties first, where there is no ambiguity about which is which
+  out = out.replace(/animation-duration:\s*([^;}]+)/gi,
+    (_a, v: string) => 'animation-duration: ' + v.replace(TIME, (t) => scale(t, duration)))
+  out = out.replace(/animation-delay:\s*([^;}]+)/gi,
+    (_a, v: string) => 'animation-delay: ' + v.replace(TIME, (t) => scale(t, stagger)))
+
+  // then the shorthand, where the first time is the duration and the second is the delay
+  out = out.replace(/(^|[;{\s])animation:\s*([^;}]+)/gi, (_all, lead: string, body: string) => {
+    let seen = 0
+    const moved = body.replace(TIME, (t) => scale(t, ++seen === 1 ? duration : stagger))
+    return `${lead}animation: ${moved}`
+  })
+
+  if (ease) {
+    // a named curve, a bezier or a steps call, all of which sit where a timing function goes
+    out = out.replace(/cubic-bezier\([^)]*\)|steps\([^)]*\)|\b(?:ease-in-out|ease-in|ease-out|ease|linear)\b/gi,
+      () => ease)
+  }
+  return out
+}
+
 export function scopeOf(css: string, declared?: unknown): string {
   const used = [...css.matchAll(/\[(data-[-\w]+)\]/g)].map((m) => m[1])
   const said = String(declared ?? '').replace(/[^-\w]/g, '').slice(0, 40)
