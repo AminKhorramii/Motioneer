@@ -638,6 +638,13 @@ Two things make it work on real components rather than only on toys:
   collide, everything else is forwarded, and the websocket upgrade is passed through so hot reload
   survives.
 
+`node verify/studio-sites.mjs` aims the studio at twenty real sites in turn and checks four things
+for each: that the frame stays inside the proxy, that its dom arrives, that its stylesheets can be
+read, and that clicking something hands back an element with css attached. Every proxy bug so far was
+found this way and none of them appear against a fixture. Nineteen of the twenty work; npm sits behind
+a bot check, which a proxy cannot pass and which the studio says out loud rather than showing a blank
+frame.
+
 `Export` writes one html file with every option in it, the transport included, no requests at all.
 The options share a document rather than sitting in iframes, which they can only do because each
 sheet is already scoped to an attribute: option two gets `data-motion-fold-2` and its selectors are

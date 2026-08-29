@@ -52,6 +52,7 @@ verify/                the suites, in order of how much they prove
   tauri.mjs            the desktop shell, checked without a window
   oneline.mjs          the handoff format, and its format number
   update.mjs           the update channel: publishable, complete, never stranded
+  studio-sites.mjs     twenty real sites through the proxy, picked one at a time
 
 tools/                 run by hand or at author time, never at run time
   try.mjs              the loop for working on Wall itself
