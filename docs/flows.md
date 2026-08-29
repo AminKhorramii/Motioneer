@@ -648,6 +648,20 @@ to keep something alive has no business finishing in 400ms. Enforcing those woul
 the good work for failing to be an entrance, so they are reported on the card and left to a person.
 That distinction came out of the measurements, not out of taste.
 
+Legality has a floor and no ceiling, so the rendered pass also measures three things nothing rejects
+on. How much of the component takes part, how far anything strays outside its own box, and how much of
+it is invisible at the very first frame. Options are then ordered by the last two, because a component
+that cannot be seen when you first look at it is worse than one that can and a part that leaves the
+box risks being clipped, and both are faults of degree rather than kind. How much takes part is shown
+and deliberately not scored: an emphasis motion stirs three percent because it is about one thing and
+an entrance stirs ninety because it is about all of them, and neither is better.
+
+Two measurements were wrong before they were right, and both were caught by calibrating rather than by
+reading. Displacement of the bounding box reported that fifteen of twenty one motions barely moved,
+including one described as rows typing onto the page, because a clip-path reveal and a scaleX move
+nothing. And sampling only real elements reported that nothing at all took part in a border tracing
+its own outline, because that is a pseudo element and querySelectorAll cannot see one.
+
 Two hazards are about the page this sheet gets pasted into rather than about the component.
 `leaks` rejects a selector that does not start from the scope attribute, because `.card {}` looks
 correct in a preview where the only card on screen is the one being previewed and then animates every

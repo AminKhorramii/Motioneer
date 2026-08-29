@@ -834,6 +834,94 @@ async function drifts(o) {
     }
     const still = await measure('', false)
     const after = await measure(o.css, true)
+
+    /**
+     * How much this actually moves, and whether it is watchable, which no gate has ever asked.
+     *
+     * Everything up to here answers "is this wrong". Legality has a floor and no ceiling: a motion
+     * that nudges one element two pixels passes every check and nobody sees it, and one that throws a
+     * card four hundred pixels across the screen passes the same checks. Both are legal. Neither is
+     * good.
+     *
+     * So the sheet is walked across its own span and three things are measured. Travel is the largest
+     * distance any part covers, as a fraction of the component, which separates the imperceptible from
+     * the violent. Escape is how far anything strays outside the component's own box, which is where
+     * clipping and collisions with neighbours come from. Blank is how much of the component is
+     * invisible at the very first frame, because the prompt asks for no blank frame and this will be
+     * watched from the middle.
+     */
+    const span = Math.max(400, Math.min(6000, tempo(o.css).span || 800))
+    const frames = []
+    for (const at of [0, 0.25, 0.5, 0.75, 1]) {
+      await page.evaluate((t) => {
+        for (const a of document.getAnimations()) { try { a.pause(); a.currentTime = t } catch {} }
+      }, Math.round(span * at))
+      await page.waitForTimeout(24)
+      /**
+       * Every way a thing can look different, not only where its box is.
+       *
+       * The first version of this measured x and y and reported that fifteen of twenty one motions
+       * barely moved, including one described as rows typing onto the page and another as a
+       * strikethrough landing. Both plainly move. Neither translates: one is a clip-path opening and
+       * the other is a scaleX from nothing, and a bounding box notices neither. Measuring displacement
+       * and calling it motion would have ranked a slide above a beautifully drawn reveal.
+       */
+      /**
+       * The pseudo elements are sampled too, because a great deal of this motion lives there.
+       *
+       * A scan line, a strike, an underline drawing itself: every one of those is a ::before or an
+       * ::after, and querySelectorAll cannot see any of them. Measured without them, a motion
+       * described as a border tracing its own outline reported that nothing at all took part, and
+       * ranking on that would have quietly buried an entire technique.
+       */
+      frames.push(await page.evaluate(() => {
+        const read = (e, pseudo) => {
+          const c = getComputedStyle(e, pseudo)
+          if (pseudo && (c.content === 'none' || !c.content)) return null
+          const b = pseudo ? null : e.getBoundingClientRect()
+          return [b ? b.x : 0, b ? b.y : 0, b ? b.width : 0, b ? b.height : 0,
+            parseFloat(c.opacity), c.visibility === 'visible' ? 1 : 0,
+            c.transform, c.clipPath, c.filter,
+            pseudo ? c.width + ' ' + c.height + ' ' + c.inset : '']
+        }
+        const out = []
+        for (const e of [...document.querySelectorAll('#r, #r *')].slice(0, 240)) {
+          out.push(read(e, null))
+          out.push(read(e, '::before'))
+          out.push(read(e, '::after'))
+        }
+        return out
+      }))
+    }
+    const root = after.boxes[0] || [0, 0, 1, 1, 1]
+    const size = Math.max(1, Math.hypot(root[2], root[3]))
+    let travel = 0, escape = 0
+    // how much of the component takes part, which is the question "one part or ten" asked of the
+    // rendering rather than of the delays in the sheet
+    const stirred = new Set()
+    for (let i = 1; i < frames.length; i++) {
+      frames[i].forEach((b, j) => {
+        const a = frames[0][j]
+        if (!a || !b) return
+        travel = Math.max(travel, Math.hypot(b[0] - a[0], b[1] - a[1]))
+        if (Math.hypot(b[0] - a[0], b[1] - a[1]) > 0.5 || Math.abs(b[4] - a[4]) > 0.04
+          || b[6] !== a[6] || b[7] !== a[7] || b[8] !== a[8] || b[9] !== a[9]
+          || Math.abs(b[2] - a[2]) > 0.5 || Math.abs(b[3] - a[3]) > 0.5) stirred.add(j)
+      })
+    }
+    // the resting box of the whole thing, which is what anything straying outside is measured against
+    const rest = { x: still.boxes[0][0], y: still.boxes[0][1], w: still.boxes[0][2], h: still.boxes[0][3] }
+    for (const f of frames) {
+      for (const b of f) {
+        if (!b || b[4] < 0.05 || !b[2]) continue
+        escape = Math.max(escape,
+          rest.x - b[0], rest.y - b[1],
+          (b[0] + b[2]) - (rest.x + rest.w), (b[1] + b[3]) - (rest.y + rest.h))
+      }
+    }
+    const inkAt = (f) => f.reduce((n, b) => n + (b && b[4] > 0.05 && b[5] && b[2] > 0 ? 1 : 0), 0)
+    const atRest = Math.max(1, inkAt(frames[frames.length - 1]))
+    const blank = Math.max(0, 1 - inkAt(frames[0]) / atRest)
     if (!still.boxes.length || !after.boxes.length) return { skipped: 'nothing rendered to measure' }
     let off = 0, ghost = 0
     still.boxes.forEach((a, i) => {
@@ -842,7 +930,10 @@ async function drifts(o) {
         Math.abs(a[2] - b[2]), Math.abs(a[3] - b[3]))
       ghost = Math.max(ghost, a[4] - b[4])
     })
-    return { off, ghost, running: after.running }
+    return { off, ghost, running: after.running,
+      travel: Math.round(travel), reach: Math.round(travel / size * 100),
+      stir: Math.round(stirred.size / Math.max(1, frames[0].filter(Boolean).length) * 100),
+      escape: Math.round(Math.max(0, escape)), blank: Math.round(blank * 100) }
   } catch (e) {
     return { skipped: String(e && e.message ? e.message : e).slice(0, 90) }
   } finally { if (page) await page.close().catch(() => {}) }
@@ -1139,10 +1230,11 @@ user sees, and the css below is the rules that actually matched it.\n\n${source.
     const rest = await drifts({ markup, base, css: ok.css, scope: ok.scope, wide })
     const settled = resting(rest)
     if (settled.length) return { verb, why: settled[0], kind: 'gate' }
+    const seen = { reach: rest.reach, stir: rest.stir, escape: rest.escape, blank: rest.blank }
     const id = String(nextId++)
     keep(id, { file: name, markup, base, shot, css: ok.css, scope: ok.scope, tw, wide, note: ok.note,
       verb: errand ? `${verb.replace(/,.*/, '')}, ${errand.does.replace(/^to /, '')}` : verb })
-    return { id, verb, scope: ok.scope, note: ok.note, css: ok.css, tempo: tempo(ok.css) }
+    return { id, verb, scope: ok.scope, note: ok.note, css: ok.css, tempo: tempo(ok.css), seen }
   }
 
   // a manner and an errand each, so two options sharing a verb still have different jobs
@@ -1167,6 +1259,20 @@ user sees, and the css below is the rules that actually matched it.\n\n${source.
   // reported nothing dropped at all, which sent the page to the wrong explanation
   const notAsked = missed.filter((m) => !worth.includes(m))
   const tried = first.filter((t) => t.id).concat(again).concat(notAsked)
+  /**
+   * Ordered on the two things that are defensibly better or worse, and on nothing else.
+   *
+   * A component that is invisible at the first frame is worse than one that is legible, because this
+   * is watched from the middle and the prompt asks for no blank frame. A part that strays outside the
+   * component's own box risks being clipped or landing on a neighbour. Both are faults of degree
+   * rather than kind, which is what makes them worth ordering by rather than rejecting on.
+   *
+   * How much of the component takes part is deliberately not in here. An emphasis motion stirs three
+   * percent because it is about one thing, and an entrance stirs ninety because it is about all of
+   * them, and neither is better. It is shown on the card as a description, not scored.
+   */
+  const cost = (t) => (t.seen ? t.seen.blank + t.seen.escape * 0.6 : 0)
+  tried.sort((a, b) => (a.id ? 0 : 1) - (b.id ? 0 : 1) || cost(a) - cost(b))
   if (worth.length) console.log(`    retried ${worth.length}, recovered ${again.filter((t) => t.id).length}`)
   const styled = picked ? 'the rules that matched it in your app'
     : tw ? 'tailwind and a Wall palette'
@@ -1437,6 +1543,11 @@ iframe{width:100%;height:280px;border:0;background:#0b0c0d;display:block}
 figcaption{padding:10px 12px;border-top:1px solid var(--line);display:grid;gap:4px;font-size:12px}
 figcaption b{font-weight:500}.note{color:var(--dim)}.verb{color:var(--faint);font-size:11px;line-height:1.5}
 .facts{color:var(--dim);font-size:11px;font-variant-numeric:tabular-nums;letter-spacing:.01em}
+.seen{color:var(--faint);font-size:11px;font-variant-numeric:tabular-nums}
+.grid.solo{grid-template-columns:1fr}
+.grid.solo figure:not(.up){display:none}
+.grid.solo figure.up iframe{height:calc(100vh - 210px)}
+.backer{grid-column:1/-1;display:flex;justify-content:flex-end;margin:-4px 2px 0}
 .row{display:flex;gap:6px;margin-top:4px}
 .mini{height:24px;padding:0 9px;font-size:11.5px;background:var(--raised);color:var(--dim);
   border:1px solid var(--line2);border-radius:5px;cursor:pointer;font-family:inherit}
@@ -1562,6 +1673,7 @@ const play=document.getElementById('play'),ask=document.getElementById('ask'),ca
 const palette=document.getElementById('palette')
 let file=null, opts=[], running=true, t=0, last=performance.now(), held=new Map()
 let ends=new Map(), span=4200, rate=1
+let opened=null   // the option filling the room, or null for the grid
 let aimN=0   // bumped on every aim so the frame refetches instead of reusing the last page
 let quietMode=false
 /* a frame that has navigated to somebody else's origin is one we can no longer read, and the only
@@ -1771,6 +1883,14 @@ const SHADER = [
  * point, and throwing on load because a backslash in a template literal is eaten before the browser
  * sees it. One implementation, measured once.
  */
+/* what the rendering saw, beside what the sheet says: the two answer different questions */
+const seenLine = (o)=>{
+  const v=o.seen; if(!v) return ''
+  const bits=[v.stir+'% of it moves']
+  if(v.blank) bits.push(v.blank+'% blank at the first frame')
+  if(v.escape) bits.push('strays '+v.escape+'px outside')
+  return bits.join(' &middot; ')
+}
 const factLine = (o)=>{
   const t=o.tempo; if(!t) return ''
   const bits=[]
@@ -1834,7 +1954,7 @@ ask.onclick=async()=>{
   try{
     const r=await post('/__wall/motion',
       Object.assign({count:Number(document.getElementById('count').value)}, APP?chosen:{file}), 360000)
-    opts=r.kept||[]; cars=null; held.clear(); ends.clear()
+    opts=r.kept||[]; cars=null; opened=null; held.clear(); ends.clear()
     verdict = opts.length ? null : {dropped:r.dropped||[], error:r.error}
     render()
     drops.textContent=(r.dropped&&r.dropped.length&&opts.length? r.dropped.length+' dropped: '
@@ -1923,12 +2043,17 @@ function render(){
     '<figure><iframe data-i="'+i+'" src="/__wall/preview/'+o.id+q+'"></iframe>'+
     '<figcaption><b>'+(o.note||'untitled')+'</b>'+
     '<span class="facts">'+factLine(o)+'</span>'+
+    '<span class="seen">'+seenLine(o)+'</span>'+
     '<span class="verb">timing from '+o.verb+'</span>'+
     '<span class="note">'+o.scope+'</span>'+
-    '<span class="row"><button class="mini keep" data-more="'+o.id+'">More like this</button>'+
+    '<span class="row"><button class="mini" data-open="'+o.id+'">'+(opened===o.id?'Close':'Open')+'</button>'+
+    '<button class="mini keep" data-more="'+o.id+'">More like this</button>'+
     '<button class="mini" data-copy="'+o.id+'">Copy CSS</button>'+
     '<button class="mini" data-save="'+o.id+'">Save file</button></span></figcaption></figure>').join('')
+  grid.classList.toggle('solo', !!opened)
+  if(opened && !opts.some(o=>o.id===opened)) opened=null
   document.querySelectorAll('figure').forEach((f,i)=>{
+    if(opts[i] && opts[i].id===opened) f.classList.add('up')
     if(opts[i] && opts[i].id===chosenOpt) f.classList.add('chosen')
     f.onclick=e=>{
       if(e.target.closest('button')) return
@@ -1937,6 +2062,12 @@ function render(){
       f.classList.add('chosen')
       drawInspector()
     }
+  })
+  /* one option filling the room, because a card three hundred pixels wide is a thumbnail of a
+     decision rather than the decision. Escape comes back, and the transport keeps driving it */
+  document.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>{
+    opened = opened===b.dataset.open ? null : b.dataset.open
+    held.clear(); ends.clear(); render()
   })
   document.querySelectorAll('[data-more]').forEach(b=>b.onclick=async()=>{
     const keep=opts.find(x=>x.id===b.dataset.more)
@@ -2051,16 +2182,20 @@ function paint(){
   /* only the previews in the grid: the sidebar thumbnails and the proxied app are iframes too, and
      counting them made the readout say 3 of 5 driven when all five were fine. That is the wandering
      number I could not pin down all session, and it was this */
-  const frames=document.querySelectorAll('.grid iframe')
+  /* a preview inside a hidden figure stops running and stops replying, so counting it says one of
+     two are driven when the one you are looking at is fine */
+  const frames=[...document.querySelectorAll('.grid iframe')].filter(f=>f.offsetParent!==null)
   if(!opts.length&&!(cars&&cars.some(c=>c.id))){
     link.removeAttribute('data-ok'); link.title='nothing to drive yet'; return }
-  const live=[...held.values()].filter(n=>n>0).length
+  /* counted over the frames that are actually on screen rather than over everything the map still
+     remembers, or closing an opened option reports five of one */
+  const live=frames.filter((f,i)=>(held.get(i)||0)>0).length
   const all=live===frames.length
   link.setAttribute('data-ok', all?'yes':'no')
   link.title=live+' of '+frames.length+' previews are being driven by the scrubber'
 }
 function hold(ms){
-  document.querySelectorAll('.grid iframe').forEach((f,i)=>{
+  ;[...document.querySelectorAll('.grid iframe')].filter(f=>f.offsetParent!==null).forEach((f,i)=>{
     try{f.contentWindow.postMessage({wall:'hold',t:ms,i},'*')}catch(_){}
   })
   scrub.value=ms; at.textContent=(ms/1000).toFixed(2)
@@ -2075,6 +2210,7 @@ addEventListener('keydown',e=>{
   if(e.target.tagName==='INPUT'&&e.target.type!=='range')return
   // escape leaves pick mode from either side: the frame has its own handler, but the pointer being
   // over the frame does not mean the frame has focus, and a key that works only sometimes reads broken
+  if(e.key==='Escape'&&opened){ opened=null; held.clear(); ends.clear(); render(); return }
   if(e.key==='Escape'&&document.getElementById('pick').getAttribute('aria-pressed')==='true'){
     const f=document.querySelector('.appwrap iframe')
     if(f) f.contentWindow.postMessage({wall:'nopick'},'*')
