@@ -506,8 +506,13 @@ function trimmed(el,cap){
     var drop=Math.max(1,Math.floor(all.length*0.08));
     for(var i=0;i<drop;i++){var n=c.querySelectorAll('*');if(n.length<2)break;n[n.length-1].remove()}}
   return c.outerHTML}
+/* Picking stays armed until it is turned off.
+   It used to disarm itself after one element, which was fine when a pick replaced the last one and is
+   broken now that several of them make a rail: you click the second thing, nothing happens, and the
+   button is the only place that says why. Measured before the change, three clicks in a row produced
+   one selection. Escape leaves, and so does pressing the button again. */
 function pick(e){if(!on)return;e.preventDefault();e.stopPropagation();
-  var el=last||e.target;on=false;if(box)box.style.display='none';
+  var el=last||e.target;
   var r=el.getBoundingClientRect(),h=trimmed(el,14000);
   var css=rules(el);
   /* Stagger is the whole difference between motion somebody notices and motion somebody ignores, and
@@ -519,10 +524,17 @@ function pick(e){if(!on)return;e.preventDefault();e.stopPropagation();
     : kids<3 ? 'this has fewer than three children, so there is little to stagger' : '';
   parent.postMessage({wall:'picked',html:h,css:css,label:label(el),opaque:opaque,weak:weak,
     cut:h.length<el.outerHTML.length,w:Math.round(r.width),h:Math.round(r.height)},'*')}
+function arm(v){on=v;
+  document.documentElement.style.cursor=v?'crosshair':'';
+  if(!v&&box)box.style.display='none';
+  parent.postMessage({wall:v?'armed':'disarmed'},'*')}
 addEventListener('mousemove',move,true);addEventListener('click',pick,true);
+/* a framework that acts on mousedown would fire before the click is stopped */
+addEventListener('mousedown',function(e){if(on){e.preventDefault();e.stopPropagation()}},true);
+addEventListener('keydown',function(e){if(on&&e.key==='Escape'){e.preventDefault();arm(false)}},true);
 addEventListener('message',function(e){var d=e.data||{};
-  if(d.wall==='pick'){on=true}
-  if(d.wall==='nopick'){on=false;if(box)box.style.display='none'}});
+  if(d.wall==='pick')arm(true);
+  if(d.wall==='nopick')arm(false)});
 parent.postMessage({wall:'ready'},'*');
 })();<\/script>`
 
@@ -978,6 +990,8 @@ figcaption b{font-weight:500}.note{color:var(--dim)}.verb{color:var(--faint);fon
   border:1px solid var(--line);border-radius:6px;font-size:11.5px;color:var(--dim)}
 .pill b{display:grid;place-items:center;width:15px;height:15px;flex:none;border-radius:4px;
   background:var(--accent);color:#fff;font-size:9.5px;font-weight:500}
+.pill .who{display:grid;gap:1px;min-width:0;overflow:hidden}
+.pill .who i{font-style:normal;color:var(--faint);font-size:10px;font-variant-numeric:tabular-nums}
 .pill button{margin-left:auto;background:none;border:0;color:var(--faint);cursor:pointer;
   font-size:14px;line-height:1;padding:0 2px}
 .pill button:hover{color:var(--ink)}
@@ -1238,11 +1252,14 @@ addEventListener('message',e=>{const d=e.data||{}
     if(d.end>0){ends.set(d.i,d.end); const want=Math.max(1200,Math.min(20000,Math.max(...ends.values())+300))
       if(Math.abs(want-span)>60){span=want;scrub.max=span;document.getElementById('span').textContent=(span/1000).toFixed(1)+'s'}}
     paint()}
+  if(d.wall==='armed'||d.wall==='disarmed'){
+    document.getElementById('pick').setAttribute('aria-pressed',d.wall==='armed')
+    document.getElementById('pick').textContent=d.wall==='armed'?'Picking… (esc)':'Pick element'
+  }
   if(d.wall==='picked'){
     chosen={html:d.html,css:d.css,label:d.label,w:d.w,h:d.h,
       cut:d.cut,opaque:d.opaque,weak:d.weak}
     picks.push(chosen)
-    document.getElementById('pick').setAttribute('aria-pressed','false')
     drawSel()
     document.getElementById('sel').insertAdjacentHTML('beforeend','<b class="chip">'+d.label
       +'<br><span>'+(d.css.length/1000).toFixed(1)+'kb of matched css, '
@@ -1260,7 +1277,8 @@ function drawSel(){
   const el=document.getElementById('sel')
   if(!picks.length){ el.innerHTML=''; ask.textContent='Give it motion'; return }
   el.innerHTML='<p class="selhead">Selection'+(picks.length>1?' &middot; '+picks.length:'')+'</p>'
-    +picks.map((p,i)=>'<span class="pill"><b>'+(i+1)+'</b>'+p.label.slice(0,26)
+    +picks.map((p,i)=>'<span class="pill"><b>'+(i+1)+'</b><span class="who">'+p.label.slice(0,24)
+      +'<i>'+p.w+'&times;'+p.h+(p.weak?' &middot; thin':'')+'</i></span>'
       +'<button data-drop="'+i+'" title="remove">&times;</button></span>').join('')
     +(picks.length>1?'<p class="hint">These will be given one motion each and played on one '
       +'timeline, each starting a beat after the one above it.</p>':'')
@@ -1291,6 +1309,14 @@ requestAnimationFrame(function tick(now){const s=now-last;last=now
 play.onclick=()=>{running=!running;face()}
 scrub.oninput=()=>{running=false;face();t=Number(scrub.value);hold(t)}
 addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT'&&e.target.type!=='range')return
+  // escape leaves pick mode from either side: the frame has its own handler, but the pointer being
+  // over the frame does not mean the frame has focus, and a key that works only sometimes reads broken
+  if(e.key==='Escape'&&document.getElementById('pick').getAttribute('aria-pressed')==='true'){
+    const f=document.querySelector('.appwrap iframe')
+    if(f) f.contentWindow.postMessage({wall:'nopick'},'*')
+    return
+  }
   if(e.target.tagName==='INPUT'&&e.target.type==='range')return
   if(e.key===' '){e.preventDefault();play.click()}
   if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();running=false;face()
