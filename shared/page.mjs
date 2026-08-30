@@ -711,7 +711,7 @@ ask.onclick=async()=>{
   if(!APP && !file) return alert('Pick a component first.')
   if(ask.disabled) return
   verdict=null
-  ask.disabled=true; ask.textContent='Writing…'
+  ask.disabled=true; askSays('Writing…')
   if(APP && picks.length>1){
     grid.innerHTML=WAITER(); runShader()
     drops.textContent=''
@@ -744,7 +744,7 @@ ask.onclick=async()=>{
       ? 'The studio did not answer within six minutes. It may still be working: the terminal says what it is doing.'
       : String(e && e.message ? e.message : e)}
     opts=[]; render() }
-  ask.disabled=false; ask.innerHTML='Give it motion'
+  ask.disabled=false; askSays('Give it motion')
 }
 cam.onchange=render
 document.getElementById('depth').onchange=render
@@ -1556,10 +1556,20 @@ function wireTimeline(live){
 }
 
 /* the selection, which is the thing a rail is built out of */
+/**
+ * The label, never the button.
+ *
+ * Writing textContent onto the button removes the canvas the arm light draws into and the span
+ * every other caller writes to. So the first time somebody asked for motion the button lost its
+ * light for the rest of the session, and every drawSel after that threw on a null and stopped
+ * halfway, which showed up as a picked element whose name never updated. Four call sites wanted
+ * this and three of them got it wrong, which is what a helper is for.
+ */
+function askSays(t){ const l = ask.querySelector('.lbl'); if (l) l.textContent = t }
+
 function drawSel(){
   const el=document.getElementById('sel')
-  if(!picks.length){ el.innerHTML=''; ask.querySelector('.lbl').textContent='Give it motion'
-    armGlow(false); return }
+  if(!picks.length){ el.innerHTML=''; askSays('Give it motion'); armGlow(false); return }
   el.innerHTML='<p class="selhead">Selection'+(picks.length>1?' &middot; '+picks.length:'')+'</p>'
     +picks.map((p,i)=>'<span class="pill"><b>'+(i+1)+'</b>'
       +'<span class="shot"><iframe data-shot="'+i+'" scrolling="no" tabindex="-1"></iframe></span>'
@@ -1577,7 +1587,7 @@ function drawSel(){
     mark('removing '+tagOf(picks[Number(b.dataset.drop)].label))
     picks.splice(Number(b.dataset.drop),1); chosen=picks[picks.length-1]||null
     cars=null; opts=[]; drawSel(); render() })
-  ask.querySelector('.lbl').textContent=picks.length>1?'Give them motion':'Give it motion'
+  askSays(picks.length>1?'Give them motion':'Give it motion')
   armGlow(picks.length>0)
 }
 function paint(){
