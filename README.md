@@ -28,17 +28,28 @@ stack** — design tokens, structure, and copy, not a static file to port.
 Nothing else to download: `npx` resolves the latest version on every run, so Windows and
 Linux work without a build and a run is never stale. A desktop app is coming.
 
-Three tools: `design` opens Wall and answers within seconds, so your agent is free while you
+Five tools: `design` opens Wall and answers within seconds, so your agent is free while you
 read · `collect` hands it the page you chose, whenever you choose it · `check` names the
-patterns that make a page look generated.
+patterns that make a page look generated · `studio` opens the motion studio pointed at your
+running app · `motion` writes motion straight into your code without opening anything.
 
 ## Motion, for components you already have
+
+Two ways in, and they reach the same room. Ask your agent, which opens it for you:
+
+> open the motion studio on localhost:3000
+
+Or bring it up yourself:
 
 ```
 npm run studio                                     the components in examples/
 npm run studio -- ~/app/src/ui --css ~/app/globals.css
 npm run studio -- --app http://localhost:3000      your dev server
 ```
+
+Use `studio` when you want to look at several motions and choose. Use `motion` when you want
+the stylesheet written into your code without stopping to look, which is the same gates and
+the same deck with nobody watching.
 
 Or open it with no arguments and **type an address into the sidebar**: `localhost:3000`,
 `stripe.com`, anything reachable. The five most recent stay in the rail with their favicons.
@@ -52,6 +63,10 @@ that nearly worked; the inspector makes it slower or wider apart without asking 
 Reading a component out of a `.tsx` is guesswork, so it does not: with `--app` your dev
 server is proxied through the studio's own origin, which makes the frame same origin, which
 makes its dom readable. A picked element brings the rules that actually matched it.
+
+Save what you like and it stays in the browser, so a restart does not lose it, and it comes
+away as one file that opens anywhere. **Film** renders what is on screen frame by frame and
+encodes it in the page itself, so posting a clip needs nothing installed.
 
 What comes out is a `.motion.css` scoped to one attribute, which ships in your product.
 Six gates read that sheet and a seventh renders it: one that leaves the component twelve

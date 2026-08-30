@@ -129,6 +129,36 @@ const TOOLS = [
     },
   },
   {
+    name: 'studio',
+    description:
+      'Open the motion studio, so the person can point at a running site or a component, pick '
+      + 'elements off it, and compare several motions for them on one timeline. Use this when '
+      + 'somebody wants motion for something they already have and would rather choose than '
+      + 'describe, or when they say the words motion studio. Prefer the motion tool instead when '
+      + 'they want the stylesheet written straight into their code without looking at it first. '
+      + 'This returns as soon as the studio is open, which is the normal outcome and not a '
+      + 'failure: picking and comparing takes minutes. If one is already open it says so rather '
+      + 'than starting a second, because a second would take the port and roam elsewhere.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        url: {
+          type: 'string',
+          description:
+            'A running site or dev server to aim it at, like http://localhost:3000. Its elements '
+            + 'become pickable. Leave it out to open on a folder of components instead.',
+        },
+        dir: {
+          type: 'string',
+          description:
+            'Absolute path of the project, so the studio opens on its components when no url is '
+            + 'given. Always pass it. This server runs as its own process and its working '
+            + 'directory is not necessarily the project you are in.',
+        },
+      },
+    },
+  },
+  {
     name: 'motion',
     description:
       'Give a component you already have motion that is not a 300ms fade. Send the markup and get '
@@ -250,6 +280,55 @@ function launchShell(found, request) {
       resolve(true)
     })
   })
+}
+
+/**
+ * Open the motion studio, or say that one is already open.
+ *
+ * A second studio does not replace the first, it finds the port busy and roams to 4322, which is
+ * right for a person reading the terminal and wrong for an agent that has just told somebody to
+ * look at 4321. So this asks first.
+ *
+ * It waits for the server to actually answer rather than reporting success on spawn. A studio that
+ * failed to start looks exactly like one that started, right up until the person opens the address
+ * and finds nothing there, and by then the agent has already said it worked.
+ */
+async function studio({ url, dir }) {
+  const port = Number(process.env.WALL_PORT || 4321)
+  const at = `http://localhost:${port}`
+  const answering = async () => {
+    try {
+      const r = await fetch(`${at}/__wall/model`, { signal: AbortSignal.timeout(700) })
+      return r.ok
+    } catch { return false }
+  }
+  if (await answering()) {
+    return `A motion studio is already open at ${at}. Tell them to use that one rather than `
+      + 'opening another, and if they want it pointed somewhere else there is an address bar in '
+      + 'the top left of it.'
+  }
+  const args = [path.join(ROOT, 'tools', 'studio.mjs')]
+  if (url) args.push('--app', String(url))
+  else if (dir) args.push(String(dir))
+  // process.execPath for the same reason openInBrowser gives: an agent launched from a desktop
+  // icon has a login shell's PATH, which on any machine using nvm has no node on it
+  const child = spawn(process.execPath, args, { stdio: 'ignore', detached: true, cwd: dir || ROOT })
+  const started = await new Promise((done) => {
+    child.on('error', () => done(false))
+    child.on('spawn', () => { child.unref(); done(true) })
+  })
+  if (!started) return 'The studio could not be started from here. `npm run studio` in the project will do it.'
+  for (let n = 0; n < 40; n++) {
+    if (await answering()) {
+      return `The motion studio is open at ${at}.${url ? ` It is aimed at ${url}.` : ''} Tell them `
+        + 'to pick one or more elements and press Give it motion, and that several motions come '
+        + 'back to compare on one timeline. Choosing takes minutes, so do not wait on it: they can '
+        + 'save what they like from the studio itself.'
+    }
+    await new Promise((r) => setTimeout(r, 250))
+  }
+  return `The studio was started but has not answered at ${at} within ten seconds. Ask them to `
+    + 'check the terminal, or run `npm run studio` themselves.'
 }
 
 /**
@@ -545,6 +624,7 @@ async function motion(args) {
 }
 
 async function call(name, args, id) {
+  if (name === 'studio') return ok(id, await studio(args ?? {}))
   if (name === 'motion') {
     return ok(id, await motion(args ?? {}))
   }
