@@ -1240,7 +1240,50 @@ const KEEP = 240
 const keep = (id, option) => {
   made.set(id, option)
   while (made.size > KEEP) made.delete(made.keys().next().value)
+  saveSoon()
 }
+
+/**
+ * What survives the studio restarting under you.
+ *
+ * Editing this file restarts the process, which used to mean losing the site you had aimed at, the
+ * elements you had picked and every option you had just spent two minutes generating. So the work in
+ * flight is written next to the other local state and read back if the restart was recent.
+ *
+ * Recent is the whole test. A session file from yesterday is somebody opening the studio again, and
+ * restoring an aim and forty options into that would be baffling. A session file from four seconds
+ * ago is node's watcher having bounced the process while a browser tab is still sitting there open.
+ *
+ * Only the last forty options are kept. The store holds up to two hundred and forty and each one
+ * carries markup and a computed style snapshot, so writing all of them on every change would put
+ * megabytes through the disk for the sake of previews nobody is going to scroll back to.
+ */
+const SESSION_AT = path.join(work, 'session.json')
+const WARM = 20_000
+const BOOT = Date.now()
+const streams = new Set()   // open event streams, which have to be let go of before the process can
+let saving = null
+const saveSoon = () => {
+  if (saving) return
+  // debounced, because five options landing together is five writes of the same megabyte
+  saving = setTimeout(() => {
+    saving = null
+    try {
+      const recent = [...made.entries()].slice(-40)
+      writeFileSync(SESSION_AT, JSON.stringify({ at: Date.now(), aim: AIM, nextId, made: recent }))
+    } catch { /* a session that cannot be written is not a reason to stop working */ }
+  }, 400)
+}
+const resumed = (() => {
+  try {
+    const was = JSON.parse(readFileSync(SESSION_AT, 'utf8'))
+    if (!was || Date.now() - was.at > WARM) return null
+    for (const [id, o] of was.made ?? []) made.set(id, o)
+    nextId = Math.max(nextId, Number(was.nextId) || 0)
+    if (was.aim) aimAt(was.aim)
+    return was
+  } catch { return null }
+})()
 
 /**
  * Variations on one that nearly worked.
@@ -1776,6 +1819,22 @@ const server = createServer(async (req, res) => {
       res.writeHead(200, { 'content-type': 'text/javascript', 'cache-control': 'no-cache' })
       return res.end(readFileSync(at))
     }
+    /**
+     * A stream whose only content is which process is answering.
+     *
+     * EventSource reconnects by itself, so the page does not have to poll or guess. When the number
+     * changes it is talking to a different process than the one that served it, which is the only
+     * reliable signal that the code under it moved.
+     */
+    if (url.pathname === '/__wall/live') {
+      res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache',
+        connection: 'keep-alive' })
+      res.write(`data: ${JSON.stringify({ boot: BOOT })}\n\n`)
+      const beat = setInterval(() => { try { res.write(': still here\n\n') } catch { /* gone */ } }, 15_000)
+      streams.add(res)
+      req.on('close', () => { clearInterval(beat); streams.delete(res) })
+      return
+    }
     if (url.pathname === '/__wall/model' && req.method === 'GET') {
       return json(res, { providers: PROVIDERS, current: publicly(MODEL), canCli: CAN_CLI })
     }
@@ -1864,6 +1923,7 @@ const server = createServer(async (req, res) => {
         if (bad) return json(res, { error: bad.error })
         console.log(`  aimed at ${AIM}`)
         remember(AIM)
+        saveSoon()
         return json(res, { at: AIM, host: HOST, recent })
       } catch (e) { return json(res, { error: `that is not an address I can reach: ${e.message}` }) }
     }
@@ -1946,6 +2006,24 @@ const live = await listenNear(server, PORT).catch((e) => {
   console.log(`\n  cannot listen: ${e.message}\n`)
   process.exit(1)
 })
+/**
+ * Letting go quickly when the watcher asks.
+ *
+ * Node's watcher sends a signal and then waits ten seconds for the process to leave before it
+ * insists. An open event stream uses every one of those seconds, which turns a one second restart
+ * into eleven and makes the thing built to save time cost it instead. Nothing here is worth a
+ * graceful drain: the session is already on disk, so the sockets can go immediately.
+ */
+const letGo = () => {
+  for (const r of streams) { try { r.end() } catch { /* already gone */ } }
+  streams.clear()
+  try { server.closeAllConnections?.() } catch { /* an older node without it */ }
+  server.close(() => process.exit(0))
+  setTimeout(() => process.exit(0), 200).unref()
+}
+process.on('SIGTERM', letGo)
+process.on('SIGINT', letGo)
+
 const broke = scriptsParse()
 if (broke) {
   console.log(`\n  ${broke}`)
@@ -1964,12 +2042,21 @@ else {
 console.log(TARGET ? '  picked elements bring their own css, so nothing is guessed'
   : rawSheet ? `  styled with ${SHEET}`
     : '  no --css given: utility classes are compiled here and coloured from a Wall palette')
-console.log(KEY ? '  a key is set, so calls go straight to the api and skip a process per option.'
-    + (CAN_CLI ? ' If it is refused, the claude command takes over\n' : '\n')
-  : CAN_WRITE ? '  the claude command is here, so motion can be written\n'
-  : '  no claude command on PATH, so nothing can be written. Install it, or start the studio\n'
-    + '  from a shell where `claude` runs, and the button will have something to call.\n')
-if (!process.env.WALL_NO_OPEN) {
+/* named from the config rather than from a key that no longer exists. This line read `KEY ?` for
+   several commits after the variable behind it was removed, and threw every boot into the catch all
+   handler, which is exactly the kind of thing you never see by reading the first two lines */
+const writing = resolve(MODEL)
+console.log(CAN_WRITE || MODEL.provider !== 'claude-cli'
+  ? `  writing with ${writing.label}${writing.model ? `, ${writing.model}` : ''}`
+    + `, changeable in settings\n`
+  : '  no claude command on PATH, so nothing can be written. Install it, or pick another service\n'
+    + '  in settings, and the button will have something to call.\n')
+if (resumed) {
+  console.log(`  picked up where it left off: ${made.size} option${made.size === 1 ? '' : 's'}`
+    + `${resumed.aim ? `, still aimed at ${new URL(resumed.aim).host}` : ''}`)
+}
+// a restart every time a file is saved must not open a tab every time a file is saved
+if (!process.env.WALL_NO_OPEN && !resumed) {
   const [cmd, a] = process.platform === 'darwin' ? ['open', [where]]
     : process.platform === 'win32' ? ['cmd', ['/c', 'start', '', where]]
       : ['xdg-open', [where]]

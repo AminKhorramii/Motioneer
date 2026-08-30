@@ -63,9 +63,7 @@ verify/                the suites, in order of how much they prove
 tools/                 run by hand or at author time, never at run time
   try.mjs              the loop for working on Wall itself
   studio.mjs           the motion studio: proxy, picker, transport, rail, camera, export
-  animate.mjs          the same job as one command, for a file rather than a room
   motion.mjs           moving marks, drawn and animated in one call
-  shot.mjs             a camera pass over a component: macro, tilted, shallow focus
   film.mjs             renders a folder of shots frame by frame, mp4 if ffmpeg is there
   capture.mjs          record real streams into fixtures/
   shots.mjs            screenshots into shots/

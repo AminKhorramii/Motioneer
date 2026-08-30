@@ -737,13 +737,17 @@ is already scoped: option two gets `data-motion-fold-2` and its selectors are re
 `Film` renders whatever is on screen frame by frame, the rail with its offsets and cameras included,
 and plays the result in a panel with somewhere to take it away, because a path printed in a status
 line is a thing you then have to go and find. It hands back an mp4 if ffmpeg is on the machine and the frames plus a one line script if it is not. Stepped
-rather than recorded for the same reason film.mjs gives: a recording hopes the machine keeps up and
-produces a different file every run, while setting the clock by hand produces the same film every
-time. Measured on three options, 48 frames at 1280 by 720 in four seconds.
+rather than recorded: a recording hopes the machine keeps up and produces a different file every run,
+while setting the clock by hand produces the same film every time. Measured on a real option, 48
+frames at 1280 by 720 in under a second.
 
-`shot.mjs` and `film.mjs` are the other end of it: a camera pass over a component, then that move
-rendered frame by frame. The frames are the deliverable and mp4 only happens if ffmpeg is installed,
-which is said out loud rather than silently skipped.
+It draws in the browser rather than on the machine serving the page. There were two of these and a
+setting to choose between them, which was the wrong answer: the headless one rendered exactly what
+chromium renders, but it needed playwright and ffmpeg, and playwright is a development dependency
+absent from the published package while ffmpeg is something a person may happen to have. On a clean
+install it produced no film at all, and a path that is not installed is not more faithful than one
+that is. What the browser path cannot draw is specific and short, so `limits()` looks for those five
+things in the document being filmed and says so on the film where they are present.
 
 ### Proving it
 

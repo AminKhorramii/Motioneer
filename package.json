@@ -34,7 +34,7 @@
     "verify:beat": "node verify/beat.mjs",
     "verify:cli": "node verify/cli.mjs",
     "bench": "npm run build && node tools/bench.mjs",
-    "studio": "node tools/studio.mjs",
+    "studio": "node --watch tools/studio.mjs",
     "verify:model": "node verify/model.mjs",
     "verify:guard": "node verify/guard.mjs",
     "verify:mp4": "node verify/mp4.mjs"
