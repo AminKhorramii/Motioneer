@@ -1,25 +1,28 @@
 # Working on Wall
 
-Wall does one thing twice. It makes a wall of complete landing pages to compare, choose from,
-and hand back to your agent as a spec, and it runs a studio that gives several motions to a
-component you already have so they can be compared on one timeline. Same act, different
-material. Read `docs/flows.md` for every path through both and the code that carries it, and
-`docs/architecture.md` for the module map.
+Wall is a motion studio. You point it at a running site, pick elements off it, and get several
+motions for each to compare on one timeline. It used to also make walls of landing pages; that
+half was removed, and anything in git history about sections, worlds, composing or slop belongs
+to it rather than to this. Read `docs/flows.md` for every path through the studio and the code
+that carries it, `docs/architecture.md` for the module map, and `docs/rail.md` for the plan for
+multi selection.
 
 ## Where things live
 
-- The page model is `src/sections.ts`: a section argues a role and wears a form.
-- Rendering is `src/render.ts`, dressing and worlds machinery `src/worlds.ts`, the model
-  path `src/compose.ts`, briefs `src/brief.ts`, the slop detector `src/slop.ts`.
-- Everything opinionated is data in `src/design/`, one file per kind of knowledge: faces,
-  presets, worlds, angles, craft rules, the slop catalogue, the direction library, the
-  system prompts. Tune taste there without touching machinery.
 - The studio is `tools/studio.mjs`: the proxy, the picker, the transport, the rail. It is one
   file because it is one room, and nothing else imports from it.
+- The page it serves is `shared/page.mjs`, lifted out because a worker has no filesystem to
+  read a component folder from. It is one template literal, so **watch the backslashes**: a
+  regex written there loses its escapes before a browser sees it. There is a startup guard that
+  reads the source and refuses to run when it finds one, because this has cost seven bugs.
+- Everything opinionated is data in `src/design/`, one file per kind of knowledge. The two decks
+  and what a motion is asked to be are `src/design/motion.ts`; the palettes are `presets.ts`.
+  Tune taste there without touching machinery.
 - What judges model written css lives in `src/written.ts` beside the other gates, never in the
-  studio page: `unmoved`, `brittle`, `janky`, `unstill`, `leaks`, `scopeOf`, `tempo`, `retimed`, `namespaced`. The page
-  is a template literal, so a regex written there loses its backslashes before the browser sees
-  it, and a second copy of a measurement is how `3.2s` came to be read as `2s`.
+  studio page: `unmoved`, `brittle`, `janky`, `unstill`, `leaks`, `scopeOf`, `tempo`, `retimed`,
+  `namespaced`. A second copy of a measurement is how `3.2s` came to be read as `2s`.
+- Nothing in `shared/` imports a node builtin at module scope except `cli.mjs`, which is loaded
+  only when the command line provider is chosen. Keep it that way.
 
 ## House rules
 
@@ -40,11 +43,14 @@ material. Read `docs/flows.md` for every path through both and the code that car
 
 ## Before pushing
 
-Run `npm run build && node verify/app.mjs` at minimum; run `verify:stream` when the model path
-or renderer changed, and `verify:oneline` when the handoff format changed. When the studio
-changed, drive it: `node verify/studio-sites.mjs` for the proxy and the picker,
-`node verify/studio-capture.mjs` for what survives being picked. Both need the network and
-both are worth the minutes, because every proxy bug so far was invisible to a fixture.
+Run `npm run verify:all` at minimum, which builds and runs everything that needs no network.
+When the studio changed, drive it: `npm run verify:studio` for the proxy and the picker,
+`npm run verify:capture` for what survives being picked. Both need the network and both are
+worth the minutes, because every proxy bug so far was invisible to a fixture.
+
+Drive the actual room for anything a person touches. Three separate faults in one sitting came
+from reading a `let` before its line ran, which kills the whole page script and takes every
+listener below it with it, and none of those were visible to `node --check`.
 
 `npm run studio` watches its own sources, so editing it restarts it in about half a second and
 the page puts your work back: the aim, the picks and the options all survive, because losing two

@@ -1,134 +1,57 @@
-# Architecture
+# The module map
 
-Where everything lives, and the rule that decides which file owns what: logic goes in whichever
-module owns the data it reads. Files stay far from a thousand lines.
-
-## The map
+Wall is a motion studio. One room, served by one node program, with the parts that have to agree
+with each other kept outside it.
 
 ```
-src/
-  sections.ts   the page model. the single source of shape
-  worlds.ts     design worlds: one set of decisions that propagate together
-  taste.ts      taste in both senses: the sheet a variant is made against, and what you keep
-  render.ts     page model to standalone HTML
-  backdrop.ts   drawn art, seeded from the taste sheet
-  brief.ts      page model to a markdown spec
-  slop.ts       the generic patterns, checked locally
-  written.ts    a page the model wrote whole, and the filter between its markup and the wall
-  reply.ts      reading an object out of a model reply that is partial, fenced or not quite JSON
-  compose.ts    the model path: angles, fan out, streaming, partial JSON
-  host.ts       the only file that knows where Wall is running
-  core.ts       the headless core, exported for shells with no DOM
+tools/
+  studio.mjs           the room: the proxy, the picker, the transport, the rail, the export
 
-  App.tsx       the studio: state, the wall, keyboard and wheel, persistence
-  Dock.tsx      what you ask for, and where you are
-  SectionsRail.tsx  the section list and its controls
-  BriefRail.tsx     the brief and the taste sheet
-  Onboarding.tsx    first run, in two steps
-  models.tsx    the vendors, and their marks drawn rather than fetched
-  wall.css      the chrome
+shared/                everything the studio uses that is not the room itself
+  page.mjs             the page it serves. One template literal, so watch the backslashes
+  model.mjs            which service writes the motion, and the catalogue of the ones it can
+  providers.mjs        the two wire formats worth speaking, since most vendors speak one of them
+  cli.mjs              the claude command, when that is what is writing
+  guard.mjs            what the proxy may fetch, which matters the moment this is not on a laptop
+  raster.mjs           a document drawn to a canvas at a chosen instant, for filming
+  mp4.mjs              those canvases encoded, with a muxer, because a browser has no mp4 writer
+  port.mjs             listening near a port rather than on it
 
-  imagepipe.ts  the image pipeline as the app sees it, wasm underneath
-  imagewasm.ts  generated: the crate, inlined as base64
+src/                   what the studio imports through a built bundle, because node cannot read ts
+  design/motion.ts     the two decks, and what a motion is asked to be
+  written.ts           the gates: what makes a written sheet acceptable
+  theme.ts, taste.ts   the palettes a preview is dressed in
+  reply.ts             pulling json out of a reply that may be wrapped in prose
+  core.ts              the barrel, exporting exactly what runs outside a browser
 
-shared/providers.mjs   one model path for every shell
-shared/port.mjs        binds the port asked for, or the next free one, and says which
+mcp/
+  index.mjs            Wall as a tool an agent calls: studio opens the room, motion skips it
 
-src/written.ts         everything that judges model written css, and the two that repair it:
-                       safeStyle, unmoved, brittle, janky, unstill, leaks, scopeOf,
-                       tempo, retimed, namespaced. Never in the studio page, which is a
-                       template literal that eats a backslash before the browser sees it
-mcp/index.mjs          the three tools an agent calls, and how Wall is opened
-src-tauri/             the desktop shell, built but not released yet
-crates/wall-image/     decode, fit, flatten, re-encode. compiled to wasm
-server/index.mjs       serves dist and holds the keys
-fixtures/              recorded upstream streams, response bodies only
-
-verify/                the suites, in order of how much they prove
-  harness.mjs          one way to open the app for a suite
-  fake-upstream.mjs    a local vendor, replaying fixtures at their recorded pace
-  app.mjs              the app, mock model, and the house gate first
-  stream.mjs           the real streaming path, no mock anywhere
-  hard.mjs             an overgrown page, copy written to break the parser
-  beat.mjs             the heartbeat the server sends so a wait is not a hang
-  image.mjs            the image pipeline
-  mcp.mjs              the agent path end to end, protocol to handoff
-  server.mjs           the self hosted server, key never reaches the visitor
-  tauri.mjs            the desktop shell, checked without a window
-  oneline.mjs          the handoff format, and its format number
-  update.mjs           the update channel: publishable, complete, never stranded
+verify/                the suites, read as a set
   studio-sites.mjs     twenty real sites through the proxy, picked one at a time
   studio-capture.mjs   what survives being picked, by site and by kind of element
-
-tools/                 run by hand or at author time, never at run time
-  try.mjs              the loop for working on Wall itself
-  studio.mjs           the motion studio: proxy, picker, transport, rail, camera, export
-  motion.mjs           moving marks, drawn and animated in one call
-  film.mjs             renders a folder of shots frame by frame, mp4 if ffmpeg is there
-  capture.mjs          record real streams into fixtures/
-  shots.mjs            screenshots into shots/
-  wallclock.mjs        how long a whole wall takes, measured through the real app
-  fonts.mjs            generates src/typefaces.ts, committed
-  wasm.mjs             generates src/imagewasm.ts from the crate, committed
-
-examples/components/   shadcn shaped components with repeated parts, what the studio opens on
+  raster.mjs           what a drawn frame keeps, against a real browser
+  mp4.mjs              the container, parsed back and checked byte for byte
+  model.mjs            the provider layer, against a server that speaks the wire formats
+  guard.mjs            the proxy guard, against the addresses people use to get past one
+  mcp.mjs              the server over stdio, driven the way an agent drives it
+  cli.mjs              the claude command path
 ```
 
-## The data model
+## Which file owns what
 
-```ts
-Page {
-  id
-  taste: Taste          // colours, faces, scale, radius, density, weight, caps, motion
-  sections: Section[]   // ordered
-  angle?: string        // what this page argues
-  world?: WorldId       // how it is built
-  backdrop?: Backdrop
-}
+**The studio is one file because it is one room**, and nothing else imports from it. The proxy, the
+picker, the transport and the rail are all one act and splitting them would mean four files that
+only ever change together.
 
-Section { id, kind, variant, on, content }
-```
+**What judges a sheet lives in `src/written.ts`**, never in the page. The page is a template
+literal, so a regex written there loses its backslashes before a browser sees it, and a second copy
+of a measurement is how `3.2s` came to be read as `2s`. There is a guard at startup that reads the
+source and refuses to run when it finds one.
 
-Nine kinds exist: hero, logos, features, showcase, quote, pricing, faq, cta, footer. Each has
-between one and four layout variants. A world chooses which kinds exist, in what order, and
-which variant each one wears, so pages differ in silhouette rather than only in surface.
+**Everything opinionated is data in `src/design/`**, one file per kind of knowledge, so taste is
+tuned without touching machinery.
 
-Content is an untyped bag per kind because it is what a model fills in and what `applyEdit()`
-writes into by path. Everything that reads it is one `switch` in `render.ts`.
-
-## The boundaries that matter
-
-**`host.ts`** separates the app from its shell. Above it, one codebase; below it, three
-answers for state, export, preview, streaming and images. Adding a fourth shell is a file, not
-a fork.
-
-**`core.ts`** separates page making from the browser. The model, the renderer, the worlds and
-the checks have no DOM dependency, which is what makes an agent tool or a render service cheap.
-
-**`shared/providers.mjs`** separates Wall from the vendors. Two wire formats, Anthropic and
-OpenAI, cover every model in the picker; a new vendor is a row in `models.tsx` with a base URL.
-
-It also separates the wire format from the transport. `setFetch()` lets a shell hand in the
-fetch it needs without bringing a second copy of the request shapes with it: Node and a browser
-holding its own key use the global, and the desktop app hands in one that travels through Rust,
-because its webview is a real browser origin that would otherwise negotiate preflight with every
-vendor. That is the difference between three shells and three implementations.
-
-**`crates/wall-image`** is the only place with real compute, and it is one crate rather than one
-per shell. Compiled to wasm and inlined, the desktop app, the web build and a served deployment
-run the same binary. Rust is there because a generated image is the one thing in a Wall page
-measured in megabytes, not because the rest of the app is slow: a whole wall of eight pages
-renders in 0.18ms, which is a hundredth of a frame.
-
-**The iframe** separates a paper from the app. Model authored CSS runs inside a sandboxed frame
-holding nothing but the page, and `safeCss()` still strips imports and remote urls, because the
-promise that a shipped page is one file with no requests is worth more than the flexibility.
-
-## Two rules the code follows
-
-**Clamp, do not trust.** Every number a model chooses for a world is bounded. The model chooses
-inside a range and does not get to leave it, because an unbounded scale produces an unreadable
-page rather than a daring one.
-
-**Fail one, not eight.** Fan out catches per angle, so one bad reply loses one page. Runs carry
-a token, so a wall started while another is streaming abandons the first rather than mixing them.
+**Nothing in `shared/` imports a node builtin at module scope** except `cli.mjs`, which is loaded
+only when the command line provider is chosen. That is what lets the same code serve a page, judge
+a sheet and call a model somewhere with no filesystem and no shell.
