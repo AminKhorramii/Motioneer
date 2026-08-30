@@ -1055,14 +1055,25 @@ document.getElementById('save').onclick=async()=>{
      literal, which delivers the browser an unescaped dot that matches any character, so a file
      called my.component.tsx came back as my.componen */
   const stem=(v)=>{const k=String(v||'').lastIndexOf('.'); return k>0?String(v).slice(0,k):String(v||'')}
-  const ids = opts.length ? opts.map(o=>o.id) : (cars||[]).filter(c=>c.id).map(c=>c.id)
+  /* a rail is a composition, so what it hands over is the sequencing as well as the motions. Sending
+     the ids alone exported every car starting together, which is the one decision a rail records */
+  const live = (cars||[]).filter(c=>c.id)
+  const onRail = !opts.length && live.length
+  const ids = opts.length ? opts.map(o=>o.id) : live.map(c=>c.id)
   if(!ids.length) return
   const btn=document.getElementById('save'); btn.textContent='Writing…'
   const r=await fetch('/__wall/export',{method:'POST',headers:{'content-type':'application/json'},
     body:JSON.stringify({ids,palette:palette.value,
+      at: onRail ? live.map(c=>Math.round(c.at||0)) : [],
+      shots: onRail ? live.map(c=>c.shot||'') : [],
       name:stem((APP?(chosen&&chosen.label):file||'').split('/').pop())})}).then(r=>r.json())
   btn.textContent='Export'
+  /* cameras are not carried yet, and an export that quietly drops one is how the offsets went
+     missing in the first place, so it says so rather than looking complete */
+  const shot = onRail && live.some(c=>c.shot)
   drops.textContent='Wrote '+r.at+', '+r.kb+'kb. One file, opens anywhere, no requests.'
+    +(onRail?' The cars keep their offsets.':'')
+    +(shot?' The cameras do not travel into an export yet, so it plays locked off.':'')
 }
 document.getElementById('rate').onchange=e=>{rate=parseFloat(e.target.value)}
 

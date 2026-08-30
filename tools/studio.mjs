@@ -1418,17 +1418,27 @@ user sees, and the css below is the rules that actually matched it.\n\n${source.
  * attribute data-motion-fold-2 and rewriting its selectors to match keeps four sheets from colliding
  * in the same page. The transport then drives document.getAnimations() directly, with no postMessage
  * at all, because there is nothing to talk to.
+ *
+ * Two things are exported through here and they are not the same artifact. Several motions for one
+ * component is a comparison: a grid of captioned cards, every one held at the same instant, because
+ * the whole point is to see them do the same thing at the same time. A rail is a composition: one
+ * stage, the cars in the order they were arranged, each held at t minus its own offset. Exporting a
+ * composition as a comparison is what this did to every rail, and it arrived as a stack of components
+ * all starting together with the sequencing, the one decision a rail records, silently dropped.
  */
-const exportable = async (ids, palette) => {
+const exportable = async (ids, palette, offsets = [], shots = []) => {
   const picked = ids.map((id) => made.get(id)).filter(Boolean)
   if (!picked.length) return null
+  /* offsets are what tells the two apart, because they are what a rail has and a set of options for
+     one component does not */
+  const rail = offsets.length > 0
   const tw = picked.some((o) => o.tw) ? (await getTailwind()).js : null
   const parts = picked.map((o, i) => {
     // one sheet per option in one document, so each is renamed apart from the others
     const tag = o.scope ? `${o.scope}-${i + 1}` : ''
     const css = o.scope ? o.css.replaceAll(`[${o.scope}]`, `[${tag}]`) : o.css
     const markup = tag ? o.markup.replace(/<(\w+)/, `<$1 ${tag}`) : o.markup
-    return { ...o, css, markup, tag }
+    return { ...o, css, markup, tag, at: rail ? Math.max(0, Math.round(Number(offsets[i]) || 0)) : 0 }
   })
   const width = picked[0].wide ? `${picked[0].wide}px` : 'max-content'
   return `<!doctype html><html class="dark"><head><meta charset="utf-8">
@@ -1455,12 +1465,18 @@ figure{margin:0;background:var(--panel);border:1px solid var(--line);border-radi
 figcaption{padding:11px 13px;border-top:1px solid var(--line);font-size:12px}
 figcaption b{display:block;font-weight:500;margin-bottom:3px}
 figcaption span{color:var(--faint);font-size:11px}
+/* a composition is one stage rather than a wall of cards, and it is laid out the way the studio was
+   showing it, so what you send somebody is what you were looking at when you decided to send it */
+.wrap.rail{display:flex;flex-direction:column;justify-content:center;gap:10px;
+  height:calc(100vh - 48px);padding:14px}
+.wrap.rail figure{flex:1 1 0;min-height:0;background:none;border:0;border-radius:0;position:relative}
+.wrap.rail .stage{height:100%}
 </style></head><body>
 <header><button id="play">Pause</button><span class="clock" id="at">0.00 s</span>
   <input id="scrub" type="range" min="0" max="4000" value="0" step="10">
   <span class="clock" style="min-width:auto">${picked[0].file}</span></header>
-<div class="wrap">${parts.map((p) => `<figure><div class="stage"><div class="inner">${p.markup}</div></div>
-  <figcaption><b>${p.note || 'untitled'}</b><span>timing from ${p.verb}</span></figcaption></figure>`).join('')}
+<div class="wrap${rail ? ' rail' : ''}">${parts.map((p, i) => `<figure data-rail="${i}"><div class="stage"><div class="inner">${p.markup}</div></div>
+  ${rail ? '' : `<figcaption><b>${p.note || 'untitled'}</b><span>timing from ${p.verb}</span></figcaption>`}</figure>`).join('')}
 </div>
 <script>
 var running=true,t=0,last=performance.now(),span=4000
@@ -1470,10 +1486,19 @@ for (var el of document.querySelectorAll('.inner')){
   var s=Math.min(1,(box.width-24)/r.width,(box.height-24)/r.height)
   el.style.transform='translate(-50%,-50%) scale('+s.toFixed(4)+')'
 }
+/* which figure an animation belongs to, walked up from whatever it is animating, exactly as the
+   studio's own rail frame does it. An offset of zero for every one leaves a grid of options behaving
+   as it always did, so there is one transport here rather than two */
+var AT=${JSON.stringify(parts.map((p) => p.at))}
+function seat(a){try{var n=a.effect&&a.effect.target
+  while(n&&n!==document.body){if(n.dataset&&n.dataset.rail!==undefined)return Number(n.dataset.rail)
+    n=n.parentElement}}catch(_){}
+  return 0}
 function hold(ms){var end=0
-  for (var a of document.getAnimations()){try{a.pause();a.currentTime=ms
+  for (var a of document.getAnimations()){try{var off=AT[seat(a)]||0
+    a.pause();a.currentTime=Math.max(0,ms-off)
     var e=a.effect&&a.effect.getComputedTiming?a.effect.getComputedTiming().endTime:0
-    if(typeof e==='number'&&isFinite(e)&&e>end)end=e}catch(_){}}
+    if(typeof e==='number'&&isFinite(e)&&e+off>end)end=e+off}catch(_){}}
   if(end>0){var want=Math.max(1200,Math.min(20000,Math.round(end)+300))
     if(Math.abs(want-span)>60){span=want;scrub.max=span}}
   scrub.value=ms;at.textContent=(ms/1000).toFixed(2)+' / '+(span/1000).toFixed(1)+' s'}
@@ -1517,14 +1542,22 @@ async function railOf(picks, palette) {
   }))
 }
 
+/**
+ * The offsets and the cameras are read at the position the car was asked for, not the position it
+ * ended up in. An id the store has evicted drops out of `parts` and every car after it moves up one,
+ * so looking up `shots[i]` and `AT[i]` by the new position hands each remaining car the timing and
+ * the camera belonging to its neighbour. The rail still plays, in the wrong order, which is the kind
+ * of wrong nobody reports because it looks like a composition somebody chose.
+ */
 const railView = (ids, palette, offsets = [], shots = []) => {
-  const parts = ids.map((id, i) => made.get(id)).filter(Boolean).map((o, i) => {
-    const tag = o.scope ? `${o.scope}-r${i + 1}` : ''
-    const css = o.scope ? o.css.replaceAll(`[${o.scope}]`, `[${tag}]`) : o.css
-    const from = o.shot || o.markup
-    const markup = tag ? from.replace(/<(\w+)/, `<$1 ${tag}`) : from
-    return { ...o, css, markup, tag, i, shot: shots[i] || '' }
-  })
+  const parts = ids.map((id, asked) => ({ o: made.get(id), asked })).filter((x) => x.o)
+    .map(({ o, asked }, i) => {
+      const tag = o.scope ? `${o.scope}-r${i + 1}` : ''
+      const css = o.scope ? o.css.replaceAll(`[${o.scope}]`, `[${tag}]`) : o.css
+      const from = o.shot || o.markup
+      const markup = tag ? from.replace(/<(\w+)/, `<$1 ${tag}`) : from
+      return { ...o, css, markup, tag, i, at: offsets[asked] ?? i * 420, shot: shots[asked] || '' }
+    })
   if (!parts.length) return null
   const tw = parts.some((o) => o.tw)
   return `<html class="dark"><head><meta charset="utf-8">
@@ -1578,7 +1611,8 @@ ${parts.filter((p) => p.shot).map((p) => {
     ${body}</div>`
 }).join('')}</div>
 <script>
-var AT=${JSON.stringify(ids.map((_, i) => offsets[i] ?? i * 420))}
+/* one entry per car actually on the page, in the order they are drawn, so data-rail indexes it */
+var AT=${JSON.stringify(parts.map((p) => Math.round(p.at)))}
 for (var car of document.querySelectorAll('.car')){
   var el=car.querySelector('.in'); if(!el) continue
   if(car.classList.contains('shot')) continue   // a rig does its own framing
@@ -1748,7 +1782,7 @@ const server = createServer(async (req, res) => {
     }
     if (url.pathname === '/__wall/export' && req.method === 'POST') {
       const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))
-      const html = await exportable(body.ids ?? [], body.palette)
+      const html = await exportable(body.ids ?? [], body.palette, body.at ?? [], body.shots ?? [])
       if (!html) { res.writeHead(404); return res.end('nothing to export') }
       const stem = String(body.name ?? 'motion').replace(/[^-\w]/g, '-') || 'motion'
       const at = path.resolve(work, `${stem}.html`)
@@ -1813,7 +1847,8 @@ const server = createServer(async (req, res) => {
      * thousand lines through the escaping that has already cost this file six bugs, and would make
      * every page load carry an encoder almost nobody presses.
      */
-    if (url.pathname === '/__wall/raster.mjs' || url.pathname === '/__wall/mp4.mjs') {
+    if (url.pathname === '/__wall/raster.mjs' || url.pathname === '/__wall/mp4.mjs'
+      || url.pathname === '/__wall/arrange.mjs') {
       const at = path.resolve('shared', url.pathname.split('/').pop())
       if (!existsSync(at)) { res.writeHead(404); return res.end('') }
       res.writeHead(200, { 'content-type': 'text/javascript', 'cache-control': 'no-cache' })
