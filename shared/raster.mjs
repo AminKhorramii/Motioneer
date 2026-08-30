@@ -86,6 +86,17 @@ const SVGNS = 'http://www.w3.org/2000/svg'
 
 /** the attribute a held element wears, so a pseudo element can be named by a rule */
 const HELD = 'data-wall-held'
+/**
+ * An element saying that its subtree runs on a clock offset from the document's.
+ *
+ * A rail is several components on one timeline, each starting at its own instant, and the studio
+ * expresses that by holding each one at t minus its own offset rather than rewriting anybody's
+ * delays. That is a live animation operation, and this file does not do live animations: it writes
+ * the instant into the css, because a serialized copy carries declarations and not clocks. So a
+ * document with several clocks in it has to say so in the markup, or a film of a rail draws every
+ * car at the same instant and the sequencing, which is the whole thing being filmed, is gone.
+ */
+const OFFSET = 'data-wall-at'
 
 /** an element, and the two children css can give it that no inline style can reach */
 const PARTS = [null, '::before', '::after']
@@ -384,8 +395,24 @@ export function holdAt(doc, ms) {
   const retimed = new Set()
   let n = 0
 
+  /* the nearest clock this element sits on, remembered per element because holding the same document
+     at ninety instants in a row would otherwise walk every ancestry ninety times */
+  const onClock = new Map()
+  const clockOf = (el) => {
+    if (onClock.has(el)) return onClock.get(el)
+    const said = el.getAttribute && el.getAttribute(OFFSET)
+    const own = said !== null && said !== undefined && said !== ''
+      ? (Number(said) || 0)
+      : (el.parentElement ? clockOf(el.parentElement) : 0)
+    onClock.set(el, own)
+    return own
+  }
+
   for (const el of doc.querySelectorAll('*')) {
     const lines = []
+    /* not clamped at zero: a car whose turn has not come is legitimately at a negative instant, and
+       that is what leaves it holding its first frame instead of being dragged forward to it */
+    const local = at - clockOf(el)
     for (const part of PARTS) {
       let style = null
       try {
@@ -396,7 +423,7 @@ export function holdAt(doc, ms) {
       const name = style && style.animationName
       if (!name || name === 'none') continue
       const shifted = String(style.animationDelay || '0s').split(',')
-        .map((one) => `${millis(one) - at}ms`).join(', ')
+        .map((one) => `${millis(one) - local}ms`).join(', ')
       lines.push(`[${HELD}="${n}"]${part || ''}{animation-delay:${shifted} !important;animation-play-state:paused !important}`)
     }
     if (!lines.length) continue

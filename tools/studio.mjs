@@ -1629,7 +1629,11 @@ ${parts.filter((p) => p.shot).map((p) => {
          <div class="layer sharp">${inner}</div>
          <div class="layer blur" data-copy></div></div></div></div>`
     : inner
-  return `<div class="car${p.shot ? ' shot' : ''}" data-rail="${p.i}">
+  /* data-wall-at says which clock this car runs on. The transport holds it at t minus its offset,
+     which is a live animation and is invisible to anything that draws the document instead of
+     watching it: filming walked every element and wrote one instant into all of them, so a rail came
+     out with every car starting together and the sequencing, the thing being filmed, was gone */
+  return `<div class="car${p.shot ? ' shot' : ''}" data-rail="${p.i}" data-wall-at="${Math.round(p.at)}">
     <span class="tag">${p.i + 1}. ${String(p.file || p.note || '').slice(0, 44)}</span>
     ${body}</div>`
 }).join('')}</div>

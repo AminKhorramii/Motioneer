@@ -835,7 +835,17 @@ single missing option handed every car after it its neighbour's timing.
 
 `Film` renders whatever is on screen frame by frame, the rail with its offsets and cameras included,
 and plays the result in a panel with somewhere to take it away, because a path printed in a status
-line is a thing you then have to go and find. It hands back an mp4 if ffmpeg is on the machine and the frames plus a one line script if it is not. Stepped
+line is a thing you then have to go and find.
+
+That sentence was false for as long as it had been written. The transport holds each car at `t` minus
+its own offset, which is an operation on live animations, and filming does not watch a document, it
+copies one: a copy carries declarations and not clocks, so `holdAt` writes the instant into each
+element's own `animation-delay`. It wrote one instant into all of them, so a filmed rail came out with
+every car starting together, the same loss the export had and for the same underlying reason. A
+document with more than one clock in it now says so in the markup, `data-wall-at` on each car, and
+`holdAt` reads the nearest one rather than assuming there is only the document's. A car whose turn has
+not come sits at a negative instant, which is what leaves it holding its first frame instead of being
+dragged forward to it. It hands back an mp4 if ffmpeg is on the machine and the frames plus a one line script if it is not. Stepped
 rather than recorded: a recording hopes the machine keeps up and produces a different file every run,
 while setting the clock by hand produces the same film every time. Measured on a real option, 48
 frames at 1280 by 720 in under a second.

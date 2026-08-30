@@ -309,6 +309,43 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
     ok('the exported file opens without complaint', faults.length === 0, faults.join('; ').slice(0, 60))
 
     /**
+     * What Film draws, which is not what the transport shows unless somebody makes it so.
+     *
+     * The preview holds each car at t minus its own offset, which is an operation on live animations.
+     * Filming does not watch a document, it copies one, and a copy carries declarations rather than
+     * clocks, so holdAt writes the instant into each element's own animation-delay. It wrote a single
+     * instant into all of them: every car started together and the sequencing, the whole thing being
+     * filmed, was gone. Reported from real use, the same way the export was, and for the same reason.
+     *
+     * Checked against the computed styles the copy inherits, at instants chosen so the answer differs
+     * between the two behaviours: at 200ms only the first car has begun, and a film that ignores
+     * offsets has all three at the same opacity.
+     */
+    const rail = await seat.newPage()
+    await rail.goto(`http://localhost:${XPORT}/__wall/railview?ids=1,2,3&at=0,800,1600&shots=,,&palette=`,
+      { waitUntil: 'load' })
+    await rail.waitForTimeout(900)
+    const drawnAt = (ms) => rail.evaluate(async (t) => {
+      const R = await import('/__wall/raster.mjs')
+      const undo = R.holdAt(document, t)
+      const seen = [...document.querySelectorAll('.car')]
+        .map((c) => Number(getComputedStyle(c.querySelector('b')).opacity))
+      if (typeof undo === 'function') undo()
+      return seen
+    }, ms)
+    const drewEarly = await drawnAt(200)
+    const drewMid = await drawnAt(900)
+    const drewLate = await drawnAt(2400)
+    ok('a filmed rail draws only the car whose turn has come',
+      drewEarly[0] > 0.2 && drewEarly[1] < 0.02 && drewEarly[2] < 0.02, `${drewEarly.map((v) => v.toFixed(2))}`)
+    ok('and lets the next one in at its own offset rather than at the first one',
+      drewMid[1] > 0.02 && drewMid[2] < 0.02, `${drewMid.map((v) => v.toFixed(2))}`)
+    /* the last car starts at 1600 and runs 600ms, so this is past its end rather than mid flight */
+    ok('and has them all by the end',
+      drewLate.every((v) => v > 0.9), `${drewLate.map((v) => v.toFixed(2))}`)
+    await rail.close()
+
+    /**
      * The timeline under a real pointer.
      *
      * The arithmetic above is checked without a browser, which is most of it, and none of it can see
