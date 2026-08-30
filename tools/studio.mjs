@@ -1728,6 +1728,13 @@ select,label.f{color:var(--dim);font-size:12px;display:inline-flex;align-items:c
 select{height:28px;background:var(--raised);color:var(--ink);border:1px solid var(--line2);
   border-radius:6px;font:inherit;font-size:12.5px;padding:0 6px}
 .status{font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
+/* smaller than the ones in the shortcut list, and quieter: it sits inside a button that is already
+   lit, so a second bright thing next to the word would compete with it rather than support it */
+.cap{display:inline-flex;align-items:center;justify-content:center;min-width:19px;height:15px;
+  padding:0 4px;margin-left:6px;border:1px solid var(--line2);border-top-color:rgba(255,255,255,.18);
+  border-radius:4px;background:rgba(255,255,255,.05);font:inherit;font-size:9.5px;line-height:1;
+  color:var(--dim);box-shadow:0 1px 0 rgba(0,0,0,.35);vertical-align:middle}
+.pick.on .cap{color:var(--ink)}
 kbd{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:19px;padding:0 5px;
   background:var(--raised);border:1px solid var(--line2);border-radius:4px;font-size:10.5px;color:var(--faint)}
 .grid{flex:1;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));
@@ -2786,8 +2793,13 @@ addEventListener('message',e=>{const d=e.data||{}
   if(d.wall==='armed'||d.wall==='disarmed'){
     const pb=document.getElementById('pick')
     pb.setAttribute('aria-pressed',d.wall==='armed')
-    // the label only: setting textContent here used to replace the icon along with the word
-    pb.querySelector('.lbl').textContent=d.wall==='armed'?'Picking, esc to stop':'Pick'
+    /* the label only: setting textContent here used to replace the icon along with the word.
+       And the key is drawn as a key. "Picking, esc to stop" is a sentence you read; a cap sitting
+       in the button is a thing you recognise without reading it, which is what you want from a
+       state you are only in for a couple of seconds */
+    const lbl=pb.querySelector('.lbl')
+    if(d.wall==='armed') lbl.innerHTML='Picking<kbd class="cap">esc</kbd>'
+    else lbl.textContent='Pick'
     pb.classList.toggle('on',d.wall==='armed')
   }
   if(d.wall==='picked'){
