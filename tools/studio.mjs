@@ -1385,7 +1385,7 @@ async function railOf(picks, palette) {
   return Promise.all(picks.map(async (pick, i) => {
     const src = { html: pick.html, css: pick.css ?? '', label: pick.label, w: pick.w }
     const got = await options(src, 2).catch((e) => ({ kept: [], dropped: [{ why: String(e && e.message || e) }] }))
-    if (got.kept.length) return { ...got.kept[0], label: pick.label, i }
+    if (got.kept.length) return { ...got.kept[0], label: pick.label, i, ms: tempo(got.kept[0].css).span || 600 }
     // every reason, not just the first, because two attempts failing the same way says something
     // different from two failing differently
     const why = [...new Set((got.dropped || []).map((d) => String(d.why || '')).filter(Boolean))].join('; ')
@@ -1393,7 +1393,7 @@ async function railOf(picks, palette) {
   }))
 }
 
-const railView = (ids, palette, beat = 420) => {
+const railView = (ids, palette, offsets = []) => {
   const parts = ids.map((id, i) => made.get(id)).filter(Boolean).map((o, i) => {
     const tag = o.scope ? `${o.scope}-r${i + 1}` : ''
     const css = o.scope ? o.css.replaceAll(`[${o.scope}]`, `[${tag}]`) : o.css
@@ -1419,24 +1419,29 @@ ${parts.map((p) => p.css).join('\n')}
   <span class="tag">${p.i + 1}. ${String(p.file || p.note || '').slice(0, 44)}</span>
   <div class="in" style="width:${p.wide ? p.wide + 'px' : 'max-content'}">${p.markup}</div></div>`).join('')}</div>
 <script>
-var BEAT=${beat}
+var AT=${JSON.stringify(ids.map((_, i) => offsets[i] ?? i * 420))}
 for (var car of document.querySelectorAll('.car')){
   var el=car.querySelector('.in'), r=el.getBoundingClientRect(), box=car.getBoundingClientRect()
   var s=Math.min(1,(box.width-20)/r.width,(box.height-8)/r.height)
   if(s<1) el.style.transform='scale('+s.toFixed(4)+')'
 }
 /* which element an animation belongs to decides which clock it is on */
+/* which car an animation belongs to decides which clock it is on, and each car now carries its own
+   offset rather than being spaced by its position, so the sequence can be composed rather than
+   assumed */
 function seat(a){ try{ var n=a.effect&&a.effect.target; while(n&&n!==document.body){
   if(n.dataset&&n.dataset.rail!==undefined) return Number(n.dataset.rail); n=n.parentElement } }catch(_){}
   return 0 }
+function delay(a){ var i=seat(a); return AT[i]||0 }
 requestAnimationFrame(function(){document.getAnimations().forEach(function(a){
   try{a.pause();a.currentTime=0}catch(_){}})})
 addEventListener('message',function(e){var d=e.data||{};if(d.wall!=='hold')return
   var a=document.getAnimations(),end=0
   a.forEach(function(x){try{
-    var at=Math.max(0,d.t-seat(x)*BEAT); x.pause(); x.currentTime=at
+    var off=delay(x)
+    var at=Math.max(0,d.t-off); x.pause(); x.currentTime=at
     var t=x.effect&&x.effect.getComputedTiming?x.effect.getComputedTiming().endTime:0
-    if(typeof t==='number'&&isFinite(t)&&t+seat(x)*BEAT>end)end=t+seat(x)*BEAT
+    if(typeof t==='number'&&isFinite(t)&&t+off>end)end=t+off
   }catch(_){}})
   ;(e.source||parent).postMessage({wall:'held',n:a.length,i:d.i,end:Math.round(end)},'*')})
 <\/script></body></html>`
@@ -1578,7 +1583,29 @@ figcaption b{font-weight:500}.note{color:var(--dim)}.verb{color:var(--faint);fon
 .hint b{color:var(--dim);font-weight:500}
 .appwrap{grid-column:1/-1;height:calc(100vh - 116px);border:1px solid var(--line);border-radius:8px;
   overflow:hidden;background:#fff}
+/* the rail and its sequence share the height: the timeline used to be laid out below the frame and
+   therefore below the fold, which is a poor place for the one thing that explains what you are
+   watching */
+.grid.railed .appwrap{height:calc(100vh - 116px - var(--tl, 170px))}
 .appwrap iframe{width:100%;height:100%}
+.tl{grid-column:1/-1;margin:10px 0 0;padding:11px 12px 9px;background:var(--panel);
+  border:1px solid var(--line);border-radius:8px;position:relative}
+.tlhead{font-size:10.5px;color:var(--faint);letter-spacing:.06em;margin-bottom:8px}
+.tlrow{display:flex;align-items:center;gap:10px;margin:5px 0}
+.tlname{display:flex;align-items:center;gap:7px;width:190px;flex:none;font-size:11.5px;
+  color:var(--dim);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.tlname b{display:grid;place-items:center;width:15px;height:15px;flex:none;border-radius:4px;
+  background:var(--accent);color:#fff;font-size:9.5px;font-weight:500}
+.tltrack{position:relative;flex:1;height:20px;background:var(--bg);border-radius:5px;
+  border:1px solid var(--line)}
+.tlbar{position:absolute;top:2px;bottom:2px;background:rgba(94,106,210,.5);
+  border:1px solid var(--accent);border-radius:4px;cursor:grab;display:flex;align-items:center;
+  padding:0 5px;touch-action:none}
+.tlbar:active{cursor:grabbing;background:rgba(94,106,210,.72)}
+.tlbar i{font-style:normal;font-size:9.5px;color:#fff;font-variant-numeric:tabular-nums;
+  white-space:nowrap;pointer-events:none}
+.tlfoot{display:flex;justify-content:space-between;font-size:10px;color:var(--faint);
+  margin:6px 0 0;padding-left:200px;font-variant-numeric:tabular-nums}
 #pick[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff}
 .chip{display:block;margin:10px;padding:8px 10px;background:var(--raised);border:1px solid var(--line2);
   border-radius:6px;font-size:11.5px;color:var(--ink);word-break:break-all}
@@ -1939,11 +1966,12 @@ ask.onclick=async()=>{
     drops.textContent=''
     try{
       const r=await post('/__wall/rail',{picks,palette:palette.value},420000)
-      cars=r.cars||[]; opts=[]; held.clear(); ends.clear(); render()
+      cars=(r.cars||[]).map((c,i)=>({...c, at: i*420}))
+      opts=[]; held.clear(); ends.clear(); render()
       const moved=cars.filter(c=>c.id).length
       const lost=cars.filter(c=>!c.id)
       drops.innerHTML=moved+' of '+cars.length+' moved.'
-        +(moved?' Each starts a beat after the one above it.':'')
+        +(moved?' They begin a beat apart, and the sequence below can be dragged.':'')
         +(lost.length?'<br>'+lost.map(c=>'<b>'+c.label+'</b> did not: '+String(c.why||'')).join('<br>'):'')
     }catch(e){ verdict={dropped:[],error:String(e && e.message||e)}; render() }
     ask.disabled=false; drawSel(); return
@@ -2005,10 +2033,12 @@ document.getElementById('tapply').onclick=async()=>{
   document.getElementById('inote').textContent='Added beside the original, which is untouched.'
 }
 document.getElementById('save').onclick=async()=>{
-  if(!opts.length) return
+  // a rail is a thing worth handing over too, and it was the one result you could not export
+  const ids = opts.length ? opts.map(o=>o.id) : (cars||[]).filter(c=>c.id).map(c=>c.id)
+  if(!ids.length) return
   const btn=document.getElementById('save'); btn.textContent='Writing…'
   const r=await fetch('/__wall/export',{method:'POST',headers:{'content-type':'application/json'},
-    body:JSON.stringify({ids:opts.map(o=>o.id),palette:palette.value,
+    body:JSON.stringify({ids,palette:palette.value,
       name:(APP?(chosen&&chosen.label):file||'').split('/').pop().replace(/\.[^.]+$/,'')})}).then(r=>r.json())
   btn.textContent='Export'
   drops.textContent='Wrote '+r.at+', '+r.kb+'kb. One file, opens anywhere, no requests.'
@@ -2017,9 +2047,17 @@ document.getElementById('rate').onchange=e=>{rate=parseFloat(e.target.value)}
 
 function render(){
   if(cars && cars.some(c=>c.id)){
-    const ids=cars.filter(c=>c.id).map(c=>c.id).join(',')
+    const live=cars.filter(c=>c.id)
+    const ids=live.map(c=>c.id).join(',')
+    const at=live.map(c=>Math.round(c.at)).join(',')
     grid.innerHTML='<div class="appwrap"><iframe data-i="0" src="/__wall/railview?ids='+ids
-      +'&palette='+encodeURIComponent(palette.value)+'"></iframe></div>'
+      +'&at='+at+'&palette='+encodeURIComponent(palette.value)+'"></iframe></div>'
+      + timeline(live)
+    grid.classList.add('railed')
+    // the strip is as tall as it needs to be, and the frame gives up exactly that much
+    const strip=document.getElementById('tl')
+    if(strip) grid.style.setProperty('--tl', (strip.getBoundingClientRect().height+14)+'px')
+    wireTimeline(live)
     return
   }
   if(!opts.length && verdict) return explain()
@@ -2050,6 +2088,7 @@ function render(){
     '<button class="mini keep" data-more="'+o.id+'">More like this</button>'+
     '<button class="mini" data-copy="'+o.id+'">Copy CSS</button>'+
     '<button class="mini" data-save="'+o.id+'">Save file</button></span></figcaption></figure>').join('')
+  grid.classList.remove('railed')
   grid.classList.toggle('solo', !!opened)
   if(opened && !opts.some(o=>o.id===opened)) opened=null
   document.querySelectorAll('figure').forEach((f,i)=>{
@@ -2151,6 +2190,60 @@ function paintShots(){
       + 'el.style.transform="translate(-50%,-50%) scale("+s.toFixed(4)+")";'
       + '</scr' + 'ipt></body></html>')
     d.close()
+  }
+}
+
+/**
+ * The sequence, drawn.
+ *
+ * A rail is a composition and it was being presented as a stack of boxes, with the order encoded in
+ * an invisible constant: every car started 420ms after the one above it and nothing said so or let
+ * you change it. Which is to say the one thing a rail is actually for, deciding what happens when,
+ * was the one thing you could not see or touch.
+ *
+ * So each car is a bar, placed where it starts and as long as it runs. Drag one and that car moves in
+ * time. The playhead is the same scrubber that drives the previews, so what you read here and what
+ * you watch above it are the same clock.
+ */
+function railSpan(live){
+  return Math.max(1200, ...live.map(c=>c.at + (c.ms||600))) * 1.04
+}
+function timeline(live){
+  const total=railSpan(live)
+  return '<div class="tl" id="tl"><div class="tlhead">Sequence &middot; drag a bar to move it in time</div>'
+    + live.map((c,i)=>'<div class="tlrow"><span class="tlname" title="'+(c.note||'')+'"><b>'+(i+1)+'</b>'
+        +((c.note||c.label||'').split(',')[0]).slice(0,26)+'</span>'
+        +'<span class="tltrack" data-track="'+i+'">'
+        +'<span class="tlbar" data-bar="'+i+'" style="left:'+(c.at/total*100).toFixed(2)+'%;'
+        +'width:'+Math.max(2,(c.ms||600)/total*100).toFixed(2)+'%">'
+        +'<i>'+(c.at/1000).toFixed(2)+'s</i></span></span></div>').join('')
+    + '<div class="tlfoot"><span>0s</span><span>'+(total/1000).toFixed(1)+'s</span></div>'
+    + '<div class="tlhead" id="tlplay"></div></div>'
+}
+function wireTimeline(live){
+  const total=railSpan(live)
+  for (const bar of document.querySelectorAll('[data-bar]')){
+    bar.onpointerdown=e=>{
+      e.preventDefault()
+      const i=Number(bar.dataset.bar), track=bar.parentElement
+      const w=track.getBoundingClientRect().width, from=e.clientX, was=live[i].at
+      const move=ev=>{
+        const at=Math.max(0, was + (ev.clientX-from)/w*total)
+        live[i].at=at
+        bar.style.left=(at/total*100).toFixed(2)+'%'
+        bar.querySelector('i').textContent=(at/1000).toFixed(2)+'s'
+      }
+      const up=()=>{
+        window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up)
+        // only reload the frame when the drag ends, or every pixel would restart the page
+        held.clear(); ends.clear(); render()
+      }
+      /* on the window rather than on the bar with a pointer capture: the cursor leaves a twelve
+         pixel bar within one frame of any real drag, and capture was not holding it. Synthetic
+         events fired straight at the bar worked, which is exactly the shape of bug that passes a
+         unit test and fails a hand */
+      window.addEventListener('pointermove',move); window.addEventListener('pointerup',up)
+    }
   }
 }
 
@@ -2347,7 +2440,8 @@ const server = createServer(async (req, res) => {
     }
     if (url.pathname === '/__wall/railview') {
       const ids = (url.searchParams.get('ids') ?? '').split(',').filter(Boolean)
-      const html = railView(ids, url.searchParams.get('palette'), Number(url.searchParams.get('beat')) || 420)
+      const at = (url.searchParams.get('at') ?? '').split(',').map(Number).filter((n) => !Number.isNaN(n))
+      const html = railView(ids, url.searchParams.get('palette'), at)
       if (!html) { res.writeHead(404); return res.end('gone') }
       res.writeHead(200, { 'content-type': 'text/html' })
       return res.end(html)

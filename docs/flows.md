@@ -701,9 +701,17 @@ original stays beside it.
 
 ### Several elements, and the camera
 
-Picks accumulate into a rail: one motion each, played on one timeline, each starting a beat after the
-one above it. The sequencing costs nothing because the transport already exists, so each element is
-held at `t` minus its own offset rather than having its delays rewritten.
+Picks accumulate into a rail: one motion each, played on one timeline. The sequencing costs nothing
+because the transport already exists, so each element is held at `t` minus its own offset rather than
+having its delays rewritten.
+
+A rail is a composition, and it was being shown as a stack of boxes with the order encoded in an
+invisible constant: every car started 420ms after the one above it, and nothing said so or let you
+change it. The one thing a rail is for, deciding what happens when, was the one thing you could not
+see or touch. So the sequence is drawn under it, a bar per car placed where it starts and as long as
+it runs, and dragging a bar moves that car in time. The frame reloads when the drag ends rather than
+on every pixel, and the scrubber resizes to whatever the new arrangement needs. A rail can be exported
+too, which it could not before.
 
 The camera is four shots on that same clock: locked off, a slow push, a drift and an orbit, with a
 lens dial that moves the defocus, the bloom and the vignette together. It used to be one twelve second
