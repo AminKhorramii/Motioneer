@@ -363,9 +363,6 @@ header.bare .whenplaying{display:none}
         <option value="push">slow push</option>
         <option value="drift">drift</option>
         <option value="orbit">orbit</option></select></label>
-      <label>Film in<select id="filmwhere" title="where the frames are drawn">
-        <option value="browser" selected>this browser</option>
-        <option value="server">the server</option></select></label>
       <label>Shape<select id="shape">
         <option value="wide" selected>wide 1280</option>
         <option value="square">square 1080</option>
@@ -958,18 +955,26 @@ function filmable(){
   return f ? { frame:f, what:nameOf(o) } : { why:'That option is not on screen.' }
 }
 /**
- * Filming here, in the page, rather than on the machine serving it.
+ * Filming, in the page.
  *
- * The server path drives a second headless browser to screenshot the frame ninety times and shells
- * out to ffmpeg. It renders exactly what chromium renders, which is the reason to keep it, but it
- * needs two programs installed and neither of them exists on a worker. This path needs nothing: the
- * frame is already on screen, the browser has been able to encode h264 since 2021, and the clock is
- * stepped by hand either way, so a frame in the file is still the frame you were looking at.
+ * There were two of these for a while, and a setting to choose between them, which was the wrong
+ * answer to a real question. The other one drove a second headless browser to screenshot the frame
+ * ninety times and shelled out to ffmpeg, and it rendered exactly what chromium renders, which
+ * sounds like the one to keep until you check whether it runs: playwright is a development
+ * dependency and absent from the published package, and ffmpeg is something a person may happen to
+ * have. On a clean install that path produced no film at all. A path that is not installed is not
+ * more faithful than one that is, and offering two means trusting neither.
  *
- * What it costs is fidelity. Drawing the dom means going through an svg foreignObject, and the list
- * of what does not survive that is in raster.mjs and shown to whoever presses the button. Measured
- * against the server path on four real pages the difference was between 0.02 and 0.46 percent of
- * pixels, all of it antialiasing, but a page using a backdrop filter would not be so lucky.
+ * So this is the only one. The frame is already on screen, the browser has encoded h264 since 2021,
+ * and the clock is stepped by hand rather than recorded, so a frame in the file is still the frame
+ * you were looking at and the same arrangement gives the same film every time.
+ *
+ * Its limits are real and they are specific. Drawing the dom means going through an svg
+ * foreignObject, which cannot draw a nested frame, a canvas, a shadow root, a backdrop filter or a
+ * blend mode. Measured against the headless path on four real pages the difference was between 0.02
+ * and 0.46 percent of pixels and all of it was antialiasing, so the honest thing is not a warning on
+ * every film. It is to look at this document for the five things that actually break, and say so on
+ * the one film where they are present.
  */
 async function filmHere(frame, want, say){
   const doc=frame.contentDocument
@@ -993,7 +998,7 @@ async function filmHere(frame, want, say){
   // for no reason, when the encoder only ever looks at one of them
   const bytes=await M.encode(stream(),{width:want.w,height:want.h,fps:want.fps,
     onProgress:(done)=>say('Drawing frame '+done+' of '+total)})
-  return {bytes,total,notes:(inlined&&inlined.notes)||[],caveats:R.CAVEATS}
+  return {bytes,total,notes:(inlined&&inlined.notes)||[],limits:R.limits(doc)}
 }
 const SHAPES={wide:{w:1280,h:720},square:{w:1080,h:1080},tall:{w:1080,h:1350}}
 let takes=[]
@@ -1023,32 +1028,21 @@ document.getElementById('film').onclick=async()=>{
   const shape=document.getElementById('shape').value
   const size=SHAPES[shape]||SHAPES.wide
   const ms=Math.max(1200, span+400), fps=30
-  const here=document.getElementById('filmwhere').value!=='server'
   try{
-    if(here){
-      say('Filming')
-      const {bytes,total,notes}=await filmHere(frame,{ms,fps,w:size.w,h:size.h},say)
-      const url=URL.createObjectURL(new Blob([bytes],{type:'video/mp4'}))
-      takes.push({ name, url,
-        facts:total+' frames at '+fps+'fps, '+(total/fps).toFixed(1)+'s, '+size.w+' by '+size.h
-          +', of '+aim.what,
-        note:'Drawn in this browser, so nothing was installed and nothing was uploaded.'
-          +(notes.length?' '+notes.length+' asset'+(notes.length>1?'s':'')+' would not load.':'') })
-      showReel(takes[takes.length-1]); drops.textContent=''
-    } else {
-      say('Filming on the server')
-      const r=await post('/__wall/film',{ path:new URL(frame.src).pathname+new URL(frame.src).search,
-        ms, fps, shape, name:base }, 600000)
-      if(r.error){ drops.textContent=r.error }
-      else if(r.mp4){
-        // labelled by what is already in this panel, not by what the server called the directory:
-        // the server counts takes on disk and knows nothing about the ones filmed in the browser
-        takes.push({ name, url:'/__wall/reel?name='+encodeURIComponent(r.name||name)+'&t='+Date.now(),
-          facts:r.frames+' frames at '+fps+'fps, '+(r.frames/fps).toFixed(1)+'s, '+r.size+', of '+aim.what,
-          note:'Rendered by a headless browser, which is what chromium actually paints. '+r.mp4 })
-        showReel(takes[takes.length-1]); drops.textContent=''
-      } else drops.textContent='Filmed '+r.frames+' frames into '+r.at+'. '+(r.why||'')
-    }
+    say('Filming')
+    const {bytes,total,notes,limits}=await filmHere(frame,{ms,fps,w:size.w,h:size.h},say)
+    const url=URL.createObjectURL(new Blob([bytes],{type:'video/mp4'}))
+    /* said only when it applies. A film of a component with no canvas and no blend mode in it has
+       nothing to warn about, and a standing disclaimer on every one of them teaches you to skip
+       the line that will one day matter */
+    const trouble=(limits||[]).map(l=>l.n+' '+l.what).join('. ')
+    takes.push({ name, url,
+      facts:total+' frames at '+fps+'fps, '+(total/fps).toFixed(1)+'s, '+size.w+' by '+size.h
+        +', of '+aim.what,
+      note:(notes.length?notes.length+' asset'+(notes.length>1?'s':'')+' would not load. ':'')
+        +(trouble?'This one has '+trouble+', so check the film against the preview.'
+          :'Drawn here, so nothing was installed and nothing was uploaded.') })
+    showReel(takes[takes.length-1]); drops.textContent=''
   }catch(e){
     // said rather than swallowed: the browser path refuses for reasons a person can act on
     drops.textContent=String(e && e.message||e)

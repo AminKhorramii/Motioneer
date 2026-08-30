@@ -25,7 +25,7 @@ import { createServer } from 'node:http'
 import net from 'node:net'
 import { randomUUID } from 'node:crypto'
 import { readFileSync, writeFileSync, existsSync, statSync, readdirSync, mkdirSync, rmSync } from 'node:fs'
-import { spawn, spawnSync } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import path from 'node:path'
 import { hasClaude } from '../shared/cli.mjs'
 import { isLocal, allowed } from '../shared/guard.mjs'
@@ -1570,66 +1570,6 @@ addEventListener('message',function(e){var d=e.data||{};if(d.wall!=='hold')retur
 <\/script></body></html>`
 }
 
-/**
- * A film of whatever is on screen, rendered rather than recorded.
- *
- * film.mjs already does this from the command line, and asking somebody to leave the room they are
- * composing in, run a second tool and hope it picks up the same arrangement is the wrong shape. The
- * arrangement lives here: which options, in what order, at what offsets, under which camera. So the
- * frames are taken here too.
- *
- * Stepped rather than recorded, for the same reason film.mjs gives: a recording hopes the machine
- * keeps up and produces a different file every run, while setting the clock by hand produces the same
- * film every time at whatever frame rate is asked for. The transport that scrubs the studio is exactly
- * the mechanism for it.
- *
- * mp4 only if ffmpeg is on the machine. It is a thing somebody may have rather than something this
- * depends on, and the frames are the deliverable either way, which is said rather than skipped.
- */
-async function film(url, { fps = 30, ms = 3000, size = { width: 1280, height: 720 }, name = 'film' }) {
-  const eye = await eyes()
-  if (!eye.browser) return { error: eye.why }
-  /* every take kept: it overwrote the last one, so filming a second time to compare it with the
-     first destroyed the first, which is the one thing a second take is for */
-  let take = name, out = path.resolve(work, take)
-  for (let n = 2; existsSync(out); n++) { take = `${name}-${n}`; out = path.resolve(work, take) }
-  mkdirSync(path.join(out, 'frames'), { recursive: true })
-  const page = await eye.browser.newPage({ viewport: size })
-  const total = Math.max(1, Math.min(600, Math.round((ms / 1000) * fps)))
-  try {
-    await page.goto(url, { waitUntil: 'load' })
-    await page.waitForTimeout(700)
-    for (let f = 0; f < total; f++) {
-      const at = Math.round((f / fps) * 1000)
-      // the same hold the scrubber uses, so a frame here is the frame you were looking at
-      await page.evaluate((t) => {
-        window.postMessage({ wall: 'hold', t, i: 0 }, '*')
-        for (const a of document.getAnimations()) { try { a.pause(); a.currentTime = t } catch {} }
-      }, at).catch(() => {})
-      await page.screenshot({ path: path.join(out, 'frames', String(f).padStart(5, '0') + '.png') })
-    }
-  } finally { await page.close().catch(() => {}) }
-
-  const ff = spawnSync('which', ['ffmpeg'], { encoding: 'utf8' }).stdout.trim()
-  if (!ff) {
-    writeFileSync(path.join(out, 'make-mp4.sh'),
-      `#!/bin/sh\n# X takes mp4 and not webm, and macOS has no transcoder that reads webm.\n`
-      + `#   brew install ffmpeg\n\nffmpeg -y -framerate ${fps} -i frames/%05d.png \\\n`
-      + `  -c:v libx264 -pix_fmt yuv420p -preset slow -crf 18 \\\n`
-      + `  -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -movflags +faststart film.mp4\n`)
-    return { at: out, frames: total, mp4: null, name: take,
-      size: `${size.width} by ${size.height}`,
-      why: 'ffmpeg is not installed, so the frames are the deliverable. brew install ffmpeg, then sh make-mp4.sh' }
-  }
-  const mp4 = path.join(out, 'film.mp4')
-  const r = spawnSync(ff, ['-y', '-framerate', String(fps), '-i', path.join(out, 'frames', '%05d.png'),
-    // yuv420p and even dimensions, or half the players in the world show a green frame
-    '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'slow', '-crf', '18',
-    '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2', '-movflags', '+faststart', mp4], { encoding: 'utf8' })
-  return r.status === 0
-    ? { at: out, frames: total, mp4, name: take, size: `${size.width} by ${size.height}` }
-    : { at: out, frames: total, mp4: null, name: take, size: `${size.width} by ${size.height}`, why: String(r.stderr).split('\n').slice(-3).join(' ').slice(0, 140) }
-}
 
 /* ── the room ─────────────────────────────────────────────────────────────────────────────────── */
 const PAGE = () => page({ AIM, CAN_WRITE, HAS_FOLDER, PRESETS })
@@ -1872,33 +1812,6 @@ const server = createServer(async (req, res) => {
         ? { ...body, key: body.key || (body.provider === MODEL.provider ? MODEL.key : '') || '' }
         : MODEL
       return json(res, await checkProvider(trying, { callMs: 30_000, env: CLEAN_ENV }))
-    }
-    if (url.pathname === '/__wall/film' && req.method === 'POST') {
-      const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))
-      // asked of the server rather than of a const declared two hundred lines below this handler
-      const on = server.address() && server.address().port
-      const where = `http://localhost:${on}${body.path || '/'}`
-      console.log(`  filming ${body.path} for ${Math.round((body.ms || 3000) / 1000)}s`)
-      const made = await film(where, {
-        fps: Number(body.fps) || 30,
-        ms: Math.max(500, Math.min(20000, Number(body.ms) || 3000)),
-        size: { wide: { width: 1280, height: 720 }, square: { width: 1080, height: 1080 },
-          tall: { width: 1080, height: 1350 } }[body.shape] ?? { width: 1280, height: 720 },
-        name: String(body.name ?? 'film').replace(/[^-\w]/g, '-') || 'film',
-      })
-      if (made.mp4) console.log(`    ${made.mp4}`)
-      else if (made.why) console.log(`    ${made.why}`)
-      return json(res, made)
-    }
-    /** the film itself, so it plays in the room it was composed in */
-    if (url.pathname === '/__wall/reel') {
-      const name = String(url.searchParams.get('name') ?? '').replace(/[^-\w]/g, '')
-      const at = path.resolve(work, name, 'film.mp4')
-      if (!name || !existsSync(at)) { res.writeHead(404); return res.end('no film by that name') }
-      const body = readFileSync(at)
-      res.writeHead(200, { 'content-type': 'video/mp4', 'content-length': body.length,
-        'accept-ranges': 'none', 'cache-control': 'no-store' })
-      return res.end(body)
     }
     if (url.pathname === '/__wall/save' && req.method === 'POST') {
       const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))

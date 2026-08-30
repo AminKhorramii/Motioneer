@@ -49,6 +49,38 @@ export const CAVEATS = [
   'Chromium taints a canvas drawn from a blob url, so the copy travels as a base64 data uri and a very large page makes a very large string.',
 ]
 
+/**
+ * Which of the caveats above this particular document actually runs into.
+ *
+ * A list of everything that can go wrong is a thing nobody reads. What is worth saying is that the
+ * component you are about to film has a backdrop filter in it, on the film where it happens, once.
+ * So this looks for the three that change a frame visibly and silently, and says nothing at all the
+ * rest of the time, which is almost always.
+ *
+ * Deliberately not exhaustive. Scroll position and a missing caret are real and nobody cares; the
+ * ones here are the ones that make somebody post a film with a hole in it.
+ */
+export function limits(doc) {
+  const found = []
+  const count = (what, test) => {
+    let n = 0
+    for (const el of doc.querySelectorAll('*')) { try { if (test(el)) n++ } catch { /* detached */ } }
+    if (n) found.push({ what, n })
+  }
+  count('a nested frame, which draws as an empty box', (el) => el.tagName === 'IFRAME')
+  count('a canvas, which draws as a still picture of its pixels', (el) => el.tagName === 'CANVAS')
+  count('a shadow root, whose contents are not copied', (el) => !!el.shadowRoot)
+  const styled = (prop, ok) => (el) => {
+    const v = doc.defaultView.getComputedStyle(el)[prop]
+    return !!v && v !== 'none' && v !== 'normal' && ok(v)
+  }
+  count('backdrop-filter, which has no backdrop to sample and renders flat',
+    styled('backdropFilter', () => true))
+  count('mix-blend-mode, which blends against the copy rather than the page',
+    styled('mixBlendMode', () => true))
+  return found
+}
+
 const XHTML = 'http://www.w3.org/1999/xhtml'
 const SVGNS = 'http://www.w3.org/2000/svg'
 
