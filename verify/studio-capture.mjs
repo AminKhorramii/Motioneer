@@ -266,6 +266,81 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
     ok('a composition is one stage rather than a wall of captioned cards',
       await sheetPage.evaluate(() => document.querySelectorAll('figcaption').length) === 0)
     ok('the exported file opens without complaint', faults.length === 0, faults.join('; ').slice(0, 60))
+
+    /**
+     * The timeline under a real pointer.
+     *
+     * The arithmetic above is checked without a browser, which is most of it, and none of it can see
+     * the two faults this leg exists for. Both were found by hand and both were silent: a cmd click
+     * that took a row out of the selection and put it straight back, because the bar and the row were
+     * each answering the same press; and a completed drag that swallowed the next click, so selecting
+     * a row after moving one did nothing until you clicked twice.
+     *
+     * Driven with page.mouse rather than synthetic events, for the reason written next to the drag
+     * handler: the cursor leaves a twelve pixel bar within a frame of any real drag, and events fired
+     * straight at the element pass while a hand fails.
+     */
+    const room = await seat.newPage()
+    const said = []
+    room.on('pageerror', (e) => said.push(String(e)))
+    await room.goto(`http://localhost:${XPORT}`, { waitUntil: 'load' })
+    await room.waitForTimeout(1200)
+    const lay = async () => room.evaluate(async () => {
+      await arriving
+      arr = ARR.fromRail([
+        { id: '1', note: 'header', tempo: { span: 400 }, label: 'header' },
+        { id: '2', note: 'cards', tempo: { span: 600 }, label: 'ul' },
+        { id: '3', note: 'chart', tempo: { span: 500 }, label: 'figure' }])
+      running = false; zoom = 0; choose([]); render()
+    })
+    const offs = () => room.evaluate(() => arr.cars.map((c) => Math.round(c.at)))
+    const picked = () => room.evaluate(() => [...sel])
+    await lay(); await room.waitForTimeout(300)
+
+    await room.locator('[data-row="0"]').click(); await room.waitForTimeout(120)
+    await room.locator('[data-row="2"]').click({ modifiers: ['Shift'] }); await room.waitForTimeout(120)
+    ok('shift click takes the rows between', String(await picked()) === '0,1,2', `${await picked()}`)
+    await room.locator('[data-row="1"]').click({ modifiers: ['Meta'] }); await room.waitForTimeout(120)
+    ok('and the platform modifier takes one back out rather than putting it back in',
+      String(await picked()) === '0,2', `${await picked()}`)
+
+    await room.evaluate(() => choose([0, 1, 2], 0)); await room.waitForTimeout(100)
+    const was = await offs()
+    const bar = await room.locator('[data-bar="1"]').boundingBox()
+    const track = await room.locator('[data-track="1"]').boundingBox()
+    await room.mouse.move(bar.x + bar.width / 2, bar.y + bar.height / 2)
+    await room.mouse.down()
+    await room.mouse.move(track.x + track.width * 0.62, bar.y + bar.height / 2, { steps: 16 })
+    await room.mouse.up(); await room.waitForTimeout(300)
+    const now = await offs()
+    const between = (a) => a.slice(1).map((v, k) => v - a[k])
+    ok('dragging one of several selected bars moves them all',
+      now.every((v, k) => v !== was[k]), `${was} then ${now}`)
+    ok('and the offsets between them survive the drag',
+      String(between(now)) === String(between(was)), `${between(was)} then ${between(now)}`)
+
+    // the click that follows a completed drag must not be read as a fresh selection, or eaten
+    await room.locator('[data-row="0"]').click(); await room.waitForTimeout(150)
+    ok('a row clicked straight after a drag still selects, first time',
+      String(await picked()) === '0', `${await picked()}`)
+
+    await lay(); await room.waitForTimeout(250)
+    await room.locator('[data-row="0"]').click(); await room.waitForTimeout(100)
+    await room.keyboard.press('Meta+a'); await room.waitForTimeout(150)
+    const steps = await room.evaluate(() => past.length)
+    const before = await offs()
+    for (let n = 0; n < 5; n += 1) { await room.keyboard.press('ArrowRight'); await room.waitForTimeout(35) }
+    await room.waitForTimeout(250)
+    const after = await offs()
+    const moves = after.map((v, k) => v - before[k])
+    ok('every selected row nudges by the same amount', new Set(moves).size === 1, `${moves}`)
+    ok('and by a step that does not change under the hand, so five presses are five of one thing',
+      moves[0] % 5 === 0 && moves[0] !== 0, `${moves[0]}ms over five presses`)
+    ok('a held run of nudges is one step to undo rather than five',
+      await room.evaluate(() => past.length) === steps + 1)
+    await room.evaluate(() => undo()); await room.waitForTimeout(200)
+    ok('and one undo puts the whole run back', String(await offs()) === String(before), `${await offs()}`)
+    ok('the timeline drives without complaint', said.length === 0, said.join('; ').slice(0, 60))
     await seat.close()
   }
   shut()

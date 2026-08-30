@@ -1849,7 +1849,11 @@ const server = createServer(async (req, res) => {
      */
     if (url.pathname === '/__wall/raster.mjs' || url.pathname === '/__wall/mp4.mjs'
       || url.pathname === '/__wall/arrange.mjs') {
-      const at = path.resolve('shared', url.pathname.split('/').pop())
+      /* next to this file rather than next to wherever it was started from. Resolving against the
+         working directory meant these only existed when the studio was run from the repository root,
+         which is what npm run studio does and so nobody met it; started anywhere else, and the agent
+         tool starts it wherever the agent happens to be, Film simply could not load its encoder */
+      const at = new URL(`../shared/${url.pathname.split('/').pop()}`, import.meta.url)
       if (!existsSync(at)) { res.writeHead(404); return res.end('') }
       res.writeHead(200, { 'content-type': 'text/javascript', 'cache-control': 'no-cache' })
       return res.end(readFileSync(at))

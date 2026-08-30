@@ -239,6 +239,25 @@ header.bare .whenplaying{display:none}
 .take.on{border-color:var(--accent);color:var(--ink)}
 .tltrack{position:relative;flex:1;height:20px;background:var(--bg);border-radius:5px;
   border:1px solid var(--line)}
+/* the rows and the playhead share one positioned box, so the line can be laid over the tracks
+   without anybody having to know how wide the labels are. The two numbers are measured off the
+   first track after a draw rather than written down twice, which is what the foot used to do */
+.tlgrid{position:relative}
+.tlplay{position:absolute;top:0;bottom:0;left:var(--tlx,270px);width:var(--tlw,0);
+  pointer-events:none;overflow:hidden}
+.tlplay i{position:absolute;top:0;bottom:0;left:0;width:1px;background:var(--accent);opacity:.6;
+  transform:translateX(var(--t,0px))}
+.tlplay.off{display:none}
+/* the lead of a selection keeps the outline it always had; the rest of the set is filled. With one
+   row selected the two land on the same row and it looks exactly as it did */
+.tlrow.sel{background:rgba(94,106,210,.09)}
+.tlbar.sel{background:rgba(94,106,210,.62)}
+.tlsnap{position:absolute;top:-2px;bottom:-2px;width:1px;background:var(--accent);opacity:.85;
+  pointer-events:none}
+.tlhint{color:var(--accent)}
+.tlfit{height:16px;padding:0 6px;margin-right:7px;background:var(--raised);color:var(--dim);
+  border:1px solid var(--line2);border-radius:4px;font:inherit;font-size:9.5px;cursor:pointer}
+.tlfit:hover{color:var(--ink);border-color:var(--accent)}
 .tlbar{position:absolute;top:2px;bottom:2px;background:rgba(94,106,210,.5);
   border:1px solid var(--accent);border-radius:4px;cursor:grab;display:flex;align-items:center;
   padding:0 5px;touch-action:none}
@@ -439,6 +458,34 @@ let ARR=null
 const arriving=import('/__wall/arrange.mjs').then(m=>{ARR=m}).catch(()=>{})
 /* one question, asked in five places before this, each its own chance to answer differently */
 const railed=()=>!!(ARR&&arr&&ARR.live(arr).length)
+/**
+ * Which rows are selected, and which one of them the inspector speaks for.
+ *
+ * A set of car indices, and a lead that is also a car index rather than a motion id. It has to be an
+ * index: duplicating a car gives two cars the same motion, and an id could not say which of them you
+ * meant. chosenOpt is still written alongside, because the inspector and the options grid share it
+ * and both of them are asking a question about a motion rather than about a place in the rail.
+ *
+ * One writer keeps the invariant, rather than each of the readers deriving it: the lead is a member
+ * of the set, or the set is empty and there is no lead.
+ *
+ * anchor is where a shift range measures from, which is the row last clicked without a modifier.
+ * The range runs over rows rather than over time, because rows are what you can see and a range that
+ * jumped to cars you never dragged across would be astonishing.
+ */
+let sel=new Set(), anchor=null, lead=null
+/**
+ * The drawn ruler, which only ever grows while you are working.
+ *
+ * Sizing the strip to its contents means the scale changes under the hand. Nudge a car to the right
+ * and the rail gets longer, so every other bar shrinks and slides left although nothing about them
+ * changed; worse, the coarse grid is chosen from that scale, so five presses of the same key moved a
+ * selection 100, 100, 250, 250 and 250ms. A step that is not the same twice is not a step.
+ *
+ * So the drawn span is sticky and Fit is how you ask for it back.
+ */
+let zoom=0
+const ruler=()=>{ zoom=ARR.viewSpan(arr,zoom); return zoom }
 /* the cars that carry a motion, each with the index it sits at, since a dead car still owns a row */
 const onRail=()=>(railed()?ARR.live(arr):[])
 let verdict=null  // why the last ask produced nothing, so the grid can say so
@@ -465,10 +512,14 @@ let glowing=0     // the arm light's frame handle, read by drawSel before its ow
  */
 const HIST=60
 let past=[], ahead=[]
-const snap=()=>({ picks:picks.slice(), opts:opts.slice(), chosen, arr, opened, chosenOpt })
+/* the selection travels with the step. Undoing a reorder and being left holding whichever car has
+   now slid into that index is a small thing that feels like the tool losing your place */
+const snap=()=>({ picks:picks.slice(), opts:opts.slice(), chosen, arr, opened, chosenOpt,
+  sel:[...sel], lead, anchor, zoom })
 function restore(st){
   picks=st.picks.slice(); opts=st.opts.slice(); chosen=st.chosen
   arr=st.arr; opened=st.opened; chosenOpt=st.chosenOpt
+  sel=new Set(st.sel||[]); lead=st.lead===undefined?null:st.lead; anchor=st.anchor??null; zoom=st.zoom||0
   held.clear(); ends.clear(); drawSel(); render(); drawInspector(); drawHistory()
 }
 /* called before the change, so what lands on the stack is the state to come back to */
@@ -498,11 +549,83 @@ addEventListener('keydown',e=>{
      so this only answers when the keystroke was aimed at the room rather than at a control */
   const t=e.target, tag=t&&t.tagName
   if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||(t&&t.isContentEditable)) return
+  if(railKey(e)) return
   if(!(e.metaKey||e.ctrlKey)) return
   const k=String(e.key).toLowerCase()
   if(k==='z'&&!e.shiftKey){ e.preventDefault(); undo() }
   else if((k==='z'&&e.shiftKey)||k==='y'){ e.preventDefault(); redo() }
 })
+/**
+ * The keys the timeline answers, which is only ever while it has rows selected.
+ *
+ * Before the modifier gate above, because an arrow and a backspace carry none. The rule the whole
+ * thing expresses is that the arrows belong to whatever you last touched: with rows selected they
+ * nudge those rows, and with nothing selected they scrub, which is what they have always done. That
+ * is why this stops the event reaching the transport rather than the two of them both answering.
+ *
+ * A held arrow repeats about thirty times a second and each repeat is an edit, so a run of them
+ * collapses into one step. Sixty history entries recording one gesture is an undo stack that cannot
+ * undo anything you would want back.
+ */
+let nudgeTill=0
+function railKey(e){
+  if(!railed()||!sel.size) return false
+  const k=e.key
+  const rows=[...document.querySelectorAll('.tlrow')].map(r=>Number(r.dataset.row))
+  if(k==='ArrowLeft'||k==='ArrowRight'){
+    e.preventDefault(); e.stopImmediatePropagation()
+    const total=ruler()
+    const track=document.querySelector('.tltrack')
+    const step=e.altKey?1:ARR.gridStep(total,track?track.getBoundingClientRect().width:700)
+    const by=(k==='ArrowLeft'?-1:1)*step*(e.shiftKey?10:1)
+    const now=performance.now()
+    if(now>nudgeTill) mark(sel.size>1?'nudging '+sel.size+' cars':'nudging '+nameOf(arr.cars[[...sel][0]].motion))
+    nudgeTill=now+700
+    arr=ARR.shifted(arr,[...sel],by)
+    held.clear(); ends.clear(); render()
+    return true
+  }
+  if(k==='ArrowUp'||k==='ArrowDown'){
+    e.preventDefault(); e.stopImmediatePropagation()
+    const seat=rows.indexOf(lead)
+    const to=rows[Math.max(0,Math.min(rows.length-1,seat+(k==='ArrowUp'?-1:1)))]
+    if(to===undefined) return true
+    if(e.shiftKey){ const next=new Set(sel); next.add(to); choose([...next],to) }
+    else { anchor=to; choose([to],to) }
+    return true
+  }
+  if((e.metaKey||e.ctrlKey)&&String(k).toLowerCase()==='a'){
+    e.preventDefault(); e.stopImmediatePropagation()
+    nudgeTill=0; choose(rows, rows[rows.length-1]); return true
+  }
+  if(k==='Backspace'||k==='Delete'){
+    e.preventDefault(); e.stopImmediatePropagation()
+    nudgeTill=0
+    mark(sel.size>1?'removing '+sel.size+' cars from the rail':'removing a car from the rail')
+    /* the cars go and the picks stay. Removing a voice from a composition is not the same as
+       un choosing the element, and the pills have their own remove button that means that. It also
+       keeps this honest: a car has a copy of what its pick looked like rather than an index into
+       picks, and after a reorder or a duplicate there is no index left to trust */
+    arr={...arr, cars:arr.cars.filter((_,i)=>!sel.has(i))}
+    choose([]); anchor=null
+    if(!ARR.live(arr).length) arr=null
+    held.clear(); ends.clear(); render()
+    return true
+  }
+  if((e.metaKey||e.ctrlKey)&&String(k).toLowerCase()==='d'){
+    e.preventDefault(); e.stopImmediatePropagation()
+    nudgeTill=0
+    mark(sel.size>1?'duplicating '+sel.size+' cars':'duplicating a car')
+    const cars=[], made=[]
+    arr.cars.forEach((c,i)=>{ cars.push(c); if(sel.has(i)){ made.push(cars.length); cars.push({...c}) } })
+    arr={...arr, cars}
+    // the copies are what you now have hold of, so duplicate then nudge is one gesture
+    choose(made, made[made.length-1])
+    held.clear(); ends.clear(); render()
+    return true
+  }
+  return false
+}
 
 const pickBtn=document.getElementById('pick')
 pickBtn.onclick=()=>{
@@ -739,7 +862,7 @@ ask.onclick=async()=>{
          has already waited minutes on the model, so this costs nothing and every synchronous reader
          below it can stop asking whether the import landed */
       await arriving
-      arr=ARR.fromRail(r.cars||[])
+      arr=ARR.fromRail(r.cars||[]); zoom=0; sel=new Set(); lead=null; anchor=null
       opts=[]; held.clear(); ends.clear(); render()
       const moved=ARR.live(arr).length
       const lost=arr.cars.filter(c=>!c.motion)
@@ -881,9 +1004,8 @@ addEventListener('keydown',e=>{ if(e.key==='Escape') shut() })
 /* the car is handed back beside its motion, and o still means the thing with an id and a note, so
    everything reading o.id or o.note is unchanged and only when-it-starts and what-films-it moved */
 function subject(){
-  if(railed()){
-    const x=ARR.live(arr).find(y=>y.car.motion.id===chosenOpt)
-    if(x) return { kind:'car', car:x.car, i:x.i, o:x.car.motion }
+  if(railed()&&lead!==null&&arr.cars[lead]&&arr.cars[lead].motion){
+    return { kind:'car', car:arr.cars[lead], i:lead, o:arr.cars[lead].motion }
   }
   const o=opts.find(x=>x.id===chosenOpt)
   return o ? { kind:'opt', o } : null
@@ -1134,6 +1256,9 @@ function render(){
     const strip=document.getElementById('tl')
     if(strip) grid.style.setProperty('--tl', (strip.getBoundingClientRect().height+14)+'px')
     wireTimeline(live)
+    /* after the strip has a height, or the track is measured before it has been laid out and the
+       playhead and the ruler both align to nothing */
+    placePlayhead(); markPlayhead(Number(scrub.value)||0)
     return
   }
   if(!opts.length && verdict) return explain()
@@ -1498,32 +1623,93 @@ function paintShots(){
  * wrote through a view and edited state nobody had said could be edited.
  */
 function timeline(live){
-  const total=ARR.viewSpan(arr)
+  const total=ruler()
   const at=ARR.resolve(arr).at
-  return '<div class="tl" id="tl"><div class="tlhead">Sequence &middot; click a row to adjust it, '
-    + 'drag a bar to move it in time</div>'
-    + live.map(({car,i})=>'<div class="tlrow'+(car.motion.id===chosenOpt?' on':'')+'" data-row="'+i+'">'
+  return '<div class="tl" id="tl"><div class="tlhead" id="tlsay">Sequence &middot; click a row to adjust it, '
+    + 'shift or cmd to take several, drag a bar to move them in time</div><div class="tlgrid" id="tlgrid">'
+    + '<div class="tlplay off" id="tlplay"><i></i></div>'
+    + live.map(({car,i})=>'<div class="tlrow'+(i===lead?' on':'')
+        +(sel.has(i)?' sel':'')+'" data-row="'+i+'">'
         +'<span class="grip" data-grip="'+i+'" title="drag to reorder">&#8942;&#8942;</span>'
         +'<span class="tlname" title="'+esc(car.motion.note||car.pick.label)+'">'
         +esc(nameOf(car.motion)||car.pick.label)+'</span>'
         +'<span class="tlcam'+(car.shot?' on':'')+'">'
         +(CAMS.find(x=>x[0]===(car.shot||''))||CAMS[0])[1]+'</span>'
         +'<span class="tltrack" data-track="'+i+'">'
-        +'<span class="tlbar" data-bar="'+i+'" style="left:'+(at[i]/total*100).toFixed(2)+'%;'
+        +'<span class="tlbar'+(sel.has(i)?' sel':'')+'" data-bar="'+i+'" style="left:'
+        +(at[i]/total*100).toFixed(2)+'%;'
         +'width:'+Math.max(2,car.motion.ms/total*100).toFixed(2)+'%">'
         +'<i>'+(at[i]/1000).toFixed(2)+'s</i></span></span></div>').join('')
-    + '<div class="tlfoot"><span>0s</span><span>'+(total/1000).toFixed(1)+'s</span></div>'
-    + '<div class="tlhead" id="tlplay"></div></div>'
+    + '</div><div class="tlfoot"><span>0s</span><span>'
+    + (ARR.viewSpan(arr,0)<total-1
+        ? '<button class="tlfit" id="tlfit" title="the ruler only grows while you work, so this brings'
+          +' it back to what the composition needs">fit</button>' : '')
+    + (total/1000).toFixed(1)+'s</span></div></div>'
 }
-function selectRow(i){
+/**
+ * Where the track column actually is, measured rather than written down.
+ *
+ * The foot's ruler was aligned to the tracks by a hand matched padding of 270px, which is the grip
+ * plus the name plus the camera plus three gaps. Every one of those is a number in the stylesheet, so
+ * the alignment was four numbers agreeing by hand and it would have quietly parted the first time a
+ * column changed width. The playhead needs the same two numbers, so both read them off a real track.
+ */
+function placePlayhead(){
+  const strip=document.getElementById('tl'), track=document.querySelector('.tltrack')
+  const line=document.getElementById('tlplay')
+  if(!strip||!track||!line) return
+  const a=document.getElementById('tlgrid').getBoundingClientRect(), b=track.getBoundingClientRect()
+  strip.style.setProperty('--tlx',(b.left-a.left)+'px')
+  strip.style.setProperty('--tlw',b.width+'px')
+  const foot=strip.querySelector('.tlfoot'); if(foot) foot.style.paddingLeft=(b.left-a.left)+'px'
+}
+/* the playhead is the transport's clock, so it is moved from hold rather than kept in step by hand */
+function markPlayhead(ms){
+  const line=document.getElementById('tlplay'); if(!line||!railed()) return
+  const total=ruler(), w=parseFloat(getComputedStyle(line).width)||0
+  const past=ms>total
+  line.classList.toggle('off',past)
+  if(!past) line.style.setProperty('--t',(ms/total*w).toFixed(1)+'px')
+}
+/* the one writer, so the lead can never drift out of the set it is supposed to lead */
+function choose(indices, head){
+  sel=new Set(indices.filter(i=>arr&&arr.cars[i]&&arr.cars[i].motion))
+  lead = head!==undefined && sel.has(head) ? head : [...sel][sel.size-1]
+  if(lead===undefined) lead=null
+  chosenOpt = lead===null ? null : arr.cars[lead].motion.id
+  paintSel(); drawInspector()
+}
+/* classes only, so a selection change costs no frame reload: the rail iframe is showing the same
+   cars at the same offsets and reloading it would restart every motion to light up a row */
+function paintSel(){
+  for(const r of document.querySelectorAll('.tlrow')){
+    const i=Number(r.dataset.row)
+    r.classList.toggle('sel', sel.has(i))
+    r.classList.toggle('on', i===lead)
+    const bar=r.querySelector('.tlbar'); if(bar) bar.classList.toggle('sel', sel.has(i))
+  }
+}
+function selectRow(i, e){
   const car=arr&&arr.cars[i]; if(!car||!car.motion) return
-  chosenOpt=car.motion.id
-  document.querySelectorAll('.tlrow').forEach(r=>r.classList.toggle('on', Number(r.dataset.row)===i))
+  const rows=[...document.querySelectorAll('.tlrow')].map(r=>Number(r.dataset.row))
+  if(e&&e.shiftKey&&anchor!==null&&rows.includes(anchor)){
+    const a=rows.indexOf(anchor), b=rows.indexOf(i)
+    choose(rows.slice(Math.min(a,b),Math.max(a,b)+1), anchor)
+  }else if(e&&(e.metaKey||e.ctrlKey)){
+    const next=new Set(sel)
+    if(next.has(i)) next.delete(i); else next.add(i)
+    anchor=i
+    choose([...next], next.has(i)?i:undefined)
+  }else{
+    anchor=i
+    choose([i], i)
+  }
   shut(); insp.hidden=false
-  drawInspector()
 }
 function wireTimeline(live){
-  const total=ARR.viewSpan(arr)
+  const total=ruler()
+  const fit=document.getElementById('tlfit')
+  if(fit) fit.onclick=e=>{ e.stopPropagation(); zoom=0; render() }
   /**
    * Order, dragged.
    *
@@ -1545,7 +1731,7 @@ function wireTimeline(live){
       // always, or the document listener below closes the panel this just opened
       e.stopPropagation()
       if(e.target.closest('[data-grip]')) return
-      selectRow(Number(row.dataset.row))
+      selectRow(Number(row.dataset.row), e)
     }
   }
   for (const grip of document.querySelectorAll('[data-grip]')){
@@ -1570,7 +1756,11 @@ function wireTimeline(live){
           mark('reordering the rail')
           /* a car that did not move keeps its place rather than being swept to the bottom, which is
              what rebuilding the list as movers-then-failures used to do on every reorder */
-          arr=ARR.reordered(arr, Number(rows[seat].dataset.row), Number(rows[to].dataset.row))
+          const was=Number(rows[seat].dataset.row), now=Number(rows[to].dataset.row)
+          arr=ARR.reordered(arr, was, now)
+          /* every index after the move means a different car, so the selection is re-aimed at the
+             row that was dragged rather than left pointing at whatever slid into its place */
+          sel=new Set([now]); lead=now; anchor=now
           held.clear(); ends.clear(); render()
         }
       }
@@ -1582,22 +1772,55 @@ function wireTimeline(live){
       e.preventDefault()
       const i=Number(bar.dataset.bar), track=bar.parentElement
       const w=track.getBoundingClientRect().width, from=e.clientX
-      const was=ARR.resolve(arr).at[i]
-      let stepped=false, at=was
+      const when=ARR.resolve(arr).at
+      /* dragging a bar that is part of a selection moves the whole selection, and dragging one that
+         is not takes the selection with it rather than moving something you cannot see */
+      const moving = sel.has(i) && sel.size>1 ? [...sel] : [i]
+      if(!sel.has(i)) { anchor=i; choose([i],i) }
+      const wases=new Map(moving.map(k=>[k,when[k]]))
+      /**
+       * The threshold is pixels, converted here to milliseconds at the ruler this drag is happening
+       * on. A fixed millisecond figure is twenty two pixels of magnet on a short rail, where nothing
+       * can be placed off a target at all, and under two on a long one, where it may as well not
+       * exist. The grid is offered a narrower one, which is the whole priority rule: a named edge
+       * wins over a grid line near it because the grid simply misses more often.
+       */
+      const tol=(7/w)*total, gridTol=(4/w)*total, step=ARR.gridStep(total,w)
+      const targets=ARR.edges(arr,moving,running?null:Number(scrub.value))
+      let stepped=false, delta=0, hit=null
+      const bars=new Map(moving.map(k=>[k,document.querySelector('[data-bar="'+k+'"]')]))
       const move=ev=>{
-        if(!stepped){ stepped=true; mark('moving '+nameOf(arr.cars[i].motion)+' in time') }
-        at=Math.max(0, was + (ev.clientX-from)/w*total)
-        /* the bar is moved by hand while the drag is live and the arrangement is written once at the
-           end. Rebuilding the value on every pointermove would be honest and would also rebuild the
-           frame sixty times a second; the old code got the same effect by writing through a filtered
-           view of the state, which worked and meant nothing could be sure what owned a car's offset */
-        bar.style.left=(at/total*100).toFixed(2)+'%'
-        bar.querySelector('i').textContent=(at/1000).toFixed(2)+'s'
+        if(!stepped){ stepped=true
+          mark(moving.length>1 ? 'moving '+moving.length+' cars in time'
+            : 'moving '+nameOf(arr.cars[i].motion)+' in time') }
+        let want=Math.max(0, wases.get(i) + (ev.clientX-from)/w*total)
+        /* alt is read live rather than at pointerdown, so a magnet can be escaped and then let go of
+           to land clean, which is what holding it is for */
+        const free=ev.altKey
+        const got=free?{at:want,hit:null}:ARR.snapTo(want,targets,tol,step,gridTol)
+        hit=got.hit
+        delta=ARR.clampDelta(got.at-wases.get(i), moving.map(k=>wases.get(k)))
+        for(const k of moving){
+          const b=bars.get(k); if(!b) continue
+          const to=wases.get(k)+delta
+          b.style.left=(to/total*100).toFixed(2)+'%'
+          b.querySelector('i').textContent=(to/1000).toFixed(2)+'s'
+        }
+        const say=document.getElementById('tlsay')
+        if(say) say.innerHTML = hit
+          ? 'Snapped to <b class="tlhint">'+esc(hit)+'</b>. Hold alt to place it freely.'
+          : (moving.length>1?moving.length+' cars moving together.':'Dragging freely.')
       }
-      const up=()=>{
+      const up=ev=>{
         window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up)
-        if(!stepped) return selectRow(i)
-        arr=ARR.moved(arr,i,at)
+        /* a press that never moved is a click and the row's own handler is about to answer it. This
+           selected here as well, which was invisible while selecting was idempotent and became a bug
+           the moment cmd-click started toggling: the row was taken out and put straight back in */
+        if(!stepped) return
+        /* the bars are moved by hand while the drag is live and the arrangement is written once at
+           the end, because rebuilding it per pointermove would rebuild the frame sixty times a
+           second. The old code got the same effect by writing through a filtered view of the state */
+        arr=ARR.shifted(arr,moving,delta)
         // only reload the frame when the drag ends, or every pixel would restart the page
         held.clear(); ends.clear(); render()
       }
@@ -1656,6 +1879,7 @@ function hold(ms){
     try{f.contentWindow.postMessage({wall:'hold',t:ms,i},'*')}catch(_){}
   })
   scrub.value=ms; at.textContent=(ms/1000).toFixed(2)
+  markPlayhead(ms)
 }
 function face(){document.getElementById('glyph').textContent=running?'❚❚':'▶'
   play.title=running?'Pause (space)':'Play (space)'}
