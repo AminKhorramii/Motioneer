@@ -27,7 +27,9 @@ import { randomUUID } from 'node:crypto'
 import { readFileSync, writeFileSync, existsSync, statSync, readdirSync, mkdirSync, rmSync } from 'node:fs'
 import { spawn, spawnSync } from 'node:child_process'
 import path from 'node:path'
-import { hasClaude, runClaude } from '../shared/cli.mjs'
+import { hasClaude } from '../shared/cli.mjs'
+import { PROVIDERS, write as askProvider, check as checkProvider, publicly, missing, resolve }
+  from '../shared/model.mjs'
 import { streamText } from '../shared/providers.mjs'
 import { listenNear, movedFrom } from '../shared/port.mjs'
 import {
@@ -96,7 +98,7 @@ const KIND = /\.(tsx|jsx|vue|svelte|astro|html|htm)$/i
  * could have been said before any waiting happened.
  */
 const CAN_CLI = hasClaude()
-const CAN_WRITE = CAN_CLI || !!process.env.ANTHROPIC_API_KEY
+const CAN_WRITE = CAN_CLI || !!process.env.ANTHROPIC_API_KEY || existsSync('.studio/model.json')
 
 const work = '.studio'
 mkdirSync(work, { recursive: true })
@@ -1019,9 +1021,34 @@ const THINK = process.env.WALL_STUDIO_THINKING ? Number(process.env.WALL_STUDIO_
  * most people running this will have, but a key present means the fast path, and the two produce the
  * same shape so nothing downstream knows which one answered.
  */
-let KEY = process.env.ANTHROPIC_API_KEY || ''
 /* the environment the command is given, with a refused key taken out of it rather than inherited */
 const CLEAN_ENV = (() => { const e = { ...process.env }; delete e.ANTHROPIC_API_KEY; return e })()
+
+/**
+ * Which model writes the motion, kept between runs and changeable while it is running.
+ *
+ * This used to be two branches and an environment variable: a key meant the http path, no key meant
+ * the command, and the vendor was written into the call. Choosing anything else meant editing the
+ * file. The catalogue and the dispatch live in shared/model.mjs so that a worker, which has no shell
+ * to run a command in and no disk to keep a file on, can use the same seven providers by handing it
+ * a config from somewhere else.
+ *
+ * The key is written to .studio, which is already where the tailwind cache and the recent list live,
+ * and is not committed. It is never sent back to the browser: the panel is told whether a key is set,
+ * which is the only part of it a person needs to see.
+ */
+const MODEL_AT = path.join(work, 'model.json')
+const fromEnv = () => (process.env.ANTHROPIC_API_KEY
+  ? { provider: 'anthropic', key: process.env.ANTHROPIC_API_KEY, model: process.env.WALL_STUDIO_MODEL || '' }
+  : { provider: 'claude-cli', model: process.env.WALL_STUDIO_MODEL || '' })
+let MODEL = (() => {
+  try { return { ...fromEnv(), ...JSON.parse(readFileSync(MODEL_AT, 'utf8')) } }
+  catch { return fromEnv() }
+})()
+const saveModel = () => {
+  try { writeFileSync(MODEL_AT, JSON.stringify(MODEL, null, 2)) }
+  catch (e) { console.log(`  could not keep the model choice: ${e.message}`) }
+}
 
 /**
  * Where this has been pointed, kept between runs.
@@ -1046,25 +1073,14 @@ const remember = (href) => {
     writeFileSync(RECENT_AT, JSON.stringify(recent))
   } catch { /* an address that will not parse is not worth remembering */ }
 }
-const API_MODEL = process.env.WALL_STUDIO_MODEL || 'claude-sonnet-5'
-
-const viaApi = async (brief) => {
-  // streamText hands every delta to this and calls it without checking, so a missing one is a
-  // TypeError on the first token rather than a slow path: measured, it dropped all five options
-  const r = await streamText('anthropic', MOTION_SYSTEM, brief, KEY, () => {},
-    { model: API_MODEL, maxTokens: 4000 })
-  return r && r.error ? { error: r.error } : { text: (r && r.text) || '' }
-}
-
 let refused = false   // said once, however many calls discover it at the same moment
 
 async function askModel(brief, tries = 4) {
   let last = 'no usable reply came back'
   for (let n = 0; n < tries; n++) {
-    let reply = await (KEY
-      ? viaApi(brief)
-      : runClaude(MOTION_SYSTEM, brief, { callMs: CALL_MS, thinking: THINK, env: CLEAN_ENV })
-    ).catch((e) => ({ error: String(e && e.message ? e.message : e).slice(0, 160) }))
+    let reply = await askProvider(MOTION_SYSTEM, brief, MODEL,
+      { callMs: CALL_MS, thinking: THINK, env: CLEAN_ENV, maxTokens: 4000 })
+      .catch((e) => ({ error: String(e && e.message ? e.message : e).slice(0, 160) }))
 
     if (reply && reply.error) {
       last = reply.error
@@ -1081,16 +1097,25 @@ async function askModel(brief, tries = 4) {
        * rescues whichever call noticed first and leaves the others holding a terminal error. Every
        * one of them continues here, and by their next turn the key is already gone.
        */
-      // not `KEY && ...`: whichever call notices first clears it, and the rest would then fail this
+      /**
+       * Only when nobody chose this on purpose.
+       *
+       * The fallback exists because ANTHROPIC_API_KEY is so often set to something stale, and a
+       * studio that answers 401 when a working command is right there is worse than useless. But a
+       * provider picked by hand in the panel is a decision, and quietly using a different one than
+       * the person selected would hide exactly the mistake they need to see. So a config that came
+       * from the environment falls back, and one that was chosen reports.
+       */
+      // not a key test: whichever call notices first switches, and the rest would then fail this
       // test and fall through to the terminal branch holding the same 401. Measured, that kept one
       // option out of five. What matters is that the fault was authentication and there is a command
-      if (AUTH.test(last) && CAN_CLI && n < tries - 1) {
+      if (AUTH.test(last) && CAN_CLI && !MODEL.chosen && MODEL.provider !== 'claude-cli' && n < tries - 1) {
         if (!refused) {
           refused = true
           console.log(`  the api key was refused (${String(last).slice(0, 56)})`)
           console.log('  falling back to the claude command for the rest of this session')
         }
-        KEY = ''
+        MODEL = { provider: 'claude-cli', model: '' }
         continue
       }
       if (TERMINAL.test(last)) return { why: last, terminal: true }
@@ -1621,6 +1646,11 @@ header{display:flex;align-items:center;gap:12px;height:48px;padding:0 14px;
   font-size:12px;color:var(--dim)}
 .menu label.row{justify-content:flex-start;gap:8px}
 .menu select{flex:1;max-width:118px}
+.menu input{flex:1;max-width:150px;min-width:0;height:24px;padding:0 7px;background:var(--bg);
+  color:var(--ink);border:1px solid var(--line);border-radius:5px;font:inherit;font-size:11.5px}
+.menu input:focus{outline:none;border-color:var(--accent)}
+.menu .btn{width:100%}
+.mrow{display:flex;gap:5px}.mrow .btn{flex:1}
 .menu .keys{margin:2px 0 0;padding-top:9px;border-top:1px solid var(--line);
   font-size:10.5px;color:var(--faint);line-height:1.7}
 .menu.wide{width:262px}
@@ -1820,6 +1850,19 @@ figcaption b{font-weight:500}.note{color:var(--dim)}.verb{color:var(--faint);fon
       <button class="btn go" id="tapply">Add as a new option</button>
       <p class="keys" id="inote">The original stays. Adjusting makes another one beside it.</p>
     </div>
+    <div class="menu wide" id="models" hidden>
+      <p class="ihead">Writing with <em id="mtag">the default</em></p>
+      <label>Service<select id="mprov"></select></label>
+      <p class="ifacts" id="mnote"></p>
+      <label>Model<input id="mmodel" list="mlist" spellcheck="false" placeholder="default"></label>
+      <datalist id="mlist"></datalist>
+      <label id="mbaserow">Endpoint<input id="mbase" spellcheck="false" placeholder="default"></label>
+      <label id="mkeyrow">Key<input id="mkey" type="password" spellcheck="false" placeholder="not set"></label>
+      <span class="mrow"><button class="btn go" id="msave">Use this</button>
+        <button class="btn" id="mtest">Test it</button>
+        <button class="btn" id="mforget" title="Remove the stored key">Forget key</button></span>
+      <p class="keys" id="mout">The key is kept in .studio on this machine and never sent to the page.</p>
+    </div>
     <div class="menu" id="menu" hidden>
       <label>Speed<select id="rate"><option>0.25x</option><option>0.5x</option>
         <option selected>1x</option><option>2x</option></select></label>
@@ -1839,7 +1882,9 @@ figcaption b{font-weight:500}.note{color:var(--dim)}.verb{color:var(--faint);fon
       <label>Lens<select id="depth">
         <option value="0.4">shallow</option><option value="1" selected>as shot</option>
         <option value="1.6">heavy</option></select></label>
-      <p class="keys"><kbd>Space</kbd> play <kbd>&larr;</kbd><kbd>&rarr;</kbd> step <kbd>Esc</kbd> stop picking</p>
+      <button class="btn" id="modelbtn">Model and service</button>
+      <p class="keys"><kbd>Space</kbd> play <kbd>&larr;</kbd><kbd>&rarr;</kbd> step <kbd>Esc</kbd> stop picking
+        <kbd>&#8984;Z</kbd> undo <kbd>&#8984;&#8679;Z</kbd> redo</p>
     </div>
   </header>
   <div class="grid" id="grid"><div class="empty">${CAN_WRITE
@@ -2212,17 +2257,90 @@ palette.onchange=render
 const menu=document.getElementById('menu'), moreBtn=document.getElementById('more')
 const insp=document.getElementById('inspector'), inspBtn=document.getElementById('inspect')
 let chosenOpt=null   // the option the inspector is pointed at
-const reel=document.getElementById('reel')
-const pop=(panel)=>{ for(const q of [menu,insp,reel]) q.hidden = q!==panel || !q.hidden }
+const reel=document.getElementById('reel'), models=document.getElementById('models')
+const PANELS=[menu,insp,reel,models]
+const pop=(panel)=>{ for(const q of PANELS) q.hidden = q!==panel || !q.hidden }
+const shut=()=>{ for(const q of PANELS) q.hidden=true }
 document.getElementById('undo').onclick=e=>{ e.stopPropagation(); undo() }
 document.getElementById('redo').onclick=e=>{ e.stopPropagation(); redo() }
 moreBtn.onclick=e=>{ e.stopPropagation(); pop(menu) }
+
+/**
+ * The model panel.
+ *
+ * The catalogue is fetched rather than written into this page, because the list of places a request
+ * can go is knowledge and belongs with the rest of it, and because a worker serving this same page
+ * would offer a different list: no command line there, and no localhost either.
+ */
+const byId=(id)=>document.getElementById(id)
+let CAT=[], CUR=null
+async function loadModels(){
+  const r=await fetch('/__wall/model').then(r=>r.json()).catch(()=>null)
+  if(!r) return
+  CAT=r.providers||[]; CUR=r.current||null
+  byId('mprov').innerHTML=CAT.map(p=>'<option value="'+p.id+'"'
+    +(CUR&&p.id===CUR.provider?' selected':'')+'>'+p.label+'</option>').join('')
+  drawModelForm(true)
+}
+function drawModelForm(saved){
+  const p=CAT.find(x=>x.id===byId('mprov').value)||CAT[0]; if(!p) return
+  const same=!!CUR&&CUR.provider===p.id
+  byId('mtag').textContent=CUR?(CUR.label+(CUR.model?', '+CUR.model:'')):'the default'
+  byId('mnote').textContent=(p.note||'')
+    +(p.browser?' A page is allowed to call it directly, so on a deployment the key can stay in the browser.':'')
+  byId('mlist').innerHTML=(p.models||[]).map(m=>'<option value="'+m+'">').join('')
+  byId('mmodel').placeholder=(p.models&&p.models[0])||'model name'
+  byId('mbase').placeholder=p.base||'https://your endpoint'
+  /* offered by every provider that talks over http, not only the ones that demand it: a gateway or
+     a self hosted endpoint usually wants a key even though nothing here can know that it does */
+  byId('mkeyrow').hidden=p.shape==='cli'
+  byId('mkey').title=(p.needs||[]).includes('key')?'required':'optional for this one'
+  byId('mforget').hidden=!same||!CUR.hasKey
+  byId('mkey').placeholder=(same&&CUR.hasKey)?'set, leave blank to keep it'
+    :((p.needs||[]).includes('key')?'required':'optional')
+  if(saved&&same){ byId('mmodel').value=CUR.model||''; byId('mbase').value=CUR.base||'' }
+  if(!same){ byId('mmodel').value=''; byId('mbase').value=''; byId('mkey').value='' }
+}
+const modelForm=()=>({ provider:byId('mprov').value, model:byId('mmodel').value.trim(),
+  base:byId('mbase').value.trim(), key:byId('mkey').value||undefined })
+byId('modelbtn').onclick=e=>{ e.stopPropagation(); pop(models); loadModels() }
+byId('mprov').onchange=()=>drawModelForm(false)
+byId('msave').onclick=async()=>{
+  const b=byId('msave'); b.disabled=true; b.textContent='Saving'
+  const r=await fetch('/__wall/model',{method:'POST',headers:{'content-type':'application/json'},
+    body:JSON.stringify(modelForm())}).then(r=>r.json()).catch(e=>({error:String(e.message||e)}))
+  b.disabled=false; b.textContent='Use this'
+  if(r.error){ byId('mout').textContent=r.error; return }
+  CUR=r.current; byId('mkey').value=''
+  byId('mout').textContent='Saved. Motion is written with '+CUR.label
+    +(CUR.model?', '+CUR.model:'')+' from now on.'
+  drawModelForm(true)
+}
+byId('mtest').onclick=async()=>{
+  const b=byId('mtest'); b.disabled=true; b.textContent='Testing'
+  byId('mout').textContent='Asking it for one word.'
+  const r=await fetch('/__wall/model/check',{method:'POST',headers:{'content-type':'application/json'},
+    body:JSON.stringify(modelForm())}).then(r=>r.json()).catch(e=>({ok:false,why:String(e.message||e)}))
+  b.disabled=false; b.textContent='Test it'
+  byId('mout').textContent=r.ok
+    ? 'Answered in '+(r.ms/1000).toFixed(1)+' seconds, saying: '+r.said
+    : 'It did not answer. '+r.why
+}
+byId('mforget').onclick=async()=>{
+  const r=await fetch('/__wall/model',{method:'POST',headers:{'content-type':'application/json'},
+    body:JSON.stringify({ ...modelForm(), key:null })}).then(r=>r.json()).catch(e=>({error:String(e.message||e)}))
+  if(r.error){ byId('mout').textContent=r.error; return }
+  CUR=r.current; byId('mkey').value=''
+  byId('mout').textContent='The stored key is gone.'
+  drawModelForm(true)
+}
 inspBtn.onclick=e=>{ e.stopPropagation(); pop(insp); drawInspector() }
 menu.onclick=e=>e.stopPropagation()
 insp.onclick=e=>e.stopPropagation()
 reel.onclick=e=>e.stopPropagation()
-addEventListener('click',()=>{ menu.hidden=true; insp.hidden=true; reel.hidden=true })
-addEventListener('keydown',e=>{ if(e.key==='Escape'){ menu.hidden=true; insp.hidden=true; reel.hidden=true } })
+models.onclick=e=>e.stopPropagation()
+addEventListener('click',shut)
+addEventListener('keydown',e=>{ if(e.key==='Escape') shut() })
 
 /**
  * What the inspector is looking at.
@@ -2356,7 +2474,7 @@ document.getElementById('film').onclick=async()=>{
       const get=document.getElementById('reelget')
       get.href=src; get.setAttribute('download', name+'.mp4')
       document.getElementById('reelnote').textContent=r.mp4
-      reel.hidden=false; menu.hidden=true; insp.hidden=true
+      shut(); reel.hidden=false
       drops.textContent=''
     } else {
       drops.textContent='Filmed '+r.frames+' frames into '+r.at+'. '+(r.why||'')
@@ -2562,7 +2680,7 @@ function selectRow(i, live){
   const c=live[i]; if(!c) return
   chosenOpt=c.id
   document.querySelectorAll('.tlrow').forEach((r,j)=>r.classList.toggle('on', j===i))
-  insp.hidden=false; menu.hidden=true; reel.hidden=true
+  shut(); insp.hidden=false
   drawInspector()
 }
 function wireTimeline(live){
@@ -2870,6 +2988,42 @@ const server = createServer(async (req, res) => {
       const id = String(nextId++)
       keep(id, { ...base, id, css, note: base.note })
       return json(res, { id, css, tempo: tempo(css) })
+    }
+    /**
+     * The model, read and changed while the studio is running.
+     *
+     * The key never travels back out. A panel needs to know whether one is set so it can say so, and
+     * nothing more, and a settings screen that helpfully shows you your own secret is how it ends up
+     * in a screenshot.
+     */
+    if (url.pathname === '/__wall/model' && req.method === 'GET') {
+      return json(res, { providers: PROVIDERS, current: publicly(MODEL), canCli: CAN_CLI })
+    }
+    if (url.pathname === '/__wall/model' && req.method === 'POST') {
+      const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))
+      const next = {
+        provider: String(body.provider || MODEL.provider),
+        model: String(body.model ?? ''),
+        base: String(body.base ?? ''),
+        // an empty box means "leave it alone", or changing the model name would wipe the key. Only
+        // an explicit null clears it, which is what the button marked forget sends
+        key: body.key === null ? '' : (body.key ? String(body.key) : (MODEL.key || '')),
+        chosen: true,
+      }
+      const gap = missing(next)
+      if (gap.length) return json(res, { error: `${resolve(next).label} needs ${gap.join(' and ')}` })
+      MODEL = next
+      saveModel()
+      console.log(`  writing with ${resolve(MODEL).label}${MODEL.model ? `, ${MODEL.model}` : ''}`)
+      return json(res, { current: publicly(MODEL) })
+    }
+    if (url.pathname === '/__wall/model/check' && req.method === 'POST') {
+      const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))
+      // tested as typed rather than as saved, so a wrong key is caught before it is kept
+      const trying = body.provider
+        ? { ...body, key: body.key || (body.provider === MODEL.provider ? MODEL.key : '') || '' }
+        : MODEL
+      return json(res, await checkProvider(trying, { callMs: 30_000, env: CLEAN_ENV }))
     }
     if (url.pathname === '/__wall/film' && req.method === 'POST') {
       const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))

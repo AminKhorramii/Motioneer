@@ -52,7 +52,7 @@ export const REQUESTS = {
     delta: (j) => j?.choices?.[0]?.delta?.content ?? '',
   }),
   anthropic: (system, user, key, opts = {}) => ({
-    url: `${base() || opts.base || 'https://api.anthropic.com'}/v1/messages`,
+    url: `${opts.base || base() || 'https://api.anthropic.com'}/v1/messages`,
     headers: {
       'content-type': 'application/json',
       'x-api-key': key,
