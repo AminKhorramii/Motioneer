@@ -734,6 +734,21 @@ begin together and still need one above the other.
 The options share a document rather than sitting in iframes, which they can only do because each sheet
 is already scoped: option two gets `data-motion-fold-2` and its selectors are rewritten to match.
 
+Two different artifacts come out of that one button and they were being written as one. Several
+motions for a single component is a comparison, so it is a grid of captioned cards held at the same
+instant, which is the whole point of looking at them together. A rail is a composition, so it is one
+stage with the cars in the order they were arranged and each held at `t` minus its own offset. Until
+this was split, a rail exported as the first of those: every component starting together, in a stack,
+with the sequencing gone. Nothing in the file looked wrong, because every id was there and every
+sheet was correct, and the one decision a rail records was simply not written down. The offsets now
+travel with the ids, and the exported transport finds which car an animation belongs to the same way
+the rail frame does, by walking up to the nearest `data-rail`. Cameras still do not travel, and the
+page says so rather than letting the export look complete.
+
+`railView` had the same fault a step further in. It drops ids the store has evicted and then read the
+offsets and cameras at the position each car ended up in rather than the one it was asked for, so a
+single missing option handed every car after it its neighbour's timing.
+
 `Film` renders whatever is on screen frame by frame, the rail with its offsets and cameras included,
 and plays the result in a panel with somewhere to take it away, because a path printed in a status
 line is a thing you then have to go and find. It hands back an mp4 if ffmpeg is on the machine and the frames plus a one line script if it is not. Stepped
@@ -754,10 +769,18 @@ things in the document being filmed and says so on the film where they are prese
 ```
 node verify/studio-sites.mjs            twenty real sites: reachable, readable, pickable
 node verify/studio-capture.mjs --deep   what survives being picked, by kind of element
+node verify/studio-capture.mjs --rail   the composition, with no site and no key
 ```
 
-Both need the network and both are worth the minutes, because every proxy bug so far was invisible to
-a fixture. Nineteen of twenty sites work end to end; npm sits behind a bot check. Capture keeps tree
+The rail leg is in the capture suite rather than in one of its own, and it skips the site loop, so it
+needs neither the network nor a model. The composition's arithmetic is a pure module, and the export
+is checked by seeding the studio's own session store with three motions and then opening the file it
+writes: the failure worth catching there is a silent one, since a rail with its offsets dropped still
+plays and still looks like a composition somebody chose. That is why it is the one studio leg inside
+`verify:all`, which is the command people actually run.
+
+The other two need the network and both are worth the minutes, because every proxy bug so far was
+invisible to a fixture. Nineteen of twenty sites work end to end; npm sits behind a bot check. Capture keeps tree
 and shape for 67 of 89 elements, and svg is the weakest kind at 5 of 11, which is the next thing to
 chase.
 
