@@ -24,8 +24,8 @@
 import { createServer } from 'node:http'
 import net from 'node:net'
 import { randomUUID } from 'node:crypto'
-import { readFileSync, writeFileSync, existsSync, statSync, readdirSync, mkdirSync } from 'node:fs'
-import { spawn } from 'node:child_process'
+import { readFileSync, writeFileSync, existsSync, statSync, readdirSync, mkdirSync, rmSync } from 'node:fs'
+import { spawn, spawnSync } from 'node:child_process'
 import path from 'node:path'
 import { hasClaude, runClaude } from '../shared/cli.mjs'
 import { streamText } from '../shared/providers.mjs'
@@ -1447,6 +1447,64 @@ addEventListener('message',function(e){var d=e.data||{};if(d.wall!=='hold')retur
 <\/script></body></html>`
 }
 
+/**
+ * A film of whatever is on screen, rendered rather than recorded.
+ *
+ * film.mjs already does this from the command line, and asking somebody to leave the room they are
+ * composing in, run a second tool and hope it picks up the same arrangement is the wrong shape. The
+ * arrangement lives here: which options, in what order, at what offsets, under which camera. So the
+ * frames are taken here too.
+ *
+ * Stepped rather than recorded, for the same reason film.mjs gives: a recording hopes the machine
+ * keeps up and produces a different file every run, while setting the clock by hand produces the same
+ * film every time at whatever frame rate is asked for. The transport that scrubs the studio is exactly
+ * the mechanism for it.
+ *
+ * mp4 only if ffmpeg is on the machine. It is a thing somebody may have rather than something this
+ * depends on, and the frames are the deliverable either way, which is said rather than skipped.
+ */
+async function film(url, { fps = 30, ms = 3000, size = { width: 1280, height: 720 }, name = 'film' }) {
+  const eye = await eyes()
+  if (!eye.browser) return { error: eye.why }
+  const out = path.resolve(work, name)
+  rmSync(out, { recursive: true, force: true })
+  mkdirSync(path.join(out, 'frames'), { recursive: true })
+  const page = await eye.browser.newPage({ viewport: size })
+  const total = Math.max(1, Math.min(600, Math.round((ms / 1000) * fps)))
+  try {
+    await page.goto(url, { waitUntil: 'load' })
+    await page.waitForTimeout(700)
+    for (let f = 0; f < total; f++) {
+      const at = Math.round((f / fps) * 1000)
+      // the same hold the scrubber uses, so a frame here is the frame you were looking at
+      await page.evaluate((t) => {
+        window.postMessage({ wall: 'hold', t, i: 0 }, '*')
+        for (const a of document.getAnimations()) { try { a.pause(); a.currentTime = t } catch {} }
+      }, at).catch(() => {})
+      await page.screenshot({ path: path.join(out, 'frames', String(f).padStart(5, '0') + '.png') })
+    }
+  } finally { await page.close().catch(() => {}) }
+
+  const ff = spawnSync('which', ['ffmpeg'], { encoding: 'utf8' }).stdout.trim()
+  if (!ff) {
+    writeFileSync(path.join(out, 'make-mp4.sh'),
+      `#!/bin/sh\n# X takes mp4 and not webm, and macOS has no transcoder that reads webm.\n`
+      + `#   brew install ffmpeg\n\nffmpeg -y -framerate ${fps} -i frames/%05d.png \\\n`
+      + `  -c:v libx264 -pix_fmt yuv420p -preset slow -crf 18 \\\n`
+      + `  -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -movflags +faststart film.mp4\n`)
+    return { at: out, frames: total, mp4: null,
+      why: 'ffmpeg is not installed, so the frames are the deliverable. brew install ffmpeg, then sh make-mp4.sh' }
+  }
+  const mp4 = path.join(out, 'film.mp4')
+  const r = spawnSync(ff, ['-y', '-framerate', String(fps), '-i', path.join(out, 'frames', '%05d.png'),
+    // yuv420p and even dimensions, or half the players in the world show a green frame
+    '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'slow', '-crf', '18',
+    '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2', '-movflags', '+faststart', mp4], { encoding: 'utf8' })
+  return r.status === 0
+    ? { at: out, frames: total, mp4 }
+    : { at: out, frames: total, mp4: null, why: String(r.stderr).split('\n').slice(-3).join(' ').slice(0, 140) }
+}
+
 /* ── the room ─────────────────────────────────────────────────────────────────────────────────── */
 const PAGE = () => `<html><head><meta charset="utf-8"><title>motion studio</title><style>
 :root{--bg:#08090a;--panel:#0f1011;--raised:#141516;--line:rgba(255,255,255,.07);
@@ -1592,10 +1650,12 @@ figcaption b{font-weight:500}.note{color:var(--dim)}.verb{color:var(--faint);fon
   border:1px solid var(--line);border-radius:8px;position:relative}
 .tlhead{font-size:10.5px;color:var(--faint);letter-spacing:.06em;margin-bottom:8px}
 .tlrow{display:flex;align-items:center;gap:10px;margin:5px 0}
-.tlname{display:flex;align-items:center;gap:7px;width:190px;flex:none;font-size:11.5px;
+.tlname{display:flex;align-items:center;gap:7px;width:172px;flex:none;font-size:11.5px;
   color:var(--dim);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.tlname b{display:grid;place-items:center;width:15px;height:15px;flex:none;border-radius:4px;
-  background:var(--accent);color:#fff;font-size:9.5px;font-weight:500}
+.grip{width:14px;flex:none;color:var(--faint);font-size:9px;letter-spacing:-2px;cursor:grab;
+  user-select:none;touch-action:none;line-height:1}
+.grip:active{cursor:grabbing;color:var(--ink)}
+.tlrow.lifting{opacity:.55}
 .tltrack{position:relative;flex:1;height:20px;background:var(--bg);border-radius:5px;
   border:1px solid var(--line)}
 .tlbar{position:absolute;top:2px;bottom:2px;background:rgba(94,106,210,.5);
@@ -1649,6 +1709,7 @@ figcaption b{font-weight:500}.note{color:var(--dim)}.verb{color:var(--faint);fon
     <span class="sep"></span>
     <button class="icon" id="inspect" title="Inspect and adjust the chosen option">&#9707;</button>
     <button class="icon" id="more" title="Speed, palette, camera">&#183;&#183;&#183;</button>
+    <button class="btn" id="film" title="Render what is on screen frame by frame">Film</button>
     <button class="btn" id="save">Export</button>
     <div class="menu wide" id="inspector" hidden>
       <p class="ihead">Adjust <em id="itag">nothing chosen</em></p>
@@ -2032,6 +2093,21 @@ document.getElementById('tapply').onclick=async()=>{
   chosenOpt=r.id; held.clear(); ends.clear(); render(); drawInspector()
   document.getElementById('inote').textContent='Added beside the original, which is untouched.'
 }
+/* films whatever is actually on screen: the rail with its offsets and camera, or one option */
+document.getElementById('film').onclick=async()=>{
+  const frame=grid.querySelector('.appwrap iframe, .grid iframe, iframe')
+  if(!frame){ drops.textContent='nothing on screen to film'; return }
+  const btn=document.getElementById('film'); btn.disabled=true; btn.textContent='Filming…'
+  const name=(APP?(chosen&&chosen.label)||'element':(file||'film')).split('/').pop().replace(/\.[^.]+$/,'')
+  try{
+    const r=await post('/__wall/film',{ path:new URL(frame.src).pathname+new URL(frame.src).search,
+      ms:Math.max(1200, span+400), fps:30, wide:true, name }, 600000)
+    drops.textContent = r.error ? r.error
+      : r.mp4 ? 'Filmed '+r.frames+' frames. '+r.mp4
+      : 'Filmed '+r.frames+' frames into '+r.at+'. '+(r.why||'')
+  }catch(e){ drops.textContent=String(e && e.message||e) }
+  btn.disabled=false; btn.textContent='Film'
+}
 document.getElementById('save').onclick=async()=>{
   // a rail is a thing worth handing over too, and it was the one result you could not export
   const ids = opts.length ? opts.map(o=>o.id) : (cars||[]).filter(c=>c.id).map(c=>c.id)
@@ -2211,8 +2287,10 @@ function railSpan(live){
 function timeline(live){
   const total=railSpan(live)
   return '<div class="tl" id="tl"><div class="tlhead">Sequence &middot; drag a bar to move it in time</div>'
-    + live.map((c,i)=>'<div class="tlrow"><span class="tlname" title="'+(c.note||'')+'"><b>'+(i+1)+'</b>'
-        +((c.note||c.label||'').split(',')[0]).slice(0,26)+'</span>'
+    + live.map((c,i)=>'<div class="tlrow" data-row="'+i+'">'
+        +'<span class="grip" data-grip="'+i+'" title="drag to reorder">&#8942;&#8942;</span>'
+        +'<span class="tlname" title="'+(c.note||'')+'">'
+        +((c.note||c.label||'').split(',')[0]).slice(0,24)+'</span>'
         +'<span class="tltrack" data-track="'+i+'">'
         +'<span class="tlbar" data-bar="'+i+'" style="left:'+(c.at/total*100).toFixed(2)+'%;'
         +'width:'+Math.max(2,(c.ms||600)/total*100).toFixed(2)+'%">'
@@ -2222,6 +2300,39 @@ function timeline(live){
 }
 function wireTimeline(live){
   const total=railSpan(live)
+  /**
+   * Order, dragged.
+   *
+   * Offsets say when a car starts and order says where it sits in the film, and they are not the same
+   * decision: two cars can begin together and still need one above the other. Reordering swaps their
+   * places in the rail and leaves each one's offset alone, so moving a car does not silently retime it.
+   */
+  for (const grip of document.querySelectorAll('[data-grip]')){
+    grip.onpointerdown=e=>{
+      e.preventDefault()
+      const from=Number(grip.dataset.grip)
+      const rows=[...document.querySelectorAll('.tlrow')]
+      const tops=rows.map(r=>r.getBoundingClientRect().top+r.getBoundingClientRect().height/2)
+      rows[from].classList.add('lifting')
+      let to=from
+      const move=ev=>{
+        to=tops.reduce((best,t,i)=>Math.abs(ev.clientY-t)<Math.abs(ev.clientY-tops[best])?i:best,from)
+        rows.forEach((r,i)=>r.style.outline = i===to&&i!==from ? '1px solid var(--accent)' : '')
+      }
+      const up=()=>{
+        window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up)
+        rows[from].classList.remove('lifting'); rows.forEach(r=>r.style.outline='')
+        if(to!==from){
+          const order=cars.filter(c=>c.id)
+          order.splice(to,0,order.splice(from,1)[0])
+          const rest=cars.filter(c=>!c.id)
+          cars=order.concat(rest)
+          held.clear(); ends.clear(); render()
+        }
+      }
+      window.addEventListener('pointermove',move); window.addEventListener('pointerup',up)
+    }
+  }
   for (const bar of document.querySelectorAll('[data-bar]')){
     bar.onpointerdown=e=>{
       e.preventDefault()
@@ -2469,6 +2580,22 @@ const server = createServer(async (req, res) => {
       const id = String(nextId++)
       keep(id, { ...base, id, css, note: base.note })
       return json(res, { id, css, tempo: tempo(css) })
+    }
+    if (url.pathname === '/__wall/film' && req.method === 'POST') {
+      const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))
+      // asked of the server rather than of a const declared two hundred lines below this handler
+      const on = server.address() && server.address().port
+      const where = `http://localhost:${on}${body.path || '/'}`
+      console.log(`  filming ${body.path} for ${Math.round((body.ms || 3000) / 1000)}s`)
+      const made = await film(where, {
+        fps: Number(body.fps) || 30,
+        ms: Math.max(500, Math.min(20000, Number(body.ms) || 3000)),
+        size: body.wide ? { width: 1280, height: 720 } : { width: 1080, height: 1080 },
+        name: String(body.name ?? 'film').replace(/[^-\w]/g, '-') || 'film',
+      })
+      if (made.mp4) console.log(`    ${made.mp4}`)
+      else if (made.why) console.log(`    ${made.why}`)
+      return json(res, made)
     }
     if (url.pathname === '/__wall/save' && req.method === 'POST') {
       const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))
