@@ -1393,13 +1393,13 @@ async function railOf(picks, palette) {
   }))
 }
 
-const railView = (ids, palette, offsets = []) => {
+const railView = (ids, palette, offsets = [], shots = []) => {
   const parts = ids.map((id, i) => made.get(id)).filter(Boolean).map((o, i) => {
     const tag = o.scope ? `${o.scope}-r${i + 1}` : ''
     const css = o.scope ? o.css.replaceAll(`[${o.scope}]`, `[${tag}]`) : o.css
     const from = o.shot || o.markup
     const markup = tag ? from.replace(/<(\w+)/, `<$1 ${tag}`) : from
-    return { ...o, css, markup, tag, i }
+    return { ...o, css, markup, tag, i, shot: shots[i] || '' }
   })
   if (!parts.length) return null
   const tw = parts.some((o) => o.tw)
@@ -1413,17 +1413,59 @@ ${tw ? `<style>${themeFor(palette)}</style>` : ''}
 ${parts[0].base}
 ${parts.map((p) => p.css).join('\n')}
 .car > .in{transform-origin:center center}
+.car.shot{background:#050506;border-radius:8px;overflow:hidden}
+.rig{position:absolute;inset:0;display:grid;place-items:center;perspective:1400px;
+  perspective-origin:50% 45%}
+.dolly{transform-style:preserve-3d}
+.plate{position:relative;width:${Math.max(...parts.map((p) => p.wide || 800))}px;
+  transform-style:preserve-3d;filter:brightness(1.16) contrast(1.05)}
+.layer{position:absolute;inset:0;display:grid;place-items:center}.layer>*{width:100%}
+.sharp{position:relative}
+.blur{filter:blur(8px) saturate(1.1);
+  -webkit-mask-image:linear-gradient(168deg,#000 0%,transparent 32%,transparent 68%,#000 100%);
+  mask-image:linear-gradient(168deg,#000 0%,transparent 32%,transparent 68%,#000 100%)}
+.bloom{filter:blur(20px) saturate(2.1) brightness(1.3);mix-blend-mode:screen;opacity:.5;
+  pointer-events:none}
+${parts.filter((p) => p.shot).map((p) => {
+  const move = SHOTS[p.shot] || SHOTS.drift
+  return `.d${p.i}{transform:${move.from};animation:dolly${p.i} 3000ms ${move.ease} both}
+@keyframes dolly${p.i}{from{transform:${move.from}}to{transform:${move.to}}}`
+}).join('\n')}
 .tag{position:absolute;left:0;top:0;font:10px ui-monospace,monospace;color:#5c6068;letter-spacing:.04em}
 </style></head><body>
-<div class="rail">${parts.map((p) => `<div class="car" data-rail="${p.i}">
-  <span class="tag">${p.i + 1}. ${String(p.file || p.note || '').slice(0, 44)}</span>
-  <div class="in" style="width:${p.wide ? p.wide + 'px' : 'max-content'}">${p.markup}</div></div>`).join('')}</div>
+<div class="rail">${parts.map((p) => {
+  const inner = `<div class="in" style="width:${p.wide ? p.wide + 'px' : 'max-content'}">${p.markup}</div>`
+  /**
+   * A car with a camera gets its own rig.
+   *
+   * The camera is a perspective, a moving plate and two blurred copies of the subject, and every one
+   * of those is per subject. A rail is several subjects, so one shared rig could only ever film all
+   * of them together as a single flat picture. Giving each car its own means one can sit locked off
+   * while the one below it pushes in, which is what asking for a camera per item means.
+   */
+  const body = p.shot
+    ? `<div class="rig"><div class="dolly d${p.i}"><div class="plate">
+         <div class="layer bloom" data-copy></div>
+         <div class="layer sharp">${inner}</div>
+         <div class="layer blur" data-copy></div></div></div></div>`
+    : inner
+  return `<div class="car${p.shot ? ' shot' : ''}" data-rail="${p.i}">
+    <span class="tag">${p.i + 1}. ${String(p.file || p.note || '').slice(0, 44)}</span>
+    ${body}</div>`
+}).join('')}</div>
 <script>
 var AT=${JSON.stringify(ids.map((_, i) => offsets[i] ?? i * 420))}
 for (var car of document.querySelectorAll('.car')){
-  var el=car.querySelector('.in'), r=el.getBoundingClientRect(), box=car.getBoundingClientRect()
+  var el=car.querySelector('.in'); if(!el) continue
+  if(car.classList.contains('shot')) continue   // a rig does its own framing
+  var r=el.getBoundingClientRect(), box=car.getBoundingClientRect()
   var s=Math.min(1,(box.width-20)/r.width,(box.height-8)/r.height)
   if(s<1) el.style.transform='scale('+s.toFixed(4)+')'
+}
+/* the defocus and the bloom are copies, cloned here so no component is written twice */
+for (var slot of document.querySelectorAll('[data-copy]')){
+  var from=slot.parentElement.querySelector('.sharp > *')
+  if(from) slot.appendChild(from.cloneNode(true))
 }
 /* which element an animation belongs to decides which clock it is on */
 /* which car an animation belongs to decides which clock it is on, and each car now carries its own
@@ -1579,6 +1621,9 @@ header{display:flex;align-items:center;gap:12px;height:48px;padding:0 14px;
 .menu .keys{margin:2px 0 0;padding-top:9px;border-top:1px solid var(--line);
   font-size:10.5px;color:var(--faint);line-height:1.7}
 .menu.wide{width:262px}
+.menu.reel{width:340px;gap:8px}
+.menu.reel video{width:100%;border-radius:6px;background:#000;display:block}
+#reelget{width:100%;justify-content:center;text-decoration:none;text-align:center}
 .ihead{margin:0;font-size:12px;color:var(--dim)}
 .ihead em{font-style:normal;color:var(--ink)}
 .ifacts{margin:-3px 0 3px;font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums;line-height:1.6}
@@ -1650,8 +1695,10 @@ figcaption b{font-weight:500}.note{color:var(--dim)}.verb{color:var(--faint);fon
   border:1px solid var(--line);border-radius:8px;position:relative}
 .tlhead{font-size:10.5px;color:var(--faint);letter-spacing:.06em;margin-bottom:8px}
 .tlrow{display:flex;align-items:center;gap:10px;margin:5px 0}
-.tlname{display:flex;align-items:center;gap:7px;width:172px;flex:none;font-size:11.5px;
+.tlname{display:flex;align-items:center;gap:7px;width:150px;flex:none;font-size:11.5px;
   color:var(--dim);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.tlshot{height:20px;flex:none;width:88px;background:var(--raised);color:var(--dim);
+  border:1px solid var(--line2);border-radius:5px;font:inherit;font-size:10.5px;padding:0 3px}
 .grip{width:14px;flex:none;color:var(--faint);font-size:9px;letter-spacing:-2px;cursor:grab;
   user-select:none;touch-action:none;line-height:1}
 .grip:active{cursor:grabbing;color:var(--ink)}
@@ -1665,7 +1712,7 @@ figcaption b{font-weight:500}.note{color:var(--dim)}.verb{color:var(--faint);fon
 .tlbar i{font-style:normal;font-size:9.5px;color:#fff;font-variant-numeric:tabular-nums;
   white-space:nowrap;pointer-events:none}
 .tlfoot{display:flex;justify-content:space-between;font-size:10px;color:var(--faint);
-  margin:6px 0 0;padding-left:200px;font-variant-numeric:tabular-nums}
+  margin:6px 0 0;padding-left:270px;font-variant-numeric:tabular-nums}
 #pick[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff}
 .chip{display:block;margin:10px;padding:8px 10px;background:var(--raised);border:1px solid var(--line2);
   border-radius:6px;font-size:11.5px;color:var(--ink);word-break:break-all}
@@ -1711,6 +1758,13 @@ figcaption b{font-weight:500}.note{color:var(--dim)}.verb{color:var(--faint);fon
     <button class="icon" id="more" title="Speed, palette, camera">&#183;&#183;&#183;</button>
     <button class="btn" id="film" title="Render what is on screen frame by frame">Film</button>
     <button class="btn" id="save">Export</button>
+    <div class="menu reel" id="reel" hidden>
+      <p class="ihead">Film <em id="reeltag"></em></p>
+      <video id="reelvid" controls loop muted playsinline></video>
+      <p class="ifacts" id="reelfacts"></p>
+      <a class="btn go" id="reelget" download>Download the mp4</a>
+      <p class="keys" id="reelnote"></p>
+    </div>
     <div class="menu wide" id="inspector" hidden>
       <p class="ihead">Adjust <em id="itag">nothing chosen</em></p>
       <p class="ifacts" id="ifacts">Click an option below to choose it.</p>
@@ -2062,13 +2116,15 @@ palette.onchange=render
 const menu=document.getElementById('menu'), moreBtn=document.getElementById('more')
 const insp=document.getElementById('inspector'), inspBtn=document.getElementById('inspect')
 let chosenOpt=null   // the option the inspector is pointed at
-const pop=(panel)=>{ for(const q of [menu,insp]) q.hidden = q!==panel || !q.hidden }
+const reel=document.getElementById('reel')
+const pop=(panel)=>{ for(const q of [menu,insp,reel]) q.hidden = q!==panel || !q.hidden }
 moreBtn.onclick=e=>{ e.stopPropagation(); pop(menu) }
 inspBtn.onclick=e=>{ e.stopPropagation(); pop(insp); drawInspector() }
 menu.onclick=e=>e.stopPropagation()
 insp.onclick=e=>e.stopPropagation()
-addEventListener('click',()=>{ menu.hidden=true; insp.hidden=true })
-addEventListener('keydown',e=>{ if(e.key==='Escape'){ menu.hidden=true; insp.hidden=true } })
+reel.onclick=e=>e.stopPropagation()
+addEventListener('click',()=>{ menu.hidden=true; insp.hidden=true; reel.hidden=true })
+addEventListener('keydown',e=>{ if(e.key==='Escape'){ menu.hidden=true; insp.hidden=true; reel.hidden=true } })
 
 /* what the inspector is looking at, which is whichever option was clicked last */
 function drawInspector(){
@@ -2102,9 +2158,23 @@ document.getElementById('film').onclick=async()=>{
   try{
     const r=await post('/__wall/film',{ path:new URL(frame.src).pathname+new URL(frame.src).search,
       ms:Math.max(1200, span+400), fps:30, wide:true, name }, 600000)
-    drops.textContent = r.error ? r.error
-      : r.mp4 ? 'Filmed '+r.frames+' frames. '+r.mp4
-      : 'Filmed '+r.frames+' frames into '+r.at+'. '+(r.why||'')
+    if(r.error){ drops.textContent=r.error }
+    else if(r.mp4){
+      /* shown rather than written away: a path in a status line is a thing you have to go and find,
+         and the point of filming here was to stay in the room */
+      document.getElementById('reeltag').textContent=name
+      document.getElementById('reelfacts').textContent=
+        r.frames+' frames at 30fps, '+(r.frames/30).toFixed(1)+'s, 1280 by 720'
+      const src='/__wall/reel?name='+encodeURIComponent(name)+'&t='+Date.now()
+      document.getElementById('reelvid').src=src
+      const get=document.getElementById('reelget')
+      get.href=src; get.setAttribute('download', name+'.mp4')
+      document.getElementById('reelnote').textContent=r.mp4
+      reel.hidden=false; menu.hidden=true; insp.hidden=true
+      drops.textContent=''
+    } else {
+      drops.textContent='Filmed '+r.frames+' frames into '+r.at+'. '+(r.why||'')
+    }
   }catch(e){ drops.textContent=String(e && e.message||e) }
   btn.disabled=false; btn.textContent='Film'
 }
@@ -2126,8 +2196,9 @@ function render(){
     const live=cars.filter(c=>c.id)
     const ids=live.map(c=>c.id).join(',')
     const at=live.map(c=>Math.round(c.at)).join(',')
+    const shots=live.map(c=>c.shot||'').join(',')
     grid.innerHTML='<div class="appwrap"><iframe data-i="0" src="/__wall/railview?ids='+ids
-      +'&at='+at+'&palette='+encodeURIComponent(palette.value)+'"></iframe></div>'
+      +'&at='+at+'&shots='+shots+'&palette='+encodeURIComponent(palette.value)+'"></iframe></div>'
       + timeline(live)
     grid.classList.add('railed')
     // the strip is as tall as it needs to be, and the frame gives up exactly that much
@@ -2291,6 +2362,10 @@ function timeline(live){
         +'<span class="grip" data-grip="'+i+'" title="drag to reorder">&#8942;&#8942;</span>'
         +'<span class="tlname" title="'+(c.note||'')+'">'
         +((c.note||c.label||'').split(',')[0]).slice(0,24)+'</span>'
+        +'<select class="tlshot" data-cam="'+i+'" title="camera for this one">'
+        +['','locked','push','drift','orbit'].map(v=>'<option value="'+v+'"'
+            +(v===(c.shot||'')?' selected':'')+'>'+(v||'no camera')+'</option>').join('')
+        +'</select>'
         +'<span class="tltrack" data-track="'+i+'">'
         +'<span class="tlbar" data-bar="'+i+'" style="left:'+(c.at/total*100).toFixed(2)+'%;'
         +'width:'+Math.max(2,(c.ms||600)/total*100).toFixed(2)+'%">'
@@ -2307,6 +2382,12 @@ function wireTimeline(live){
    * decision: two cars can begin together and still need one above the other. Reordering swaps their
    * places in the rail and leaves each one's offset alone, so moving a car does not silently retime it.
    */
+  for (const sel of document.querySelectorAll('[data-cam]')){
+    sel.onchange=()=>{
+      live[Number(sel.dataset.cam)].shot=sel.value
+      held.clear(); ends.clear(); render()
+    }
+  }
   for (const grip of document.querySelectorAll('[data-grip]')){
     grip.onpointerdown=e=>{
       e.preventDefault()
@@ -2552,7 +2633,8 @@ const server = createServer(async (req, res) => {
     if (url.pathname === '/__wall/railview') {
       const ids = (url.searchParams.get('ids') ?? '').split(',').filter(Boolean)
       const at = (url.searchParams.get('at') ?? '').split(',').map(Number).filter((n) => !Number.isNaN(n))
-      const html = railView(ids, url.searchParams.get('palette'), at)
+      const shots = (url.searchParams.get('shots') ?? '').split(',')
+      const html = railView(ids, url.searchParams.get('palette'), at, shots)
       if (!html) { res.writeHead(404); return res.end('gone') }
       res.writeHead(200, { 'content-type': 'text/html' })
       return res.end(html)
@@ -2596,6 +2678,16 @@ const server = createServer(async (req, res) => {
       if (made.mp4) console.log(`    ${made.mp4}`)
       else if (made.why) console.log(`    ${made.why}`)
       return json(res, made)
+    }
+    /** the film itself, so it plays in the room it was composed in */
+    if (url.pathname === '/__wall/reel') {
+      const name = String(url.searchParams.get('name') ?? '').replace(/[^-\w]/g, '')
+      const at = path.resolve(work, name, 'film.mp4')
+      if (!name || !existsSync(at)) { res.writeHead(404); return res.end('no film by that name') }
+      const body = readFileSync(at)
+      res.writeHead(200, { 'content-type': 'video/mp4', 'content-length': body.length,
+        'accept-ranges': 'none', 'cache-control': 'no-store' })
+      return res.end(body)
     }
     if (url.pathname === '/__wall/save' && req.method === 'POST') {
       const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))

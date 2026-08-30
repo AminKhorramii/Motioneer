@@ -719,6 +719,11 @@ move set to infinite, and infinite was the fault: an animation with no end has a
 the transport filters that when sizing the scrubber, and dragging it end to end played an eighth of
 the move. Every move is finite now and the ruler sizes itself to whichever runs longer.
 
+Each row also carries its own camera. A camera is a perspective, a moving plate and two blurred
+copies of the subject, and every one of those is per subject, so one shared rig could only ever film
+the whole rail as a single flat picture. Each car with a shot gets its own rig, which is what lets one
+sit locked off while the one below it pushes in.
+
 Rows carry a grip and can be dragged into a different order. Order and offset are different
 decisions, so reordering swaps places in the rail and leaves each car's own offset alone: two cars can
 begin together and still need one above the other.
@@ -729,8 +734,9 @@ begin together and still need one above the other.
 The options share a document rather than sitting in iframes, which they can only do because each sheet
 is already scoped: option two gets `data-motion-fold-2` and its selectors are rewritten to match.
 
-`Film` renders whatever is on screen frame by frame, the rail with its offsets included, and hands
-back an mp4 if ffmpeg is on the machine and the frames plus a one line script if it is not. Stepped
+`Film` renders whatever is on screen frame by frame, the rail with its offsets and cameras included,
+and plays the result in a panel with somewhere to take it away, because a path printed in a status
+line is a thing you then have to go and find. It hands back an mp4 if ffmpeg is on the machine and the frames plus a one line script if it is not. Stepped
 rather than recorded for the same reason film.mjs gives: a recording hopes the machine keeps up and
 produces a different file every run, while setting the clock by hand produces the same film every
 time. Measured on three options, 48 frames at 1280 by 720 in four seconds.
