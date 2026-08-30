@@ -1508,8 +1508,10 @@ addEventListener('message',function(e){var d=e.data||{};if(d.wall!=='hold')retur
 async function film(url, { fps = 30, ms = 3000, size = { width: 1280, height: 720 }, name = 'film' }) {
   const eye = await eyes()
   if (!eye.browser) return { error: eye.why }
-  const out = path.resolve(work, name)
-  rmSync(out, { recursive: true, force: true })
+  /* every take kept: it overwrote the last one, so filming a second time to compare it with the
+     first destroyed the first, which is the one thing a second take is for */
+  let take = name, out = path.resolve(work, take)
+  for (let n = 2; existsSync(out); n++) { take = `${name}-${n}`; out = path.resolve(work, take) }
   mkdirSync(path.join(out, 'frames'), { recursive: true })
   const page = await eye.browser.newPage({ viewport: size })
   const total = Math.max(1, Math.min(600, Math.round((ms / 1000) * fps)))
@@ -1534,7 +1536,8 @@ async function film(url, { fps = 30, ms = 3000, size = { width: 1280, height: 72
       + `#   brew install ffmpeg\n\nffmpeg -y -framerate ${fps} -i frames/%05d.png \\\n`
       + `  -c:v libx264 -pix_fmt yuv420p -preset slow -crf 18 \\\n`
       + `  -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -movflags +faststart film.mp4\n`)
-    return { at: out, frames: total, mp4: null,
+    return { at: out, frames: total, mp4: null, name: take,
+      size: `${size.width} by ${size.height}`,
       why: 'ffmpeg is not installed, so the frames are the deliverable. brew install ffmpeg, then sh make-mp4.sh' }
   }
   const mp4 = path.join(out, 'film.mp4')
@@ -1543,8 +1546,8 @@ async function film(url, { fps = 30, ms = 3000, size = { width: 1280, height: 72
     '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'slow', '-crf', '18',
     '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2', '-movflags', '+faststart', mp4], { encoding: 'utf8' })
   return r.status === 0
-    ? { at: out, frames: total, mp4 }
-    : { at: out, frames: total, mp4: null, why: String(r.stderr).split('\n').slice(-3).join(' ').slice(0, 140) }
+    ? { at: out, frames: total, mp4, name: take, size: `${size.width} by ${size.height}` }
+    : { at: out, frames: total, mp4: null, name: take, size: `${size.width} by ${size.height}`, why: String(r.stderr).split('\n').slice(-3).join(' ').slice(0, 140) }
 }
 
 /* ── the room ─────────────────────────────────────────────────────────────────────────────────── */
@@ -1697,12 +1700,41 @@ figcaption b{font-weight:500}.note{color:var(--dim)}.verb{color:var(--faint);fon
 .tlrow{display:flex;align-items:center;gap:10px;margin:5px 0}
 .tlname{display:flex;align-items:center;gap:7px;width:150px;flex:none;font-size:11.5px;
   color:var(--dim);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.tlcam{flex:none;width:74px;font-size:10px;color:var(--faint);text-align:right;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tlcam.on{color:var(--accent)}
 .tlshot{height:20px;flex:none;width:88px;background:var(--raised);color:var(--dim);
   border:1px solid var(--line2);border-radius:5px;font:inherit;font-size:10.5px;padding:0 3px}
 .grip{width:14px;flex:none;color:var(--faint);font-size:9px;letter-spacing:-2px;cursor:grab;
   user-select:none;touch-action:none;line-height:1}
 .grip:active{cursor:grabbing;color:var(--ink)}
 .tlrow.lifting{opacity:.55}
+.tlrow{border-radius:6px;padding:2px 4px;cursor:pointer}
+.tlrow.on{background:rgba(94,106,210,.13);outline:1px solid rgba(94,106,210,.4)}
+/* a camera move is a motion and a dropdown of five words cannot show one, so each choice performs
+   a miniature of itself and you read it in a glance instead of applying it to find out */
+.cams{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin:1px 0 4px}
+.camchip{background:var(--raised);border:1px solid var(--line);border-radius:7px;padding:5px 3px 4px;
+  display:grid;gap:4px;justify-items:center;cursor:pointer;color:var(--dim);font-family:inherit}
+.camchip:hover{border-color:var(--line2);color:var(--ink)}
+.camchip.on{border-color:var(--accent);color:var(--ink);background:rgba(94,106,210,.14)}
+.camchip em{font-style:normal;font-size:9.5px;line-height:1.15;text-align:center}
+.cambox{width:100%;height:24px;border-radius:4px;background:#000;overflow:hidden;position:relative;
+  display:block;perspective:60px}
+.cambox i{position:absolute;left:50%;top:50%;width:17px;height:10px;margin:-5px 0 0 -8.5px;
+  border-radius:2px;background:linear-gradient(120deg,#7079ea,#3a3f8f)}
+.cam-none i{opacity:.3}
+.cam-push i{animation:cpush 2.4s ease-in-out infinite alternate}
+.cam-drift i{animation:cdrift 2.8s ease-in-out infinite alternate}
+.cam-orbit i{animation:corbit 2.8s ease-in-out infinite alternate}
+@keyframes cpush{from{transform:scale(.7)}to{transform:scale(1.4)}}
+@keyframes cdrift{from{transform:translate(-4px,2px) scale(1.18)}to{transform:translate(4px,-2px) scale(.88)}}
+@keyframes corbit{from{transform:rotateY(-34deg) scale(1.05)}to{transform:rotateY(34deg) scale(1.05)}}
+@media (prefers-reduced-motion:reduce){.cambox i{animation:none}}
+.takes{display:flex;flex-wrap:wrap;gap:4px;margin:0}
+.take{background:var(--raised);border:1px solid var(--line);color:var(--dim);border-radius:5px;
+  padding:2px 7px;font-size:10.5px;cursor:pointer;font-family:inherit}
+.take.on{border-color:var(--accent);color:var(--ink)}
 .tltrack{position:relative;flex:1;height:20px;background:var(--bg);border-radius:5px;
   border:1px solid var(--line)}
 .tlbar{position:absolute;top:2px;bottom:2px;background:rgba(94,106,210,.5);
@@ -1754,6 +1786,8 @@ figcaption b{font-weight:500}.note{color:var(--dim)}.verb{color:var(--faint);fon
     <span class="clock"><b id="at">0.00</b><i id="span">4.2s</i><em id="driven" title="how many previews the scrubber is driving"></em></span>
     <input id="scrub" type="range" min="0" max="4200" value="0" step="10">
     <span class="sep"></span>
+    <button class="icon" id="undo" disabled title="Nothing to undo">&#8630;</button>
+    <button class="icon" id="redo" disabled title="Nothing to redo">&#8631;</button>
     <button class="icon" id="inspect" title="Inspect and adjust the chosen option">&#9707;</button>
     <button class="icon" id="more" title="Speed, palette, camera">&#183;&#183;&#183;</button>
     <button class="btn" id="film" title="Render what is on screen frame by frame">Film</button>
@@ -1763,6 +1797,7 @@ figcaption b{font-weight:500}.note{color:var(--dim)}.verb{color:var(--faint);fon
       <video id="reelvid" controls loop muted playsinline></video>
       <p class="ifacts" id="reelfacts"></p>
       <a class="btn go" id="reelget" download>Download the mp4</a>
+      <div class="takes" id="takes"></div>
       <p class="keys" id="reelnote"></p>
     </div>
     <div class="menu wide" id="inspector" hidden>
@@ -1781,6 +1816,7 @@ figcaption b{font-weight:500}.note{color:var(--dim)}.verb{color:var(--faint);fon
         <option value="cubic-bezier(.34,1.56,.64,1)">overshoot</option>
         <option value="steps(6,end)">stepped</option>
         <option value="cubic-bezier(.4,0,1,1)">leave</option></select></label>
+      <div id="icam" hidden><p class="ihead">Camera</p><div class="cams" id="cams"></div></div>
       <button class="btn go" id="tapply">Add as a new option</button>
       <p class="keys" id="inote">The original stays. Adjusting makes another one beside it.</p>
     </div>
@@ -1796,6 +1832,10 @@ figcaption b{font-weight:500}.note{color:var(--dim)}.verb{color:var(--faint);fon
         <option value="push">slow push</option>
         <option value="drift">drift</option>
         <option value="orbit">orbit</option></select></label>
+      <label>Film<select id="shape">
+        <option value="wide" selected>wide 1280</option>
+        <option value="square">square 1080</option>
+        <option value="tall">tall 1080</option></select></label>
       <label>Lens<select id="depth">
         <option value="0.4">shallow</option><option value="1" selected>as shot</option>
         <option value="1.6">heavy</option></select></label>
@@ -1851,6 +1891,62 @@ let chosen=null   // the most recent pick
 let picks=[]      // everything selected, in the order it was picked
 let cars=null     // the rail, once each element has been given a motion
 let verdict=null  // why the last ask produced nothing, so the grid can say so
+
+/**
+ * Undo, kept over the composition rather than over the dom.
+ *
+ * Everything here a hand can change is a handful of small fields: which elements are picked, which
+ * options exist, which one is chosen, and for a rail, the order of the cars and when each one starts
+ * and what films it. So a step is a snapshot of those fields rather than a description of an edit.
+ * A snapshot cannot fall out of step with the thing it describes, and there is no inverse operation
+ * to write once per action and get wrong in one of them.
+ *
+ * The heavy fields are shared rather than copied. An option's markup and css never change after it is
+ * written, so copying them into every step would spend megabytes preserving something already
+ * immutable. Cars are copied, because their offset and their camera are precisely what a step is
+ * usually about.
+ */
+const HIST=60
+let past=[], ahead=[]
+const snap=()=>({ picks:picks.slice(), opts:opts.slice(), chosen,
+  cars: cars && cars.map(c=>({...c})), opened, chosenOpt })
+function restore(st){
+  picks=st.picks.slice(); opts=st.opts.slice(); chosen=st.chosen
+  cars=st.cars && st.cars.map(c=>({...c})); opened=st.opened; chosenOpt=st.chosenOpt
+  held.clear(); ends.clear(); drawSel(); render(); drawInspector(); drawHistory()
+}
+/* called before the change, so what lands on the stack is the state to come back to */
+function mark(what){
+  past.push({ ...snap(), what }); if(past.length>HIST) past.shift()
+  ahead=[]; drawHistory()
+}
+function undo(){
+  if(!past.length) return
+  const step=past.pop(); ahead.push({ ...snap(), what:step.what })
+  restore(step); drops.textContent='Undid '+step.what+'.'
+}
+function redo(){
+  if(!ahead.length) return
+  const step=ahead.pop(); past.push({ ...snap(), what:step.what })
+  restore(step); drops.textContent='Redid '+step.what+'.'
+}
+function drawHistory(){
+  const u=document.getElementById('undo'), r=document.getElementById('redo')
+  if(!u||!r) return
+  u.disabled=!past.length; r.disabled=!ahead.length
+  u.title=past.length?'Undo '+past[past.length-1].what:'Nothing to undo'
+  r.title=ahead.length?'Redo '+ahead[ahead.length-1].what:'Nothing to redo'
+}
+addEventListener('keydown',e=>{
+  /* a field with a cursor in it has an undo of its own and the browser's is the better one there,
+     so this only answers when the keystroke was aimed at the room rather than at a control */
+  const t=e.target, tag=t&&t.tagName
+  if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||(t&&t.isContentEditable)) return
+  if(!(e.metaKey||e.ctrlKey)) return
+  const k=String(e.key).toLowerCase()
+  if(k==='z'&&!e.shiftKey){ e.preventDefault(); undo() }
+  else if((k==='z'&&e.shiftKey)||k==='y'){ e.preventDefault(); redo() }
+})
 
 const pickBtn=document.getElementById('pick')
 pickBtn.onclick=()=>{
@@ -2118,6 +2214,8 @@ const insp=document.getElementById('inspector'), inspBtn=document.getElementById
 let chosenOpt=null   // the option the inspector is pointed at
 const reel=document.getElementById('reel')
 const pop=(panel)=>{ for(const q of [menu,insp,reel]) q.hidden = q!==panel || !q.hidden }
+document.getElementById('undo').onclick=e=>{ e.stopPropagation(); undo() }
+document.getElementById('redo').onclick=e=>{ e.stopPropagation(); redo() }
 moreBtn.onclick=e=>{ e.stopPropagation(); pop(menu) }
 inspBtn.onclick=e=>{ e.stopPropagation(); pop(insp); drawInspector() }
 menu.onclick=e=>e.stopPropagation()
@@ -2126,46 +2224,134 @@ reel.onclick=e=>e.stopPropagation()
 addEventListener('click',()=>{ menu.hidden=true; insp.hidden=true; reel.hidden=true })
 addEventListener('keydown',e=>{ if(e.key==='Escape'){ menu.hidden=true; insp.hidden=true; reel.hidden=true } })
 
-/* what the inspector is looking at, which is whichever option was clicked last */
+/**
+ * What the inspector is looking at.
+ *
+ * There were two rooms for this and they did not know about each other. The inspector adjusted an
+ * option's speed and spacing and easing; the timeline row set a car's offset and its camera. So on a
+ * rail you could say when a car started and what filmed it but not how fast it moved, and the
+ * inspector sat there still showing whichever option you had opened before you built the rail. The
+ * controls were never missing. They were in a room you had left.
+ *
+ * So a row on the timeline is a selection, and the inspector points at whatever is selected, car or
+ * option. One subject at a time, one place that edits it, and the timeline stays a timeline instead
+ * of growing a control panel on every row.
+ */
+function subject(){
+  if(cars){ const c=cars.find(x=>x.id&&x.id===chosenOpt); if(c) return { kind:'car', o:c } }
+  const o=opts.find(x=>x.id===chosenOpt)
+  return o ? { kind:'opt', o } : null
+}
+const nameOf = (o) => String(o.note||o.label||'untitled').split(',')[0].slice(0,28)
+
+const CAMS=[['','none'],['locked','locked off'],['push','slow push'],['drift','drift'],['orbit','orbit']]
+function drawCams(now){
+  const box=document.getElementById('cams')
+  box.innerHTML=CAMS.map(c=>'<button class="camchip'+(c[0]===now?' on':'')+'" data-campick="'+c[0]+'">'
+    +'<span class="cambox cam-'+(c[0]||'none')+'"><i></i></span><em>'+c[1]+'</em></button>').join('')
+  box.querySelectorAll('[data-campick]').forEach(b=>b.onclick=()=>{
+    const s=subject(); if(!s||s.kind!=='car') return
+    if((s.o.shot||'')===b.dataset.campick) return
+    mark('the camera on '+nameOf(s.o))
+    s.o.shot=b.dataset.campick
+    held.clear(); ends.clear(); render(); drawInspector()
+  })
+}
 function drawInspector(){
-  const o = opts.find(x=>x.id===chosenOpt)
-  document.getElementById('itag').textContent = o ? (o.note||'untitled').slice(0,44) : 'nothing chosen'
-  document.getElementById('ifacts').innerHTML = o ? factLine(o)
-    : 'Click an option below to choose it.'
-  document.getElementById('tapply').disabled = !o
+  const s=subject()
+  const tag=document.getElementById('itag'), facts=document.getElementById('ifacts')
+  const btn=document.getElementById('tapply'), camrow=document.getElementById('icam')
+  const note=document.getElementById('inote')
+  if(!s){
+    tag.textContent='nothing chosen'
+    facts.innerHTML = cars && cars.some(c=>c.id)
+      ? 'Click a row in the sequence below to adjust that one.'
+      : 'Click an option below to choose it.'
+    btn.disabled=true; camrow.hidden=true; return
+  }
+  const o=s.o
+  tag.textContent=nameOf(o)
+  btn.disabled=false
+  if(s.kind==='car'){
+    facts.innerHTML='Starts at '+(o.at/1000).toFixed(2)+'s and runs '+((o.ms||600)/1000).toFixed(2)+'s.'
+    btn.textContent='Apply to this one'
+    note.textContent='Changes this car where it sits. The others are left alone.'
+    camrow.hidden=false; drawCams(o.shot||'')
+  } else {
+    facts.innerHTML=factLine(o)
+    btn.textContent='Add as a new option'
+    note.textContent='The original stays. Adjusting makes another one beside it.'
+    camrow.hidden=true
+  }
 }
 document.getElementById('tapply').onclick=async()=>{
-  const o = opts.find(x=>x.id===chosenOpt); if(!o) return
+  const s=subject(); if(!s) return
+  const o=s.o, was=document.getElementById('tapply').textContent
   const btn=document.getElementById('tapply'); btn.disabled=true; btn.textContent='Adjusting…'
   const r = await post('/__wall/tune',{ id:o.id,
     duration:Number(document.getElementById('tdur').value),
     stagger:Number(document.getElementById('tstag').value),
     ease:document.getElementById('tease').value }, 20000).catch(e=>({error:String(e.message||e)}))
-  btn.disabled=false; btn.textContent='Add as a new option'
+  btn.disabled=false; btn.textContent=was
   if(r.error){ document.getElementById('inote').textContent=r.error.slice(0,120); return }
+  if(s.kind==='car'){
+    /* a car is one voice in a composition, so retiming it replaces it where it stands. Adding a
+       sixth car nobody asked for would be answering a different question */
+    mark('adjusting '+nameOf(o))
+    o.id=r.id; o.ms=(r.tempo && r.tempo.span) || o.ms; chosenOpt=r.id
+    held.clear(); ends.clear(); render(); drawInspector()
+    document.getElementById('inote').textContent='Applied. Undo puts it back the way it was.'
+    return
+  }
   // beside the one it came from, so the two can be held at the same instant and compared
+  mark('adjusting '+nameOf(o))
   const at = opts.findIndex(x=>x.id===o.id)
   opts.splice(at+1, 0, { ...o, id:r.id, css:r.css, note:o.note+' (adjusted)' })
   chosenOpt=r.id; held.clear(); ends.clear(); render(); drawInspector()
   document.getElementById('inote').textContent='Added beside the original, which is untouched.'
 }
-/* films whatever is actually on screen: the rail with its offsets and camera, or one option */
+/**
+ * What Film is pointed at, said out loud rather than guessed.
+ *
+ * It used to take the first iframe in the grid. On a rail that is the rail, which is right, but on a
+ * grid of five options that is option one, and it filmed it without ever saying so: you pressed Film
+ * on a wall of five and got a film of whichever happened to be first. A wrong result delivered
+ * confidently is worse than a refusal, so a grid of several asks you to open one first.
+ */
+function filmable(){
+  if(cars && cars.some(c=>c.id)){
+    const f=grid.querySelector('.appwrap iframe')
+    return f ? { frame:f, what:'the rail' } : { why:'the rail is not on screen yet' }
+  }
+  if(!opts.length){
+    const f=grid.querySelector('.appwrap iframe')
+    return f ? { frame:f, what:'the page' } : { why:'Nothing on screen to film.' }
+  }
+  if(opts.length>1 && !opened)
+    return { why:'Open one option first. Film takes one thing at a time, and from the grid it would '
+      +'quietly take the first of '+opts.length+'.' }
+  const o = opened ? opts.find(x=>x.id===opened) : opts[0]
+  if(!o) return { why:'That option is gone.' }
+  const f=grid.querySelector('iframe[data-i="'+opts.indexOf(o)+'"]')
+  return f ? { frame:f, what:nameOf(o) } : { why:'That option is not on screen.' }
+}
 document.getElementById('film').onclick=async()=>{
-  const frame=grid.querySelector('.appwrap iframe, .grid iframe, iframe')
-  if(!frame){ drops.textContent='nothing on screen to film'; return }
+  const aim=filmable()
+  if(aim.why){ drops.textContent=aim.why; return }
+  const frame=aim.frame
   const btn=document.getElementById('film'); btn.disabled=true; btn.textContent='Filming…'
   const name=(APP?(chosen&&chosen.label)||'element':(file||'film')).split('/').pop().replace(/\.[^.]+$/,'')
   try{
     const r=await post('/__wall/film',{ path:new URL(frame.src).pathname+new URL(frame.src).search,
-      ms:Math.max(1200, span+400), fps:30, wide:true, name }, 600000)
+      ms:Math.max(1200, span+400), fps:30, shape:document.getElementById('shape').value, name }, 600000)
     if(r.error){ drops.textContent=r.error }
     else if(r.mp4){
       /* shown rather than written away: a path in a status line is a thing you have to go and find,
          and the point of filming here was to stay in the room */
-      document.getElementById('reeltag').textContent=name
+      document.getElementById('reeltag').textContent=r.name||name
       document.getElementById('reelfacts').textContent=
-        r.frames+' frames at 30fps, '+(r.frames/30).toFixed(1)+'s, 1280 by 720'
-      const src='/__wall/reel?name='+encodeURIComponent(name)+'&t='+Date.now()
+        r.frames+' frames at 30fps, '+(r.frames/30).toFixed(1)+'s, '+r.size+', of '+aim.what
+      const src='/__wall/reel?name='+encodeURIComponent(r.name||name)+'&t='+Date.now()
       document.getElementById('reelvid').src=src
       const get=document.getElementById('reelget')
       get.href=src; get.setAttribute('download', name+'.mp4')
@@ -2357,21 +2543,27 @@ function railSpan(live){
 }
 function timeline(live){
   const total=railSpan(live)
-  return '<div class="tl" id="tl"><div class="tlhead">Sequence &middot; drag a bar to move it in time</div>'
-    + live.map((c,i)=>'<div class="tlrow" data-row="'+i+'">'
+  return '<div class="tl" id="tl"><div class="tlhead">Sequence &middot; click a row to adjust it, '
+    + 'drag a bar to move it in time</div>'
+    + live.map((c,i)=>'<div class="tlrow'+(c.id===chosenOpt?' on':'')+'" data-row="'+i+'">'
         +'<span class="grip" data-grip="'+i+'" title="drag to reorder">&#8942;&#8942;</span>'
         +'<span class="tlname" title="'+(c.note||'')+'">'
         +((c.note||c.label||'').split(',')[0]).slice(0,24)+'</span>'
-        +'<select class="tlshot" data-cam="'+i+'" title="camera for this one">'
-        +['','locked','push','drift','orbit'].map(v=>'<option value="'+v+'"'
-            +(v===(c.shot||'')?' selected':'')+'>'+(v||'no camera')+'</option>').join('')
-        +'</select>'
+        +'<span class="tlcam'+(c.shot?' on':'')+'">'
+        +(CAMS.find(x=>x[0]===(c.shot||''))||CAMS[0])[1]+'</span>'
         +'<span class="tltrack" data-track="'+i+'">'
         +'<span class="tlbar" data-bar="'+i+'" style="left:'+(c.at/total*100).toFixed(2)+'%;'
         +'width:'+Math.max(2,(c.ms||600)/total*100).toFixed(2)+'%">'
         +'<i>'+(c.at/1000).toFixed(2)+'s</i></span></span></div>').join('')
     + '<div class="tlfoot"><span>0s</span><span>'+(total/1000).toFixed(1)+'s</span></div>'
     + '<div class="tlhead" id="tlplay"></div></div>'
+}
+function selectRow(i, live){
+  const c=live[i]; if(!c) return
+  chosenOpt=c.id
+  document.querySelectorAll('.tlrow').forEach((r,j)=>r.classList.toggle('on', j===i))
+  insp.hidden=false; menu.hidden=true; reel.hidden=true
+  drawInspector()
 }
 function wireTimeline(live){
   const total=railSpan(live)
@@ -2382,10 +2574,21 @@ function wireTimeline(live){
    * decision: two cars can begin together and still need one above the other. Reordering swaps their
    * places in the rail and leaves each one's offset alone, so moving a car does not silently retime it.
    */
-  for (const sel of document.querySelectorAll('[data-cam]')){
-    sel.onchange=()=>{
-      live[Number(sel.dataset.cam)].shot=sel.value
-      held.clear(); ends.clear(); render()
+  /**
+   * Clicking a row aims the inspector at that car, which is where its camera and its timing both
+   * live now.
+   *
+   * The bar is not excluded from this even though the bar is also the drag handle. It is the most
+   * obvious thing in the row to click, it sits across the middle of it, and a first version that
+   * ignored clicks landing on it meant aiming at the centre of a row did nothing at all. A press
+   * that never moves is a click and selects; one that moves is a drag and retimes.
+   */
+  for (const row of document.querySelectorAll('.tlrow')){
+    row.onclick=e=>{
+      // always, or the document listener below closes the panel this just opened
+      e.stopPropagation()
+      if(e.target.closest('[data-grip]')) return
+      selectRow(Number(row.dataset.row), live)
     }
   }
   for (const grip of document.querySelectorAll('[data-grip]')){
@@ -2404,6 +2607,7 @@ function wireTimeline(live){
         window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up)
         rows[from].classList.remove('lifting'); rows.forEach(r=>r.style.outline='')
         if(to!==from){
+          mark('reordering the rail')
           const order=cars.filter(c=>c.id)
           order.splice(to,0,order.splice(from,1)[0])
           const rest=cars.filter(c=>!c.id)
@@ -2419,7 +2623,9 @@ function wireTimeline(live){
       e.preventDefault()
       const i=Number(bar.dataset.bar), track=bar.parentElement
       const w=track.getBoundingClientRect().width, from=e.clientX, was=live[i].at
+      let stepped=false
       const move=ev=>{
+        if(!stepped){ stepped=true; mark('moving '+nameOf(live[i])+' in time') }
         const at=Math.max(0, was + (ev.clientX-from)/w*total)
         live[i].at=at
         bar.style.left=(at/total*100).toFixed(2)+'%'
@@ -2427,6 +2633,7 @@ function wireTimeline(live){
       }
       const up=()=>{
         window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up)
+        if(!stepped) return selectRow(i, live)
         // only reload the frame when the drag ends, or every pixel would restart the page
         held.clear(); ends.clear(); render()
       }
@@ -2459,6 +2666,7 @@ function drawSel(){
   // after the markup exists, not in the middle of building it
   paintShots()
   el.querySelectorAll('[data-drop]').forEach(b=>b.onclick=()=>{
+    mark('removing '+tagOf(picks[Number(b.dataset.drop)].label))
     picks.splice(Number(b.dataset.drop),1); chosen=picks[picks.length-1]||null
     cars=null; opts=[]; drawSel(); render() })
   ask.textContent=picks.length>1?'Give them motion':'Give it motion'
@@ -2672,7 +2880,8 @@ const server = createServer(async (req, res) => {
       const made = await film(where, {
         fps: Number(body.fps) || 30,
         ms: Math.max(500, Math.min(20000, Number(body.ms) || 3000)),
-        size: body.wide ? { width: 1280, height: 720 } : { width: 1080, height: 1080 },
+        size: { wide: { width: 1280, height: 720 }, square: { width: 1080, height: 1080 },
+          tall: { width: 1080, height: 1350 } }[body.shape] ?? { width: 1280, height: 720 },
         name: String(body.name ?? 'film').replace(/[^-\w]/g, '-') || 'film',
       })
       if (made.mp4) console.log(`    ${made.mp4}`)
