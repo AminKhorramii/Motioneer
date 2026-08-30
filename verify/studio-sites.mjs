@@ -51,10 +51,12 @@ for (const [name, addr] of list) {
     await page.click('#go')
     // "reaching it" is the in flight state and must not be mistaken for an answer
     await page.waitForFunction(
-      () => !/reaching it/i.test(document.getElementById('aimnote').textContent),
+      () => document.getElementById('aimnote').dataset.state !== 'reaching',
       null, { timeout: 60000 })
     const note = await page.textContent('#aimnote')
-    if (!/proxied/i.test(note)) { row.note = note.trim().slice(0, 60); rows.push(row); await ctx.close(); continue }
+    // the element's state rather than its wording, which is copy and is allowed to change
+    const state = await page.getAttribute('#aimnote', 'data-state')
+    if (state !== 'ok') { row.note = note.trim().slice(0, 60); rows.push(row); await ctx.close(); continue }
     row.aimed = await page.inputValue('#url')
     await page.waitForTimeout(9000)
 

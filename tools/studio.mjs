@@ -1868,7 +1868,9 @@ header.bare .whenplaying{display:none}
       <input id="url" spellcheck="false" placeholder="localhost:3000" value="${AIM ?? ''}">
       <button class="enter" id="go" title="Aim the studio here" type="submit">&#9166;</button>
     </form>
-    <span id="aimnote">${AIM ? 'proxied here, so its elements can be picked'
+    <!-- data-state, not the words: two verifications used to grep this sentence to decide whether
+         a site had loaded, which made a line of copy load bearing and unchangeable -->
+    <span id="aimnote" data-state="${AIM ? 'ok' : 'empty'}">${AIM ? ''
       : HAS_FOLDER ? 'or pick a component below' : 'type where your app is running'}</span>
   </div>
   <div class="files" id="files"></div>
@@ -2017,6 +2019,7 @@ function watchFrame(){
        emptying itself, which leaves the frame ours and completely blank. Both want the same answer */
     if((!ours || (tries>2 && alive<20)) && !quietMode){
       quietMode=true; aimN++
+      document.getElementById('aimnote').dataset.state='ok'
       document.getElementById('aimnote').innerHTML=(ours
         ? 'that page emptied itself when its own scripts ran, '
         : 'that site moves its own frame back to its origin, ')
@@ -2107,14 +2110,16 @@ const aimform=document.getElementById('aimform'), urlbox=document.getElementById
 aimform.onsubmit=async e=>{
   e.preventDefault()
   const said=urlbox.value.trim(); if(!said) return
-  document.getElementById('aimnote').textContent='reaching it…'
+  const note=document.getElementById('aimnote')
+  note.dataset.state='reaching'; note.textContent='reaching it…'
   const r=await fetch('/__wall/target',{method:'POST',headers:{'content-type':'application/json'},
     body:JSON.stringify({url:said})}).then(x=>x.json()).catch(e=>({error:String(e)}))
-  if(r.error){ document.getElementById('aimnote').textContent=r.error; return }
+  if(r.error){ note.dataset.state='error'; note.textContent=r.error; return }
   urlbox.value=r.at; APP=true; aimN++; quietMode=false; picks=[]; opts=[]; verdict=null; chosen=null; cars=null
   // the folder list is about somewhere else now
   drawRail(r.recent||[])
-  document.getElementById('aimnote').textContent='proxied here, so its elements can be picked'
+  // nothing to say once it is up: the page is right there and it says it better
+  note.dataset.state='ok'; note.textContent=''
   document.getElementById('fav').src='/__wall/favicon?t='+Date.now()
   pickBtn.style.display=''
   drawSel(); render()

@@ -68,9 +68,9 @@ for (const [site, addr] of list) {
     await page.goto(`http://localhost:${PORT}`, { waitUntil: 'load' })
     await page.fill('#url', addr)
     await page.click('#go')
-    await page.waitForFunction(() => !/reaching it/i.test(document.getElementById('aimnote').textContent),
+    await page.waitForFunction(() => document.getElementById('aimnote').dataset.state !== 'reaching',
       null, { timeout: 60000 })
-    if (!/proxied/i.test(await page.textContent('#aimnote'))) {
+    if (await page.getAttribute('#aimnote', 'data-state') !== 'ok') {
       rows.push({ site, kind: '(site)', note: (await page.textContent('#aimnote')).trim().slice(0, 44) })
       await ctx.close(); continue
     }
