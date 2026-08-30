@@ -79,15 +79,18 @@ const ok = (how, cond, detail = '') => {
 
 {
   const A = await import('../shared/arrange.mjs')
+  /* the key is the car's own name and the id is its motion's, which is exactly the distinction the
+     solver got wrong: keyed by motion, cycling a car onto an alternative renamed it and silently cut
+     loose everything that followed it */
   const car = (id, at, ms, after = null) => ({
-    pick: { label: id, w: 100, h: 40 }, motion: { id, note: id, ms }, alternatives: [],
+    key: id, pick: { label: id, w: 100, h: 40 }, motion: { id, note: id, ms }, alternatives: [],
     at, after, shot: '', tune: null, why: '',
   })
   const arrange = (cars) => ({ id: 'a1', cars, camera: '', markers: [] })
 
   console.log('\n  the solver')
-  const chain = arrange([car('a', 0, 500), car('b', 9999, 300, { id: 'a', mode: 'after', gap: 100 }),
-    car('c', 9999, 200, { id: 'b', mode: 'with', gap: 0 })])
+  const chain = arrange([car('a', 0, 500), car('b', 9999, 300, { key: 'a', mode: 'after', gap: 100 }),
+    car('c', 9999, 200, { key: 'b', mode: 'with', gap: 0 })])
   const walked = A.resolve(chain)
   ok('a chain starts each car when the one it follows has finished',
     walked.at[1] === 600 && walked.at[2] === 600, `${walked.at.join(', ')}`)
@@ -99,10 +102,10 @@ const ok = (how, cond, detail = '') => {
      hang exactly as the page would */
   const at = new URL('../shared/arrange.mjs', import.meta.url).href
   const probe = `import { resolve } from '${at}'
-const car = (id, o, after) => ({ pick:{label:id}, motion:{id,ms:200}, alternatives:[], at:o, after })
+const car = (id, o, after) => ({ key:id, pick:{label:id}, motion:{id,ms:200}, alternatives:[], at:o, after })
 process.stdout.write(JSON.stringify(resolve({ cars: [
-  car('a', 300, { id:'b', mode:'after', gap:0 }),
-  car('b', 100, { id:'a', mode:'after', gap:0 }),
+  car('a', 300, { key:'b', mode:'after', gap:0 }),
+  car('b', 100, { key:'a', mode:'after', gap:0 }),
   car('c', 700, null) ] })))`
   const ran = spawnSync(process.execPath, ['--input-type=module', '-e', probe],
     { timeout: 4000, encoding: 'utf8' })
@@ -159,6 +162,44 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
   ok('so dragging back out restores the arrangement exactly',
     String([0, 1, 2].map((i) => A.shifted(wall, [0, 1, 2], 200).cars[i].at)) === String(before))
 
+  console.log('\n  cars tied to other cars')
+  const tied = arrange([car('a', 0, 500), car('b', 9999, 300, { key: 'a', mode: 'after', gap: 0 })])
+  ok('a follower starts when the car it follows finishes',
+    A.resolve(tied).at[1] === 500, `${A.resolve(tied).at}`)
+  ok('and moving the leader carries it, which is the whole reason to tie one',
+    A.resolve(A.moved(tied, 0, 300)).at[1] === 800, `${A.resolve(A.moved(tied, 0, 300)).at}`)
+  ok('a longer motion on the leader pushes the follower along too',
+    A.resolve(A.swapped(A.offered(tied, 0, [{ id: 'a2', ms: 900 }]), 0, 1)).at[1] === 900)
+  /* dragging a tied bar has to change the gap: its absolute offset is not what puts it anywhere, so
+     writing there leaves the bar where it was and the arrangement quietly altered */
+  const nudgedTie = A.moved(tied, 1, 620)
+  ok('dragging a tied bar retimes its gap rather than doing nothing visible',
+    A.resolve(nudgedTie).at[1] === 620 && nudgedTie.cars[1].after.gap === 120,
+    `gap ${nudgedTie.cars[1].after.gap}`)
+  ok('and the gap is whole milliseconds rather than whatever the pointer landed on',
+    Number.isInteger(A.moved(tied, 1, 620.37).cars[1].after.gap))
+  ok('a with link starts them together instead',
+    A.resolve(arrange([car('a', 0, 500),
+      car('b', 9999, 300, { key: 'a', mode: 'with', gap: 0 })])).at[1] === 0)
+  ok('a link to a car that is not here is not a link',
+    A.resolve(arrange([car('a', 250, 500),
+      car('b', 700, 300, { key: 'nope', mode: 'after', gap: 0 })])).at[1] === 700)
+  /**
+   * The one that was wrong, and silently.
+   *
+   * Links were keyed by motion id, and a car's motion is the single thing about it that changes:
+   * cycling onto an alternative renamed the car, so everything following it came loose and fell back
+   * to the absolute offset it had been ignoring. The rail carried on playing, at the wrong times,
+   * having dropped a decision without saying anything.
+   */
+  const swapped = A.swapped(A.offered(tied, 0, [{ id: 'a-other', ms: 700 }]), 0, 1)
+  ok('cycling the leader onto another motion does not cut its follower loose',
+    swapped.cars[1].after !== null && A.resolve(swapped).at[1] === 700,
+    `follower at ${A.resolve(swapped).at[1]} after the leader became ${swapped.cars[0].motion.id}`)
+  ok('two cars can play the same motion and still be told apart',
+    A.resolve(arrange([car('x', 0, 400), { ...car('y', 0, 400), motion: { id: 'x', note: 'x', ms: 400 } },
+      car('z', 9999, 200, { key: 'y', mode: 'after', gap: 0 })])).at[2] === 400)
+
   console.log('\n  the value')
   const built = A.fromRail([
     { id: 'm1', note: 'one', tempo: { span: 400 }, label: 'div.Card',
@@ -194,7 +235,7 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
   ok('and their offsets are the resolved ones, skipping the row that did not move',
     /at=0%2C840/.test(A.urlOf(pair, '') || ''))
   ok('a link changes what railview is told rather than anything on the server',
-    /at=0%2C400/.test(A.urlOf(A.retimed(pair, 2, { after: { id: 'm1', mode: 'after', gap: 0 } }), '') || ''))
+    /at=0%2C400/.test(A.urlOf(A.retimed(pair, 2, { after: { key: 'c1', mode: 'after', gap: 0 } }), '') || ''))
   ok('and a rail with nothing that moved asks for nothing',
     A.urlOf(A.fromRail([{ label: 'x', why: 'no' }]), '') === null)
 
@@ -369,6 +410,32 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
       /ids=1b/.test(await room.evaluate(() => ARR.urlOf(arr, ''))))
     await room.evaluate(() => undo()); await room.waitForTimeout(250)
     ok('and undo puts the first one back', String(await playing()) === 'header rises,cards deal')
+
+    /* tying one car to another by dragging from the end of its bar onto the row it should follow */
+    await lay(); await room.waitForTimeout(300)
+    const tieOnto = async (from, onto) => {
+      const grab = await room.locator(`[data-tie="${from}"]`).boundingBox()
+      const drop = await room.locator(`[data-row="${onto}"]`).boundingBox()
+      await room.mouse.move(grab.x + grab.width / 2, grab.y + grab.height / 2)
+      await room.mouse.down()
+      await room.mouse.move(drop.x + 120, drop.y + drop.height / 2, { steps: 10 })
+      await room.mouse.up(); await room.waitForTimeout(300)
+    }
+    const when = () => room.evaluate(() => ARR.resolve(arr).at.map(Math.round))
+    await tieOnto(1, 0)
+    ok('a bar dragged onto another row starts when that one finishes',
+      (await when())[1] === 400, `${await when()}`)
+    ok('and the row says what it follows rather than only looking different',
+      /after/.test(await room.textContent('.tlrow[data-row="1"] .tlties') || ''))
+    await room.evaluate(() => { arr = ARR.moved(arr, 0, 300); render() }); await room.waitForTimeout(250)
+    ok('moving the leader carries the follower without it being touched',
+      String(await when()) === '300,700,840', `${await when()}`)
+    await tieOnto(0, 1)
+    ok('a tie that would make a ring is refused rather than quietly ignored',
+      await room.evaluate(() => arr.cars[0].after === null)
+        && /ring/.test(await room.textContent('#drops') || ''))
+    ok('and the refusal leaves the composition exactly as it was',
+      String(await when()) === '300,700,840', `${await when()}`)
 
     ok('the timeline drives without complaint', said.length === 0, said.join('; ').slice(0, 60))
     await seat.close()

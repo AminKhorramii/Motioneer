@@ -42,6 +42,15 @@ export function fromRail(got, id = 'a1') {
     const alternatives = (c.alts || (c.id ? [c] : [])).map(motionOf).filter(Boolean)
     const motion = c.id ? (alternatives.find((m) => m.id === c.id) || motionOf(c)) : null
     return {
+      /**
+       * A car's own name, which is not its motion's.
+       *
+       * Links used to be keyed by motion id, and a car's motion is the one thing about it that
+       * changes: cycling onto an alternative renamed it, so every car following it silently came
+       * loose and fell back to the absolute offset it had been ignoring. The rail still played, at
+       * the wrong times, having thrown away a decision without saying so.
+       */
+      key: `c${i + 1}`,
       pick: Object.freeze({ label: String(c.label ?? 'element'), w: num(c.w), h: num(c.h) }),
       motion,
       alternatives: Object.freeze(alternatives),
@@ -53,6 +62,16 @@ export function fromRail(got, id = 'a1') {
     }
   })
   return { id, cars, camera: '', markers: [] }
+}
+
+/** a name no car in this arrangement is using, for a copy that must not answer to the original's */
+export function freshKey(arr) {
+  let n = 0
+  for (const c of (arr && arr.cars) || []) {
+    const m = /^c(\d+)$/.exec(String(c.key || ''))
+    if (m) n = Math.max(n, Number(m[1]))
+  }
+  return `c${n + 1}`
 }
 
 const motionOf = (o) => (o && o.id
@@ -88,14 +107,14 @@ export const live = (arr) => (arr && arr.cars ? arr.cars : [])
 export function resolve(arr) {
   const cars = (arr && arr.cars) ? arr.cars : []
   const at = cars.map((c) => Math.max(0, num(c.at)))
-  const byId = new Map()
-  cars.forEach((c, i) => { if (c.motion) byId.set(c.motion.id, i) })
+  const byKey = new Map()
+  cars.forEach((c, i) => { if (c.key) byKey.set(String(c.key), i) })
 
   // a link to a car that is not here, or to itself, is not a link
   const link = cars.map((c, i) => {
     const l = c.after
-    if (!l || !l.id) return null
-    const to = byId.get(String(l.id))
+    if (!l || !l.key) return null
+    const to = byKey.get(String(l.key))
     if (to === undefined || to === i) return null
     return { to, gap: num(l.gap), mode: l.mode === 'with' ? 'with' : 'after' }
   })
@@ -121,7 +140,7 @@ export function resolve(arr) {
   /* every node the walk never drained is in a cycle or hangs off one. Each keeps the absolute offset
      it already had, which is why that field is never derived away */
   const cyclic = []
-  cars.forEach((c, i) => { if (!settled[i] && c.motion) cyclic.push(c.motion.id) })
+  cars.forEach((c, i) => { if (!settled[i]) cyclic.push(String(c.key)) })
   return { at, cyclic }
 }
 
@@ -219,14 +238,43 @@ export function clampDelta(delta, wases) {
 const withCars = (arr, cars) => ({ ...arr, cars })
 const patch = (arr, i, fields) => withCars(arr, arr.cars.map((c, k) => (k === i ? { ...c, ...fields } : c)))
 
-/** one car moved to an absolute instant */
-export const moved = (arr, i, at) => patch(arr, i, { at: Math.max(0, num(at)) })
+/**
+ * One car moved to an instant, whichever field actually decides where it sits.
+ *
+ * A linked car's absolute `at` is not what puts it anywhere: resolve overwrites it from whatever it
+ * follows. Writing there would leave the bar exactly where it was and the arrangement quietly
+ * changed, which is a drag that appears to do nothing. So a link is retimed by its gap, and the
+ * gesture stays the same one.
+ */
+export function moved(arr, i, at) {
+  const car = arr.cars[i]
+  if (!car) return arr
+  /* whole milliseconds. A pointer lands on a fraction of one and nothing downstream wants it: the
+     bar reads two decimal places of seconds, railview rounds, and an export carrying 46.228ms of gap
+     is a number no one chose and no one can type back */
+  const want = Math.max(0, Math.round(num(at)))
+  if (!car.after || !car.after.key) return patch(arr, i, { at: want })
+  const { at: when } = resolve(arr)
+  const to = arr.cars.findIndex((c) => String(c.key) === String(car.after.key))
+  if (to < 0) return patch(arr, i, { at: want })
+  const base = when[to] + (car.after.mode === 'with' ? 0 : runs(arr.cars[to]))
+  return patch(arr, i, { at: want, after: { ...car.after, gap: Math.round(want - base) } })
+}
 
-/** a set of cars moved together, keeping every offset between them */
+/**
+ * A set of cars moved together, keeping every offset between them.
+ *
+ * The clamp is over where the cars actually are, so a linked car counts at its resolved instant
+ * rather than at the absolute offset it is not using.
+ */
 export function shifted(arr, ids, delta) {
   const want = new Set(ids)
-  const step = clampDelta(delta, arr.cars.filter((_, i) => want.has(i)).map((c) => Math.max(0, num(c.at))))
-  return withCars(arr, arr.cars.map((c, i) => (want.has(i) ? { ...c, at: Math.max(0, num(c.at) + step) } : c)))
+  const { at } = resolve(arr)
+  const step = clampDelta(delta, arr.cars.map((c, i) => (want.has(i) ? at[i] : null))
+    .filter((v) => v !== null))
+  let out = arr
+  for (const i of want) out = moved(out, i, at[i] + step)
+  return out
 }
 
 /** a row moved to a different place in the film, which is not a change to when it starts */

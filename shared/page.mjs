@@ -268,6 +268,18 @@ header.bare .whenplaying{display:none}
   border-radius:4px;cursor:pointer;display:grid;place-items:center}
 .tlmore:hover{color:var(--accent)}
 .tlmore svg{width:12px;height:12px}
+/* a car can be pinned to another rather than to the clock, so changing one duration stops meaning
+   dragging everything after it back into place by hand */
+.tlbar.tied{background:rgba(94,106,210,.32);border-style:dashed}
+.tlbar.knot{border-color:#c2603f;background:rgba(194,96,63,.28)}
+.tltie{position:absolute;right:-4px;top:50%;width:9px;height:9px;margin-top:-4.5px;border-radius:50%;
+  background:var(--accent);border:1.5px solid var(--panel);cursor:crosshair;opacity:0}
+.tlrow:hover .tltie,.tlbar.tied .tltie{opacity:1}
+.tlrow.tying{outline:1px solid var(--accent)}
+.tlties{display:block;font-style:normal;font-size:9.5px;color:var(--faint);text-decoration:none;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tlties.knot{color:#c2603f}
+.tlname{display:block!important}
 .tlrow.working .tlalt{color:var(--faint)}
 .tlrow.working .tlbar{animation:tlwork 1.1s ease-in-out infinite}
 @keyframes tlwork{0%,100%{opacity:1}50%{opacity:.45}}
@@ -630,8 +642,14 @@ function railKey(e){
     e.preventDefault(); e.stopImmediatePropagation()
     nudgeTill=0
     mark(sel.size>1?'duplicating '+sel.size+' cars':'duplicating a car')
+    /* the copy is given a name of its own, and does not inherit what the original follows. Two cars
+       answering to one key means anything tied to that key follows whichever the solver reached
+       last, which is a decision nobody made */
     const cars=[], made=[]
-    arr.cars.forEach((c,i)=>{ cars.push(c); if(sel.has(i)){ made.push(cars.length); cars.push({...c}) } })
+    arr.cars.forEach((c,i)=>{
+      cars.push(c)
+      if(sel.has(i)){ made.push(cars.length); cars.push({...c, key:ARR.freshKey({cars}), after:null}) }
+    })
     arr={...arr, cars}
     // the copies are what you now have hold of, so duplicate then nudge is one gesture
     choose(made, made[made.length-1])
@@ -1638,7 +1656,14 @@ function paintShots(){
  */
 function timeline(live){
   const total=ruler()
-  const at=ARR.resolve(arr).at
+  const solved=ARR.resolve(arr), at=solved.at, cyclic=solved.cyclic
+  /* what a car follows, by the name of the row rather than by an id nobody chose or can read */
+  const follows=(car)=>{
+    if(!car.after) return ''
+    const to=arr.cars.find(c=>String(c.key)===String(car.after.key))
+    if(!to) return ''
+    return (car.after.mode==='with'?'with ':'after ')+nameOf(to.motion)
+  }
   return '<div class="tl" id="tl"><div class="tlhead" id="tlsay">Sequence &middot; click a row to adjust it, '
     + 'shift or cmd to take several, drag a bar to move them in time</div><div class="tlgrid" id="tlgrid">'
     + '<div class="tlplay off" id="tlplay"><i></i></div>'
@@ -1646,7 +1671,10 @@ function timeline(live){
         +(sel.has(i)?' sel':'')+'" data-row="'+i+'">'
         +'<span class="grip" data-grip="'+i+'" title="drag to reorder">&#8942;&#8942;</span>'
         +'<span class="tlname" title="'+esc(car.motion.note||car.pick.label)+'">'
-        +esc(nameOf(car.motion)||car.pick.label)+'</span>'
+        +esc(nameOf(car.motion)||car.pick.label)
+        +(car.after?'<u class="tlties'+(cyclic.includes(car.key)?' knot':'')+'">'
+          +esc(cyclic.includes(car.key)?'follows itself':follows(car))+'</u>':'')
+        +'</span>'
         +'<span class="tlcam'+(car.shot?' on':'')+'">'
         +(CAMS.find(x=>x[0]===(car.shot||''))||CAMS[0])[1]+'</span>'
         +'<button class="tlalt'+(car.alternatives.length>1?'':' one')+'" data-alt="'+i+'" tabindex="-1"'
@@ -1655,10 +1683,14 @@ function timeline(live){
         +'<button class="tlmore" data-more-car="'+i+'" tabindex="-1"'
         +' title="more like this one, for this car only">'+ICON.more+'</button>'
         +'<span class="tltrack" data-track="'+i+'">'
-        +'<span class="tlbar'+(sel.has(i)?' sel':'')+'" data-bar="'+i+'" style="left:'
+        +'<span class="tlbar'+(sel.has(i)?' sel':'')+(car.after?' tied':'')
+        +(cyclic.includes(car.key)?' knot':'')+'" data-bar="'+i+'" style="left:'
         +(at[i]/total*100).toFixed(2)+'%;'
         +'width:'+Math.max(2,car.motion.ms/total*100).toFixed(2)+'%">'
-        +'<i>'+(at[i]/1000).toFixed(2)+'s</i></span></span></div>').join('')
+        +'<i>'+(at[i]/1000).toFixed(2)+'s</i>'
+        +'<b class="tltie" data-tie="'+i+'" title="drag onto another row to start this one when that'
+        +' one finishes, or drop it here to cut the link"></b>'
+        +'</span></span></div>').join('')
     + '</div><div class="tlfoot"><span>0s</span><span>'
     + (ARR.viewSpan(arr,0)<total-1
         ? '<button class="tlfit" id="tlfit" title="the ruler only grows while you work, so this brings'
@@ -1793,6 +1825,60 @@ function wireTimeline(live){
   if(fit) fit.onclick=e=>{ e.stopPropagation(); zoom=0; render() }
   for (const chip of document.querySelectorAll('[data-alt]')){
     chip.onclick=e=>{ e.stopPropagation(); cycleAlt(Number(chip.dataset.alt), e.shiftKey?-1:1) }
+  }
+  /**
+   * Tying one car to another, by dragging from the end of its bar onto the row it should follow.
+   *
+   * Absolute offsets mean that making one motion slower is followed by dragging every bar after it
+   * back into place by hand, which is the sort of work a tool should be doing. A tie says the thing
+   * you actually meant: this starts when that one finishes.
+   *
+   * Dropped on its own row, or anywhere that is not a row, it cuts the link and the car keeps the
+   * instant it was resolved to, so undoing a tie does not also move the car.
+   */
+  for (const tie of document.querySelectorAll('[data-tie]')){
+    tie.onpointerdown=e=>{
+      e.preventDefault(); e.stopPropagation()
+      const from=Number(tie.dataset.tie)
+      const rows=[...document.querySelectorAll('.tlrow')]
+      let onto=null
+      const move=ev=>{
+        const row=document.elementFromPoint(ev.clientX,ev.clientY)
+        const hit=row&&row.closest?row.closest('.tlrow'):null
+        onto=hit&&Number(hit.dataset.row)!==from?Number(hit.dataset.row):null
+        rows.forEach(r=>r.classList.toggle('tying', onto!==null&&Number(r.dataset.row)===onto))
+        const say=document.getElementById('tlsay')
+        if(say) say.textContent = onto===null
+          ? 'Drop on a row to follow it, or here to cut the link.'
+          : 'Follows '+nameOf(arr.cars[onto].motion)+', starting when it finishes.'
+      }
+      const up=ev=>{
+        window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up)
+        rows.forEach(r=>r.classList.remove('tying'))
+        const car=arr.cars[from]
+        if(onto===null){
+          if(!car.after) return render()
+          mark('cutting '+nameOf(car.motion)+' loose')
+          /* it keeps where it had been resolved to, or cutting a link would also move the car and
+             one gesture would be two changes */
+          arr=ARR.retimed(ARR.moved(arr,from,ARR.resolve(arr).at[from]),from,{after:null})
+        }else{
+          mark('following '+nameOf(arr.cars[onto].motion))
+          const to=arr.cars[onto]
+          arr=ARR.retimed(arr,from,{after:{key:to.key,mode:ev.altKey?'with':'after',gap:0}})
+          const knots=ARR.resolve(arr).cyclic
+          if(knots.includes(car.key)){
+            /* a ring resolves rather than hanging, and every car in it falls back to its own offset,
+               but a rail that quietly ignores what you just asked for is worse than one that says no */
+            arr=ARR.retimed(arr,from,{after:null})
+            drops.textContent='That would make a ring, so the link was not made: '
+              +nameOf(arr.cars[onto].motion)+' already waits on '+nameOf(car.motion)+'.'
+          }
+        }
+        held.clear(); ends.clear(); render()
+      }
+      window.addEventListener('pointermove',move); window.addEventListener('pointerup',up)
+    }
   }
   for (const b of document.querySelectorAll('[data-more-car]')){
     b.onclick=e=>{ e.stopPropagation(); moreLikeCar(Number(b.dataset.moreCar)) }
