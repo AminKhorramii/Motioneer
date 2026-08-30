@@ -46,10 +46,16 @@ changed, drive it: `node verify/studio-sites.mjs` for the proxy and the picker,
 `node verify/studio-capture.mjs` for what survives being picked. Both need the network and
 both are worth the minutes, because every proxy bug so far was invisible to a fixture.
 
-Kill the old studio by port before starting a new one. A busy port makes it roam to 4322 and
-say so, which is right for a person and a trap for a script: `for p in 4321 4322 4323; do
-lsof -ti tcp:$p | xargs -r kill -9; done`. Testing a stale process cost four wrong diagnoses
-in one session. Commit straight
+`npm run studio` watches its own sources, so editing it restarts it in about half a second and
+the page puts your work back: the aim, the picks and the options all survive, because losing two
+minutes of generation on every save is how you end up not changing anything. The server half is
+kept in `.studio/session.json` and only read back if it was written in the last twenty seconds,
+so opening the studio tomorrow is a fresh start rather than a haunting.
+
+Kill the old studio by port before starting a new one anyway when driving it from a script. A busy
+port makes it roam to 4322 and say so, which is right for a person and a trap for a script: `for p
+in 4321 4322 4323; do lsof -ti tcp:$p | xargs -r kill -9; done`. Testing a stale process cost four
+wrong diagnoses in one session. Commit straight
 to master with a one-line sentence subject that says why, not what. No pull requests.
 
 ## More than one session at once

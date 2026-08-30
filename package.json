@@ -37,7 +37,10 @@
     "studio": "node --watch tools/studio.mjs",
     "verify:model": "node verify/model.mjs",
     "verify:guard": "node verify/guard.mjs",
-    "verify:mp4": "node verify/mp4.mjs"
+    "verify:mp4": "node verify/mp4.mjs",
+    "verify:studio": "node verify/studio-sites.mjs",
+    "verify:capture": "node verify/studio-capture.mjs",
+    "verify:raster": "node verify/raster.mjs"
   },
   "devDependencies": {
     "@fontsource-variable/archivo": "^5.3.0",
