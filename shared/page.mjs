@@ -230,8 +230,11 @@ header.bare .whenplaying{display:none}
   border:1px solid var(--line);border-radius:8px;position:relative}
 .tlhead{font-size:10.5px;color:var(--faint);letter-spacing:.06em;margin-bottom:8px}
 .tlrow{display:flex;align-items:center;gap:10px;margin:5px 0}
-.tlname{display:flex;align-items:center;gap:7px;width:150px;flex:none;font-size:11.5px;
-  color:var(--dim);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+/* two lines: which element this row is, and what it is doing. The element leads, because a row is
+   one of the things you picked and the motion is what you are choosing for it */
+.tlname{display:block;width:172px;flex:none;font-size:11.5px;color:var(--dim);overflow:hidden}
+.tlname b{display:block;font-weight:400;color:var(--ink);font-size:11px;
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .tlcam{flex:none;width:74px;font-size:10px;color:var(--faint);text-align:right;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tlcam.on{color:var(--accent)}
@@ -316,7 +319,6 @@ header.bare .whenplaying{display:none}
 .tlties{display:block;font-style:normal;font-size:9.5px;color:var(--faint);text-decoration:none;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tlties.knot{color:#c2603f}
-.tlname{display:block!important}
 /* several arrangements of the same elements, on one clock: the wall, applied to time */
 /* named apart from the film reel's takes, which is a different list of a different thing and owns
    .takes, #takes and data-take already. One of them collided and the page stopped parsing */
@@ -1510,6 +1512,38 @@ addEventListener('message',e=>{const d=e.data||{}
  * escaping it into an attribute is a bug waiting for the first component with a data attribute in it.
  */
 const tagOf = (label) => String(label || '').split('.')[0] || 'element'
+/**
+ * An element named so it can be told apart from the one above it.
+ *
+ * The tag alone is not a name. Two picks off the same page are nearly always both a div, so a
+ * selection of them read "div" and "div", and the rail showed each row by what its motion was called,
+ * which says what the motion does rather than what it does it to. With one pick that is fine. With
+ * two there was nothing on screen saying which row was which element.
+ *
+ * So the tag keeps a class, and which class it keeps matters. A css module writes the file and a hash
+ * after the name and neither identifies anything to a person. A utility stack is all layout words
+ * that every second element on the page carries, and the first is no more telling than the fifth, so
+ * those are passed over when there is anything else and used when there is not.
+ *
+ * Plain string work rather than a pattern, deliberately: this file is one template literal and a
+ * regex written in it loses its escapes before a browser ever sees it.
+ */
+const DULL=new Set(['flex','grid','block','inline','contents','relative','absolute','fixed','sticky',
+  'flex-row','flex-col','items-center','items-start','justify-center','justify-between','w-full',
+  'h-full','container','wrapper','inner','content','row','col','box','group','root'])
+function subjectOf(label){
+  const said=String(label||'')
+  const dot=said.indexOf('.')
+  const tag=(dot<0?said:said.slice(0,dot))||'element'
+  if(dot<0) return tag
+  const trim=(one)=>{
+    const cuts=[one.indexOf('__'),one.indexOf('-module')].filter(i=>i>0)
+    return cuts.length?one.slice(0,Math.min.apply(null,cuts)):one
+  }
+  const names=said.slice(dot+1).split('.').filter(Boolean).map(trim).filter(Boolean)
+  const told=names.find(one=>!DULL.has(one))||names[0]
+  return told?tag+'.'+told.slice(0,22):tag
+}
 const esc = (v) => String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;')
 const svg = (d,fill) => '<svg viewBox="0 0 16 16" width="13" height="13" fill="'+(fill||'none')
   +'" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">'
@@ -1780,10 +1814,14 @@ function timeline(live){
     + live.map(({car,i})=>'<div class="tlrow'+(i===lead?' on':'')
         +(sel.has(i)?' sel':'')+'" data-row="'+i+'">'
         +'<span class="grip" data-grip="'+i+'" title="drag to reorder">&#8942;&#8942;</span>'
-        +'<span class="tlname" title="'+esc(car.motion.note||car.pick.label)+'">'
-        +esc(nameOf(car.motion)||car.pick.label)
-        +(car.after?'<u class="tlties'+(cyclic.includes(car.key)?' knot':'')+'">'
-          +esc(cyclic.includes(car.key)?'follows itself':follows(car))+'</u>':'')
+        /* the element first and what it is doing underneath. A row is one of the things you picked,
+           and naming it by its motion meant two rows off the same page read the same */
+        +'<span class="tlname" title="'+esc(car.pick.label+' · '+(car.motion.note||''))+'">'
+        +'<b>'+esc(subjectOf(car.pick.label))+'</b>'
+        +'<u class="tlties'+(cyclic.includes(car.key)?' knot':'')+'">'
+        +esc(car.after
+          ? (cyclic.includes(car.key)?'follows itself':follows(car))
+          : nameOf(car.motion))+'</u>'
         +'</span>'
         +'<span class="tlcam'+(car.shot?' on':'')+'">'
         +(CAMS.find(x=>x[0]===(car.shot||''))||CAMS[0])[1]+'</span>'
@@ -2202,7 +2240,9 @@ function drawSel(){
   el.innerHTML='<p class="selhead">Selection'+(picks.length>1?' &middot; '+picks.length:'')+'</p>'
     +picks.map((p,i)=>'<span class="pill"><b>'+(i+1)+'</b>'
       +'<span class="shot"><iframe data-shot="'+i+'" scrolling="no" tabindex="-1"></iframe></span>'
-      +'<span class="who"><em>'+tagOf(p.label)+'</em><i>'+p.w+'&times;'+p.h
+      /* the whole label in the title, since a class stack is worth having and not worth showing */
+      +'<span class="who" title="'+esc(p.label)+'"><em>'+esc(subjectOf(p.label))
+      +'</em><i>'+p.w+'&times;'+p.h
       +(p.cut?' &middot; trimmed':'')+'</i>'
       +(p.weak?'<u>'+p.weak+'</u>':'')
       +(p.opaque?'<u>'+p.opaque+' sheet'+(p.opaque>1?'s':'')+' unreadable</u>':'')+'</span>'

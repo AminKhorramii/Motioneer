@@ -519,6 +519,41 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
     await room.locator('.tlmark').first().click(); await room.waitForTimeout(250)
     ok('clicking it takes it away', (await room.evaluate(() => arr.markers)).length === 0)
 
+    /**
+     * Two picks off one page, told apart.
+     *
+     * Reported from real use: a rail of div.flex.flex-row.items-center and
+     * div.logoWallMarquee-module-scss-module__4H5q showed "div" and "div" in the selection, and named
+     * each row by what its motion was called, which says what the motion does rather than what it
+     * does it to. Both rows read the same and nothing on screen said which was which.
+     */
+    await room.evaluate(async () => {
+      await arriving
+      const two = ['div.flex.flex-row.items-center', 'div.logoWallMarquee-module-scss-module__4H5q']
+      picks = two.map((label) => ({ label, html: '<div></div>', css: '', shot: '', w: 640, h: 80, n: 6 }))
+      arr = ARR.fromRail(two.map((label, i) => ({
+        id: String(i + 1), note: 'the row settles in place', verb: 'settling,',
+        tempo: { span: 420 }, label })))
+      zoom = 0; choose([]); rails = []; railN = 0; drawSel(); render()
+    })
+    await room.waitForTimeout(400)
+    const named = await room.evaluate(() =>
+      [...document.querySelectorAll('.tlname b')].map((n) => n.textContent))
+    const pills = await room.evaluate(() =>
+      [...document.querySelectorAll('.pill .who em')].map((n) => n.textContent))
+    ok('two picks off one page get two different names in the selection',
+      pills.length === 2 && pills[0] !== pills[1], `${pills}`)
+    ok('and two different names on the rail, even when their motions are called the same thing',
+      named.length === 2 && named[0] !== named[1], `${named}`)
+    ok('a css module name drops the file and the hash, which identify nothing to a person',
+      /logoWallMarquee/.test(named[1] || '') && !/4H5q/.test(named[1] || ''), `${named[1]}`)
+    ok('a row still says what its motion is, under the element it belongs to',
+      /settles/.test(await room.evaluate(() =>
+        document.querySelector('.tlname u').textContent) || ''))
+    ok('and the whole label is kept where it can be read in full',
+      /items-center/.test(await room.evaluate(() =>
+        document.querySelector('.tlname').getAttribute('title')) || ''))
+
     ok('the timeline drives without complaint', said.length === 0, said.join('; ').slice(0, 60))
     await seat.close()
   }
