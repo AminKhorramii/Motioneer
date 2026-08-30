@@ -809,6 +809,40 @@ them. The strip says what the composition does with its time: how many cars, whe
 where it goes quiet. That reports and does not judge, because whether a two second hole is a fault
 depends on what the thing is for.
 
+### Where each component sits
+
+A rail opened as a stack of equal rows in the order the picks happened, which is not what any of
+these compositions looks like: a header sits above a row of cards and a chart sits beside them. Every
+component can be dragged to where it belongs and sized by the handle on its edge, and anything nobody
+has touched keeps sharing what is left, so the stack is what it opens on and the stage is what a hand
+makes. Places are kept in per cent, so an arrangement survives the frame being resized and a film at
+1080 square shows what was arranged in whatever the window was. Where and when stay separate
+decisions, the way order and offset already were.
+
+The frame reports and does not decide. It is rebuilt from the arrangement on every change, so a
+placement it kept to itself would be lost on the next render and would disagree with undo until then.
+
+Each row also wears a picture of its element. The selection has drawn a thumbnail of every pick since
+the picker existed and the rail never used one, so a row read `div.something` when it could show the
+thing. Naming was its own fault: the label was cut at the first dot, and nearly everything on a page
+is a `div`, so two picks read identically and the row was named after its motion rather than after
+what the motion moves.
+
+### Restarting under an open page
+
+`npm run studio` watches its own sources, so an edit bounces the process in about half a second while
+the tab carries on with the javascript it loaded. A dynamic import is cached for the life of a
+document, so a change to `arrange.mjs` or `raster.mjs` is not in that tab at all and the studio and
+the page it served disagree with nothing saying so. That is how a fix can land, be checked, and still
+not be what somebody is looking at, which is the stale process warning one process along.
+
+The page reloads when the boot answering it changes, which is only bearable because the work is left
+with the server first: the picks, the arrangement, every offset, link and placement come back with
+it. The options survived a restart and the composition did not, which was the wrong way round. The
+blob is opaque on the server, because the page is the only thing that knows what an arrangement
+means, and it is revived rather than trusted on the way back, since everything here leans on the
+motions being frozen and json carries values and not that promise.
+
 Still to do here: a bezier editor, since four easing presets is a ceiling on taste, and one camera
 over the whole composition with the per-car one as an override.
 
@@ -826,8 +860,14 @@ this was split, a rail exported as the first of those: every component starting 
 with the sequencing gone. Nothing in the file looked wrong, because every id was there and every
 sheet was correct, and the one decision a rail records was simply not written down. The offsets now
 travel with the ids, and the exported transport finds which car an animation belongs to the same way
-the rail frame does, by walking up to the nearest `data-rail`. Cameras still do not travel, and the
-page says so rather than letting the export look complete.
+the rail frame does, by walking up to the nearest `data-rail`.
+
+Three things had to be added to that one at a time, and the order is the lesson. The offsets went
+first. Then the placement, once components could be put where they belong, because sending the ids
+and the offsets alone lost the layout exactly the way sending the ids alone had lost the timing. Then
+the cameras, which arrived locked off. Every time the file looked complete: every id present, every
+sheet correct, one decision quietly not written down. The status line now names what actually
+travelled rather than saying the file was written and leaving you to find out.
 
 `railView` had the same fault a step further in. It drops ids the store has evicted and then read the
 offsets and cameras at the position each car ended up in rather than the one it was asked for, so a

@@ -1362,12 +1362,13 @@ document.getElementById('save').onclick=async()=>{
         ? Math.round(x.car.place.x)+'_'+Math.round(x.car.place.y)+'_'+Math.round(x.car.place.w) : '') : [],
       name:stem((APP?(chosen&&chosen.label):file||'').split('/').pop())})}).then(r=>r.json())
   btn.textContent='Export'
-  /* cameras are not carried yet, and an export that quietly drops one is how the offsets went
-     missing in the first place, so it says so rather than looking complete */
+  /* said rather than assumed. Every one of these was dropped on the way out at some point, and each
+     time the file looked complete, so the line names what actually travelled */
   const shot = rail && rows.some(x=>x.car.shot)
+  const put = rail && rows.some(x=>x.car.place)
   drops.textContent='Wrote '+r.at+', '+r.kb+'kb. One file, opens anywhere, no requests.'
-    +(rail?' The cars keep their offsets.':'')
-    +(shot?' The cameras do not travel into an export yet, so it plays locked off.':'')
+    +(rail?' The cars keep their offsets'+(put?', where you put them':'')
+      +(shot?' and their cameras':'')+'.':'')
 }
 document.getElementById('rate').onchange=e=>{rate=parseFloat(e.target.value)}
 

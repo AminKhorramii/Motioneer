@@ -342,6 +342,35 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
       await sheetPage.evaluate(() => document.querySelectorAll('figcaption').length) === 0)
     ok('the exported file opens without complaint', faults.length === 0, faults.join('; ').slice(0, 60))
 
+    /* the last thing the handoff was dropping. Offsets went first, then the placement, and each time
+       the file looked complete: every id present, every sheet correct, one decision quietly gone */
+    const filmed = await fetch(`http://localhost:${XPORT}/__wall/export`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ids: ['1', '2'], at: [0, 700], shots: ['push', ''],
+        place: ['', ''], name: 'camleg' }),
+    }).then((r) => r.json()).catch((e) => ({ error: String(e) }))
+    if (filmed.at) {
+      const rigged = await seat.newPage()
+      await rigged.goto(`file://${filmed.at}`, { waitUntil: 'load' })
+      await rigged.waitForTimeout(300)
+      const dollyAt = (ms) => rigged.evaluate((t) => {
+        running = false; hold(t)
+        const d = document.querySelector('.dolly')
+        return { m: d ? getComputedStyle(d).transform : 'none',
+          copies: document.querySelectorAll('.layer.blur > *, .layer.bloom > *').length }
+      }, ms)
+      const early = await dollyAt(200)
+      const late = await dollyAt(2600)
+      ok('a car exported with a camera brings its rig with it', early.m !== 'none' && early.m !== '')
+      ok('and the two blurred copies of the subject are cloned into it', early.copies === 2)
+      ok('and the camera actually moves rather than sitting on its first frame',
+        early.m !== late.m, `${String(early.m).slice(0, 34)} then ${String(late.m).slice(0, 34)}`)
+      ok('while the car without one is left alone',
+        await rigged.evaluate(() => document.querySelectorAll('.rig').length) === 1)
+      await rigged.close()
+    } else ok('a rail with a camera exports', false, String(filmed.error))
+
     /**
      * What Film draws, which is not what the transport shows unless somebody makes it so.
      *

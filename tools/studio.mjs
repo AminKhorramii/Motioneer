@@ -1457,7 +1457,7 @@ const exportable = async (ids, palette, offsets = [], shots = [], places = []) =
     const said = String(places[i] ?? '').split('_').map(Number)
     const place = rail && said.length === 3 && said.every((v) => Number.isFinite(v))
       ? { x: said[0], y: said[1], w: said[2] } : null
-    return { ...o, css, markup, tag, place,
+    return { ...o, css, markup, tag, place, shot: rail ? (shots[i] || '') : '',
       at: rail ? Math.max(0, Math.round(Number(offsets[i]) || 0)) : 0 }
   })
   const width = picked[0].wide ? `${picked[0].wide}px` : 'max-content'
@@ -1498,16 +1498,54 @@ figcaption span{color:var(--faint);font-size:11px}
 .wrap.rail.staged figure.put .inner{position:static;transform:none;width:100%}
 .wrap.rail.staged .loose{position:absolute;inset:14px;display:flex;flex-direction:column;
   justify-content:center;gap:10px}
+/**
+ * The cameras, carried out with everything else.
+ *
+ * A camera is a perspective, a moving plate and two blurred copies of the subject, and the export
+ * had none of that, so a car filmed with a slow push arrived locked off. The page said so, which is
+ * better than pretending, but an export that drops a decision is the same fault as the one that
+ * dropped the offsets and then the placement. This is the rail frame's rig, in the file.
+ */
+.rig{position:absolute;inset:0;display:grid;place-items:center;perspective:1400px;
+  perspective-origin:50% 45%}
+.dolly{transform-style:preserve-3d}
+.plate{position:relative;width:100%;transform-style:preserve-3d;filter:brightness(1.16) contrast(1.05)}
+.layer{position:absolute;inset:0;display:grid;place-items:center}.layer>*{width:100%}
+.sharp{position:relative}
+.blur{filter:blur(8px) saturate(1.1);
+  -webkit-mask-image:linear-gradient(168deg,#000 0%,transparent 32%,transparent 68%,#000 100%);
+  mask-image:linear-gradient(168deg,#000 0%,transparent 32%,transparent 68%,#000 100%)}
+.bloom{filter:blur(20px) saturate(2.1) brightness(1.3);mix-blend-mode:screen;opacity:.5;
+  pointer-events:none}
+figure.filmed .stage{background:#050506;border-radius:8px;overflow:hidden}
+${parts.filter((p) => p.shot).map((p, k) => {
+  const move = SHOTS[p.shot] || SHOTS.drift
+  return `.d${k}{transform:${move.from};animation:dolly${k} 3000ms ${move.ease} both}
+@keyframes dolly${k}{from{transform:${move.from}}to{transform:${move.to}}}`
+}).join('\n')}
 </style></head><body>
 <header><button id="play">Pause</button><span class="clock" id="at">0.00 s</span>
   <input id="scrub" type="range" min="0" max="4000" value="0" step="10">
   <span class="clock" style="min-width:auto">${picked[0].file}</span></header>
 <div class="wrap${rail ? ' rail' : ''}${parts.some((p) => p.place) ? ' staged' : ''}">${
   parts.some((p) => p.place) && parts.some((p) => !p.place) ? '<div class="loose"></div>' : ''
-}${parts.map((p, i) => `<figure data-rail="${i}"${p.place
-  ? ` class="put" style="left:${p.place.x}%;top:${p.place.y}%;width:${p.place.w}%"` : ''
-}><div class="stage"><div class="inner">${p.markup}</div></div>
-  ${rail ? '' : `<figcaption><b>${p.note || 'untitled'}</b><span>timing from ${p.verb}</span></figcaption>`}</figure>`).join('')}
+}${parts.map((p, i) => {
+  const rigged = parts.filter((q) => q.shot).indexOf(p)
+  const inner = `<div class="inner">${p.markup}</div>`
+  /* a car with a camera gets its own rig, for the reason the rail frame gives: a perspective and its
+     blurred copies are per subject, so one shared rig could only film them all as a flat picture */
+  const body = p.shot
+    ? `<div class="rig"><div class="dolly d${rigged}"><div class="plate">
+         <div class="layer bloom" data-copy></div>
+         <div class="layer sharp">${inner}</div>
+         <div class="layer blur" data-copy></div></div></div></div>`
+    : inner
+  const at = p.place ? ` style="left:${p.place.x}%;top:${p.place.y}%;width:${p.place.w}%"` : ''
+  return `<figure data-rail="${i}" class="${p.place ? 'put ' : ''}${p.shot ? 'filmed' : ''}"${at}>`
+    + `<div class="stage">${body}</div>`
+    + `${rail ? '' : `<figcaption><b>${p.note || 'untitled'}</b><span>timing from ${p.verb}</span></figcaption>`}`
+    + '</figure>'
+}).join('')}
 </div>
 <script>
 var running=true,t=0,last=performance.now(),span=4000
@@ -1521,6 +1559,11 @@ for (var el of document.querySelectorAll('.inner')){
    studio's own rail frame does it. An offset of zero for every one leaves a grid of options behaving
    as it always did, so there is one transport here rather than two */
 var AT=${JSON.stringify(parts.map((p) => p.at))}
+/* the defocus and the bloom are copies of the subject, cloned here so no component is written twice */
+for (var slot of document.querySelectorAll('[data-copy]')){
+  var lit=slot.parentElement.querySelector('.sharp > *')
+  if(lit) slot.appendChild(lit.cloneNode(true))
+}
 function seat(a){try{var n=a.effect&&a.effect.target
   while(n&&n!==document.body){if(n.dataset&&n.dataset.rail!==undefined)return Number(n.dataset.rail)
     n=n.parentElement}}catch(_){}
