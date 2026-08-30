@@ -28,6 +28,7 @@ import { readFileSync, writeFileSync, existsSync, statSync, readdirSync, mkdirSy
 import { spawn, spawnSync } from 'node:child_process'
 import path from 'node:path'
 import { hasClaude } from '../shared/cli.mjs'
+import { isLocal, allowed } from '../shared/guard.mjs'
 import { PROVIDERS, write as askProvider, check as checkProvider, publicly, missing, resolve }
   from '../shared/model.mjs'
 import { streamText } from '../shared/providers.mjs'
@@ -65,9 +66,23 @@ let AIM = null   // the address as typed, for the sidebar to show
  * A bare host is allowed because that is what people type. localhost:3000 is not a url and every
  * browser has forgiven that for twenty years, so this does too.
  */
+/**
+ * How careful the proxy is about where it is pointed.
+ *
+ * A laptop wants none of it: aiming at localhost:3000 is the whole feature. Anywhere reachable by
+ * somebody else wants all of it, because the same code is then an open proxy that will fetch
+ * whatever it is told and serve it from your origin, and the list of things worth fetching from
+ * inside a datacentre begins with the address that hands out credentials. The rules and the reasons
+ * are in shared/guard.mjs, since a worker needs the same answers and has no dns to ask with.
+ */
+const MODE = process.env.WALL_PUBLIC ? 'public' : 'local'
+const ALLOW = (process.env.WALL_ALLOW || '').split(',').map((h) => h.trim()).filter(Boolean)
+const DENY = (process.env.WALL_DENY || '').split(',').map((h) => h.trim()).filter(Boolean)
+const GUARD = { mode: MODE, allow: ALLOW, deny: DENY }
+
 /** a bare host is http only when it is this machine: everywhere else redirects to https, and the
     redirect leaves the proxy, which puts the real site in the frame and closes its dom again */
-const localish = (host) => /^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|.*\.local)(:\d+)?$/i.test(host)
+const localish = (host) => isLocal(String(host).split(':')[0])
 
 function aimAt(raw) {
   const said = String(raw ?? '').trim()
@@ -437,11 +452,35 @@ const hop = new Set(['connection', 'keep-alive', 'transfer-encoding', 'upgrade',
   'proxy-authenticate', 'proxy-authorization', 'te', 'trailer'])
 
 /** ask for the entry once, following redirects, and move HOST to wherever it actually ended up */
+const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 '
+  + '(KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+const HOPS = new Set([301, 302, 303, 307, 308])
+
 async function settleEntry() {
   try {
-    const r = await fetch(HOST + ENTRY, { redirect: 'follow', signal: AbortSignal.timeout(15000),
-      headers: { 'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 '
-        + '(KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36' } })
+    /**
+     * Redirects followed by hand rather than by fetch, so every hop is checked before it is taken.
+     *
+     * With redirect set to follow, a public host that answers 302 to 169.254.169.254 has already
+     * been fetched by the time anything here could refuse it: the request left, whatever it did
+     * happened, and refusing to display the answer is not the same as not having asked. Checking
+     * each hop first is the only version of this that actually declines.
+     */
+    let here = HOST + ENTRY
+    let r
+    for (let hop = 0; ; hop++) {
+      if (hop > 8) return { error: 'that address redirects in a loop' }
+      const may = await allowed(here, GUARD)
+      if (!may.ok) {
+        return { error: hop ? `it redirected somewhere this will not follow: ${may.why}` : may.why }
+      }
+      r = await fetch(here, { redirect: 'manual', signal: AbortSignal.timeout(15000),
+        headers: { 'user-agent': UA } })
+      if (!HOPS.has(r.status)) break
+      const loc = r.headers.get('location')
+      if (!loc) break
+      here = new URL(loc, here).href
+    }
     if (r.status === 403 || r.status === 429) {
       const body = (await r.text()).slice(0, 4000)
       const wall = /just a moment|cf-browser-verification|cloudflare|captcha|are you a robot/i.test(body)
@@ -449,7 +488,8 @@ async function settleEntry() {
         ? 'that site is behind a bot check, which a proxy cannot pass. Nothing here can fix that.'
         : `that site answered ${r.status} to this request` }
     }
-    const at = new URL(r.url)
+    // where it landed, which the loop above has already been allowed to reach
+    const at = new URL(here)
     if (at.origin !== HOST || at.pathname + at.search !== ENTRY) {
       HOST = at.origin
       ENTRY = at.pathname + at.search
@@ -3086,6 +3126,18 @@ const server = createServer(async (req, res) => {
     if (url.pathname === '/__wall/target' && req.method === 'POST') {
       const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))
       try {
+        /**
+         * Checked before it is aimed, not after.
+         *
+         * aimAt sets HOST and ENTRY as it parses, so refusing afterwards would leave the studio
+         * pointed at the address it just refused, and the next request through the catch all forward
+         * would fetch it anyway. The order is the whole protection.
+         */
+        const want = /^https?:\/\//i.test(String(body.url ?? '').trim())
+          ? String(body.url).trim()
+          : (isLocal(String(body.url ?? '').trim().split('/')[0]) ? 'http://' : 'https://') + String(body.url ?? '').trim()
+        const may = await allowed(want, GUARD)
+        if (!may.ok) return json(res, { error: may.why })
         aimAt(body.url)
         const bad = await settleEntry()
         if (bad) return json(res, { error: bad.error })
@@ -3105,7 +3157,8 @@ const server = createServer(async (req, res) => {
     /** a stylesheet from somewhere else, served from here so the page can read its own rules */
     if (url.pathname === '/__wall/asset') {
       const want = url.searchParams.get('u') ?? ''
-      if (!/^https?:\/\//i.test(want)) { res.writeHead(400); return res.end('') }
+      const may = await allowed(want, GUARD)
+      if (!may.ok) { res.writeHead(400); return res.end(may.why) }
       try {
         const r = await fetch(want, { signal: AbortSignal.timeout(12000) })
         const body = Buffer.from(await r.arrayBuffer())
@@ -3117,6 +3170,7 @@ const server = createServer(async (req, res) => {
     if (url.pathname === '/__wall/favicon') {
       const from = url.searchParams.get('host') || HOST
       if (!from) { res.writeHead(404); return res.end('') }
+      if (!(await allowed(from, GUARD)).ok) { res.writeHead(404); return res.end('') }
       try {
         const r = await fetch(`${new URL(from).origin}/favicon.ico`, { signal: AbortSignal.timeout(4000) })
         if (!r.ok || !/image|icon/i.test(r.headers.get('content-type') ?? '')) throw new Error('none')
