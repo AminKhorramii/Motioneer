@@ -248,6 +248,13 @@ header.bare .whenplaying{display:none}
 .tlplay i{position:absolute;top:0;bottom:0;left:0;width:1px;background:var(--accent);opacity:.6;
   transform:translateX(var(--t,0px))}
 .tlplay.off{display:none}
+/* beats to align to, laid over the tracks the same way the playhead is so neither has to know how
+   wide the label columns are */
+.tlmarks{position:absolute;top:0;bottom:0;left:var(--tlx,270px);width:var(--tlw,0);pointer-events:none}
+.tlmark{position:absolute;top:0;bottom:0;width:1px;margin-left:-0.5px;background:var(--faint);
+  opacity:.7;pointer-events:auto;cursor:pointer}
+.tlmark:hover{background:var(--accent);opacity:1;width:2px}
+.tlfoot span:first-child{color:var(--dim)}
 /* the lead of a selection keeps the outline it always had; the rest of the set is filled. With one
    row selected the two land on the same row and it looks exactly as it did */
 .tlrow.sel{background:rgba(94,106,210,.09)}
@@ -1751,7 +1758,12 @@ function timeline(live){
         +'<b class="tltie" data-tie="'+i+'" title="drag onto another row to start this one when that'
         +' one finishes, or drop it here to cut the link"></b>'
         +'</span></span></div>').join('')
-    + '</div><div class="tlfoot"><span>0s</span><span>'
+    + '<div class="tlmarks" id="tlmarks">'
+    + (arr.markers||[]).map(m=>'<b class="tlmark" data-mark="'+m+'" title="a beat to align to, and a'
+        +' thing bars snap onto. Click to take it away" style="left:'
+        +(m/total*100).toFixed(3)+'%"></b>').join('')
+    + '</div>'
+    + '</div><div class="tlfoot"><span>'+shape()+'</span><span>'
     + (ARR.viewSpan(arr,0)<total-1
         ? '<button class="tlfit" id="tlfit" title="the ruler only grows while you work, so this brings'
           +' it back to what the composition needs">fit</button>' : '')
@@ -1799,6 +1811,21 @@ function paintSel(){
     r.classList.toggle('on', i===lead)
     const bar=r.querySelector('.tlbar'); if(bar) bar.classList.toggle('sel', sel.has(i))
   }
+}
+/**
+ * What the composition does with its time, said out loud.
+ *
+ * A tool that can measure its own output is in a position to criticise it, and everything landing in
+ * the first fifth of a rail then two seconds of nothing is a real criticism. It reports and does not
+ * judge: which of those is a fault depends on what the thing is for, and the house rule is that a
+ * gate is calibrated against real output before it is enforced rather than tuned by taste.
+ */
+function shape(){
+  const d=ARR.density(arr); if(!d) return '0s'
+  const s=(ms)=>(ms/1000).toFixed(2)+'s'
+  if(d.cars<2) return '0s'
+  const hole=d.hole>=400?', then nothing for '+s(d.hole)+' after '+s(d.holeAt):''
+  return '0s &middot; '+d.cars+' cars, all landed by '+s(d.settledBy)+hole
 }
 /* the chip says what it is showing and what else it has, so it is legible before you press it */
 function altTitle(car){
@@ -1883,6 +1910,28 @@ function wireTimeline(live){
   const total=ruler()
   const fit=document.getElementById('tlfit')
   if(fit) fit.onclick=e=>{ e.stopPropagation(); zoom=0; render() }
+  /* a marker is dropped by double clicking the track it belongs on, which is where you are already
+     looking, and taken away by clicking it. Bars snap onto them, so this is how a beat gets
+     something to be aligned to rather than being lined up against another bar by eye */
+  for (const track of document.querySelectorAll('.tltrack')){
+    track.ondblclick=e=>{
+      e.stopPropagation()
+      const box=track.getBoundingClientRect()
+      const at=Math.max(0,Math.round((e.clientX-box.left)/box.width*total))
+      mark('a marker at '+(at/1000).toFixed(2)+'s')
+      arr={...arr, markers:(arr.markers||[]).concat(at).sort((a,b)=>a-b)}
+      render()
+    }
+  }
+  for (const m of document.querySelectorAll('[data-mark]')){
+    m.onclick=e=>{
+      e.stopPropagation()
+      const at=Number(m.dataset.mark)
+      mark('taking a marker away')
+      arr={...arr, markers:(arr.markers||[]).filter(v=>v!==at)}
+      render()
+    }
+  }
   const fork=document.getElementById('tlfork')
   if(fork) fork.onclick=e=>{ e.stopPropagation()
     mark(rails.length?'forking the arrangement':'comparing two arrangements')

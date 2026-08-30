@@ -462,6 +462,26 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
     ok('keeping one drops the rest and leaves a single rail',
       (await shown()).length === 1 && /the rail/.test(await room.evaluate(() => filmable().what || '')))
 
+    /* beats to align to, and the tool saying what its own composition does with its time */
+    await lay(); await room.waitForTimeout(300)
+    const foot = () => room.textContent('.tlfoot span')
+    ok('the strip says what the composition does with its time',
+      /3 cars, all landed by/.test(await foot()), (await foot()).trim())
+    await room.evaluate(() => { arr = ARR.moved(arr, 2, 3200); render() })
+    await room.waitForTimeout(300)
+    ok('and names a hole in it, which is a criticism it is in a position to make',
+      /then nothing for/.test(await foot()), (await foot()).trim())
+    const strip = await room.locator('[data-track="0"]').boundingBox()
+    await room.mouse.dblclick(strip.x + strip.width * 0.4, strip.y + strip.height / 2)
+    await room.waitForTimeout(300)
+    ok('double clicking a track drops a marker',
+      (await room.evaluate(() => arr.markers)).length === 1
+        && await room.evaluate(() => document.querySelectorAll('.tlmark').length) === 1)
+    ok('and a bar will snap onto it, which is the whole reason to place one',
+      await room.evaluate(() => ARR.edges(arr, [1], null).some((t) => t.what === 'a marker')))
+    await room.locator('.tlmark').first().click(); await room.waitForTimeout(250)
+    ok('clicking it takes it away', (await room.evaluate(() => arr.markers)).length === 0)
+
     ok('the timeline drives without complaint', said.length === 0, said.join('; ').slice(0, 60))
     await seat.close()
   }
