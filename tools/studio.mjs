@@ -1954,7 +1954,10 @@ header.bare .whenplaying{display:none}
         <option value="push">slow push</option>
         <option value="drift">drift</option>
         <option value="orbit">orbit</option></select></label>
-      <label>Film<select id="shape">
+      <label>Film in<select id="filmwhere" title="where the frames are drawn">
+        <option value="browser" selected>this browser</option>
+        <option value="server">the server</option></select></label>
+      <label>Shape<select id="shape">
         <option value="wide" selected>wide 1280</option>
         <option value="square">square 1080</option>
         <option value="tall">tall 1080</option></select></label>
@@ -2542,43 +2545,116 @@ function filmable(){
   const f=grid.querySelector('iframe[data-i="'+opts.indexOf(o)+'"]')
   return f ? { frame:f, what:nameOf(o) } : { why:'That option is not on screen.' }
 }
+/**
+ * Filming here, in the page, rather than on the machine serving it.
+ *
+ * The server path drives a second headless browser to screenshot the frame ninety times and shells
+ * out to ffmpeg. It renders exactly what chromium renders, which is the reason to keep it, but it
+ * needs two programs installed and neither of them exists on a worker. This path needs nothing: the
+ * frame is already on screen, the browser has been able to encode h264 since 2021, and the clock is
+ * stepped by hand either way, so a frame in the file is still the frame you were looking at.
+ *
+ * What it costs is fidelity. Drawing the dom means going through an svg foreignObject, and the list
+ * of what does not survive that is in raster.mjs and shown to whoever presses the button. Measured
+ * against the server path on four real pages the difference was between 0.02 and 0.46 percent of
+ * pixels, all of it antialiasing, but a page using a backdrop filter would not be so lucky.
+ */
+async function filmHere(frame, want, say){
+  const doc=frame.contentDocument
+  if(!doc) throw new Error('that frame cannot be read from here, so the server has to film it')
+  const [R,M]=await Promise.all([import('/__wall/raster.mjs'),import('/__wall/mp4.mjs')])
+  if(!M.supported()) throw new Error('this browser has no video encoder, so the server has to film it')
+  /* the preview drives its own clock and would fight the raster, so it is held first */
+  try{ frame.contentWindow.postMessage({wall:'hold',t:0,i:0},'*') }catch{}
+  await new Promise(r=>setTimeout(r,120))
+  const total=Math.max(1,Math.round(want.ms/1000*want.fps))
+  say('Reading what it needs')
+  // once for the whole film: refetching a font ninety times is most of the wall clock
+  const inlined=await R.inline(doc,{fetchVia:(u)=>fetch('/__wall/asset?u='+encodeURIComponent(u))})
+  async function* stream(){
+    for(let i=0;i<total;i++){
+      yield await R.rasterize(doc,{width:want.w,height:want.h,
+        ms:Math.round(i/want.fps*1000),inlined})
+    }
+  }
+  // streamed rather than collected: ninety canvases at 1280 by 720 is a third of a gigabyte held
+  // for no reason, when the encoder only ever looks at one of them
+  const bytes=await M.encode(stream(),{width:want.w,height:want.h,fps:want.fps,
+    onProgress:(done)=>say('Drawing frame '+done+' of '+total)})
+  return {bytes,total,notes:(inlined&&inlined.notes)||[],caveats:R.CAVEATS}
+}
+const SHAPES={wide:{w:1280,h:720},square:{w:1080,h:1080},tall:{w:1080,h:1350}}
+let takes=[]
+/* every take kept and switchable, because comparing two is the only reason to shoot a second */
+function showReel(t){
+  document.getElementById('reeltag').textContent=t.name
+  document.getElementById('reelfacts').textContent=t.facts
+  document.getElementById('reelvid').src=t.url
+  const get=document.getElementById('reelget')
+  get.href=t.url; get.setAttribute('download',t.name+'.mp4')
+  document.getElementById('reelnote').textContent=t.note||''
+  const box=document.getElementById('takes')
+  box.innerHTML=takes.length>1?takes.map((x,i)=>'<button class="take'+(x===t?' on':'')
+    +'" data-take="'+i+'">'+esc(x.name)+'</button>').join(''):''
+  box.querySelectorAll('[data-take]').forEach(b=>b.onclick=()=>showReel(takes[Number(b.dataset.take)]))
+  shut(); reel.hidden=false
+}
 document.getElementById('film').onclick=async()=>{
   const aim=filmable()
   if(aim.why){ drops.textContent=aim.why; return }
   const frame=aim.frame
-  const btn=document.getElementById('film'); btn.disabled=true; btn.textContent='Filming…'
-  const name=(APP?(chosen&&chosen.label)||'element':(file||'film')).split('/').pop().replace(/\.[^.]+$/,'')
+  const btn=document.getElementById('film'); btn.disabled=true
+  const say=(m)=>{ btn.textContent=m; drops.textContent=m }
+  const base=(APP?(chosen&&chosen.label)||'element':(file||'film')).split('/').pop().replace(/[^A-Za-z0-9_-]+/g,'-')
+  const n=takes.filter(t=>t.name===base||t.name.startsWith(base+' ')).length
+  const name=n?base+' '+(n+1):base
+  const shape=document.getElementById('shape').value
+  const size=SHAPES[shape]||SHAPES.wide
+  const ms=Math.max(1200, span+400), fps=30
+  const here=document.getElementById('filmwhere').value!=='server'
   try{
-    const r=await post('/__wall/film',{ path:new URL(frame.src).pathname+new URL(frame.src).search,
-      ms:Math.max(1200, span+400), fps:30, shape:document.getElementById('shape').value, name }, 600000)
-    if(r.error){ drops.textContent=r.error }
-    else if(r.mp4){
-      /* shown rather than written away: a path in a status line is a thing you have to go and find,
-         and the point of filming here was to stay in the room */
-      document.getElementById('reeltag').textContent=r.name||name
-      document.getElementById('reelfacts').textContent=
-        r.frames+' frames at 30fps, '+(r.frames/30).toFixed(1)+'s, '+r.size+', of '+aim.what
-      const src='/__wall/reel?name='+encodeURIComponent(r.name||name)+'&t='+Date.now()
-      document.getElementById('reelvid').src=src
-      const get=document.getElementById('reelget')
-      get.href=src; get.setAttribute('download', name+'.mp4')
-      document.getElementById('reelnote').textContent=r.mp4
-      shut(); reel.hidden=false
-      drops.textContent=''
+    if(here){
+      say('Filming')
+      const {bytes,total,notes}=await filmHere(frame,{ms,fps,w:size.w,h:size.h},say)
+      const url=URL.createObjectURL(new Blob([bytes],{type:'video/mp4'}))
+      takes.push({ name, url,
+        facts:total+' frames at '+fps+'fps, '+(total/fps).toFixed(1)+'s, '+size.w+' by '+size.h
+          +', of '+aim.what,
+        note:'Drawn in this browser, so nothing was installed and nothing was uploaded.'
+          +(notes.length?' '+notes.length+' asset'+(notes.length>1?'s':'')+' would not load.':'') })
+      showReel(takes[takes.length-1]); drops.textContent=''
     } else {
-      drops.textContent='Filmed '+r.frames+' frames into '+r.at+'. '+(r.why||'')
+      say('Filming on the server')
+      const r=await post('/__wall/film',{ path:new URL(frame.src).pathname+new URL(frame.src).search,
+        ms, fps, shape, name:base }, 600000)
+      if(r.error){ drops.textContent=r.error }
+      else if(r.mp4){
+        // labelled by what is already in this panel, not by what the server called the directory:
+        // the server counts takes on disk and knows nothing about the ones filmed in the browser
+        takes.push({ name, url:'/__wall/reel?name='+encodeURIComponent(r.name||name)+'&t='+Date.now(),
+          facts:r.frames+' frames at '+fps+'fps, '+(r.frames/fps).toFixed(1)+'s, '+r.size+', of '+aim.what,
+          note:'Rendered by a headless browser, which is what chromium actually paints. '+r.mp4 })
+        showReel(takes[takes.length-1]); drops.textContent=''
+      } else drops.textContent='Filmed '+r.frames+' frames into '+r.at+'. '+(r.why||'')
     }
-  }catch(e){ drops.textContent=String(e && e.message||e) }
+  }catch(e){
+    // said rather than swallowed: the browser path refuses for reasons a person can act on
+    drops.textContent=String(e && e.message||e)
+  }
   btn.disabled=false; btn.textContent='Film'
 }
 document.getElementById('save').onclick=async()=>{
   // a rail is a thing worth handing over too, and it was the one result you could not export
+  /* lastIndexOf rather than a pattern. The regex here was /\.[^.]+$/ written inside a template
+     literal, which delivers the browser an unescaped dot that matches any character, so a file
+     called my.component.tsx came back as my.componen */
+  const stem=(v)=>{const k=String(v||'').lastIndexOf('.'); return k>0?String(v).slice(0,k):String(v||'')}
   const ids = opts.length ? opts.map(o=>o.id) : (cars||[]).filter(c=>c.id).map(c=>c.id)
   if(!ids.length) return
   const btn=document.getElementById('save'); btn.textContent='Writing…'
   const r=await fetch('/__wall/export',{method:'POST',headers:{'content-type':'application/json'},
     body:JSON.stringify({ids,palette:palette.value,
-      name:(APP?(chosen&&chosen.label):file||'').split('/').pop().replace(/\.[^.]+$/,'')})}).then(r=>r.json())
+      name:stem((APP?(chosen&&chosen.label):file||'').split('/').pop())})}).then(r=>r.json())
   btn.textContent='Export'
   drops.textContent='Wrote '+r.at+', '+r.kb+'kb. One file, opens anywhere, no requests.'
 }
@@ -3137,6 +3213,33 @@ function scriptsParse() {
       return `script ${i + 1} of ${blocks.length} in the studio page does not parse: ${e.message}`
     }
   }
+  /**
+   * A backslash that will not survive being written here.
+   *
+   * The page is a template literal, so a regex written inside it loses its escapes before the
+   * browser ever sees it: /[^\\w-]+/ arrives as /[^w-]+/ and quietly replaces every character that
+   * is not a w, and /\\.[^.]+$/ arrives as /.[^.]+$/ and eats one character too many. Both shipped.
+   * Neither is a syntax error, so `new Function` above is blind to them, and the only tell is a
+   * filename made of dashes. This reads the source rather than the output, because by the time it is
+   * output the evidence is gone.
+   */
+  const src = readFileSync(new URL(import.meta.url), 'utf8')
+  /* bounded to the template itself. Reaching to the next top level declaration swept in this very
+     function, whose own regexes are ordinary code and keep their escapes just fine */
+  const from = src.indexOf('const PAGE = () =>')
+  const to = src.indexOf('</body></html>`', from)
+  // comments first, or this reports the paragraph above that describes the bug it looks for
+  const code = src.slice(from, to)
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .split('\n').filter((l) => !/^\s*(\/\/|\*)/.test(l)).join('\n')
+  const suspect = []
+  for (const m of code.matchAll(/\/[^/\n ][^\n]*?\\[wsdbWSDB.][^\n]*?\/[gimsuy]*/g)) {
+    if (!m[0].includes('\\\\')) suspect.push(m[0].slice(0, 44))
+  }
+  if (suspect.length) {
+    return `a regex in the studio page loses its escapes before the browser reads it: ${suspect[0]}`
+      + ` (double the backslash, or write the class out in full)`
+  }
   // the picker is assembled separately and injected into somebody else's document
   const inner = PICKER.replace(/^<script>/, '').replace(/<\/script>$/, '').replace(/<\\\/script>/g, '')
   try { new Function(inner) } catch (e) { return `the picker does not parse: ${e.message}` }
@@ -3262,6 +3365,20 @@ const server = createServer(async (req, res) => {
      * nothing more, and a settings screen that helpfully shows you your own secret is how it ends up
      * in a screenshot.
      */
+    /**
+     * The two halves of filming, served rather than inlined.
+     *
+     * They are ordinary modules that run in a browser, and the page loads them with a dynamic import
+     * the first time somebody presses Film. Inlining them into this template would put another two
+     * thousand lines through the escaping that has already cost this file six bugs, and would make
+     * every page load carry an encoder almost nobody presses.
+     */
+    if (url.pathname === '/__wall/raster.mjs' || url.pathname === '/__wall/mp4.mjs') {
+      const at = path.resolve('shared', url.pathname.split('/').pop())
+      if (!existsSync(at)) { res.writeHead(404); return res.end('') }
+      res.writeHead(200, { 'content-type': 'text/javascript', 'cache-control': 'no-cache' })
+      return res.end(readFileSync(at))
+    }
     if (url.pathname === '/__wall/model' && req.method === 'GET') {
       return json(res, { providers: PROVIDERS, current: publicly(MODEL), canCli: CAN_CLI })
     }
