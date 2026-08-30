@@ -437,6 +437,31 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
     ok('and the refusal leaves the composition exactly as it was',
       String(await when()) === '300,700,840', `${await when()}`)
 
+    /* two arrangements of the same elements, on one clock, which is the wall applied to time */
+    await lay(); await room.waitForTimeout(300)
+    const shown = () => room.evaluate(() => [...document.querySelectorAll('.grid iframe')]
+      .map((f) => decodeURIComponent((f.src.split('at=')[1] || '').split('&')[0])))
+    await room.locator('#tlfork').click(); await room.waitForTimeout(700)
+    ok('forking puts a second arrangement on screen', (await shown()).length === 2, `${await shown()}`)
+    await room.evaluate(() => { arr = ARR.moved(arr, 2, 1800); render() })
+    await room.waitForTimeout(400)
+    const both = await shown()
+    ok('changing one leaves the other alone, which is the whole point of the pair',
+      both.length === 2 && both[0] !== both[1] && both[0] === '0,420,840', `${both}`)
+    ok('and both are driven by the one scrubber rather than by clocks of their own',
+      await room.evaluate(async () => {
+        hold(500); await new Promise((r) => setTimeout(r, 400))
+        return [...document.querySelectorAll('.grid iframe')].every((f, i) => held.get(i) > 0)
+      }))
+    ok('film refuses to guess which of them you meant',
+      /Keep the one/.test(await room.evaluate(() => filmable().why || '')))
+    await room.locator('[data-arr-to="0"]').click(); await room.waitForTimeout(400)
+    ok('switching back finds the first exactly as it was left',
+      String(await when()) === '0,420,840', `${await when()}`)
+    await room.locator('#tlkeep').click(); await room.waitForTimeout(500)
+    ok('keeping one drops the rest and leaves a single rail',
+      (await shown()).length === 1 && /the rail/.test(await room.evaluate(() => filmable().what || '')))
+
     ok('the timeline drives without complaint', said.length === 0, said.join('; ').slice(0, 60))
     await seat.close()
   }

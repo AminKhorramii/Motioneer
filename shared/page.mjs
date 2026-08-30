@@ -280,6 +280,25 @@ header.bare .whenplaying{display:none}
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tlties.knot{color:#c2603f}
 .tlname{display:block!important}
+/* several arrangements of the same elements, on one clock: the wall, applied to time */
+/* named apart from the film reel's takes, which is a different list of a different thing and owns
+   .takes, #takes and data-take already. One of them collided and the page stopped parsing */
+.rails{height:100%}
+.rails.many{display:flex;gap:8px;height:100%}
+.rails.many .appwrap{flex:1 1 0;min-width:0;position:relative;border:1px solid var(--line);
+  border-radius:8px;overflow:hidden}
+.rails.many .appwrap.on{border-color:var(--accent)}
+.railby{position:absolute;left:7px;top:6px;font-size:10px;color:var(--faint);letter-spacing:.04em;
+  background:rgba(8,9,10,.72);padding:2px 6px;border-radius:4px;pointer-events:none}
+.rails.many .appwrap.on .railby{color:var(--ink)}
+.tltop{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.tltop .tlhead{margin:0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tlrails{display:flex;gap:4px;flex:none}
+.railtab{height:18px;padding:0 8px;background:var(--raised);color:var(--dim);
+  border:1px solid var(--line2);border-radius:4px;font:inherit;font-size:10px;cursor:pointer}
+.railtab:hover{color:var(--ink);border-color:var(--accent)}
+.railtab.on{border-color:var(--accent);color:var(--ink);background:rgba(94,106,210,.16)}
+.railtab.keep{color:var(--accent)}
 .tlrow.working .tlalt{color:var(--faint)}
 .tlrow.working .tlbar{animation:tlwork 1.1s ease-in-out infinite}
 @keyframes tlwork{0%,100%{opacity:1}50%{opacity:.45}}
@@ -512,6 +531,26 @@ let sel=new Set(), anchor=null, lead=null
  */
 let zoom=0
 const ruler=()=>{ zoom=ARR.viewSpan(arr,zoom); return zoom }
+/**
+ * Several arrangements of the same elements, on one clock.
+ *
+ * This is the wall applied to time instead of to layout: fork what you have, change one thing, and
+ * watch both at the same instant rather than trying to remember the first while you look at the
+ * second. Keeping one and dropping the rest is the same act the wall of pages already asks for.
+ *
+ * arr stays the one being edited and every operation keeps writing to it; the list is brought back
+ * into step in render, which is the single place every change already ends. Two variables that must
+ * agree, updated in one place, rather than twenty assignments each remembering to update a list.
+ *
+ * Three is allowed and two is the default. Measured on a rail of five cars with a camera on every
+ * one: 30 animations a frame without cameras and 95 with, since a rig clones its subject twice, so
+ * three of them is 285 live animations. Driving one frame costs a median 8.3ms and a p95 of 8.4;
+ * driving two or three costs the same median and a p95 of 16.7, which is one dropped frame in
+ * twenty. Three is affordable and is not free, and the cost arrives at the second frame rather than
+ * at the third.
+ */
+let rails=[], railN=0
+const comparing=()=>rails.length>1
 /* the cars that carry a motion, each with the index it sits at, since a dead car still owns a row */
 const onRail=()=>(railed()?ARR.live(arr):[])
 let verdict=null  // why the last ask produced nothing, so the grid can say so
@@ -541,11 +580,11 @@ let past=[], ahead=[]
 /* the selection travels with the step. Undoing a reorder and being left holding whichever car has
    now slid into that index is a small thing that feels like the tool losing your place */
 const snap=()=>({ picks:picks.slice(), opts:opts.slice(), chosen, arr, opened, chosenOpt,
-  sel:[...sel], lead, anchor, zoom })
+  sel:[...sel], lead, anchor, zoom, rails:rails.slice(), railN })
 function restore(st){
   picks=st.picks.slice(); opts=st.opts.slice(); chosen=st.chosen
   arr=st.arr; opened=st.opened; chosenOpt=st.chosenOpt
-  sel=new Set(st.sel||[]); lead=st.lead===undefined?null:st.lead; anchor=st.anchor??null; zoom=st.zoom||0
+  sel=new Set(st.sel||[]); lead=st.lead===undefined?null:st.lead; anchor=st.anchor??null; zoom=st.zoom||0; rails=(st.rails||[]).slice(); railN=st.railN||0
   held.clear(); ends.clear(); drawSel(); render(); drawInspector(); drawHistory()
 }
 /* called before the change, so what lands on the stack is the state to come back to */
@@ -894,7 +933,7 @@ ask.onclick=async()=>{
          has already waited minutes on the model, so this costs nothing and every synchronous reader
          below it can stop asking whether the import landed */
       await arriving
-      arr=ARR.fromRail(r.cars||[]); zoom=0; sel=new Set(); lead=null; anchor=null
+      arr=ARR.fromRail(r.cars||[]); zoom=0; sel=new Set(); lead=null; anchor=null; rails=[]; railN=0
       opts=[]; held.clear(); ends.clear(); render()
       const moved=ARR.live(arr).length
       const lost=arr.cars.filter(c=>!c.motion)
@@ -1135,6 +1174,10 @@ document.getElementById('tapply').onclick=async()=>{
  */
 function filmable(){
   if(railed()){
+    /* several arrangements on screen is the same trap a grid of five options already was: taking the
+       first frame would film take one and never say it had chosen. Keep one, then film it */
+    if(comparing()) return { why:'Several arrangements are on screen. Keep the one you want first, so '
+      +'the film is of something you chose rather than of whichever happens to be on the left.' }
     const f=grid.querySelector('.appwrap iframe')
     return f ? { frame:f, what:'the rail' } : { why:'the rail is not on screen yet' }
   }
@@ -1279,10 +1322,17 @@ function render(){
   if(viewing==='saved'){ drawSaved(); return }
   if(railed()){
     const live=ARR.live(arr)
+    /* the one place every change already ends, so it is the one place the list is brought back into
+       step with the arrangement being edited */
+    if(rails.length) rails[railN]=arr
     /* the frame is asked for by the module rather than by a string built here, which is what keeps a
        car pinned to another one from ever reaching the server: it resolves to plain offsets first */
-    grid.innerHTML='<div class="appwrap"><iframe data-i="0" src="'+ARR.urlOf(arr,palette.value)
-      +'"></iframe></div>' + timeline(live)
+    const frames = comparing()
+      ? rails.map((t,n)=>'<div class="appwrap'+(n===railN?' on':'')+'" data-arr="'+n+'">'
+          +'<iframe data-i="'+n+'" src="'+ARR.urlOf(t,palette.value)+'"></iframe>'
+          +'<span class="railby">'+(n===railN?'editing ':'')+esc('take '+(n+1))+'</span></div>').join('')
+      : '<div class="appwrap"><iframe data-i="0" src="'+ARR.urlOf(arr,palette.value)+'"></iframe></div>'
+    grid.innerHTML='<div class="rails'+(comparing()?' many':'')+'">'+frames+'</div>' + timeline(live)
     grid.classList.add('railed')
     // the strip is as tall as it needs to be, and the frame gives up exactly that much
     const strip=document.getElementById('tl')
@@ -1664,8 +1714,18 @@ function timeline(live){
     if(!to) return ''
     return (car.after.mode==='with'?'with ':'after ')+nameOf(to.motion)
   }
-  return '<div class="tl" id="tl"><div class="tlhead" id="tlsay">Sequence &middot; click a row to adjust it, '
-    + 'shift or cmd to take several, drag a bar to move them in time</div><div class="tlgrid" id="tlgrid">'
+  return '<div class="tl" id="tl">'
+    + '<div class="tltop"><div class="tlhead" id="tlsay">Sequence &middot; click a row to adjust it, '
+    + 'shift or cmd to take several, drag a bar to move them in time</div>'
+    + '<div class="tlrails">'
+    + (comparing()? rails.map((t,n)=>'<button class="railtab'+(n===railN?' on':'')+'" data-arr-to="'+n+'">'
+        +esc('take '+(n+1))+'</button>').join('') : '')
+    + (rails.length<3
+        ? '<button class="railtab add" id="tlfork" title="a copy of this arrangement, so one thing can'
+          +' be changed and both watched at the same instant">fork</button>' : '')
+    + (comparing()? '<button class="railtab keep" id="tlkeep" title="keep the one being edited and'
+        +' drop the others, which is the whole point of having made them">keep this</button>' : '')
+    + '</div></div><div class="tlgrid" id="tlgrid">'
     + '<div class="tlplay off" id="tlplay"><i></i></div>'
     + live.map(({car,i})=>'<div class="tlrow'+(i===lead?' on':'')
         +(sel.has(i)?' sel':'')+'" data-row="'+i+'">'
@@ -1823,6 +1883,29 @@ function wireTimeline(live){
   const total=ruler()
   const fit=document.getElementById('tlfit')
   if(fit) fit.onclick=e=>{ e.stopPropagation(); zoom=0; render() }
+  const fork=document.getElementById('tlfork')
+  if(fork) fork.onclick=e=>{ e.stopPropagation()
+    mark(rails.length?'forking the arrangement':'comparing two arrangements')
+    if(!rails.length) rails=[arr]
+    rails[railN]=arr
+    rails.push(ARR.forked(arr,'a'+(rails.length+1)))
+    railN=rails.length-1; arr=rails[railN]
+    /* the frames are all being replaced and their acks are counted by position, so what the maps
+       remember is about a set of frames that no longer exists */
+    held.clear(); ends.clear(); render() }
+  for (const tab of document.querySelectorAll('[data-arr-to]')){
+    tab.onclick=e=>{ e.stopPropagation()
+      const n=Number(tab.dataset.arrTo); if(n===railN) return
+      rails[railN]=arr; railN=n; arr=rails[railN]
+      /* the selection is indices into the arrangement being edited, and this is a different one */
+      sel=new Set(); lead=null; anchor=null
+      render(); drawInspector() }
+  }
+  const keep=document.getElementById('tlkeep')
+  if(keep) keep.onclick=e=>{ e.stopPropagation()
+    mark('keeping one arrangement and dropping the others')
+    rails=[]; railN=0
+    held.clear(); ends.clear(); render() }
   for (const chip of document.querySelectorAll('[data-alt]')){
     chip.onclick=e=>{ e.stopPropagation(); cycleAlt(Number(chip.dataset.alt), e.shiftKey?-1:1) }
   }
