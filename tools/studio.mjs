@@ -1987,7 +1987,7 @@ header.bare .whenplaying{display:none}
     </div>
   </header>
   <div class="grid" id="grid"><div class="empty">${CAN_WRITE
-    ? 'Pick a component on the left, then press <b>Give it motion</b>.'
+    ? 'Type where your site is running, up on the left, then pick something on it.'
     : 'No <b>claude</b> command on PATH, so nothing can be written here.<br>'
       + 'Start the studio from a shell where <b>claude</b> runs.'}</div></div>
   <div class="drops" id="drops"></div>
@@ -2711,7 +2711,8 @@ function render(){
     watchFrame()
     return }
   if(!opts.length){ if(file) return peek()
-    grid.innerHTML='<div class="empty">Pick a component on the left.</div>'; return }
+    grid.innerHTML='<div class="empty">Type a site or a local address on the left to start.</div>'
+    return }
   const lens=document.getElementById('depth').value
   const q='?palette='+encodeURIComponent(palette.value)
     +(cam.value?'&camera='+cam.value+'&depth='+lens:'')
@@ -2821,7 +2822,17 @@ const ICON={
   kept: svg('M4 2.6h8v11.2l-4-2.7-4 2.7z','currentColor'),
   down: svg('M8 2.6v8.1M4.9 7.6L8 10.7l3.1-3.1M3 13.2h10'),
   drop: svg('M4.6 4.6l6.8 6.8M11.4 4.6l-6.8 6.8'),
+  code: svg('M5.6 5.2L2.6 8l3 2.8M10.4 5.2L13.4 8l-3 2.8M9.2 3.4l-2.4 9.2'),
 }
+/* one place that puts bytes on somebody's disk, since three buttons wanted it and each writing its
+   own anchor is three chances to leak an object url */
+function give(text, name, type){
+  const url=URL.createObjectURL(new Blob([text],{type}))
+  const a=document.createElement('a')
+  a.href=url; a.download=name; a.click()
+  setTimeout(()=>URL.revokeObjectURL(url),4000)
+}
+const slug=(v)=>String(v||'motion').replace(/[^A-Za-z0-9]+/g,'-').replace(/^-|-$/g,'').toLowerCase()
 
 /**
  * Motions you kept, in the browser.
@@ -2884,7 +2895,20 @@ function standalone(r){
     +sheet+'</style><div id="w">'+scoped+'</div>'
     +'<scr'+'ipt>var w=document.getElementById("w"),b=w.getBoundingClientRect(),'
     +'s=Math.min(1,(innerWidth-16)/Math.max(b.width,1),(innerHeight-16)/Math.max(b.height,1));'
-    +'w.style.transform="translate(-50%,-50%) scale("+s.toFixed(3)+")";</scr'+'ipt>'
+    +'w.style.transform="translate(-50%,-50%) scale("+s.toFixed(3)+")";'
+    /* played on a loop with a pause between passes. A motion runs once and is over in under a
+       second, so a shelf of them was a shelf of finished states: you had to reload the page to see
+       what you had saved. The pause matters as much as the repeat, because a motion restarting the
+       instant it lands reads as a stutter rather than as the same move happening again. */
+    /* a motion written to repeat forever is left alone. Restarting one every second and a half
+       would cut it off mid pass, which is the opposite of the problem this solves */
+    +'function span(){var e=0,forever=false;document.getAnimations().forEach(function(a){'
+    +'var t=a.effect&&a.effect.getComputedTiming();if(!t)return;'
+    +'if(!isFinite(t.endTime)){forever=true;return}e=Math.max(e,t.endTime)});'
+    +'return e?e:(forever?0:900)}'
+    +'function again(){document.getAnimations().forEach(function(a){'
+    +'try{a.currentTime=0;a.play()}catch(_){}})}'
+    +'setTimeout(function(){var d=span();if(d)setInterval(again,d+700)},60);</scr'+'ipt>'
 }
 async function countSaved(){
   const n=(await shelfAll().catch(()=>[])).length
@@ -2901,7 +2925,9 @@ async function drawSaved(){
       +'<span class="facts">'+(r.tempo?factLine(r):'')+'</span>'
       +'<span class="seen">'+(r.seen?seenLine(r):'')+'</span>'
       +'<span class="row">'
-      +'<button class="icb" data-getcss="'+esc(r.id)+'" title="Download the css">'+ICON.down+'</button>'
+      +'<button class="icb" data-gethtml="'+esc(r.id)+'" title="Download it as one file that '
+      +'opens anywhere">'+ICON.down+'</button>'
+      +'<button class="icb" data-getcss="'+esc(r.id)+'" title="Download just the css">'+ICON.code+'</button>'
       +'<button class="icb" data-forget="'+esc(r.id)+'" title="Remove it from saved">'+ICON.drop+'</button>'
       +'</span></figcaption></figure>').join('')
     : '<div class="empty">Nothing saved yet. The bookmark on a motion keeps it here, '
@@ -2915,14 +2941,22 @@ async function drawSaved(){
   })
   /* written here rather than fetched: the whole record is already in this page, so asking a server
      to hand back something it does not have any more would only be a way for this to stop working */
+  /**
+   * Downloaded as the thing itself.
+   *
+   * The same document the tile is playing, which is one file that opens anywhere and asks the
+   * network for nothing. A stylesheet is the right handoff to an agent and the wrong one to a
+   * person who wanted to keep what they were just looking at, so both are offered and the file is
+   * the one on the left.
+   */
+  grid.querySelectorAll('[data-gethtml]').forEach(b=>b.onclick=()=>{
+    const r=list.find(x=>x.id===b.dataset.gethtml); if(!r) return
+    give(standalone(r), slug(r.note)+'.html', 'text/html')
+  })
   grid.querySelectorAll('[data-getcss]').forEach(b=>b.onclick=()=>{
     const r=list.find(x=>x.id===b.dataset.getcss); if(!r) return
-    const text='/* '+r.note+String.fromCharCode(10)+'   add '+r.scope
-      +' to the root element */'+String.fromCharCode(10)+r.css
-    const url=URL.createObjectURL(new Blob([text],{type:'text/css'}))
-    const a=document.createElement('a')
-    a.href=url; a.download=(r.note||'motion').replace(/[^a-z0-9]+/gi,'-').toLowerCase()+'.css'
-    a.click(); setTimeout(()=>URL.revokeObjectURL(url),4000)
+    give('/* '+r.note+String.fromCharCode(10)+'   add '+r.scope+' to the root element */'
+      +String.fromCharCode(10)+r.css, slug(r.note)+'.css', 'text/css')
   })
 }
 
