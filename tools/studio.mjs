@@ -1078,9 +1078,24 @@ const CLEAN_ENV = (() => { const e = { ...process.env }; delete e.ANTHROPIC_API_
  * which is the only part of it a person needs to see.
  */
 const MODEL_AT = path.join(work, 'model.json')
-const fromEnv = () => (process.env.ANTHROPIC_API_KEY
-  ? { provider: 'anthropic', key: process.env.ANTHROPIC_API_KEY, model: process.env.WALL_STUDIO_MODEL || '' }
-  : { provider: 'claude-cli', model: process.env.WALL_STUDIO_MODEL || '' })
+/**
+ * The command already signed in on this machine, whenever there is one.
+ *
+ * This used to prefer ANTHROPIC_API_KEY the moment it was set, because an http request skips the
+ * 2.74 seconds a CLI session spends booting and authenticating before the model reads a word. That
+ * is a real saving and it is still there for anybody who wants it, but it is the wrong default: a
+ * key in the environment is usually left over from something else, it is often stale, and it spends
+ * money on an account the person may not have meant to use. The command needs nothing pasted, needs
+ * no key to go wrong, and is what most people running this already have.
+ *
+ * The key is still picked up when there is no command to run, so a machine without one is not left
+ * with nothing.
+ */
+const fromEnv = () => (CAN_CLI
+  ? { provider: 'claude-cli', model: process.env.WALL_STUDIO_MODEL || '' }
+  : (process.env.ANTHROPIC_API_KEY
+    ? { provider: 'anthropic', key: process.env.ANTHROPIC_API_KEY, model: process.env.WALL_STUDIO_MODEL || '' }
+    : { provider: 'claude-cli', model: process.env.WALL_STUDIO_MODEL || '' }))
 let MODEL = (() => {
   try { return { ...fromEnv(), ...JSON.parse(readFileSync(MODEL_AT, 'utf8')) } }
   catch { return fromEnv() }
@@ -3388,9 +3403,17 @@ const server = createServer(async (req, res) => {
         provider: String(body.provider || MODEL.provider),
         model: String(body.model ?? ''),
         base: String(body.base ?? ''),
-        // an empty box means "leave it alone", or changing the model name would wipe the key. Only
-        // an explicit null clears it, which is what the button marked forget sends
-        key: body.key === null ? '' : (body.key ? String(body.key) : (MODEL.key || '')),
+        /**
+         * An empty box means leave it alone, or changing the model name would wipe the key. Only an
+         * explicit null clears it, which is what the button marked forget sends.
+         *
+         * Falling back to the environment last: the key there is no longer good enough to pick a
+         * provider on its own, but somebody who has set it and then deliberately chose Anthropic in
+         * the panel has already said what they want, and asking them to paste what is sitting in
+         * their shell would be pedantry rather than care.
+         */
+        key: body.key === null ? '' : (body.key ? String(body.key)
+          : (MODEL.key || (String(body.provider) === 'anthropic' ? process.env.ANTHROPIC_API_KEY || '' : ''))),
         chosen: true,
       }
       const gap = missing(next)
