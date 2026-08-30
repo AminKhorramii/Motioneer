@@ -1,0 +1,1627 @@
+/**
+ * The studio page.
+ *
+ * Lifted out of tools/studio.mjs, which was three and a half thousand lines and half of them this.
+ * Two reasons. The house rule asks for files far from a thousand lines and that one was not close.
+ * And a worker has to serve this same page while having no filesystem to read a component folder
+ * from and no shell to run a command in, so the page had to stop being part of a node program.
+ *
+ * It takes what it varies by rather than reading it from module scope: an address, whether anything
+ * here can write, whether there is a folder of components to offer, and the palettes. Everything
+ * else in here is the same wherever it is served from.
+ *
+ * WATCH THE BACKSLASHES. This is one template literal, so a regex written inside it loses its
+ * escapes before a browser ever sees it: /[^\\w-]+/ arrives as /[^w-]+/ and quietly matches almost
+ * nothing you meant. That has cost this file seven bugs. Write the character class out in full, or
+ * double the backslash, and the guard in studio.mjs will tell you if you forget.
+ */
+export const page = ({ AIM = '', CAN_WRITE = false, HAS_FOLDER = false, PRESETS = [] } = {}) =>
+`<html><head><meta charset="utf-8"><title>motion studio</title><style>
+:root{--bg:#08090a;--panel:#0f1011;--raised:#141516;--line:rgba(255,255,255,.07);
+  --line2:rgba(255,255,255,.11);--ink:#e6e6e6;--dim:#8a8f98;--faint:#5c6068;--accent:#5e6ad2}
+*{box-sizing:border-box}
+body{margin:0;height:100vh;display:grid;grid-template-columns:250px 1fr;background:var(--bg);
+  color:var(--ink);font:13px/1.5 ui-sans-serif,-apple-system,"Inter",sans-serif}
+aside{border-right:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;min-height:0}
+.head{padding:11px 11px 12px;border-bottom:1px solid var(--line);display:grid;gap:7px}
+.head span{color:var(--faint);font-size:11px;word-break:break-all;padding:0 3px;line-height:1.5}
+.aim{display:flex;align-items:center;gap:6px;height:30px;padding:0 4px 0 8px;background:var(--bg);
+  border:1px solid var(--line2);border-radius:7px;transition:border-color 120ms ease,box-shadow 120ms ease}
+.aim:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(94,106,210,.18)}
+.aim img{width:14px;height:14px;border-radius:3px;flex:none;display:none}
+.aim img[src]{display:block}
+.aim input{flex:1;min-width:0;background:none;border:0;outline:none;color:var(--ink);
+  font:inherit;font-size:12.5px;padding:0}
+.aim input::placeholder{color:var(--faint)}
+.enter{display:grid;place-items:center;width:22px;height:22px;flex:none;background:var(--raised);
+  color:var(--dim);border:1px solid var(--line2);border-radius:5px;font-size:12px;cursor:pointer;
+  padding:0;line-height:1;transition:color 120ms ease,background 120ms ease}
+.enter:hover{color:var(--ink);background:#1a1b1d}
+.aim:focus-within .enter{border-color:rgba(94,106,210,.5);color:var(--ink)}
+.files{overflow:auto;padding:6px;flex:0 1 auto}.files:empty{padding:0}
+#sel{overflow:auto;padding-bottom:10px}
+.file{display:block;width:100%;text-align:left;background:none;border:0;color:var(--dim);
+  padding:6px 9px;border-radius:5px;font:inherit;font-size:12px;cursor:pointer;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.railhead{margin:10px 9px 4px;font-size:10.5px;letter-spacing:.06em;color:var(--faint)}
+.railhead:first-child{margin-top:4px}
+.site{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:none;border:0;
+  color:var(--dim);padding:6px 9px;border-radius:5px;font:inherit;cursor:pointer;min-width:0}
+.site:hover{background:var(--raised);color:var(--ink)}
+.site img{width:13px;height:13px;border-radius:3px;flex:none;opacity:0}
+.site img[src]{opacity:1}
+.site span{display:grid;min-width:0;gap:1px}
+.site b{font-weight:400;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.site i{font-style:normal;font-size:10.5px;color:var(--faint);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.file:hover{background:var(--raised);color:var(--ink)}
+.file[aria-current=true]{background:var(--raised);color:var(--ink)}
+main{display:flex;flex-direction:column;min-width:0;min-height:0}
+header{display:flex;align-items:center;gap:12px;height:48px;padding:0 14px;
+  border-bottom:1px solid var(--line);background:var(--panel);flex:none}
+.btn{display:inline-flex;align-items:center;gap:7px;height:28px;padding:0 11px;background:var(--raised);
+  color:var(--ink);border:1px solid var(--line2);border-radius:6px;font:inherit;font-size:12.5px;
+  cursor:pointer;transition:background 100ms ease}
+.btn:hover{background:#1a1b1d}.btn:disabled{opacity:.45;cursor:default}
+.btn.go{border-color:rgba(94,106,210,.55)}
+.sep{width:1px;height:18px;background:var(--line)}
+.clock{display:inline-flex;align-items:baseline;gap:5px;font-variant-numeric:tabular-nums;font-size:12.5px}
+.clock b{font-weight:400;min-width:34px;text-align:right}
+.clock i{font-style:normal;color:var(--faint);font-size:11px}
+.clock em{font-style:normal;width:5px;height:5px;border-radius:50%;background:var(--line2);
+  align-self:center;transition:background 160ms ease}
+.clock em[data-ok=yes]{background:#4f9d69}.clock em[data-ok=no]{background:#d29d6b}
+.icon{display:grid;place-items:center;width:28px;height:28px;padding:0;background:var(--raised);
+  color:var(--dim);border:1px solid var(--line2);border-radius:6px;font:inherit;font-size:11px;
+  cursor:pointer;transition:color 120ms ease,background 120ms ease}
+.icon:hover{color:var(--ink);background:#1a1b1d}
+.split{display:inline-flex;align-items:stretch}
+.split .go{border-radius:6px 0 0 6px;border-right:0}
+.split select{border-radius:0 6px 6px 0;padding:0 4px 0 7px;color:var(--dim)}
+.menu[hidden]{display:none}
+.menu{position:absolute;top:44px;right:14px;z-index:20;display:grid;gap:9px;padding:12px;width:214px;
+  background:var(--panel);border:1px solid var(--line2);border-radius:9px;
+  box-shadow:0 12px 34px rgba(0,0,0,.5)}
+.menu label{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  font-size:12px;color:var(--dim)}
+.menu label.row{justify-content:flex-start;gap:8px}
+.menu select{flex:1;max-width:118px}
+.menu input{flex:1;max-width:150px;min-width:0;height:24px;padding:0 7px;background:var(--bg);
+  color:var(--ink);border:1px solid var(--line);border-radius:5px;font:inherit;font-size:11.5px}
+.menu input:focus{outline:none;border-color:var(--accent)}
+.menu .btn{width:100%}
+.mrow{display:flex;gap:5px}.mrow .btn{flex:1}
+.menu .keys{margin:2px 0 0;padding-top:9px;border-top:1px solid var(--line);
+  font-size:10.5px;color:var(--faint);line-height:1.7}
+.menu.wide{width:262px}
+.menu.reel{width:340px;gap:8px}
+.menu.reel video{width:100%;border-radius:6px;background:#000;display:block}
+#reelget{width:100%;justify-content:center;text-decoration:none;text-align:center}
+.ihead{margin:0;font-size:12px;color:var(--dim)}
+.ihead em{font-style:normal;color:var(--ink)}
+.ifacts{margin:-3px 0 3px;font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums;line-height:1.6}
+#tapply{width:100%;justify-content:center;margin-top:2px}
+figure.chosen{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+figure{cursor:pointer}
+figure .row button{cursor:pointer}
+header{position:relative}
+.unit{color:var(--faint);font-size:11px;margin-left:1px}.unit b{font-weight:400}
+#scrub{flex:1;height:3px;-webkit-appearance:none;background:var(--line2);border-radius:2px;cursor:pointer}
+#scrub::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;
+  background:var(--accent);border:2px solid var(--panel)}
+select,label.f{color:var(--dim);font-size:12px;display:inline-flex;align-items:center;gap:6px}
+select{height:28px;background:var(--raised);color:var(--ink);border:1px solid var(--line2);
+  border-radius:6px;font:inherit;font-size:12.5px;padding:0 6px}
+.status{font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
+/* smaller than the ones in the shortcut list, and quieter: it sits inside a button that is already
+   lit, so a second bright thing next to the word would compete with it rather than support it */
+.cap{display:inline-flex;align-items:center;justify-content:center;min-width:19px;height:15px;
+  padding:0 4px;margin-left:6px;border:1px solid var(--line2);border-top-color:rgba(255,255,255,.18);
+  border-radius:4px;background:rgba(255,255,255,.05);font:inherit;font-size:9.5px;line-height:1;
+  color:var(--dim);box-shadow:0 1px 0 rgba(0,0,0,.35);vertical-align:middle}
+.pick.on .cap{color:var(--ink)}
+kbd{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:19px;padding:0 5px;
+  background:var(--raised);border:1px solid var(--line2);border-radius:4px;font-size:10.5px;color:var(--faint)}
+.grid{flex:1;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));
+  gap:12px;padding:14px;align-content:start}
+figure{margin:0;background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden;
+  display:flex;flex-direction:column}
+iframe{width:100%;height:280px;border:0;background:#0b0c0d;display:block}
+.solo{grid-column:1/-1}.solo iframe{height:min(58vh,460px)}
+figcaption{padding:10px 12px;border-top:1px solid var(--line);display:grid;gap:4px;font-size:12px}
+figcaption b{font-weight:500}.note{color:var(--dim)}.verb{color:var(--faint);font-size:11px;line-height:1.5}
+.facts{color:var(--dim);font-size:11px;font-variant-numeric:tabular-nums;letter-spacing:.01em}
+.seen{color:var(--faint);font-size:11px;font-variant-numeric:tabular-nums}
+.grid.solo{grid-template-columns:1fr}
+.grid.solo figure:not(.up){display:none}
+.grid.solo figure.up iframe{height:calc(100vh - 210px)}
+.backer{grid-column:1/-1;display:flex;justify-content:flex-end;margin:-4px 2px 0}
+.row{display:flex;gap:6px;margin-top:4px}
+.whenplaying{display:flex;align-items:center;gap:12px;flex:1;min-width:0}
+header.bare .whenplaying{display:none}
+.btn.pick svg{opacity:.65}
+.btn.pick.on{border-color:rgba(94,106,210,.7)}
+.btn.pick.on svg{opacity:1;color:var(--accent)}
+/* the arm light. A field evaluated per pixel into the button rather than a css gradient sweeping
+   across it, because a sweep repeats on a loop you can count and a field does not */
+#ask{position:relative;overflow:hidden;isolation:isolate}
+#askfield{position:absolute;inset:0;width:100%;height:100%;opacity:0;pointer-events:none;
+  transition:opacity 500ms ease;filter:blur(7px) saturate(1.5);mix-blend-mode:screen;z-index:0}
+#ask .lbl{position:relative;z-index:1}
+#ask.armed{border-color:rgba(94,106,210,.8);
+  box-shadow:0 0 0 1px rgba(94,106,210,.2),0 6px 22px -8px rgba(94,106,210,.75)}
+@media (prefers-reduced-motion:reduce){#askfield{display:none}}
+.foot{margin-top:auto;border-top:1px solid var(--line);padding:6px;display:grid;gap:2px;flex:none}
+.foothit{display:flex;align-items:center;gap:8px;width:100%;height:28px;padding:0 8px;background:none;
+  border:0;border-radius:6px;color:var(--dim);font:inherit;font-size:12px;cursor:pointer;text-align:left}
+.foothit:hover,.foothit.on{background:var(--raised);color:var(--ink)}
+.foothit i{margin-left:auto;font-style:normal;font-size:10.5px;color:var(--faint);
+  background:var(--bg);border-radius:20px;padding:1px 6px;min-width:18px;text-align:center}
+.foothit i:empty{display:none}
+.icb{display:grid;place-items:center;width:26px;height:26px;background:var(--raised);color:var(--faint);
+  border:1px solid var(--line);border-radius:6px;cursor:pointer;padding:0;transition:color 90ms ease}
+.icb:hover{color:var(--ink);border-color:var(--line2)}
+.icb.on{color:var(--accent);border-color:rgba(94,106,210,.5)}
+.mini{height:24px;padding:0 9px;font-size:11.5px;background:var(--raised);color:var(--dim);
+  border:1px solid var(--line2);border-radius:5px;cursor:pointer;font-family:inherit}
+.mini:hover{color:var(--ink)}
+.mini.keep{border-color:rgba(94,106,210,.5);color:var(--ink)}
+.empty{padding:40px;color:var(--faint);text-align:center;grid-column:1/-1;line-height:1.8}
+.wait{grid-column:1/-1;display:grid;place-items:center;padding:16vh 0 0}
+.field{font:11px/1.15 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink);
+  letter-spacing:3px;user-select:none;white-space:nowrap}
+.field i{font-style:normal;opacity:0}
+
+.hint{margin:4px 10px;font-size:12px;color:var(--faint);line-height:1.7}
+.selhead{margin:12px 12px 6px;font-size:10.5px;text-transform:none;letter-spacing:.06em;color:var(--faint)}
+.pill{display:flex;align-items:center;gap:8px;margin:5px 10px;padding:6px 6px 6px 7px;background:var(--raised);
+  border:1px solid var(--line);border-radius:7px;font-size:11.5px;color:var(--dim)}
+.shot{flex:none;width:86px;height:52px;border-radius:4px;overflow:hidden;background:#0b0c0d;
+  border:1px solid var(--line);position:relative}
+.shot iframe{width:100%;height:100%;border:0;display:block;pointer-events:none}
+.pill .who em{font-style:normal;color:var(--ink);font-size:11.5px}
+.pill .who u{text-decoration:none;color:#d29d6b;font-size:10px;line-height:1.35}
+.pill b{display:grid;place-items:center;width:15px;height:15px;flex:none;border-radius:4px;
+  background:var(--accent);color:#fff;font-size:9.5px;font-weight:500}
+.pill .who{display:grid;gap:2px;min-width:0;overflow:hidden;flex:1}
+.pill .who i{font-style:normal;color:var(--faint);font-size:10px;font-variant-numeric:tabular-nums}
+.pill button{margin-left:auto;background:none;border:0;color:var(--faint);cursor:pointer;
+  font-size:14px;line-height:1;padding:0 2px}
+.pill button:hover{color:var(--ink)}
+.hint b{color:var(--dim);font-weight:500}
+.appwrap{grid-column:1/-1;height:calc(100vh - 116px);border:1px solid var(--line);border-radius:8px;
+  overflow:hidden;background:#fff}
+/* the rail and its sequence share the height: the timeline used to be laid out below the frame and
+   therefore below the fold, which is a poor place for the one thing that explains what you are
+   watching */
+.grid.railed .appwrap{height:calc(100vh - 116px - var(--tl, 170px))}
+.appwrap iframe{width:100%;height:100%}
+.tl{grid-column:1/-1;margin:10px 0 0;padding:11px 12px 9px;background:var(--panel);
+  border:1px solid var(--line);border-radius:8px;position:relative}
+.tlhead{font-size:10.5px;color:var(--faint);letter-spacing:.06em;margin-bottom:8px}
+.tlrow{display:flex;align-items:center;gap:10px;margin:5px 0}
+.tlname{display:flex;align-items:center;gap:7px;width:150px;flex:none;font-size:11.5px;
+  color:var(--dim);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.tlcam{flex:none;width:74px;font-size:10px;color:var(--faint);text-align:right;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tlcam.on{color:var(--accent)}
+.tlshot{height:20px;flex:none;width:88px;background:var(--raised);color:var(--dim);
+  border:1px solid var(--line2);border-radius:5px;font:inherit;font-size:10.5px;padding:0 3px}
+.grip{width:14px;flex:none;color:var(--faint);font-size:9px;letter-spacing:-2px;cursor:grab;
+  user-select:none;touch-action:none;line-height:1}
+.grip:active{cursor:grabbing;color:var(--ink)}
+.tlrow.lifting{opacity:.55}
+.tlrow{border-radius:6px;padding:2px 4px;cursor:pointer}
+.tlrow.on{background:rgba(94,106,210,.13);outline:1px solid rgba(94,106,210,.4)}
+/* a camera move is a motion and a dropdown of five words cannot show one, so each choice performs
+   a miniature of itself and you read it in a glance instead of applying it to find out */
+.cams{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin:1px 0 4px}
+.camchip{background:var(--raised);border:1px solid var(--line);border-radius:7px;padding:5px 3px 4px;
+  display:grid;gap:4px;justify-items:center;cursor:pointer;color:var(--dim);font-family:inherit}
+.camchip:hover{border-color:var(--line2);color:var(--ink)}
+.camchip.on{border-color:var(--accent);color:var(--ink);background:rgba(94,106,210,.14)}
+.camchip em{font-style:normal;font-size:9.5px;line-height:1.15;text-align:center}
+.cambox{width:100%;height:24px;border-radius:4px;background:#000;overflow:hidden;position:relative;
+  display:block;perspective:60px}
+.cambox i{position:absolute;left:50%;top:50%;width:17px;height:10px;margin:-5px 0 0 -8.5px;
+  border-radius:2px;background:linear-gradient(120deg,#7079ea,#3a3f8f)}
+.cam-none i{opacity:.3}
+.cam-push i{animation:cpush 2.4s ease-in-out infinite alternate}
+.cam-drift i{animation:cdrift 2.8s ease-in-out infinite alternate}
+.cam-orbit i{animation:corbit 2.8s ease-in-out infinite alternate}
+@keyframes cpush{from{transform:scale(.7)}to{transform:scale(1.4)}}
+@keyframes cdrift{from{transform:translate(-4px,2px) scale(1.18)}to{transform:translate(4px,-2px) scale(.88)}}
+@keyframes corbit{from{transform:rotateY(-34deg) scale(1.05)}to{transform:rotateY(34deg) scale(1.05)}}
+@media (prefers-reduced-motion:reduce){.cambox i{animation:none}}
+.takes{display:flex;flex-wrap:wrap;gap:4px;margin:0}
+.take{background:var(--raised);border:1px solid var(--line);color:var(--dim);border-radius:5px;
+  padding:2px 7px;font-size:10.5px;cursor:pointer;font-family:inherit}
+.take.on{border-color:var(--accent);color:var(--ink)}
+.tltrack{position:relative;flex:1;height:20px;background:var(--bg);border-radius:5px;
+  border:1px solid var(--line)}
+.tlbar{position:absolute;top:2px;bottom:2px;background:rgba(94,106,210,.5);
+  border:1px solid var(--accent);border-radius:4px;cursor:grab;display:flex;align-items:center;
+  padding:0 5px;touch-action:none}
+.tlbar:active{cursor:grabbing;background:rgba(94,106,210,.72)}
+.tlbar i{font-style:normal;font-size:9.5px;color:#fff;font-variant-numeric:tabular-nums;
+  white-space:nowrap;pointer-events:none}
+.tlfoot{display:flex;justify-content:space-between;font-size:10px;color:var(--faint);
+  margin:6px 0 0;padding-left:270px;font-variant-numeric:tabular-nums}
+#pick[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff}
+.chip{display:block;margin:10px;padding:8px 10px;background:var(--raised);border:1px solid var(--line2);
+  border-radius:6px;font-size:11.5px;color:var(--ink);word-break:break-all}
+.chip span{color:var(--faint)}
+.drops{padding:0 14px 14px;color:var(--faint);font-size:11.5px;line-height:1.7}
+</style></head><body>
+<aside>
+  <div class="head">
+    <form class="aim" id="aimform" autocomplete="off">
+      <img id="fav" alt="" width="14" height="14">
+      <input id="url" spellcheck="false" placeholder="localhost:3000" value="${AIM ?? ''}">
+      <button class="enter" id="go" title="Aim the studio here" type="submit">&#9166;</button>
+    </form>
+    <!-- data-state, not the words: two verifications used to grep this sentence to decide whether
+         a site had loaded, which made a line of copy load bearing and unchangeable -->
+    <span id="aimnote" data-state="${AIM ? 'ok' : 'empty'}">${AIM ? ''
+      : HAS_FOLDER ? 'or pick a component below' : 'type where your app is running'}</span>
+  </div>
+  <div class="files" id="files"></div>
+  <div id="sel"></div>
+  <div class="foot">
+    <button class="foothit" id="savedbtn" title="Motions you kept">
+      <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor"
+        stroke-width="1.4" stroke-linejoin="round"><path d="M4 2.6h8v11.2l-4-2.7-4 2.7z"/></svg>
+      <span>Saved</span><i id="savedn"></i></button>
+    <button class="foothit" id="setbtn" title="Which model writes the motion">
+      <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor"
+        stroke-width="1.4" stroke-linecap="round"><path d="M2 4.5h12M2 11.5h12"/>
+        <circle cx="6" cy="4.5" r="1.7"/><circle cx="10.5" cy="11.5" r="1.7"/></svg>
+      <span>Settings</span></button>
+  </div>
+</aside>
+<main>
+  <!--
+    Four things, grouped by what they act on: the source on the left, the transport in the middle,
+    everything occasional behind one button on the right.
+
+    It held eleven controls in a row before, three of them dropdowns, and a diagnostic readout and a
+    permanent row of keyboard hints. Scrubbing is what this tool does all day and it was competing
+    with a palette picker for attention. The occasional settings are still one click away, and the
+    keyboard hints moved in there with them, where they are read once rather than looked past
+    constantly.
+  -->
+  <header>
+    <button class="btn pick" id="pick" title="Click elements on the page to select them">
+      <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor"
+        stroke-width="1.5" stroke-linecap="round"><path d="M8 1.6v3.1M8 11.3v3.1M1.6 8h3.1M11.3 8h3.1"/>
+        <circle cx="8" cy="8" r="2.9"/></svg><span class="lbl">Pick</span></button>
+    <button class="btn go" id="ask"><canvas id="askfield" aria-hidden="true"></canvas>
+      <span class="lbl">Give it motion</span></button>
+    <span class="whenplaying">
+      <span class="sep"></span>
+      <button class="icon" id="play" title="Play or pause (space)"><span id="glyph">❚❚</span><span id="word" hidden></span></button>
+      <span class="clock"><b id="at">0.00</b><i id="span">4.2s</i><em id="driven" title="how many previews the scrubber is driving"></em></span>
+      <input id="scrub" type="range" min="0" max="4200" value="0" step="10">
+      <span class="sep"></span>
+      <button class="icon" id="inspect" title="Adjust the chosen one">&#9707;</button>
+      <button class="icon" id="more" title="Speed, palette, camera, film shape">&#183;&#183;&#183;</button>
+      <button class="btn" id="film" title="Render what is on screen frame by frame">Film</button>
+      <button class="btn" id="save">Export</button>
+    </span>
+    <div class="menu reel" id="reel" hidden>
+      <p class="ihead">Film <em id="reeltag"></em></p>
+      <video id="reelvid" controls loop muted playsinline></video>
+      <p class="ifacts" id="reelfacts"></p>
+      <a class="btn go" id="reelget" download>Download the mp4</a>
+      <div class="takes" id="takes"></div>
+      <p class="keys" id="reelnote"></p>
+    </div>
+    <div class="menu wide" id="inspector" hidden>
+      <p class="ihead">Adjust <em id="itag">nothing chosen</em></p>
+      <p class="ifacts" id="ifacts">Click an option below to choose it.</p>
+      <label>Speed<select id="tdur">
+        <option value="0.5">twice as fast</option><option value="0.75">a little faster</option>
+        <option value="1" selected>as written</option><option value="1.5">a little slower</option>
+        <option value="2">half speed</option></select></label>
+      <label>Spacing<select id="tstag">
+        <option value="0.5">tighter</option><option value="1" selected>as written</option>
+        <option value="1.5">looser</option><option value="2">twice as far apart</option></select></label>
+      <label>Easing<select id="tease">
+        <option value="">as written</option>
+        <option value="cubic-bezier(.16,1,.3,1)">arrive and settle</option>
+        <option value="cubic-bezier(.34,1.56,.64,1)">overshoot</option>
+        <option value="steps(6,end)">stepped</option>
+        <option value="cubic-bezier(.4,0,1,1)">leave</option></select></label>
+      <div id="icam" hidden><p class="ihead">Camera</p><div class="cams" id="cams"></div></div>
+      <button class="btn go" id="tapply">Add as a new option</button>
+      <p class="keys" id="inote">The original stays. Adjusting makes another one beside it.</p>
+    </div>
+    <div class="menu wide" id="models" hidden>
+      <p class="ihead">Writing with <em id="mtag">the default</em></p>
+      <label>Service<select id="mprov"></select></label>
+      <p class="ifacts" id="mnote"></p>
+      <label>Model<input id="mmodel" list="mlist" spellcheck="false" placeholder="default"></label>
+      <datalist id="mlist"></datalist>
+      <label id="mbaserow">Endpoint<input id="mbase" spellcheck="false" placeholder="default"></label>
+      <label id="mkeyrow">Key<input id="mkey" type="password" spellcheck="false" placeholder="not set"></label>
+      <span class="mrow"><button class="btn go" id="msave">Use this</button>
+        <button class="btn" id="mtest">Test it</button>
+        <button class="btn" id="mforget" title="Remove the stored key">Forget key</button></span>
+      <p class="keys" id="mout">The key is kept in .studio on this machine and never sent to the page.</p>
+    </div>
+    <div class="menu" id="menu" hidden>
+      <label>How many<select id="count" title="how many options each ask returns">
+        <option>3</option><option>4</option><option selected>5</option><option>6</option></select></label>
+      <label>Speed<select id="rate"><option>0.25x</option><option>0.5x</option>
+        <option selected>1x</option><option>2x</option></select></label>
+      <label>Palette<select id="palette">
+        ${PRESETS.map((p, i) => `<option${i === 1 ? ' selected' : ''}>${p.name}</option>`).join('')}
+      </select></label>
+      <label>Shot<select id="cam">
+        <option value="">no camera</option>
+        <option value="locked">locked off</option>
+        <option value="push">slow push</option>
+        <option value="drift">drift</option>
+        <option value="orbit">orbit</option></select></label>
+      <label>Film in<select id="filmwhere" title="where the frames are drawn">
+        <option value="browser" selected>this browser</option>
+        <option value="server">the server</option></select></label>
+      <label>Shape<select id="shape">
+        <option value="wide" selected>wide 1280</option>
+        <option value="square">square 1080</option>
+        <option value="tall">tall 1080</option></select></label>
+      <label>Lens<select id="depth">
+        <option value="0.4">shallow</option><option value="1" selected>as shot</option>
+        <option value="1.6">heavy</option></select></label>
+      <button class="btn" id="modelbtn">Model and service</button>
+      <p class="keys"><kbd>Space</kbd> play <kbd>&larr;</kbd><kbd>&rarr;</kbd> step <kbd>Esc</kbd> stop picking
+        <kbd>&#8984;Z</kbd> undo <kbd>&#8984;&#8679;Z</kbd> redo</p>
+    </div>
+  </header>
+  <div class="grid" id="grid"><div class="empty">${CAN_WRITE
+    ? 'Type where your site is running, up on the left, then pick something on it.'
+    : 'No <b>claude</b> command on PATH, so nothing can be written here.<br>'
+      + 'Start the studio from a shell where <b>claude</b> runs.'}</div></div>
+  <div class="drops" id="drops"></div>
+</main>
+<script>
+const grid=document.getElementById('grid'),drops=document.getElementById('drops')
+const scrub=document.getElementById('scrub'),at=document.getElementById('at'),link=document.getElementById('driven')
+const play=document.getElementById('play'),ask=document.getElementById('ask'),cam=document.getElementById('cam')
+const palette=document.getElementById('palette')
+let file=null, opts=[], running=true, t=0, last=performance.now(), held=new Map()
+let ends=new Map(), span=4200, rate=1
+let opened=null   // the option filling the room, or null for the grid
+let aimN=0   // bumped on every aim so the frame refetches instead of reusing the last page
+let quietMode=false
+/* a frame that has navigated to somebody else's origin is one we can no longer read, and the only
+   answer that works is to load it again with its scripts refused */
+function watchFrame(){
+  const f=grid.querySelector('.appwrap iframe'); if(!f) return
+  let tries=0
+  const check=()=>{
+    if(!document.contains(f)) return
+    let ours=true, alive=0
+    try{ ours = f.contentWindow.location.host===location.host
+      const d=f.contentWindow.document
+      alive = d && d.documentElement ? d.querySelectorAll('*').length : 0
+    }catch(_){ ours=false }
+    /* two ways a page refuses to be looked at: it takes the frame somewhere else, or it destroys its
+       own document where it stands. railway does the second, deciding it has hit a server error and
+       emptying itself, which leaves the frame ours and completely blank. Both want the same answer */
+    if((!ours || (tries>2 && alive<20)) && !quietMode){
+      quietMode=true; aimN++
+      document.getElementById('aimnote').dataset.state='ok'
+      document.getElementById('aimnote').innerHTML=(ours
+        ? 'that page emptied itself when its own scripts ran, '
+        : 'that site moves its own frame back to its origin, ')
+        +'so it is loaded again with <b>scripts refused</b>: the markup and styles are still there'
+      render(); return
+    }
+    if(++tries<14) setTimeout(check,700)
+  }
+  setTimeout(check,1400)
+}
+let APP=${AIM ? 'true' : 'false'}
+const CAN_WRITE=${CAN_WRITE ? 'true' : 'false'}
+let chosen=null   // the most recent pick
+let picks=[]      // everything selected, in the order it was picked
+let cars=null     // the rail, once each element has been given a motion
+let verdict=null  // why the last ask produced nothing, so the grid can say so
+let dbp=null      // the saved shelf, opened on first use
+let kept=new Set()// which options are on it, so a card can show its bookmark filled
+let viewing=null  // 'saved' when the shelf has the room instead of the options
+let glowing=0     // the arm light's frame handle, read by drawSel before its own line runs
+
+/**
+ * Undo, kept over the composition rather than over the dom.
+ *
+ * Everything here a hand can change is a handful of small fields: which elements are picked, which
+ * options exist, which one is chosen, and for a rail, the order of the cars and when each one starts
+ * and what films it. So a step is a snapshot of those fields rather than a description of an edit.
+ * A snapshot cannot fall out of step with the thing it describes, and there is no inverse operation
+ * to write once per action and get wrong in one of them.
+ *
+ * The heavy fields are shared rather than copied. An option's markup and css never change after it is
+ * written, so copying them into every step would spend megabytes preserving something already
+ * immutable. Cars are copied, because their offset and their camera are precisely what a step is
+ * usually about.
+ */
+const HIST=60
+let past=[], ahead=[]
+const snap=()=>({ picks:picks.slice(), opts:opts.slice(), chosen,
+  cars: cars && cars.map(c=>({...c})), opened, chosenOpt })
+function restore(st){
+  picks=st.picks.slice(); opts=st.opts.slice(); chosen=st.chosen
+  cars=st.cars && st.cars.map(c=>({...c})); opened=st.opened; chosenOpt=st.chosenOpt
+  held.clear(); ends.clear(); drawSel(); render(); drawInspector(); drawHistory()
+}
+/* called before the change, so what lands on the stack is the state to come back to */
+function mark(what){
+  past.push({ ...snap(), what }); if(past.length>HIST) past.shift()
+  ahead=[]; drawHistory()
+}
+function undo(){
+  if(!past.length) return
+  const step=past.pop(); ahead.push({ ...snap(), what:step.what })
+  restore(step); drops.textContent='Undid '+step.what+'.'
+}
+function redo(){
+  if(!ahead.length) return
+  const step=ahead.pop(); past.push({ ...snap(), what:step.what })
+  restore(step); drops.textContent='Redid '+step.what+'.'
+}
+function drawHistory(){
+  const u=document.getElementById('undo'), r=document.getElementById('redo')
+  if(!u||!r) return
+  u.disabled=!past.length; r.disabled=!ahead.length
+  u.title=past.length?'Undo '+past[past.length-1].what:'Nothing to undo'
+  r.title=ahead.length?'Redo '+ahead[ahead.length-1].what:'Nothing to redo'
+}
+addEventListener('keydown',e=>{
+  /* a field with a cursor in it has an undo of its own and the browser's is the better one there,
+     so this only answers when the keystroke was aimed at the room rather than at a control */
+  const t=e.target, tag=t&&t.tagName
+  if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||(t&&t.isContentEditable)) return
+  if(!(e.metaKey||e.ctrlKey)) return
+  const k=String(e.key).toLowerCase()
+  if(k==='z'&&!e.shiftKey){ e.preventDefault(); undo() }
+  else if((k==='z'&&e.shiftKey)||k==='y'){ e.preventDefault(); redo() }
+})
+
+const pickBtn=document.getElementById('pick')
+pickBtn.onclick=()=>{
+  const want=pickBtn.getAttribute('aria-pressed')!=='true'
+  pickBtn.setAttribute('aria-pressed',want)
+  const f=document.querySelector('.appwrap iframe')
+  if(f) f.contentWindow.postMessage({wall:want?'pick':'nopick'},'*')
+}
+/* aiming somewhere new: the frame reloads, the selection is somebody else's page now, and the
+   favicon is asked for once the target has actually changed rather than optimistically */
+const aimform=document.getElementById('aimform'), urlbox=document.getElementById('url')
+aimform.onsubmit=async e=>{
+  e.preventDefault()
+  const said=urlbox.value.trim(); if(!said) return
+  const note=document.getElementById('aimnote')
+  note.dataset.state='reaching'; note.textContent='reaching it…'
+  const r=await fetch('/__wall/target',{method:'POST',headers:{'content-type':'application/json'},
+    body:JSON.stringify({url:said})}).then(x=>x.json()).catch(e=>({error:String(e)}))
+  if(r.error){ note.dataset.state='error'; note.textContent=r.error; return }
+  urlbox.value=r.at; APP=true; aimN++; quietMode=false; picks=[]; opts=[]; verdict=null; chosen=null; cars=null
+  // the folder list is about somewhere else now
+  drawRail(r.recent||[])
+  // nothing to say once it is up: the page is right there and it says it better
+  note.dataset.state='ok'; note.textContent=''
+  document.getElementById('fav').src='/__wall/favicon?t='+Date.now()
+  pickBtn.style.display=''
+  drawSel(); render()
+}
+if(APP){ document.getElementById('fav').src='/__wall/favicon' } else { pickBtn.style.display='none' }
+render()
+/**
+ * The rail lists where this has been, and falls back to the components in the repo when it has been
+ * nowhere yet. Both are labelled, because a list of addresses and a list of files are different
+ * things and an unlabelled mixture of the two would be worse than either.
+ */
+let files=[]
+function drawRail(recent){
+  const rail=document.getElementById('files')
+  const rows=[]
+  if(recent.length) rows.push('<p class="railhead">Recent</p>'
+    +recent.map(r=>'<button class="site" data-go="'+r.href+'">'
+      +'<img src="/__wall/favicon?host='+encodeURIComponent(r.href)+'" alt="" width="13" height="13">'
+      +'<span><b>'+r.host+'</b>'+(r.path?'<i>'+r.path.slice(0,26)+'</i>':'')+'</span></button>').join(''))
+  if(files.length && !recent.length) rows.push('<p class="railhead">In this repo</p>'
+    +files.map(f=>'<button class="file" data-f="'+f+'">'+f.split('/').slice(-2).join('/')+'</button>').join(''))
+  rail.innerHTML=rows.join('')
+  rail.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{
+    urlbox.value=b.dataset.go; aimform.requestSubmit()
+  })
+  rail.querySelectorAll('.file').forEach(b=>b.onclick=()=>{
+    file=b.dataset.f
+    rail.querySelectorAll('.file').forEach(x=>x.setAttribute('aria-current',x===b))
+    opts=[]; verdict=null; cars=null; held.clear(); drops.textContent=''; render()
+  })
+}
+Promise.all([fetch('/__wall/list').then(r=>r.json()), fetch('/__wall/recent').then(r=>r.json())])
+  .then(([fs,rs])=>{ files=fs; drawRail(rs) })
+
+/**
+ * Why nothing came back.
+ *
+ * Falling back to the untouched preview is the worst thing this could do, because it looks exactly
+ * like the state before the button was pressed. The two reasons are entirely different problems: a
+ * model that never answered is usually the claude command missing, which no amount of trying again
+ * will fix, while a gate rejecting every attempt is about this particular component and is worth
+ * another go with a different verb.
+ */
+function explain(){
+  const d=verdict.dropped||[]
+  const silent=d.length&&d.every(x=>x.kind==='model')
+  let body
+  if(verdict.error) body='<b>The studio errored.</b><br>'+verdict.error
+  else if(!CAN_WRITE||silent) body='<b>The model did not answer.</b><br>'
+    +(CAN_WRITE
+      ? 'Each attempt was made three times with a pause between, and every one came back with:<br><br>'
+        +d.slice(0,3).map(x=>'&middot; '+x.why).join('<br>')
+        +'<br><br>That is upstream rather than about this component. Worth pressing again in a moment.'
+      : 'There is no claude command on PATH, so there is nothing for the button to call. '
+        +'Start the studio from a shell where <b>claude</b> runs.')
+  else body='<b>Every option was turned down by a gate.</b><br>'
+    +d.map(x=>'&middot; '+x.why).join('<br>')
+    +'<br><br>That is usually a component with nothing in it that wants to move separately. '
+    +'Try one with repeated parts, or press again for different verbs.'
+  grid.innerHTML='<div class="empty" style="text-align:left;max-width:640px;margin:24px auto">'+body+'</div>'
+  paint()
+}
+
+/**
+ * The waiting state, which is the one piece of motion in here the studio wrote itself.
+ *
+ * "Asking for 5 motions. About thirty seconds." was a sentence in a large empty room, and it broke
+ * two of the rules this tool enforces on everything else: nothing moved, and what little it said was
+ * a guess at a duration rather than a report of anything. A tool about motion showing a still while
+ * it works is the wrong advertisement.
+ *
+ * So it is a stepped wave and a braille turn, and it obeys the same craft the gates demand: only
+ * transform and opacity, delays forty milliseconds apart, a steps() timing that jerks the way a
+ * mechanism does rather than easing the way a default does. The glyph is animated through the content
+ * property, which is the only honest way to do ascii in css.
+ */
+const WAITER = () => '<div class="wait"><div class="field" id="field"></div></div>'
+
+/**
+ * The waiting state is a small shader written in characters.
+ *
+ * Two sine fields crossing at different rates, sampled per cell, mapped onto a ramp that runs from
+ * nothing to a full block. It is the oldest trick in graphics and it still reads better than a
+ * spinner, because a spinner says only that something is happening while a field says the thing
+ * happening is continuous and has a shape.
+ *
+ * Sparse on purpose. The ramp starts with two blank steps so most of the grid is empty at any moment
+ * and what remains is a drifting suggestion rather than a wall of glyphs, which is the difference
+ * between this and every terminal loading animation.
+ */
+const SHADER = [
+  '(function(){',
+  "var host=document.getElementById('field'); if(!host) return",
+  'var COLS=64, ROWS=16, N=COLS*ROWS',
+  /* Built once and then only its opacity changes.
+     A ramp of glyphs steps between characters, and steps are what made the last one read as a
+     terminal animation rather than a field. One glyph everywhere with a continuous brightness is the
+     smooth version of the same idea, and opacity is the one property that costs nothing to change. */
+  "var frag=document.createDocumentFragment(), cells=[]",
+  'for(var i=0;i<N;i++){',
+  "  var c=document.createElement('i')",
+  "  c.textContent='\u00b7'",
+  '  frag.appendChild(c); cells.push(c)',
+  "  if(i%COLS===COLS-1) frag.appendChild(document.createElement('br'))",
+  '}',
+  'host.appendChild(frag)',
+  'var t=0',
+  'function frame(){',
+  '  if(!document.body.contains(host)) return',
+  '  t+=0.055',
+  '  for(var y=0;y<ROWS;y++){',
+  '    for(var x=0;x<COLS;x++){',
+  /* one field folded into the next, which is what stops it looking like a grid of sine waves */
+  '      var q=Math.sin(x*0.13+t*0.9)+Math.cos(y*0.21-t*0.6)',
+  '      var r=Math.sin((x*0.07+y*0.11)+q*0.8+t*0.5)',
+  '      var v=Math.sin(x*0.05-y*0.08+r*1.6+t*0.35)',
+  '      var a=(v+1)/2',
+  '      a=a*a*(3-2*a)',
+  /* raised to a power so most of the grid falls away and only the crests are lit: a field where
+     every cell is half on reads as a grey rectangle rather than as something moving through */
+  '      a=a*a*a',
+  /* and a soft round falloff, because the edge of the grid is not part of the picture */
+  '      var dx=(x/COLS-0.5)*2.05, dy=(y/ROWS-0.5)*2.05',
+  '      var d=Math.sqrt(dx*dx+dy*dy)',
+  '      var m=1-Math.min(1,Math.max(0,(d-0.25)/0.85))',
+  '      m=m*m*(3-2*m)',
+  '      cells[y*COLS+x].style.opacity=(a*m).toFixed(3)',
+  '    }',
+  '  }',
+  '  requestAnimationFrame(frame)',
+  '}',
+  'frame()',
+  '})()',
+].join(String.fromCharCode(10))
+
+/**
+ * What a motion is actually made of, read off its own stylesheet.
+ *
+ * The note names the idea and the card showed nothing else, so choosing between five of them meant
+ * watching each in turn and holding the differences in your head. Every fact worth knowing is already
+ * in the css: how many parts move, how far apart they start, how long one takes, and which properties
+ * are touched. That last one is the difference between motion that holds sixty frames and motion that
+ * does not, and it is the first thing anybody experienced would ask.
+ */
+/**
+ * The facts come from the server, which computes them with the same tested function the gates use.
+ *
+ * There were two implementations of this: tempo() in typescript and a regex copy in this page. The
+ * copy shipped two bugs on its own, reading 3.2s as 2s because its pattern could not see a decimal
+ * point, and throwing on load because a backslash in a template literal is eaten before the browser
+ * sees it. One implementation, measured once.
+ */
+/* what the rendering saw, beside what the sheet says: the two answer different questions */
+const seenLine = (o)=>{
+  const v=o.seen; if(!v) return ''
+  const bits=[v.stir+'% of it moves']
+  if(v.blank) bits.push(v.blank+'% blank at the first frame')
+  if(v.escape) bits.push('strays '+v.escape+'px outside')
+  return bits.join(' &middot; ')
+}
+const factLine = (o)=>{
+  const t=o.tempo; if(!t) return ''
+  const bits=[]
+  const parts=(t.gaps?t.gaps.length:0)+1
+  bits.push(parts>1?parts+' parts':'one part')
+  if(t.gaps&&t.gaps.length) bits.push(Math.round(t.gaps.reduce((a,b)=>a+b,0)/t.gaps.length)+'ms apart')
+  if(t.durations&&t.durations.length) bits.push(Math.round(Math.max.apply(null,t.durations))+'ms each')
+  if(t.span) bits.push('over in '+(t.span/1000).toFixed(1)+'s')
+  if(t.paints&&t.paints.length) bits.push(t.paints.slice(0,3).join(', '))
+  return bits.join(' &middot; ')
+}
+
+
+/** the component as it is, so the left rail is a thing you browse rather than a thing you submit */
+function peek(){
+  const lens=document.getElementById('depth').value
+  const q='?file='+encodeURIComponent(file)+'&palette='+encodeURIComponent(palette.value)
+    +(cam.value?'&camera='+cam.value+'&depth='+lens:'')
+  grid.innerHTML='<figure class="solo"><iframe data-i="0" src="/__wall/peek'+q+'"></iframe><figcaption>'
+    +'<b>'+file.split('/').pop()+'</b><span class="verb">as written, nothing added yet. '
+    +'Press <b>Give it motion</b> for options.</span></figcaption></figure>'
+}
+
+/* a request that never comes back would leave the button reading Writing for as long as the tab is
+   open, so every ask carries its own deadline and says so if it runs out */
+let inflight=null
+async function post(where, body, ms){
+  if(inflight) inflight.abort()
+  const c=new AbortController(); inflight=c
+  const bell=setTimeout(()=>c.abort(), ms)
+  try{
+    const r=await fetch(where,{method:'POST',headers:{'content-type':'application/json'},
+      body:JSON.stringify(body),signal:c.signal})
+    if(!r.ok) throw new Error('the studio answered '+r.status)
+    return await r.json()
+  }finally{ clearTimeout(bell); if(inflight===c) inflight=null }
+}
+ask.onclick=async()=>{
+  if(APP && !picks.length) return alert('Press Pick element, then click something in your app.')
+  if(!APP && !file) return alert('Pick a component first.')
+  if(ask.disabled) return
+  verdict=null
+  ask.disabled=true; ask.textContent='Writing…'
+  if(APP && picks.length>1){
+    grid.innerHTML=WAITER(); runShader()
+    drops.textContent=''
+    try{
+      const r=await post('/__wall/rail',{picks,palette:palette.value},420000)
+      cars=(r.cars||[]).map((c,i)=>({...c, at: i*420}))
+      opts=[]; held.clear(); ends.clear(); render()
+      const moved=cars.filter(c=>c.id).length
+      const lost=cars.filter(c=>!c.id)
+      drops.innerHTML=moved+' of '+cars.length+' moved.'
+        +(moved?' They begin a beat apart, and the sequence below can be dragged.':'')
+        +(lost.length?'<br>'+lost.map(c=>'<b>'+c.label+'</b> did not: '+String(c.why||'')).join('<br>'):'')
+    }catch(e){ verdict={dropped:[],error:String(e && e.message||e)}; render() }
+    ask.disabled=false; drawSel(); return
+  }
+  chosen=picks[picks.length-1]||chosen
+  grid.innerHTML=WAITER(); runShader()
+  drops.textContent=''
+  try{
+    const r=await post('/__wall/motion',
+      Object.assign({count:Number(document.getElementById('count').value)}, APP?chosen:{file}), 360000)
+    opts=r.kept||[]; cars=null; opened=null; held.clear(); ends.clear()
+    verdict = opts.length ? null : {dropped:r.dropped||[], error:r.error}
+    render()
+    drops.textContent=(r.dropped&&r.dropped.length&&opts.length? r.dropped.length+' dropped: '
+      +r.dropped.map(d=>d.why.split('.')[0]).join('; ')+'. ' : '')
+      +(r.styled?'Styled with '+r.styled+'.':'')
+  }catch(e){
+    verdict={dropped:[],error: e && e.name==='AbortError'
+      ? 'The studio did not answer within six minutes. It may still be working: the terminal says what it is doing.'
+      : String(e && e.message ? e.message : e)}
+    opts=[]; render() }
+  ask.disabled=false; ask.innerHTML='Give it motion'
+}
+cam.onchange=render
+document.getElementById('depth').onchange=render
+palette.onchange=render
+const menu=document.getElementById('menu'), moreBtn=document.getElementById('more')
+const insp=document.getElementById('inspector'), inspBtn=document.getElementById('inspect')
+let chosenOpt=null   // the option the inspector is pointed at
+const reel=document.getElementById('reel'), models=document.getElementById('models')
+const PANELS=[menu,insp,reel,models]
+const pop=(panel)=>{ for(const q of PANELS) q.hidden = q!==panel || !q.hidden }
+const shut=()=>{ for(const q of PANELS) q.hidden=true }
+moreBtn.onclick=e=>{ e.stopPropagation(); pop(menu) }
+
+/**
+ * The model panel.
+ *
+ * The catalogue is fetched rather than written into this page, because the list of places a request
+ * can go is knowledge and belongs with the rest of it, and because a worker serving this same page
+ * would offer a different list: no command line there, and no localhost either.
+ */
+const byId=(id)=>document.getElementById(id)
+let CAT=[], CUR=null
+async function loadModels(){
+  const r=await fetch('/__wall/model').then(r=>r.json()).catch(()=>null)
+  if(!r) return
+  CAT=r.providers||[]; CUR=r.current||null
+  byId('mprov').innerHTML=CAT.map(p=>'<option value="'+p.id+'"'
+    +(CUR&&p.id===CUR.provider?' selected':'')+'>'+p.label+'</option>').join('')
+  drawModelForm(true)
+}
+function drawModelForm(saved){
+  const p=CAT.find(x=>x.id===byId('mprov').value)||CAT[0]; if(!p) return
+  const same=!!CUR&&CUR.provider===p.id
+  byId('mtag').textContent=CUR?(CUR.label+(CUR.model?', '+CUR.model:'')):'the default'
+  byId('mnote').textContent=(p.note||'')
+    +(p.browser?' A page is allowed to call it directly, so on a deployment the key can stay in the browser.':'')
+  byId('mlist').innerHTML=(p.models||[]).map(m=>'<option value="'+m+'">').join('')
+  byId('mmodel').placeholder=(p.models&&p.models[0])||'model name'
+  byId('mbase').placeholder=p.base||'https://your endpoint'
+  /* offered by every provider that talks over http, not only the ones that demand it: a gateway or
+     a self hosted endpoint usually wants a key even though nothing here can know that it does */
+  byId('mkeyrow').hidden=p.shape==='cli'
+  byId('mkey').title=(p.needs||[]).includes('key')?'required':'optional for this one'
+  byId('mforget').hidden=!same||!CUR.hasKey
+  byId('mkey').placeholder=(same&&CUR.hasKey)?'set, leave blank to keep it'
+    :((p.needs||[]).includes('key')?'required':'optional')
+  if(saved&&same){ byId('mmodel').value=CUR.model||''; byId('mbase').value=CUR.base||'' }
+  if(!same){ byId('mmodel').value=''; byId('mbase').value=''; byId('mkey').value='' }
+}
+const modelForm=()=>({ provider:byId('mprov').value, model:byId('mmodel').value.trim(),
+  base:byId('mbase').value.trim(), key:byId('mkey').value||undefined })
+byId('modelbtn').onclick=e=>{ e.stopPropagation(); pop(models); loadModels() }
+byId('setbtn').onclick=e=>{ e.stopPropagation(); shut(); models.hidden=false; loadModels() }
+byId('savedbtn').onclick=e=>{
+  e.stopPropagation(); shut()
+  viewing = viewing==='saved' ? null : 'saved'
+  byId('savedbtn').classList.toggle('on', viewing==='saved')
+  render()
+}
+
+byId('mprov').onchange=()=>drawModelForm(false)
+byId('msave').onclick=async()=>{
+  const b=byId('msave'); b.disabled=true; b.textContent='Saving'
+  const r=await fetch('/__wall/model',{method:'POST',headers:{'content-type':'application/json'},
+    body:JSON.stringify(modelForm())}).then(r=>r.json()).catch(e=>({error:String(e.message||e)}))
+  b.disabled=false; b.textContent='Use this'
+  if(r.error){ byId('mout').textContent=r.error; return }
+  CUR=r.current; byId('mkey').value=''
+  byId('mout').textContent='Saved. Motion is written with '+CUR.label
+    +(CUR.model?', '+CUR.model:'')+' from now on.'
+  drawModelForm(true)
+}
+byId('mtest').onclick=async()=>{
+  const b=byId('mtest'); b.disabled=true; b.textContent='Testing'
+  byId('mout').textContent='Asking it for one word.'
+  const r=await fetch('/__wall/model/check',{method:'POST',headers:{'content-type':'application/json'},
+    body:JSON.stringify(modelForm())}).then(r=>r.json()).catch(e=>({ok:false,why:String(e.message||e)}))
+  b.disabled=false; b.textContent='Test it'
+  byId('mout').textContent=r.ok
+    ? 'Answered in '+(r.ms/1000).toFixed(1)+' seconds, saying: '+r.said
+    : 'It did not answer. '+r.why
+}
+byId('mforget').onclick=async()=>{
+  const r=await fetch('/__wall/model',{method:'POST',headers:{'content-type':'application/json'},
+    body:JSON.stringify({ ...modelForm(), key:null })}).then(r=>r.json()).catch(e=>({error:String(e.message||e)}))
+  if(r.error){ byId('mout').textContent=r.error; return }
+  CUR=r.current; byId('mkey').value=''
+  byId('mout').textContent='The stored key is gone.'
+  drawModelForm(true)
+}
+inspBtn.onclick=e=>{ e.stopPropagation(); pop(insp); drawInspector() }
+menu.onclick=e=>e.stopPropagation()
+insp.onclick=e=>e.stopPropagation()
+reel.onclick=e=>e.stopPropagation()
+models.onclick=e=>e.stopPropagation()
+addEventListener('click',shut)
+addEventListener('keydown',e=>{ if(e.key==='Escape') shut() })
+
+/**
+ * What the inspector is looking at.
+ *
+ * There were two rooms for this and they did not know about each other. The inspector adjusted an
+ * option's speed and spacing and easing; the timeline row set a car's offset and its camera. So on a
+ * rail you could say when a car started and what filmed it but not how fast it moved, and the
+ * inspector sat there still showing whichever option you had opened before you built the rail. The
+ * controls were never missing. They were in a room you had left.
+ *
+ * So a row on the timeline is a selection, and the inspector points at whatever is selected, car or
+ * option. One subject at a time, one place that edits it, and the timeline stays a timeline instead
+ * of growing a control panel on every row.
+ */
+function subject(){
+  if(cars){ const c=cars.find(x=>x.id&&x.id===chosenOpt); if(c) return { kind:'car', o:c } }
+  const o=opts.find(x=>x.id===chosenOpt)
+  return o ? { kind:'opt', o } : null
+}
+const nameOf = (o) => String(o.note||o.label||'untitled').split(',')[0].slice(0,28)
+
+const CAMS=[['','none'],['locked','locked off'],['push','slow push'],['drift','drift'],['orbit','orbit']]
+function drawCams(now){
+  const box=document.getElementById('cams')
+  box.innerHTML=CAMS.map(c=>'<button class="camchip'+(c[0]===now?' on':'')+'" data-campick="'+c[0]+'">'
+    +'<span class="cambox cam-'+(c[0]||'none')+'"><i></i></span><em>'+c[1]+'</em></button>').join('')
+  box.querySelectorAll('[data-campick]').forEach(b=>b.onclick=()=>{
+    const s=subject(); if(!s||s.kind!=='car') return
+    if((s.o.shot||'')===b.dataset.campick) return
+    mark('the camera on '+nameOf(s.o))
+    s.o.shot=b.dataset.campick
+    held.clear(); ends.clear(); render(); drawInspector()
+  })
+}
+function drawInspector(){
+  const s=subject()
+  const tag=document.getElementById('itag'), facts=document.getElementById('ifacts')
+  const btn=document.getElementById('tapply'), camrow=document.getElementById('icam')
+  const note=document.getElementById('inote')
+  if(!s){
+    tag.textContent='nothing chosen'
+    facts.innerHTML = cars && cars.some(c=>c.id)
+      ? 'Click a row in the sequence below to adjust that one.'
+      : 'Click an option below to choose it.'
+    btn.disabled=true; camrow.hidden=true; return
+  }
+  const o=s.o
+  tag.textContent=nameOf(o)
+  btn.disabled=false
+  if(s.kind==='car'){
+    facts.innerHTML='Starts at '+(o.at/1000).toFixed(2)+'s and runs '+((o.ms||600)/1000).toFixed(2)+'s.'
+    btn.textContent='Apply to this one'
+    note.textContent='Changes this car where it sits. The others are left alone.'
+    camrow.hidden=false; drawCams(o.shot||'')
+  } else {
+    facts.innerHTML=factLine(o)
+    btn.textContent='Add as a new option'
+    note.textContent='The original stays. Adjusting makes another one beside it.'
+    camrow.hidden=true
+  }
+}
+document.getElementById('tapply').onclick=async()=>{
+  const s=subject(); if(!s) return
+  const o=s.o, was=document.getElementById('tapply').textContent
+  const btn=document.getElementById('tapply'); btn.disabled=true; btn.textContent='Adjusting…'
+  const r = await post('/__wall/tune',{ id:o.id,
+    duration:Number(document.getElementById('tdur').value),
+    stagger:Number(document.getElementById('tstag').value),
+    ease:document.getElementById('tease').value }, 20000).catch(e=>({error:String(e.message||e)}))
+  btn.disabled=false; btn.textContent=was
+  if(r.error){ document.getElementById('inote').textContent=r.error.slice(0,120); return }
+  if(s.kind==='car'){
+    /* a car is one voice in a composition, so retiming it replaces it where it stands. Adding a
+       sixth car nobody asked for would be answering a different question */
+    mark('adjusting '+nameOf(o))
+    o.id=r.id; o.ms=(r.tempo && r.tempo.span) || o.ms; chosenOpt=r.id
+    held.clear(); ends.clear(); render(); drawInspector()
+    document.getElementById('inote').textContent='Applied. Undo puts it back the way it was.'
+    return
+  }
+  // beside the one it came from, so the two can be held at the same instant and compared
+  mark('adjusting '+nameOf(o))
+  const at = opts.findIndex(x=>x.id===o.id)
+  opts.splice(at+1, 0, { ...o, id:r.id, css:r.css, note:o.note+' (adjusted)' })
+  chosenOpt=r.id; held.clear(); ends.clear(); render(); drawInspector()
+  document.getElementById('inote').textContent='Added beside the original, which is untouched.'
+}
+/**
+ * What Film is pointed at, said out loud rather than guessed.
+ *
+ * It used to take the first iframe in the grid. On a rail that is the rail, which is right, but on a
+ * grid of five options that is option one, and it filmed it without ever saying so: you pressed Film
+ * on a wall of five and got a film of whichever happened to be first. A wrong result delivered
+ * confidently is worse than a refusal, so a grid of several asks you to open one first.
+ */
+function filmable(){
+  if(cars && cars.some(c=>c.id)){
+    const f=grid.querySelector('.appwrap iframe')
+    return f ? { frame:f, what:'the rail' } : { why:'the rail is not on screen yet' }
+  }
+  if(!opts.length){
+    const f=grid.querySelector('.appwrap iframe')
+    return f ? { frame:f, what:'the page' } : { why:'Nothing on screen to film.' }
+  }
+  if(opts.length>1 && !opened)
+    return { why:'Open one option first. Film takes one thing at a time, and from the grid it would '
+      +'quietly take the first of '+opts.length+'.' }
+  const o = opened ? opts.find(x=>x.id===opened) : opts[0]
+  if(!o) return { why:'That option is gone.' }
+  const f=grid.querySelector('iframe[data-i="'+opts.indexOf(o)+'"]')
+  return f ? { frame:f, what:nameOf(o) } : { why:'That option is not on screen.' }
+}
+/**
+ * Filming here, in the page, rather than on the machine serving it.
+ *
+ * The server path drives a second headless browser to screenshot the frame ninety times and shells
+ * out to ffmpeg. It renders exactly what chromium renders, which is the reason to keep it, but it
+ * needs two programs installed and neither of them exists on a worker. This path needs nothing: the
+ * frame is already on screen, the browser has been able to encode h264 since 2021, and the clock is
+ * stepped by hand either way, so a frame in the file is still the frame you were looking at.
+ *
+ * What it costs is fidelity. Drawing the dom means going through an svg foreignObject, and the list
+ * of what does not survive that is in raster.mjs and shown to whoever presses the button. Measured
+ * against the server path on four real pages the difference was between 0.02 and 0.46 percent of
+ * pixels, all of it antialiasing, but a page using a backdrop filter would not be so lucky.
+ */
+async function filmHere(frame, want, say){
+  const doc=frame.contentDocument
+  if(!doc) throw new Error('that frame cannot be read from here, so the server has to film it')
+  const [R,M]=await Promise.all([import('/__wall/raster.mjs'),import('/__wall/mp4.mjs')])
+  if(!M.supported()) throw new Error('this browser has no video encoder, so the server has to film it')
+  /* the preview drives its own clock and would fight the raster, so it is held first */
+  try{ frame.contentWindow.postMessage({wall:'hold',t:0,i:0},'*') }catch{}
+  await new Promise(r=>setTimeout(r,120))
+  const total=Math.max(1,Math.round(want.ms/1000*want.fps))
+  say('Reading what it needs')
+  // once for the whole film: refetching a font ninety times is most of the wall clock
+  const inlined=await R.inline(doc,{fetchVia:(u)=>fetch('/__wall/asset?u='+encodeURIComponent(u))})
+  async function* stream(){
+    for(let i=0;i<total;i++){
+      yield await R.rasterize(doc,{width:want.w,height:want.h,
+        ms:Math.round(i/want.fps*1000),inlined})
+    }
+  }
+  // streamed rather than collected: ninety canvases at 1280 by 720 is a third of a gigabyte held
+  // for no reason, when the encoder only ever looks at one of them
+  const bytes=await M.encode(stream(),{width:want.w,height:want.h,fps:want.fps,
+    onProgress:(done)=>say('Drawing frame '+done+' of '+total)})
+  return {bytes,total,notes:(inlined&&inlined.notes)||[],caveats:R.CAVEATS}
+}
+const SHAPES={wide:{w:1280,h:720},square:{w:1080,h:1080},tall:{w:1080,h:1350}}
+let takes=[]
+/* every take kept and switchable, because comparing two is the only reason to shoot a second */
+function showReel(t){
+  document.getElementById('reeltag').textContent=t.name
+  document.getElementById('reelfacts').textContent=t.facts
+  document.getElementById('reelvid').src=t.url
+  const get=document.getElementById('reelget')
+  get.href=t.url; get.setAttribute('download',t.name+'.mp4')
+  document.getElementById('reelnote').textContent=t.note||''
+  const box=document.getElementById('takes')
+  box.innerHTML=takes.length>1?takes.map((x,i)=>'<button class="take'+(x===t?' on':'')
+    +'" data-take="'+i+'">'+esc(x.name)+'</button>').join(''):''
+  box.querySelectorAll('[data-take]').forEach(b=>b.onclick=()=>showReel(takes[Number(b.dataset.take)]))
+  shut(); reel.hidden=false
+}
+document.getElementById('film').onclick=async()=>{
+  const aim=filmable()
+  if(aim.why){ drops.textContent=aim.why; return }
+  const frame=aim.frame
+  const btn=document.getElementById('film'); btn.disabled=true
+  const say=(m)=>{ btn.textContent=m; drops.textContent=m }
+  const base=(APP?(chosen&&chosen.label)||'element':(file||'film')).split('/').pop().replace(/[^A-Za-z0-9_-]+/g,'-')
+  const n=takes.filter(t=>t.name===base||t.name.startsWith(base+' ')).length
+  const name=n?base+' '+(n+1):base
+  const shape=document.getElementById('shape').value
+  const size=SHAPES[shape]||SHAPES.wide
+  const ms=Math.max(1200, span+400), fps=30
+  const here=document.getElementById('filmwhere').value!=='server'
+  try{
+    if(here){
+      say('Filming')
+      const {bytes,total,notes}=await filmHere(frame,{ms,fps,w:size.w,h:size.h},say)
+      const url=URL.createObjectURL(new Blob([bytes],{type:'video/mp4'}))
+      takes.push({ name, url,
+        facts:total+' frames at '+fps+'fps, '+(total/fps).toFixed(1)+'s, '+size.w+' by '+size.h
+          +', of '+aim.what,
+        note:'Drawn in this browser, so nothing was installed and nothing was uploaded.'
+          +(notes.length?' '+notes.length+' asset'+(notes.length>1?'s':'')+' would not load.':'') })
+      showReel(takes[takes.length-1]); drops.textContent=''
+    } else {
+      say('Filming on the server')
+      const r=await post('/__wall/film',{ path:new URL(frame.src).pathname+new URL(frame.src).search,
+        ms, fps, shape, name:base }, 600000)
+      if(r.error){ drops.textContent=r.error }
+      else if(r.mp4){
+        // labelled by what is already in this panel, not by what the server called the directory:
+        // the server counts takes on disk and knows nothing about the ones filmed in the browser
+        takes.push({ name, url:'/__wall/reel?name='+encodeURIComponent(r.name||name)+'&t='+Date.now(),
+          facts:r.frames+' frames at '+fps+'fps, '+(r.frames/fps).toFixed(1)+'s, '+r.size+', of '+aim.what,
+          note:'Rendered by a headless browser, which is what chromium actually paints. '+r.mp4 })
+        showReel(takes[takes.length-1]); drops.textContent=''
+      } else drops.textContent='Filmed '+r.frames+' frames into '+r.at+'. '+(r.why||'')
+    }
+  }catch(e){
+    // said rather than swallowed: the browser path refuses for reasons a person can act on
+    drops.textContent=String(e && e.message||e)
+  }
+  btn.disabled=false; btn.textContent='Film'
+}
+document.getElementById('save').onclick=async()=>{
+  // a rail is a thing worth handing over too, and it was the one result you could not export
+  /* lastIndexOf rather than a pattern. The regex here was /\.[^.]+$/ written inside a template
+     literal, which delivers the browser an unescaped dot that matches any character, so a file
+     called my.component.tsx came back as my.componen */
+  const stem=(v)=>{const k=String(v||'').lastIndexOf('.'); return k>0?String(v).slice(0,k):String(v||'')}
+  const ids = opts.length ? opts.map(o=>o.id) : (cars||[]).filter(c=>c.id).map(c=>c.id)
+  if(!ids.length) return
+  const btn=document.getElementById('save'); btn.textContent='Writing…'
+  const r=await fetch('/__wall/export',{method:'POST',headers:{'content-type':'application/json'},
+    body:JSON.stringify({ids,palette:palette.value,
+      name:stem((APP?(chosen&&chosen.label):file||'').split('/').pop())})}).then(r=>r.json())
+  btn.textContent='Export'
+  drops.textContent='Wrote '+r.at+', '+r.kb+'kb. One file, opens anywhere, no requests.'
+}
+document.getElementById('rate').onchange=e=>{rate=parseFloat(e.target.value)}
+
+function render(){
+  dressHeader()
+  if(viewing==='saved'){ drawSaved(); return }
+  if(cars && cars.some(c=>c.id)){
+    const live=cars.filter(c=>c.id)
+    const ids=live.map(c=>c.id).join(',')
+    const at=live.map(c=>Math.round(c.at)).join(',')
+    const shots=live.map(c=>c.shot||'').join(',')
+    grid.innerHTML='<div class="appwrap"><iframe data-i="0" src="/__wall/railview?ids='+ids
+      +'&at='+at+'&shots='+shots+'&palette='+encodeURIComponent(palette.value)+'"></iframe></div>'
+      + timeline(live)
+    grid.classList.add('railed')
+    // the strip is as tall as it needs to be, and the frame gives up exactly that much
+    const strip=document.getElementById('tl')
+    if(strip) grid.style.setProperty('--tl', (strip.getBoundingClientRect().height+14)+'px')
+    wireTimeline(live)
+    return
+  }
+  if(!opts.length && verdict) return explain()
+  if(!opts.length && APP){
+    /* Rebuilding this markup restarts the navigation, and a heavy site loading two hundred assets
+       responds to that by aborting all of them: measured on vercel, three navigations in a row left
+       the frame on chrome's error page. So the frame is only replaced when the aim has actually
+       changed, and every other render leaves it loading in peace. */
+    const have=grid.querySelector('.appwrap iframe')
+    if(have && have.dataset.n===String(aimN)) return
+    grid.innerHTML='<div class="appwrap"><iframe data-n="'+aimN+'" src="/__wall/app?n='+aimN
+      +(quietMode?'&quiet=1':'')+'"></iframe></div>'
+    watchFrame()
+    return }
+  if(!opts.length){ if(file) return peek()
+    grid.innerHTML='<div class="empty">Type a site or a local address on the left to start.</div>'
+    return }
+  const lens=document.getElementById('depth').value
+  const q='?palette='+encodeURIComponent(palette.value)
+    +(cam.value?'&camera='+cam.value+'&depth='+lens:'')
+  grid.innerHTML=opts.map((o,i)=>
+    '<figure><iframe data-i="'+i+'" src="/__wall/preview/'+o.id+q+'"></iframe>'+
+    /* the verb and the scope moved into the title. Both are worth having and neither helps you
+       choose between five of these, which is the only thing this card is for */
+    '<figcaption><b title="timing from '+esc(o.verb)+'. '+esc(o.scope)+'">'+esc(o.note||'untitled')+'</b>'+
+    '<span class="facts">'+factLine(o)+'</span>'+
+    '<span class="seen">'+seenLine(o)+'</span>'+
+    '<span class="row">'+
+    '<button class="icb" data-open="'+o.id+'" title="'+(opened===o.id?'Close it':'Open it bigger')+'">'
+      +(opened===o.id?ICON.shut:ICON.open)+'</button>'+
+    '<button class="icb" data-more="'+o.id+'" title="More like this one">'+ICON.more+'</button>'+
+    '<button class="icb'+(kept.has(o.id)?' on':'')+'" data-keep="'+o.id+'" title="'
+      +(kept.has(o.id)?'Saved':'Save it')+'">'+(kept.has(o.id)?ICON.kept:ICON.mark)+'</button>'+
+    '</span></figcaption></figure>').join('')
+  grid.classList.remove('railed')
+  grid.classList.toggle('solo', !!opened)
+  if(opened && !opts.some(o=>o.id===opened)) opened=null
+  document.querySelectorAll('figure').forEach((f,i)=>{
+    if(opts[i] && opts[i].id===opened) f.classList.add('up')
+    if(opts[i] && opts[i].id===chosenOpt) f.classList.add('chosen')
+    f.onclick=e=>{
+      if(e.target.closest('button')) return
+      chosenOpt = opts[i] ? opts[i].id : null
+      document.querySelectorAll('figure').forEach(x=>x.classList.remove('chosen'))
+      f.classList.add('chosen')
+      drawInspector()
+    }
+  })
+  /* one option filling the room, because a card three hundred pixels wide is a thumbnail of a
+     decision rather than the decision. Escape comes back, and the transport keeps driving it */
+  document.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>{
+    opened = opened===b.dataset.open ? null : b.dataset.open
+    held.clear(); ends.clear(); render()
+  })
+  document.querySelectorAll('[data-more]').forEach(b=>b.onclick=async()=>{
+    const keep=opts.find(x=>x.id===b.dataset.more)
+    b.textContent='Varying…'; ask.disabled=true
+    try{
+      const r=await post('/__wall/refine',{id:keep.id,count:3},360000)
+      // the one you liked stays on screen, with its variations beside it, so the comparison is real
+      opts=[keep].concat(r.kept); held.clear(); ends.clear(); render()
+      drops.textContent=r.dropped.length? r.dropped.length+' variation'+(r.dropped.length>1?'s':'')
+        +' dropped: '+r.dropped.map(d=>d.why.split('.')[0]).join('; ') : 'Variations of the kept motion.'
+    }catch(e){ drops.textContent = e && e.name==='AbortError'
+      ? 'That took too long and was given up on. The terminal says what it was doing.'
+      : String(e && e.message ? e.message : e) }
+    ask.disabled=false
+  })
+  document.querySelectorAll('[data-keep]').forEach(b=>b.onclick=async(e)=>{
+    e.stopPropagation()
+    const o=opts.find(x=>x.id===b.dataset.keep); if(!o) return
+    if(kept.has(o.id)){ await shelfDrop(o.id); kept.delete(o.id) }
+    else { await shelfPut(record(o)); kept.add(o.id) }
+    b.classList.toggle('on',kept.has(o.id))
+    b.title=kept.has(o.id)?'Saved':'Save it'
+    b.innerHTML=kept.has(o.id)?ICON.kept:ICON.mark
+    countSaved()
+  })
+}
+
+addEventListener('message',e=>{const d=e.data||{}
+  if(d.wall==='held'){held.set(d.i,d.n)
+    // a motion that runs six seconds cannot be scrubbed to its end on a four second ruler, and the
+    // only thing that knows how long it runs is the animation itself
+    if(d.end>0){ends.set(d.i,d.end); const want=Math.max(1200,Math.min(20000,Math.max(...ends.values())+300))
+      if(Math.abs(want-span)>60){span=want;scrub.max=span;document.getElementById('span').textContent=(span/1000).toFixed(1)+'s'}}
+    paint()}
+  if(d.wall==='armed'||d.wall==='disarmed'){
+    const pb=document.getElementById('pick')
+    pb.setAttribute('aria-pressed',d.wall==='armed')
+    /* the label only: setting textContent here used to replace the icon along with the word.
+       And the key is drawn as a key. "Picking, esc to stop" is a sentence you read; a cap sitting
+       in the button is a thing you recognise without reading it, which is what you want from a
+       state you are only in for a couple of seconds */
+    const lbl=pb.querySelector('.lbl')
+    if(d.wall==='armed') lbl.innerHTML='Picking<kbd class="cap">esc</kbd>'
+    else lbl.textContent='Pick'
+    pb.classList.toggle('on',d.wall==='armed')
+  }
+  if(d.wall==='picked'){
+    chosen={html:d.html,css:d.css,shot:d.shot,label:d.label,w:d.w,h:d.h,n:d.n,
+      cut:d.cut,opaque:d.opaque,weak:d.weak}
+    picks.push(chosen)
+    drawSel()
+    paint()
+  }})
+
+/**
+ * The pill shows the element rather than naming it.
+ *
+ * A generated class name is not a description of anything: div.MwJdiW_container.qM tells you which
+ * element the studio thinks you meant only if you happen to know that hash, and on a site built with
+ * css modules or styled components every name looks like that. The element itself is unambiguous, it
+ * is already here with the rules that matched it, and it costs one small frame each.
+ *
+ * Written into the frame rather than handed over as srcdoc, because the markup is full of quotes and
+ * escaping it into an attribute is a bug waiting for the first component with a data attribute in it.
+ */
+const tagOf = (label) => String(label || '').split('.')[0] || 'element'
+const esc = (v) => String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;')
+const svg = (d,fill) => '<svg viewBox="0 0 16 16" width="13" height="13" fill="'+(fill||'none')
+  +'" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">'
+  +'<path d="'+d+'"/></svg>'
+const ICON={
+  open: svg('M6.2 2.4H2.4v3.8M9.8 13.6h3.8v-3.8M13.6 6.2V2.4H9.8M2.4 9.8v3.8h3.8'),
+  shut: svg('M2.4 6.2h3.8V2.4M13.6 9.8H9.8v3.8M9.8 2.4v3.8h3.8M6.2 13.6V9.8H2.4'),
+  more: svg('M8 1.9l1.5 4 4 1.5-4 1.5L8 12.9 6.5 8.9l-4-1.5 4-1.5z'),
+  mark: svg('M4 2.6h8v11.2l-4-2.7-4 2.7z'),
+  kept: svg('M4 2.6h8v11.2l-4-2.7-4 2.7z','currentColor'),
+  down: svg('M8 2.6v8.1M4.9 7.6L8 10.7l3.1-3.1M3 13.2h10'),
+  drop: svg('M4.6 4.6l6.8 6.8M11.4 4.6l-6.8 6.8'),
+  code: svg('M5.6 5.2L2.6 8l3 2.8M10.4 5.2L13.4 8l-3 2.8M9.2 3.4l-2.4 9.2'),
+}
+/* one place that puts bytes on somebody's disk, since three buttons wanted it and each writing its
+   own anchor is three chances to leak an object url */
+function give(text, name, type){
+  const url=URL.createObjectURL(new Blob([text],{type}))
+  const a=document.createElement('a')
+  a.href=url; a.download=name; a.click()
+  setTimeout(()=>URL.revokeObjectURL(url),4000)
+}
+const slug=(v)=>String(v||'motion').replace(/[^A-Za-z0-9]+/g,'-').replace(/^-|-$/g,'').toLowerCase()
+
+/**
+ * Motions you kept, in the browser.
+ *
+ * These belong to you rather than to the session, so they outlive the server: restart the studio,
+ * aim it somewhere else, come back tomorrow, and what you saved is still there. In IndexedDB rather
+ * than localStorage because a saved motion carries the element's markup and its css, which is tens
+ * of kilobytes each, and forty of them would fill the five megabytes localStorage allows.
+ *
+ * Every record is self contained on purpose. Rendering one asks the server for nothing, so a saved
+ * motion still plays when whatever produced it is long gone, and the whole shelf is a folder of
+ * finished work rather than a list of ids that used to mean something.
+ */
+const DB='wall', SHELF='saved'
+function shelf(){
+  if(dbp) return dbp
+  dbp=new Promise((ok,no)=>{
+    const rq=indexedDB.open(DB,1)
+    rq.onupgradeneeded=()=>{ const d=rq.result
+      if(!d.objectStoreNames.contains(SHELF)) d.createObjectStore(SHELF,{keyPath:'id'}) }
+    rq.onsuccess=()=>ok(rq.result); rq.onerror=()=>no(rq.error)
+  })
+  return dbp
+}
+const shelfDo=(mode,fn)=>shelf().then(d=>new Promise((ok,no)=>{
+  const t=d.transaction(SHELF,mode), r=fn(t.objectStore(SHELF))
+  t.oncomplete=()=>ok(r&&r.result); t.onerror=()=>no(t.error)
+}))
+const shelfPut=(rec)=>shelfDo('readwrite',st=>st.put(rec))
+const shelfDrop=(id)=>shelfDo('readwrite',st=>st.delete(id))
+const shelfAll=()=>shelfDo('readonly',st=>st.getAll())
+  .then(l=>(l||[]).sort((a,b)=>b.at-a.at))
+
+/* what has to travel with a motion for it to still be one later */
+const record=(o)=>({
+  id:o.id, note:o.note||'untitled', css:o.css, scope:o.scope, verb:o.verb,
+  tempo:o.tempo, seen:o.seen, at:Date.now(), palette:palette.value,
+  from:(chosen&&chosen.label)||file||'',
+  src:{ shot:(chosen&&chosen.shot)||'', html:(chosen&&chosen.html)||'',
+    css:(chosen&&chosen.css)||'', w:(chosen&&chosen.w)||0 },
+})
+
+/**
+ * One document, no requests, built here rather than asked for.
+ *
+ * The snapshot is preferred over the markup for the same reason the server's preview prefers it: it
+ * carries every computed value on the element, so it cannot be let down by a rule that was not
+ * collected, and it needs no stylesheet from the page it came from.
+ */
+function standalone(r){
+  const body=(r.src&&(r.src.shot||r.src.html))||''
+  const cut=body.indexOf('>')
+  // the attribute the css is scoped to, put on the first tag, which is what the server does too
+  const scoped=(r.scope&&cut>0)?body.slice(0,cut)+' '+r.scope+body.slice(cut):body
+  const sheet=((r.src&&r.src.shot)?'':((r.src&&r.src.css)||''))+' '+(r.css||'')
+  return '<!doctype html><meta charset="utf-8"><style>'
+    +'html,body{margin:0;height:100%;background:#0f1011;overflow:hidden}'
+    +'#w{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:'
+    +((r.src&&r.src.w)||600)+'px}'
+    +sheet+'</style><div id="w">'+scoped+'</div>'
+    +'<scr'+'ipt>var w=document.getElementById("w"),b=w.getBoundingClientRect(),'
+    +'s=Math.min(1,(innerWidth-16)/Math.max(b.width,1),(innerHeight-16)/Math.max(b.height,1));'
+    +'w.style.transform="translate(-50%,-50%) scale("+s.toFixed(3)+")";'
+    /* played on a loop with a pause between passes. A motion runs once and is over in under a
+       second, so a shelf of them was a shelf of finished states: you had to reload the page to see
+       what you had saved. The pause matters as much as the repeat, because a motion restarting the
+       instant it lands reads as a stutter rather than as the same move happening again. */
+    /* a motion written to repeat forever is left alone. Restarting one every second and a half
+       would cut it off mid pass, which is the opposite of the problem this solves */
+    +'function span(){var e=0,forever=false;document.getAnimations().forEach(function(a){'
+    +'var t=a.effect&&a.effect.getComputedTiming();if(!t)return;'
+    +'if(!isFinite(t.endTime)){forever=true;return}e=Math.max(e,t.endTime)});'
+    +'return e?e:(forever?0:900)}'
+    +'function again(){document.getAnimations().forEach(function(a){'
+    +'try{a.currentTime=0;a.play()}catch(_){}})}'
+    +'setTimeout(function(){var d=span();if(d)setInterval(again,d+700)},60);</scr'+'ipt>'
+}
+async function countSaved(){
+  const n=(await shelfAll().catch(()=>[])).length
+  const badge=document.getElementById('savedn'); if(badge) badge.textContent=n||''
+}
+async function drawSaved(){
+  const list=await shelfAll().catch(()=>[])
+  kept=new Set(list.map(r=>r.id))
+  const badge=document.getElementById('savedn'); if(badge) badge.textContent=list.length||''
+  grid.classList.remove('railed'); grid.classList.remove('solo')
+  grid.innerHTML=list.length
+    ? list.map(r=>'<figure><iframe data-kept="'+esc(r.id)+'" scrolling="no"></iframe>'
+      +'<figcaption><b title="'+esc(r.from)+'">'+esc(r.note)+'</b>'
+      +'<span class="facts">'+(r.tempo?factLine(r):'')+'</span>'
+      +'<span class="seen">'+(r.seen?seenLine(r):'')+'</span>'
+      +'<span class="row">'
+      +'<button class="icb" data-gethtml="'+esc(r.id)+'" title="Download it as one file that '
+      +'opens anywhere">'+ICON.down+'</button>'
+      +'<button class="icb" data-getcss="'+esc(r.id)+'" title="Download just the css">'+ICON.code+'</button>'
+      +'<button class="icb" data-forget="'+esc(r.id)+'" title="Remove it from saved">'+ICON.drop+'</button>'
+      +'</span></figcaption></figure>').join('')
+    : '<div class="empty">Nothing saved yet. The bookmark on a motion keeps it here, '
+      +'and it stays after the studio is restarted.</div>'
+  // srcdoc after the markup exists, never while it is being built
+  for(const f of grid.querySelectorAll('[data-kept]')){
+    const r=list.find(x=>x.id===f.dataset.kept); if(r) f.srcdoc=standalone(r)
+  }
+  grid.querySelectorAll('[data-forget]').forEach(b=>b.onclick=async()=>{
+    await shelfDrop(b.dataset.forget); kept.delete(b.dataset.forget); drawSaved()
+  })
+  /* written here rather than fetched: the whole record is already in this page, so asking a server
+     to hand back something it does not have any more would only be a way for this to stop working */
+  /**
+   * Downloaded as the thing itself.
+   *
+   * The same document the tile is playing, which is one file that opens anywhere and asks the
+   * network for nothing. A stylesheet is the right handoff to an agent and the wrong one to a
+   * person who wanted to keep what they were just looking at, so both are offered and the file is
+   * the one on the left.
+   */
+  grid.querySelectorAll('[data-gethtml]').forEach(b=>b.onclick=()=>{
+    const r=list.find(x=>x.id===b.dataset.gethtml); if(!r) return
+    give(standalone(r), slug(r.note)+'.html', 'text/html')
+  })
+  grid.querySelectorAll('[data-getcss]').forEach(b=>b.onclick=()=>{
+    const r=list.find(x=>x.id===b.dataset.getcss); if(!r) return
+    give('/* '+r.note+String.fromCharCode(10)+'   add '+r.scope+' to the root element */'
+      +String.fromCharCode(10)+r.css, slug(r.note)+'.css', 'text/css')
+  })
+}
+
+/**
+ * The arm light.
+ *
+ * An interference field evaluated per pixel and blurred into the button, rather than a gradient
+ * swept across it: a sweep repeats on a period you start counting after the third pass, and a field
+ * does not repeat. It runs only while something is selected, which is the moment the button is worth
+ * looking at, and stops when the tab is hidden so it is not a battery cost for a background window.
+ */
+function armGlow(on){
+  const c=document.getElementById('askfield'); if(!c) return
+  document.getElementById('ask').classList.toggle('armed',!!on)
+  if(!on){ if(glowing) cancelAnimationFrame(glowing); glowing=0; c.style.opacity=0; return }
+  if(glowing) return
+  const W=44,H=11,g=c.getContext('2d')
+  c.width=W; c.height=H
+  const img=g.createImageData(W,H), d=img.data
+  let t=0
+  const step=()=>{
+    if(!document.body.contains(c)||document.hidden){ glowing=0; c.style.opacity=0; return }
+    t+=0.03
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+      const q=Math.sin(x*0.19+t*1.05)+Math.cos(y*0.44-t*0.72)
+      const r=Math.sin((x*0.1+y*0.22)+q*0.9+t*0.6)
+      let a=(Math.sin(x*0.07-y*0.14+r*1.7+t*0.42)+1)/2
+      a=a*a*(3-2*a); a=a*a
+      const i=(y*W+x)*4
+      d[i]=110+a*130; d[i+1]=120+a*120; d[i+2]=238; d[i+3]=a*170
+    }
+    g.putImageData(img,0,0); c.style.opacity=1
+    glowing=requestAnimationFrame(step)
+  }
+  glowing=requestAnimationFrame(step)
+}
+
+/**
+ * The header, carrying only what there is something to do with.
+ *
+ * A transport, an inspector, a film button and an export sitting above an empty room are four
+ * controls that do nothing yet, and they were the first thing anybody saw. With nothing to play,
+ * the only two things worth offering are picking something and asking for motion.
+ */
+function dressHeader(){
+  const playing = opts.length>0 || !!(cars && cars.some(c=>c.id))
+  document.querySelector('header').classList.toggle('bare', !playing || viewing==='saved')
+}
+
+/* innerHTML does not run a script tag, so the field is driven by a function the page already has */
+function runShader(){ try { eval(SHADER) } catch(e) { /* the wait is cosmetic, never fatal */ } }
+
+function paintShots(){
+  for (const f of document.querySelectorAll('[data-shot]')){
+    const p = picks[Number(f.dataset.shot)]; if(!p) continue
+    const d = f.contentDocument; if(!d) continue
+    d.open()
+    d.write('<html><head><meta charset="utf-8"><style>'
+      + 'html,body{margin:0;height:100%;overflow:hidden}'
+      + '#s{position:absolute;left:50%;top:50%;transform-origin:center center;width:'
+      + (p.w||600) + 'px}'
+      + (p.shot ? '' : p.css)
+      + '</style></head><body><div id="s">' + (p.shot || p.html) + '</div><scr' + 'ipt>'
+      + 'var el=document.getElementById("s");'
+      + 'var k=el.firstElementChild;'
+      + 'if(k){var c=getComputedStyle(k);'
+      + 'if(c.position==="fixed"||c.position==="absolute"||c.position==="sticky"){'
+      + 'k.style.position="relative";k.style.inset="auto"}}'
+      + 'var r=el.getBoundingClientRect();'
+      + 'var s=Math.min(1,(innerWidth-4)/Math.max(r.width,1),(innerHeight-4)/Math.max(r.height,1));'
+      + 'el.style.transform="translate(-50%,-50%) scale("+s.toFixed(4)+")";'
+      + '</scr' + 'ipt></body></html>')
+    d.close()
+  }
+}
+
+/**
+ * The sequence, drawn.
+ *
+ * A rail is a composition and it was being presented as a stack of boxes, with the order encoded in
+ * an invisible constant: every car started 420ms after the one above it and nothing said so or let
+ * you change it. Which is to say the one thing a rail is actually for, deciding what happens when,
+ * was the one thing you could not see or touch.
+ *
+ * So each car is a bar, placed where it starts and as long as it runs. Drag one and that car moves in
+ * time. The playhead is the same scrubber that drives the previews, so what you read here and what
+ * you watch above it are the same clock.
+ */
+function railSpan(live){
+  return Math.max(1200, ...live.map(c=>c.at + (c.ms||600))) * 1.04
+}
+function timeline(live){
+  const total=railSpan(live)
+  return '<div class="tl" id="tl"><div class="tlhead">Sequence &middot; click a row to adjust it, '
+    + 'drag a bar to move it in time</div>'
+    + live.map((c,i)=>'<div class="tlrow'+(c.id===chosenOpt?' on':'')+'" data-row="'+i+'">'
+        +'<span class="grip" data-grip="'+i+'" title="drag to reorder">&#8942;&#8942;</span>'
+        +'<span class="tlname" title="'+(c.note||'')+'">'
+        +((c.note||c.label||'').split(',')[0]).slice(0,24)+'</span>'
+        +'<span class="tlcam'+(c.shot?' on':'')+'">'
+        +(CAMS.find(x=>x[0]===(c.shot||''))||CAMS[0])[1]+'</span>'
+        +'<span class="tltrack" data-track="'+i+'">'
+        +'<span class="tlbar" data-bar="'+i+'" style="left:'+(c.at/total*100).toFixed(2)+'%;'
+        +'width:'+Math.max(2,(c.ms||600)/total*100).toFixed(2)+'%">'
+        +'<i>'+(c.at/1000).toFixed(2)+'s</i></span></span></div>').join('')
+    + '<div class="tlfoot"><span>0s</span><span>'+(total/1000).toFixed(1)+'s</span></div>'
+    + '<div class="tlhead" id="tlplay"></div></div>'
+}
+function selectRow(i, live){
+  const c=live[i]; if(!c) return
+  chosenOpt=c.id
+  document.querySelectorAll('.tlrow').forEach((r,j)=>r.classList.toggle('on', j===i))
+  shut(); insp.hidden=false
+  drawInspector()
+}
+function wireTimeline(live){
+  const total=railSpan(live)
+  /**
+   * Order, dragged.
+   *
+   * Offsets say when a car starts and order says where it sits in the film, and they are not the same
+   * decision: two cars can begin together and still need one above the other. Reordering swaps their
+   * places in the rail and leaves each one's offset alone, so moving a car does not silently retime it.
+   */
+  /**
+   * Clicking a row aims the inspector at that car, which is where its camera and its timing both
+   * live now.
+   *
+   * The bar is not excluded from this even though the bar is also the drag handle. It is the most
+   * obvious thing in the row to click, it sits across the middle of it, and a first version that
+   * ignored clicks landing on it meant aiming at the centre of a row did nothing at all. A press
+   * that never moves is a click and selects; one that moves is a drag and retimes.
+   */
+  for (const row of document.querySelectorAll('.tlrow')){
+    row.onclick=e=>{
+      // always, or the document listener below closes the panel this just opened
+      e.stopPropagation()
+      if(e.target.closest('[data-grip]')) return
+      selectRow(Number(row.dataset.row), live)
+    }
+  }
+  for (const grip of document.querySelectorAll('[data-grip]')){
+    grip.onpointerdown=e=>{
+      e.preventDefault()
+      const from=Number(grip.dataset.grip)
+      const rows=[...document.querySelectorAll('.tlrow')]
+      const tops=rows.map(r=>r.getBoundingClientRect().top+r.getBoundingClientRect().height/2)
+      rows[from].classList.add('lifting')
+      let to=from
+      const move=ev=>{
+        to=tops.reduce((best,t,i)=>Math.abs(ev.clientY-t)<Math.abs(ev.clientY-tops[best])?i:best,from)
+        rows.forEach((r,i)=>r.style.outline = i===to&&i!==from ? '1px solid var(--accent)' : '')
+      }
+      const up=()=>{
+        window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up)
+        rows[from].classList.remove('lifting'); rows.forEach(r=>r.style.outline='')
+        if(to!==from){
+          mark('reordering the rail')
+          const order=cars.filter(c=>c.id)
+          order.splice(to,0,order.splice(from,1)[0])
+          const rest=cars.filter(c=>!c.id)
+          cars=order.concat(rest)
+          held.clear(); ends.clear(); render()
+        }
+      }
+      window.addEventListener('pointermove',move); window.addEventListener('pointerup',up)
+    }
+  }
+  for (const bar of document.querySelectorAll('[data-bar]')){
+    bar.onpointerdown=e=>{
+      e.preventDefault()
+      const i=Number(bar.dataset.bar), track=bar.parentElement
+      const w=track.getBoundingClientRect().width, from=e.clientX, was=live[i].at
+      let stepped=false
+      const move=ev=>{
+        if(!stepped){ stepped=true; mark('moving '+nameOf(live[i])+' in time') }
+        const at=Math.max(0, was + (ev.clientX-from)/w*total)
+        live[i].at=at
+        bar.style.left=(at/total*100).toFixed(2)+'%'
+        bar.querySelector('i').textContent=(at/1000).toFixed(2)+'s'
+      }
+      const up=()=>{
+        window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up)
+        if(!stepped) return selectRow(i, live)
+        // only reload the frame when the drag ends, or every pixel would restart the page
+        held.clear(); ends.clear(); render()
+      }
+      /* on the window rather than on the bar with a pointer capture: the cursor leaves a twelve
+         pixel bar within one frame of any real drag, and capture was not holding it. Synthetic
+         events fired straight at the bar worked, which is exactly the shape of bug that passes a
+         unit test and fails a hand */
+      window.addEventListener('pointermove',move); window.addEventListener('pointerup',up)
+    }
+  }
+}
+
+/* the selection, which is the thing a rail is built out of */
+function drawSel(){
+  const el=document.getElementById('sel')
+  if(!picks.length){ el.innerHTML=''; ask.querySelector('.lbl').textContent='Give it motion'
+    armGlow(false); return }
+  el.innerHTML='<p class="selhead">Selection'+(picks.length>1?' &middot; '+picks.length:'')+'</p>'
+    +picks.map((p,i)=>'<span class="pill"><b>'+(i+1)+'</b>'
+      +'<span class="shot"><iframe data-shot="'+i+'" scrolling="no" tabindex="-1"></iframe></span>'
+      +'<span class="who"><em>'+tagOf(p.label)+'</em><i>'+p.w+'&times;'+p.h
+      +(p.cut?' &middot; trimmed':'')+'</i>'
+      +(p.weak?'<u>'+p.weak+'</u>':'')
+      +(p.opaque?'<u>'+p.opaque+' sheet'+(p.opaque>1?'s':'')+' unreadable</u>':'')+'</span>'
+      +'<button data-drop="'+i+'" title="remove">&times;</button></span>').join('')
+    +(picks.length>1?'<p class="hint">One motion each, on one timeline, a beat apart.</p>':'')
+    +(picks.some(x=>x.weak)?'<p class="hint">Little inside to stagger. A row of cards or a list '
+      +'gives motion more to work with.</p>':'')
+  // after the markup exists, not in the middle of building it
+  paintShots()
+  el.querySelectorAll('[data-drop]').forEach(b=>b.onclick=()=>{
+    mark('removing '+tagOf(picks[Number(b.dataset.drop)].label))
+    picks.splice(Number(b.dataset.drop),1); chosen=picks[picks.length-1]||null
+    cars=null; opts=[]; drawSel(); render() })
+  ask.querySelector('.lbl').textContent=picks.length>1?'Give them motion':'Give it motion'
+  armGlow(picks.length>0)
+}
+function paint(){
+  /* only the previews in the grid: the sidebar thumbnails and the proxied app are iframes too, and
+     counting them made the readout say 3 of 5 driven when all five were fine. That is the wandering
+     number I could not pin down all session, and it was this */
+  /* a preview inside a hidden figure stops running and stops replying, so counting it says one of
+     two are driven when the one you are looking at is fine */
+  const frames=[...document.querySelectorAll('.grid iframe')].filter(f=>f.offsetParent!==null)
+  if(!opts.length&&!(cars&&cars.some(c=>c.id))){
+    link.removeAttribute('data-ok'); link.title='nothing to drive yet'; return }
+  /* counted over the frames that are actually on screen rather than over everything the map still
+     remembers, or closing an opened option reports five of one */
+  const live=frames.filter((f,i)=>(held.get(i)||0)>0).length
+  const all=live===frames.length
+  link.setAttribute('data-ok', all?'yes':'no')
+  link.title=live+' of '+frames.length+' previews are being driven by the scrubber'
+}
+function hold(ms){
+  ;[...document.querySelectorAll('.grid iframe')].filter(f=>f.offsetParent!==null).forEach((f,i)=>{
+    try{f.contentWindow.postMessage({wall:'hold',t:ms,i},'*')}catch(_){}
+  })
+  scrub.value=ms; at.textContent=(ms/1000).toFixed(2)
+}
+function face(){document.getElementById('glyph').textContent=running?'❚❚':'▶'
+  play.title=running?'Pause (space)':'Play (space)'}
+/* last, because everything below reads state and functions declared throughout this script, and
+   three separate dead zone faults in one sitting all came from booting something too early */
+shelfAll().then(l=>{ kept=new Set(l.map(r=>r.id))
+  const badge=document.getElementById('savedn'); if(badge) badge.textContent=l.length||''
+  if(opts.length) render()
+}).catch(()=>{})
+
+requestAnimationFrame(function tick(now){const s=now-last;last=now
+  if(running){t=(t+s*rate)%span;hold(t)} requestAnimationFrame(tick)})
+play.onclick=()=>{running=!running;face()}
+scrub.oninput=()=>{running=false;face();t=Number(scrub.value);hold(t)}
+addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT'&&e.target.type!=='range')return
+  // escape leaves pick mode from either side: the frame has its own handler, but the pointer being
+  // over the frame does not mean the frame has focus, and a key that works only sometimes reads broken
+  if(e.key==='Escape'&&opened){ opened=null; held.clear(); ends.clear(); render(); return }
+  if(e.key==='Escape'&&document.getElementById('pick').getAttribute('aria-pressed')==='true'){
+    const f=document.querySelector('.appwrap iframe')
+    if(f) f.contentWindow.postMessage({wall:'nopick'},'*')
+    return
+  }
+  if(e.target.tagName==='INPUT'&&e.target.type==='range')return
+  if(e.key===' '){e.preventDefault();play.click()}
+  if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();running=false;face()
+    t=Math.max(0,Math.min(span,t+(e.key==='ArrowRight'?100:-100)));hold(t)}})
+<\/script></body></html>`
