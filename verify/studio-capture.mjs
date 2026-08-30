@@ -218,6 +218,22 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
   ok('placing one does not move it in time, because where and when are different decisions',
     A.resolve(put).at[1] === A.resolve(stack).at[1])
 
+  console.log('\n  an arrangement read back from where it was stored')
+  const away = JSON.parse(JSON.stringify(A.placed(A.retimed(
+    arrange([car('a', 0, 400), car('b', 800, 400)]), 1, { after: { key: 'a', mode: 'after', gap: 50 } }),
+  1, { x: 20, y: 60, w: 45 })))
+  const back = A.revive(away)
+  ok('what it was is what comes back', A.resolve(back).at[1] === 450, `${A.resolve(back).at}`)
+  ok('including where each component was put',
+    back.cars[1].place.x === 20 && back.cars[1].place.w === 45)
+  /* everything here leans on the motions being frozen, and json carries values and not that promise.
+     A record that came back thawed would take a write in silence instead of throwing */
+  let stillFrozen = false
+  try { back.cars[0].motion.ms = 1 } catch { stillFrozen = true }
+  ok('and the motions are frozen again, which json does not carry',
+    stillFrozen || back.cars[0].motion.ms === 400)
+  ok('nonsense is refused rather than half restored', A.revive(null) === null && A.revive({}) === null)
+
   console.log('\n  the value')
   const built = A.fromRail([
     { id: 'm1', note: 'one', tempo: { span: 400 }, label: 'div.Card',
@@ -626,6 +642,55 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
       (await room.evaluate(() => arr.cars[1].place)) === null)
 
     ok('the timeline drives without complaint', said.length === 0, said.join('; ').slice(0, 60))
+
+    /**
+     * The studio restarting under a page that is already open.
+     *
+     * npm run studio watches its own sources, so an edit bounces the process in about half a second
+     * while the tab carries on with the javascript it loaded. A dynamic import is cached for the life
+     * of a document, so a change to arrange or raster is not in that tab at all and the studio and
+     * the page disagree with nothing saying so. That is how a fix can land, be checked, and still not
+     * be what somebody is looking at.
+     *
+     * So the page reloads when the boot answering it changes, which is only bearable because the work
+     * is left with the server first. Both halves are checked here, in that order.
+     */
+    const held = () => room.evaluate(() => ({
+      picks: picks.length,
+      at: arr ? ARR.resolve(arr).at.map(Math.round) : null,
+      place: arr ? arr.cars.map((c) => (c.place ? Math.round(c.place.x) : -1)) : null,
+    }))
+    await room.evaluate(async () => {
+      await arriving
+      picks = [1, 2, 3].map((n) => ({ label: `div.card${n}`, html: '<div></div>', css: '', shot: '', w: 520, h: 110 }))
+      arr = ARR.fromRail([1, 2, 3].map((n) => ({
+        id: String(n), note: `card ${n}`, tempo: { span: 400 }, label: `div.card${n}` })), picks)
+      arr = ARR.placed(ARR.moved(ARR.moved(arr, 1, 800), 2, 1600), 2, { x: 20, y: 60, w: 45 })
+      zoom = 0; choose([]); rails = []; railN = 0; drawSel(); render()
+    })
+    await room.waitForTimeout(1500)
+    const wasThere = await held()
+    await room.reload({ waitUntil: 'load' })
+    await room.waitForTimeout(2200)
+    const cameBack = await held()
+    ok('a composition survives the page being reloaded under it',
+      JSON.stringify(cameBack) === JSON.stringify(wasThere),
+      `${JSON.stringify(wasThere)} then ${JSON.stringify(cameBack)}`)
+
+    // the studio bounced exactly the way an edit bounces it
+    for (const pid of spawnSync('lsof', ['-ti', `tcp:${XPORT}`], { encoding: 'utf8' })
+      .stdout.split('\n').filter(Boolean).filter((v) => v !== String(process.pid))) {
+      try { process.kill(Number(pid), 'SIGKILL') } catch { /* gone */ }
+    }
+    const again = spawn('node', [resolve('tools/studio.mjs'), resolve('examples/components')],
+      { cwd: bed, env: { ...process.env, WALL_PORT: String(XPORT), WALL_NO_OPEN: '1' }, stdio: 'ignore' })
+    process.on('exit', () => { try { again.kill('SIGKILL') } catch { /* gone */ } })
+    await room.waitForTimeout(9000)
+    const afterBounce = await held()
+    ok('and the page reloads itself when a different studio starts answering it',
+      JSON.stringify(afterBounce) === JSON.stringify(wasThere),
+      `${JSON.stringify(afterBounce)}`)
+    try { again.kill('SIGKILL') } catch { /* gone */ }
     await seat.close()
   }
   shut()

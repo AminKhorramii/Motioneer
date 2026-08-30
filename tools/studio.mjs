@@ -1273,16 +1273,27 @@ const saveSoon = () => {
          two each is sixteen before anybody asks for a variation, and a restore that drops one leaves
          a row offering an alternative the store can no longer serve */
       const recent = [...made.entries()].slice(-80)
-      writeFileSync(SESSION_AT, JSON.stringify({ at: Date.now(), aim: AIM, nextId, made: recent }))
+      writeFileSync(SESSION_AT,
+        JSON.stringify({ at: Date.now(), aim: AIM, nextId, made: recent, bench }))
     } catch { /* a session that cannot be written is not a reason to stop working */ }
   }, 400)
 }
+/**
+ * What the page had on screen, held for it across a restart.
+ *
+ * The options survived a restart and the composition did not, which is the wrong way round: the
+ * options are a few model calls and the arrangement is those plus every decision made about them.
+ * This is opaque here on purpose. The server is a shelf for it, not a second opinion about it, and
+ * the page is the only thing that knows what an arrangement means.
+ */
+let bench = null
 const resumed = (() => {
   try {
     const was = JSON.parse(readFileSync(SESSION_AT, 'utf8'))
     if (!was || Date.now() - was.at > WARM) return null
     for (const [id, o] of was.made ?? []) made.set(id, o)
     nextId = Math.max(nextId, Number(was.nextId) || 0)
+    bench = was.bench ?? null
     if (was.aim) aimAt(was.aim)
     return was
   } catch { return null }
@@ -2000,6 +2011,25 @@ const server = createServer(async (req, res) => {
      * changes it is talking to a different process than the one that served it, which is the only
      * reliable signal that the code under it moved.
      */
+    /**
+     * The page's own work, left with the server so a restart does not cost it.
+     *
+     * npm run studio watches its sources, so editing one bounces the process in about half a second
+     * while the browser tab carries on with the javascript it already has. Anything the page is
+     * holding in variables is only there until it reloads, and it has to reload, because a tab
+     * running the code from before the edit is a tab that disagrees with the studio serving it.
+     */
+    if (url.pathname === '/__wall/work') {
+      if (req.method === 'POST') {
+        const body = await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) })
+        try { bench = JSON.parse(body) } catch { bench = null }
+        saveSoon()
+        return json(res, { kept: !!bench })
+      }
+      // only while it is warm, so opening the studio tomorrow is a fresh start rather than a haunting
+      const warm = bench && Date.now() - BOOT < WARM
+      return json(res, warm || resumed ? (bench ?? {}) : {})
+    }
     if (url.pathname === '/__wall/live') {
       res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache',
         connection: 'keep-alive' })

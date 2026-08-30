@@ -102,6 +102,32 @@ export function placed(arr, i, at) {
 /** whether anybody has been moved, which is what tells a stage from a stack */
 export const staged = (arr) => live(arr).some((x) => !!x.car.place)
 
+/**
+ * An arrangement read back from somewhere it was stored, made trustworthy again.
+ *
+ * Everything here relies on the motion records being frozen, which is what makes sharing them across
+ * every history step safe. json carries the values and not that promise, so anything that has been
+ * through a file has to have it put back, or the first write through a shared record after a restart
+ * would be silent instead of a throw.
+ */
+export function revive(said) {
+  if (!said || !Array.isArray(said.cars)) return null
+  const cars = said.cars.map((c, i) => ({
+    key: String(c.key || `c${i + 1}`),
+    pick: Object.freeze({ ...(c.pick || { label: 'element' }) }),
+    motion: c.motion ? Object.freeze({ ...c.motion }) : null,
+    alternatives: Object.freeze((c.alternatives || []).map((m) => Object.freeze({ ...m }))),
+    at: Math.max(0, num(c.at)),
+    after: c.after && c.after.key ? { ...c.after } : null,
+    shot: String(c.shot || ''),
+    tune: c.tune || null,
+    place: c.place ? { ...c.place } : null,
+    why: String(c.why || ''),
+  }))
+  return { id: String(said.id || 'a1'), cars, camera: String(said.camera || ''),
+    markers: (said.markers || []).map(num) }
+}
+
 /** a name no car in this arrangement is using, for a copy that must not answer to the original's */
 export function freshKey(arr) {
   let n = 0

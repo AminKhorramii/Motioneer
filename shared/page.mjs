@@ -500,6 +500,10 @@ let ends=new Map(), span=4200, rate=1
    thumbnails live inside .grid too, and counting them would post hold to a still picture and, far
    worse, shift the index every rail frame is addressed by, since held and ends are keyed by position */
 const DRIVEN='.grid .appwrap iframe, .grid figure iframe'
+/* declared up here with the rest of the state, not beside keepWork at the foot of the file: render
+   runs once during boot, render leaves the work, and a let read before its line has run kills the
+   whole page script and takes every listener below it with it */
+let keeping=null
 let opened=null   // the option filling the room, or null for the grid
 let aimN=0   // bumped on every aim so the frame refetches instead of reusing the last page
 let quietMode=false
@@ -1369,6 +1373,8 @@ document.getElementById('rate').onchange=e=>{rate=parseFloat(e.target.value)}
 
 function render(){
   dressHeader()
+  /* every change ends in a render, so this is the one place worth leaving the work from */
+  keepWork()
   if(viewing==='saved'){ drawSaved(); return }
   if(railed()){
     const live=ARR.live(arr)
@@ -2366,6 +2372,69 @@ shelfAll().then(l=>{ kept=new Set(l.map(r=>r.id))
   const badge=document.getElementById('savedn'); if(badge) badge.textContent=l.length||''
   if(opts.length) render()
 }).catch(()=>{})
+
+/**
+ * The composition left with the server so a restart does not cost it, and the page reloading itself
+ * when the studio underneath it has moved.
+ *
+ * npm run studio watches its own sources, so editing one bounces the process in about half a second
+ * while this tab carries on with the javascript it already loaded. That is worse than it sounds: a
+ * dynamic import is cached for the life of a document, so a change to arrange or raster is simply
+ * not in a tab that was open when it landed, and the studio and the page it served disagree with
+ * nothing saying so. It is the fault CLAUDE.md warns about for processes, one process along.
+ *
+ * So the page reloads when the boot answering it changes, and the work is put back afterwards.
+ * Reloading without that would trade a silent wrongness for a loud loss.
+ */
+function keepWork(){
+  if(keeping) return
+  keeping=setTimeout(()=>{
+    keeping=null
+    try{ fetch('/__wall/work',{method:'POST',headers:{'content-type':'application/json'},
+      body:JSON.stringify({picks,arr,rails,railN,zoom,chosenOpt})}).catch(()=>{}) }catch(_){}
+  },600)
+}
+async function putBack(){
+  try{
+    const was=await fetch('/__wall/work').then(r=>r.json())
+    if(!was||!was.picks||!was.picks.length) return
+    await arriving
+    picks=was.picks; chosen=picks[picks.length-1]||null
+    arr=was.arr?ARR.revive(was.arr):null
+    rails=(was.rails||[]).map(t=>ARR.revive(t)).filter(Boolean)
+    railN=Math.min(Number(was.railN)||0,Math.max(0,rails.length-1))
+    zoom=Number(was.zoom)||0; chosenOpt=was.chosenOpt===undefined?null:was.chosenOpt
+    sel=new Set(); lead=null; anchor=null
+    /* an arrangement points at motions by id and the store keeps the last eighty, so one that has
+       been evicted would ask for a frame the server answers with gone. Said, rather than shown as
+       an empty room somebody has to work out for themselves */
+    if(arr&&ARR.live(arr).length){
+      const on=ARR.live(arr)
+      const there=await Promise.all(on.map(x=>fetch('/__wall/preview/'+x.car.motion.id)
+        .then(r=>r.ok).catch(()=>false)))
+      const lost=there.filter(v=>!v).length
+      if(lost===on.length){ arr=null; rails=[]
+        drops.textContent='The motions from before are past the studio memory, so the rail is gone. '
+          +'The picks are still here, so asking again is one press.' }
+      else if(lost) drops.textContent=lost+' of '+on.length
+        +' motions are past the studio memory, so those rows will not play.'
+    }
+    drawSel(); render(); drawInspector()
+  }catch(_){ /* nothing to put back is the ordinary case, and not worth saying */ }
+}
+putBack()
+/* a different process answering is the only reliable sign that the code under this page moved */
+try{
+  const watch=new EventSource('/__wall/live')
+  let born=null
+  watch.onmessage=(e)=>{
+    try{
+      const said=JSON.parse(e.data||'{}')
+      if(born===null){ born=said.boot; return }
+      if(said.boot&&said.boot!==born){ watch.close(); location.reload() }
+    }catch(_){}
+  }
+}catch(_){}
 
 requestAnimationFrame(function tick(now){const s=now-last;last=now
   if(running){t=(t+s*rate)%span;hold(t)} requestAnimationFrame(tick)})
