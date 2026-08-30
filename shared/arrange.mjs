@@ -37,8 +37,11 @@ const runs = (car) => Math.max(0, num(car && car.motion && car.motion.ms, MS))
  * one, which is what makes undo cheap, and that sharing is only safe while nothing writes through
  * them. Freezing turns an agreement between call sites into a throw at the moment one breaks it.
  */
-export function fromRail(got, id = 'a1') {
+export function fromRail(got, picks = [], id = 'a1') {
   const cars = (got || []).map((c, i) => {
+    /* what the element looked like when it was picked, carried so a row can show it rather than
+       describe it. Shared by reference across history steps like the motions are, never written to */
+    const from = (picks || [])[i] || {}
     const alternatives = (c.alts || (c.id ? [c] : [])).map(motionOf).filter(Boolean)
     const motion = c.id ? (alternatives.find((m) => m.id === c.id) || motionOf(c)) : null
     return {
@@ -51,18 +54,53 @@ export function fromRail(got, id = 'a1') {
        * the wrong times, having thrown away a decision without saying so.
        */
       key: `c${i + 1}`,
-      pick: Object.freeze({ label: String(c.label ?? 'element'), w: num(c.w), h: num(c.h) }),
+      pick: Object.freeze({
+        label: String(c.label ?? 'element'),
+        w: num(from.w, num(c.w)),
+        h: num(from.h, num(c.h)),
+        // what it looked like when it was picked, so a row can show it rather than describe it
+        html: String(from.html ?? ''),
+        css: String(from.css ?? ''),
+        shot: String(from.shot ?? ''),
+      }),
       motion,
       alternatives: Object.freeze(alternatives),
       at: i * BEAT,
       after: null,
       shot: '',
       tune: null,
+      /**
+       * Where this component sits on the stage, rather than only when it moves.
+       *
+       * A rail was a stack of equal boxes in the order the picks happened, which is not what any of
+       * these compositions actually look like: a header sits above a row of cards, and a chart sits
+       * beside them. Null means the stack, which is the sensible thing to open on; a place is what a
+       * hand puts there. Measured in per cent of the stage so it survives the frame being resized,
+       * and so a film at 1080 square shows the arrangement you made at whatever your window was.
+       */
+      place: null,
       why: c.id ? '' : String(c.why ?? 'nothing came back'),
     }
   })
   return { id, cars, camera: '', markers: [] }
 }
+
+/** a car put somewhere on the stage, or handed back to the stack when given nothing */
+export function placed(arr, i, at) {
+  if (!arr.cars[i]) return arr
+  if (!at) return patch(arr, i, { place: null })
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, num(v)))
+  return patch(arr, i, {
+    place: {
+      x: clamp(at.x, 0, 100),
+      y: clamp(at.y, 0, 100),
+      w: clamp(at.w === undefined ? (arr.cars[i].place ? arr.cars[i].place.w : 40) : at.w, 4, 100),
+    },
+  })
+}
+
+/** whether anybody has been moved, which is what tells a stage from a stack */
+export const staged = (arr) => live(arr).some((x) => !!x.car.place)
 
 /** a name no car in this arrangement is using, for a copy that must not answer to the original's */
 export function freshKey(arr) {
@@ -324,6 +362,11 @@ export function urlOf(arr, palette) {
     q('ids', on.map((x) => x.car.motion.id).join(',')),
     q('at', on.map((x) => Math.round(at[x.i])).join(',')),
     q('shots', on.map((x) => x.car.shot || '').join(',')),
+    /* one entry per car, empty where it has never been moved, so the frame can lay the untouched
+       ones out as a stack and put the rest where they were put */
+    q('place', on.map((x) => (x.car.place
+      ? `${Math.round(x.car.place.x)}_${Math.round(x.car.place.y)}_${Math.round(x.car.place.w)}`
+      : '')).join(',')),
     q('palette', palette ?? ''),
   ].join('&')}`
 }

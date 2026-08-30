@@ -84,7 +84,7 @@ const ok = (how, cond, detail = '') => {
      loose everything that followed it */
   const car = (id, at, ms, after = null) => ({
     key: id, pick: { label: id, w: 100, h: 40 }, motion: { id, note: id, ms }, alternatives: [],
-    at, after, shot: '', tune: null, why: '',
+    at, after, shot: '', tune: null, place: null, why: '',
   })
   const arrange = (cars) => ({ id: 'a1', cars, camera: '', markers: [] })
 
@@ -199,6 +199,24 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
   ok('two cars can play the same motion and still be told apart',
     A.resolve(arrange([car('x', 0, 400), { ...car('y', 0, 400), motion: { id: 'x', note: 'x', ms: 400 } },
       car('z', 9999, 200, { key: 'y', mode: 'after', gap: 0 })])).at[2] === 400)
+
+  console.log('\n  where each component sits')
+  const stack = arrange([car('a', 0, 400), car('b', 420, 400)])
+  ok('a rail opens as a stack, with nobody placed', !A.staged(stack))
+  const put = A.placed(stack, 1, { x: 35, y: 47, w: 41 })
+  ok('putting one somewhere makes it a stage', A.staged(put) && !!put.cars[1].place)
+  ok('and leaves the others where they were', put.cars[0].place === null)
+  ok('a place is kept in per cent, so it survives the frame being another size',
+    put.cars[1].place.x === 35 && put.cars[1].place.y === 47 && put.cars[1].place.w === 41)
+  ok('and is clamped to the stage rather than being lost off the edge of it',
+    A.placed(stack, 1, { x: -40, y: 900, w: 0 }).cars[1].place.x === 0
+      && A.placed(stack, 1, { x: -40, y: 900, w: 0 }).cars[1].place.y === 100
+      && A.placed(stack, 1, { x: -40, y: 900, w: 0 }).cars[1].place.w === 4)
+  ok('handing it nothing puts it back in the stack', A.placed(put, 1, null).cars[1].place === null)
+  ok('the frame is told where everyone goes, and told nothing for whoever is still stacked',
+    /place=_%2C35_47_41|place=%2C35_47_41/.test(A.urlOf(put, '') || ''), `${A.urlOf(put, '')}`)
+  ok('placing one does not move it in time, because where and when are different decisions',
+    A.resolve(put).at[1] === A.resolve(stack).at[1])
 
   console.log('\n  the value')
   const built = A.fromRail([
@@ -553,6 +571,59 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
     ok('and the whole label is kept where it can be read in full',
       /items-center/.test(await room.evaluate(() =>
         document.querySelector('.tlname').getAttribute('title')) || ''))
+
+    /**
+     * A component dragged to where it belongs, and the row wearing a picture of it.
+     *
+     * The rail opened as a stack of equal rows in the order the picks happened, which is not what any
+     * of these compositions looks like, and each row named its element instead of showing it although
+     * the selection has drawn a thumbnail of every pick since the picker existed.
+     *
+     * The thumbnails are the reason DRIVEN is narrower than every iframe in the grid: they sit inside
+     * the timeline, which is inside the grid, and counting them would post hold to a still picture
+     * and shift the index every rail frame is addressed by, since held and ends are keyed by position.
+     */
+    await room.evaluate(async () => {
+      await arriving
+      picks = [
+        { label: 'div.flex.flex-row.items-center', html: '<div data-p1><b></b></div>',
+          css: '[data-p1] b{display:block;width:260px;height:26px;background:#7079ea}', shot: '', w: 260, h: 26 },
+        { label: 'div.logoWallMarquee-module-scss-module__4H5q', html: '<div data-p2><b></b></div>',
+          css: '[data-p2] b{display:block;width:200px;height:60px;background:#3a8f6f}', shot: '', w: 200, h: 60 },
+      ]
+      arr = ARR.fromRail([
+        { id: '1', note: 'the bar slides in', tempo: { span: 420 }, label: picks[0].label },
+        { id: '2', note: 'the marquee drifts', tempo: { span: 420 }, label: picks[1].label }], picks)
+      running = false; zoom = 0; choose([]); rails = []; railN = 0; drawSel(); render()
+    })
+    await room.waitForTimeout(1400)
+    ok('every row wears a picture of the element it belongs to',
+      await room.evaluate(() => document.querySelectorAll('.tlface iframe').length) === 2)
+    ok('and each picture has the element in it rather than being an empty box',
+      String(await room.evaluate(() => [...document.querySelectorAll('.tlface iframe')]
+        .map((f) => (f.contentDocument ? f.contentDocument.querySelectorAll('b').length : 0)))) === '1,1')
+    ok('the scrubber still drives only the rail, not the thumbnails beside it',
+      await room.evaluate(() => document.querySelectorAll(DRIVEN).length) === 1)
+
+    const stageBox = await room.locator('.appwrap iframe').boundingBox()
+    const inner = room.frameLocator('.appwrap iframe')
+    const timedBefore = await room.evaluate(() => ARR.resolve(arr).at.map(Math.round))
+    const handle = await inner.locator('[data-grab="1"]').boundingBox()
+    await room.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2)
+    await room.mouse.down()
+    await room.mouse.move(stageBox.x + stageBox.width * 0.6, stageBox.y + stageBox.height * 0.55,
+      { steps: 14 })
+    await room.mouse.up(); await room.waitForTimeout(800)
+    ok('dragging a component on the stage puts it where it was dropped',
+      !!(await room.evaluate(() => arr.cars[1].place)),
+      `${JSON.stringify(await room.evaluate(() => arr.cars[1].place))}`)
+    ok('and leaves the one nobody moved in the stack',
+      (await room.evaluate(() => arr.cars[0].place)) === null)
+    ok('and does not move it in time, since where and when are different decisions',
+      String(await room.evaluate(() => ARR.resolve(arr).at.map(Math.round))) === String(timedBefore))
+    await room.evaluate(() => undo()); await room.waitForTimeout(500)
+    ok('and undo puts it back in the stack',
+      (await room.evaluate(() => arr.cars[1].place)) === null)
 
     ok('the timeline drives without complaint', said.length === 0, said.join('; ').slice(0, 60))
     await seat.close()

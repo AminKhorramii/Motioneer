@@ -232,6 +232,11 @@ header.bare .whenplaying{display:none}
 .tlrow{display:flex;align-items:center;gap:10px;margin:5px 0}
 /* two lines: which element this row is, and what it is doing. The element leads, because a row is
    one of the things you picked and the motion is what you are choosing for it */
+/* the element itself, small. A row is one of the things you picked and a picture of it is quicker to
+   read than any name could be */
+.tlface{width:44px;height:26px;flex:none;border:1px solid var(--line);border-radius:4px;
+  overflow:hidden;background:#0b0c0d;display:block}
+.tlface iframe{width:100%;height:100%;border:0;display:block;pointer-events:none}
 .tlname{display:block;width:172px;flex:none;font-size:11.5px;color:var(--dim);overflow:hidden}
 .tlname b{display:block;font-weight:400;color:var(--ink);font-size:11px;
   overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
@@ -491,6 +496,10 @@ const play=document.getElementById('play'),ask=document.getElementById('ask'),ca
 const palette=document.getElementById('palette')
 let file=null, opts=[], running=true, t=0, last=performance.now(), held=new Map()
 let ends=new Map(), span=4200, rate=1
+/* the frames the scrubber drives, which is not every frame in the room. The timeline's row
+   thumbnails live inside .grid too, and counting them would post hold to a still picture and, far
+   worse, shift the index every rail frame is addressed by, since held and ends are keyed by position */
+const DRIVEN='.grid .appwrap iframe, .grid figure iframe'
 let opened=null   // the option filling the room, or null for the grid
 let aimN=0   // bumped on every aim so the frame refetches instead of reusing the last page
 let quietMode=false
@@ -972,7 +981,7 @@ ask.onclick=async()=>{
          has already waited minutes on the model, so this costs nothing and every synchronous reader
          below it can stop asking whether the import landed */
       await arriving
-      arr=ARR.fromRail(r.cars||[]); zoom=0; sel=new Set(); lead=null; anchor=null; rails=[]; railN=0
+      arr=ARR.fromRail(r.cars||[], picks); zoom=0; sel=new Set(); lead=null; anchor=null; rails=[]; railN=0
       opts=[]; held.clear(); ends.clear(); render()
       const moved=ARR.live(arr).length
       const lost=arr.cars.filter(c=>!c.motion)
@@ -1345,6 +1354,8 @@ document.getElementById('save').onclick=async()=>{
     body:JSON.stringify({ids,palette:palette.value,
       at: rail ? rows.map(x=>Math.round(when[x.i])) : [],
       shots: rail ? rows.map(x=>x.car.shot||'') : [],
+      place: rail ? rows.map(x=>x.car.place
+        ? Math.round(x.car.place.x)+'_'+Math.round(x.car.place.y)+'_'+Math.round(x.car.place.w) : '') : [],
       name:stem((APP?(chosen&&chosen.label):file||'').split('/').pop())})}).then(r=>r.json())
   btn.textContent='Export'
   /* cameras are not carried yet, and an export that quietly drops one is how the offsets went
@@ -1379,6 +1390,7 @@ function render(){
     wireTimeline(live)
     /* after the strip has a height, or the track is measured before it has been laid out and the
        playhead and the ruler both align to nothing */
+    paintFaces()
     placePlayhead(); markPlayhead(Number(scrub.value)||0)
     return
   }
@@ -1474,6 +1486,33 @@ function render(){
 }
 
 addEventListener('message',e=>{const d=e.data||{}
+  /**
+   * A component moved to where it belongs on the stage.
+   *
+   * The frame reports and does not decide, because it is rebuilt from the arrangement on every
+   * change: a placement it kept to itself would be lost on the next render, and would disagree with
+   * undo until then. While the drag is live the car's own box is moved by hand, exactly as a bar on
+   * the timeline is, and the arrangement is written once at the end, because rebuilding the frame per
+   * pointermove would reload the document under the cursor sixty times a second.
+   */
+  if(d.wall==='placed'&&railed()){
+    const car=arr.cars[d.i]; if(!car) return
+    if(!d.done){
+      const f=grid.querySelector('.appwrap.on iframe')||grid.querySelector('.appwrap iframe')
+      const box=f&&f.contentDocument&&f.contentDocument.querySelector('[data-rail="'+d.i+'"]')
+      if(box){
+        const stage=f.contentDocument.querySelector('.rail')
+        if(stage) stage.classList.add('staged')
+        box.classList.add('put')
+        box.style.left=d.x+'%'; box.style.top=d.y+'%'; box.style.width=d.w+'%'
+      }
+      return
+    }
+    mark('moving '+nameOf(car.motion)+' on the stage')
+    arr=ARR.placed(arr,d.i,{x:d.x,y:d.y,w:d.w})
+    held.clear(); ends.clear(); render()
+    return
+  }
   if(d.wall==='held'){held.set(d.i,d.n)
     // a motion that runs six seconds cannot be scrubbed to its end on a four second ruler, and the
     // only thing that knows how long it runs is the animation itself
@@ -1743,6 +1782,37 @@ function dressHeader(){
 /* innerHTML does not run a script tag, so the field is driven by a function the page already has */
 function runShader(){ try { eval(SHADER) } catch(e) { /* the wait is cosmetic, never fatal */ } }
 
+/**
+ * Each rail row wearing a picture of the element it belongs to.
+ *
+ * The same trick the selection pills use, pointed at the cars instead of the picks, because after a
+ * reorder or a duplicate a row's position is no longer an index into picks and the car is the only
+ * thing that still knows what it was made from.
+ */
+function paintFaces(){
+  for (const f of document.querySelectorAll('[data-face]')){
+    const car = arr && arr.cars[Number(f.dataset.face)]; if(!car) continue
+    const p = car.pick; if(!p || !(p.shot||p.html)) continue
+    const d = f.contentDocument; if(!d) continue
+    d.open()
+    d.write('<html><head><meta charset="utf-8"><style>'
+      + 'html,body{margin:0;height:100%;overflow:hidden}'
+      + '#s{position:absolute;left:50%;top:50%;transform-origin:center center;width:'
+      + (p.w||600) + 'px}'
+      + (p.shot ? '' : p.css)
+      + '</style></head><body><div id="s">' + (p.shot || p.html) + '</div><scr' + 'ipt>'
+      + 'var el=document.getElementById("s");'
+      + 'var k=el.firstElementChild;'
+      + 'if(k){var c=getComputedStyle(k);'
+      + 'if(c.position==="fixed"||c.position==="absolute"||c.position==="sticky"){'
+      + 'k.style.position="relative";k.style.inset="auto"}}'
+      + 'var r=el.getBoundingClientRect();'
+      + 'var s=Math.min(1,(innerWidth-2)/Math.max(r.width,1),(innerHeight-2)/Math.max(r.height,1));'
+      + 'el.style.transform="translate(-50%,-50%) scale("+s.toFixed(4)+")";'
+      + '</scr' + 'ipt></body></html>')
+    d.close()
+  }
+}
 function paintShots(){
   for (const f of document.querySelectorAll('[data-shot]')){
     const p = picks[Number(f.dataset.shot)]; if(!p) continue
@@ -1814,6 +1884,12 @@ function timeline(live){
     + live.map(({car,i})=>'<div class="tlrow'+(i===lead?' on':'')
         +(sel.has(i)?' sel':'')+'" data-row="'+i+'">'
         +'<span class="grip" data-grip="'+i+'" title="drag to reorder">&#8942;&#8942;</span>'
+        /* the element, rather than a description of it. The selection has shown a thumbnail of every
+           pick since the picker existed and the rail never used one, so a row read div.something
+           when it could show the thing */
+        +((car.pick.shot||car.pick.html)
+          ?'<span class="tlface"><iframe data-face="'+i+'" scrolling="no" tabindex="-1"></iframe></span>'
+          :'')
         /* the element first and what it is doing underneath. A row is one of the things you picked,
            and naming it by its motion meant two rows off the same page read the same */
         +'<span class="tlname" title="'+esc(car.pick.label+' · '+(car.motion.note||''))+'">'
@@ -2265,7 +2341,7 @@ function paint(){
      number I could not pin down all session, and it was this */
   /* a preview inside a hidden figure stops running and stops replying, so counting it says one of
      two are driven when the one you are looking at is fine */
-  const frames=[...document.querySelectorAll('.grid iframe')].filter(f=>f.offsetParent!==null)
+  const frames=[...document.querySelectorAll(DRIVEN)].filter(f=>f.offsetParent!==null)
   if(!opts.length&&!railed()){
     link.removeAttribute('data-ok'); link.title='nothing to drive yet'; return }
   /* counted over the frames that are actually on screen rather than over everything the map still
@@ -2276,7 +2352,7 @@ function paint(){
   link.title=live+' of '+frames.length+' previews are being driven by the scrubber'
 }
 function hold(ms){
-  ;[...document.querySelectorAll('.grid iframe')].filter(f=>f.offsetParent!==null).forEach((f,i)=>{
+  ;[...document.querySelectorAll(DRIVEN)].filter(f=>f.offsetParent!==null).forEach((f,i)=>{
     try{f.contentWindow.postMessage({wall:'hold',t:ms,i},'*')}catch(_){}
   })
   scrub.value=ms; at.textContent=(ms/1000).toFixed(2)

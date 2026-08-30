@@ -1429,7 +1429,7 @@ user sees, and the css below is the rules that actually matched it.\n\n${source.
  * composition as a comparison is what this did to every rail, and it arrived as a stack of components
  * all starting together with the sequencing, the one decision a rail records, silently dropped.
  */
-const exportable = async (ids, palette, offsets = [], shots = []) => {
+const exportable = async (ids, palette, offsets = [], shots = [], places = []) => {
   const picked = ids.map((id) => made.get(id)).filter(Boolean)
   if (!picked.length) return null
   /* offsets are what tells the two apart, because they are what a rail has and a set of options for
@@ -1441,7 +1441,13 @@ const exportable = async (ids, palette, offsets = [], shots = []) => {
     const tag = o.scope ? `${o.scope}-${i + 1}` : ''
     const css = o.scope ? o.css.replaceAll(`[${o.scope}]`, `[${tag}]`) : o.css
     const markup = tag ? o.markup.replace(/<(\w+)/, `<$1 ${tag}`) : o.markup
-    return { ...o, css, markup, tag, at: rail ? Math.max(0, Math.round(Number(offsets[i]) || 0)) : 0 }
+    /* where it was put on the stage, if it was put anywhere, so the file shows the composition that
+       was arranged rather than the stack it started as */
+    const said = String(places[i] ?? '').split('_').map(Number)
+    const place = rail && said.length === 3 && said.every((v) => Number.isFinite(v))
+      ? { x: said[0], y: said[1], w: said[2] } : null
+    return { ...o, css, markup, tag, place,
+      at: rail ? Math.max(0, Math.round(Number(offsets[i]) || 0)) : 0 }
   })
   const width = picked[0].wide ? `${picked[0].wide}px` : 'max-content'
   return `<!doctype html><html class="dark"><head><meta charset="utf-8">
@@ -1474,11 +1480,22 @@ figcaption span{color:var(--faint);font-size:11px}
   height:calc(100vh - 48px);padding:14px}
 .wrap.rail figure{flex:1 1 0;min-height:0;background:none;border:0;border-radius:0;position:relative}
 .wrap.rail .stage{height:100%}
+/* a component that was put somewhere keeps where it was put, in per cent, so the file is the
+   composition that was arranged rather than the stack it started out as */
+.wrap.rail.staged{display:block;position:relative}
+.wrap.rail.staged figure.put{position:absolute}
+.wrap.rail.staged figure.put .inner{position:static;transform:none;width:100%}
+.wrap.rail.staged .loose{position:absolute;inset:14px;display:flex;flex-direction:column;
+  justify-content:center;gap:10px}
 </style></head><body>
 <header><button id="play">Pause</button><span class="clock" id="at">0.00 s</span>
   <input id="scrub" type="range" min="0" max="4000" value="0" step="10">
   <span class="clock" style="min-width:auto">${picked[0].file}</span></header>
-<div class="wrap${rail ? ' rail' : ''}">${parts.map((p, i) => `<figure data-rail="${i}"><div class="stage"><div class="inner">${p.markup}</div></div>
+<div class="wrap${rail ? ' rail' : ''}${parts.some((p) => p.place) ? ' staged' : ''}">${
+  parts.some((p) => p.place) && parts.some((p) => !p.place) ? '<div class="loose"></div>' : ''
+}${parts.map((p, i) => `<figure data-rail="${i}"${p.place
+  ? ` class="put" style="left:${p.place.x}%;top:${p.place.y}%;width:${p.place.w}%"` : ''
+}><div class="stage"><div class="inner">${p.markup}</div></div>
   ${rail ? '' : `<figcaption><b>${p.note || 'untitled'}</b><span>timing from ${p.verb}</span></figcaption>`}</figure>`).join('')}
 </div>
 <script>
@@ -1572,14 +1589,18 @@ async function railOf(picks, palette) {
  * the camera belonging to its neighbour. The rail still plays, in the wrong order, which is the kind
  * of wrong nobody reports because it looks like a composition somebody chose.
  */
-const railView = (ids, palette, offsets = [], shots = []) => {
+const railView = (ids, palette, offsets = [], shots = [], places = []) => {
   const parts = ids.map((id, asked) => ({ o: made.get(id), asked })).filter((x) => x.o)
     .map(({ o, asked }, i) => {
       const tag = o.scope ? `${o.scope}-r${i + 1}` : ''
       const css = o.scope ? o.css.replaceAll(`[${o.scope}]`, `[${tag}]`) : o.css
       const from = o.shot || o.markup
       const markup = tag ? from.replace(/<(\w+)/, `<$1 ${tag}`) : from
-      return { ...o, css, markup, tag, i, at: offsets[asked] ?? i * 420, shot: shots[asked] || '' }
+      /* x_y_w in per cent of the stage, or nothing where this car has never been moved */
+      const said = String(places[asked] ?? '').split('_').map(Number)
+      const place = said.length === 3 && said.every((v) => Number.isFinite(v))
+        ? { x: said[0], y: said[1], w: said[2] } : null
+      return { ...o, css, markup, tag, i, at: offsets[asked] ?? i * 420, shot: shots[asked] || '', place }
     })
   if (!parts.length) return null
   const tw = parts.some((o) => o.tw)
@@ -1590,6 +1611,28 @@ ${tw ? `<style>${themeFor(palette)}</style>` : ''}
   font:13px ui-sans-serif,system-ui}
 .rail{height:100%;display:flex;flex-direction:column;justify-content:center;gap:10px;padding:14px}
 .car{flex:1 1 0;display:grid;place-items:center;min-height:0;position:relative}
+/**
+ * A stage rather than a stack.
+ *
+ * Evenly divided rows in the order the picks happened is not what any of these compositions looks
+ * like: a header sits above a row of cards and a chart sits beside them. A car that has been put
+ * somewhere is taken out of the flow and placed, in per cent, so the arrangement survives the frame
+ * being resized and a film at 1080 square shows what was arranged in whatever the window was. Cars
+ * nobody has moved keep sharing what is left, so the stack is what this opens on and the stage is
+ * what a hand makes.
+ */
+.rail.staged{display:block;position:relative}
+.rail.staged .car.put{position:absolute;display:block;place-items:initial}
+.rail.staged .car.put > .in{width:100%!important}
+.rail.staged .loose{position:absolute;inset:14px;display:flex;flex-direction:column;
+  justify-content:center;gap:10px}
+.grab{position:absolute;inset:-6px;cursor:move;z-index:5}
+.car.put:hover .grab{outline:1px dashed rgba(94,106,210,.55);outline-offset:-4px;border-radius:6px}
+.wide{position:absolute;right:-5px;top:50%;width:10px;height:26px;margin-top:-13px;cursor:ew-resize;
+  z-index:6;border-radius:3px;background:rgba(94,106,210,.75);opacity:0;transition:opacity 90ms ease}
+.car.put:hover .wide{opacity:1}
+.car.lifted{z-index:9}
+.car.lifted .grab{outline:1px solid var(--pin,#5e6ad2);outline-offset:-4px}
 ${parts[0].base}
 ${parts.map((p) => p.css).join('\n')}
 .car > .in{transform-origin:center center}
@@ -1613,7 +1656,9 @@ ${parts.filter((p) => p.shot).map((p) => {
 }).join('\n')}
 .tag{position:absolute;left:0;top:0;font:10px ui-monospace,monospace;color:#5c6068;letter-spacing:.04em}
 </style></head><body>
-<div class="rail">${parts.map((p) => {
+<div class="rail${parts.some((p) => p.place) ? ' staged' : ''}">${
+  parts.some((p) => p.place) && parts.some((p) => !p.place)
+    ? '<div class="loose"></div>' : ''}${parts.map((p) => {
   const inner = `<div class="in" style="width:${p.wide ? p.wide + 'px' : 'max-content'}">${p.markup}</div>`
   /**
    * A car with a camera gets its own rig.
@@ -1633,9 +1678,12 @@ ${parts.filter((p) => p.shot).map((p) => {
      which is a live animation and is invisible to anything that draws the document instead of
      watching it: filming walked every element and wrote one instant into all of them, so a rail came
      out with every car starting together and the sequencing, the thing being filmed, was gone */
-  return `<div class="car${p.shot ? ' shot' : ''}" data-rail="${p.i}" data-wall-at="${Math.round(p.at)}">
+  const put = p.place
+    ? ` style="left:${p.place.x}%;top:${p.place.y}%;width:${p.place.w}%"` : ''
+  return `<div class="car${p.shot ? ' shot' : ''}${p.place ? ' put' : ''}" data-rail="${p.i}"${put}
+    data-wall-at="${Math.round(p.at)}">
     <span class="tag">${p.i + 1}. ${String(p.file || p.note || '').slice(0, 44)}</span>
-    ${body}</div>`
+    ${body}<i class="grab" data-grab="${p.i}"></i><i class="wide" data-wide="${p.i}"></i></div>`
 }).join('')}</div>
 <script>
 /* one entry per car actually on the page, in the order they are drawn, so data-rail indexes it */
@@ -1643,9 +1691,68 @@ var AT=${JSON.stringify(parts.map((p) => Math.round(p.at)))}
 for (var car of document.querySelectorAll('.car')){
   var el=car.querySelector('.in'); if(!el) continue
   if(car.classList.contains('shot')) continue   // a rig does its own framing
+  if(car.classList.contains('put')) continue    // a placed car is the width it was given
   var r=el.getBoundingClientRect(), box=car.getBoundingClientRect()
   var s=Math.min(1,(box.width-20)/r.width,(box.height-8)/r.height)
   if(s<1) el.style.transform='scale('+s.toFixed(4)+')'
+}
+/**
+ * Moving a component to where it belongs, by dragging it.
+ *
+ * The composition is arranged here rather than through a panel of numbers beside it, because where a
+ * header sits relative to a row of cards is a thing you judge by looking. Everything is reported to
+ * the parent in per cent of the stage and nothing is decided here: this frame is rebuilt from the
+ * arrangement on every change, so a placement it kept to itself would be lost on the next render and
+ * would disagree with undo in the meantime.
+ */
+function pct(e, box){
+  return { x:Math.max(0,Math.min(100,(e.clientX-box.left)/box.width*100)),
+           y:Math.max(0,Math.min(100,(e.clientY-box.top)/box.height*100)) }
+}
+function tell(i, at, done){
+  parent.postMessage({wall:'placed', i:i, x:at.x, y:at.y, w:at.w, done:!!done}, '*')
+}
+for (var handle of document.querySelectorAll('[data-grab]')){
+  handle.addEventListener('pointerdown', function(e){
+    e.preventDefault(); e.stopPropagation()
+    var i=Number(this.dataset.grab)
+    var car=this.closest('.car'), stage=document.querySelector('.rail')
+    var box=stage.getBoundingClientRect(), spot=car.getBoundingClientRect()
+    /* the grab point inside the car, so it does not jump to the cursor on the first pixel */
+    var hold={ x:(e.clientX-spot.left)/box.width*100, y:(e.clientY-spot.top)/box.height*100 }
+    var wide=spot.width/box.width*100
+    car.classList.add('lifted')
+    function move(ev){
+      var p=pct(ev, box)
+      tell(i, { x:Math.max(0,p.x-hold.x), y:Math.max(0,p.y-hold.y), w:wide }, false)
+    }
+    function up(ev){
+      window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up)
+      car.classList.remove('lifted')
+      var p=pct(ev, box)
+      tell(i, { x:Math.max(0,p.x-hold.x), y:Math.max(0,p.y-hold.y), w:wide }, true)
+    }
+    window.addEventListener('pointermove',move); window.addEventListener('pointerup',up)
+  })
+}
+for (var edge of document.querySelectorAll('[data-wide]')){
+  edge.addEventListener('pointerdown', function(e){
+    e.preventDefault(); e.stopPropagation()
+    var i=Number(this.dataset.wide)
+    var car=this.closest('.car'), stage=document.querySelector('.rail')
+    var box=stage.getBoundingClientRect(), spot=car.getBoundingClientRect()
+    var left=(spot.left-box.left)/box.width*100, top=(spot.top-box.top)/box.height*100
+    function move(ev){
+      var p=pct(ev, box)
+      tell(i, { x:left, y:top, w:Math.max(4,p.x-left) }, false)
+    }
+    function up(ev){
+      window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up)
+      var p=pct(ev, box)
+      tell(i, { x:left, y:top, w:Math.max(4,p.x-left) }, true)
+    }
+    window.addEventListener('pointermove',move); window.addEventListener('pointerup',up)
+  })
 }
 /* the defocus and the bloom are copies, cloned here so no component is written twice */
 for (var slot of document.querySelectorAll('[data-copy]')){
@@ -1809,7 +1916,7 @@ const server = createServer(async (req, res) => {
     }
     if (url.pathname === '/__wall/export' && req.method === 'POST') {
       const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))
-      const html = await exportable(body.ids ?? [], body.palette, body.at ?? [], body.shots ?? [])
+      const html = await exportable(body.ids ?? [], body.palette, body.at ?? [], body.shots ?? [], body.place ?? [])
       if (!html) { res.writeHead(404); return res.end('nothing to export') }
       const stem = String(body.name ?? 'motion').replace(/[^-\w]/g, '-') || 'motion'
       const at = path.resolve(work, `${stem}.html`)
@@ -1830,7 +1937,8 @@ const server = createServer(async (req, res) => {
       const ids = (url.searchParams.get('ids') ?? '').split(',').filter(Boolean)
       const at = (url.searchParams.get('at') ?? '').split(',').map(Number).filter((n) => !Number.isNaN(n))
       const shots = (url.searchParams.get('shots') ?? '').split(',')
-      const html = railView(ids, url.searchParams.get('palette'), at, shots)
+      const places = (url.searchParams.get('place') ?? '').split(',')
+      const html = railView(ids, url.searchParams.get('palette'), at, shots, places)
       if (!html) { res.writeHead(404); return res.end('gone') }
       res.writeHead(200, { 'content-type': 'text/html' })
       return res.end(html)
