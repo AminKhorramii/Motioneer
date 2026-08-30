@@ -161,6 +161,36 @@ header.bare .whenplaying{display:none}
 .icb{display:grid;place-items:center;width:26px;height:26px;background:var(--raised);color:var(--faint);
   border:1px solid var(--line);border-radius:6px;cursor:pointer;padding:0;transition:color 90ms ease}
 .icb:hover{color:var(--ink);border-color:var(--line2)}
+/**
+ * A request in flight, on a button with no room for a word.
+ *
+ * Two things at once, because either alone reads wrong. The sparkle turning and breathing says
+ * this control is busy; a light going round the border says something is being waited for. The
+ * sparkle without the sweep looks like a hover, and the sweep without the sparkle looks like the
+ * button is merely disabled.
+ *
+ * The ring is drawn under a plate the size of the button's inside, so what shows is a moving edge
+ * rather than a wedge across the middle. On the timeline button, which has no border to sweep,
+ * only the sparkle turns.
+ */
+.icb.working,.tlmore.working{color:var(--accent);cursor:default;position:relative}
+/* clipped to the button, or the cone escapes at the corner radius and reads as a blob stuck to
+   one side rather than as a light going round */
+.icb.working{overflow:hidden;border-color:rgba(94,106,210,.35)}
+.icb.working svg,.tlmore.working svg{position:relative;z-index:2;
+  animation:sparking 2.2s cubic-bezier(.4,0,.6,1) infinite}
+.icb.working::after{content:'';position:absolute;inset:-45%;z-index:0;
+  background:conic-gradient(from 0turn,transparent 0deg,rgba(120,132,240,.95) 50deg,transparent 125deg);
+  animation:circling 1.35s linear infinite}
+/* the plate that turns a filled cone into a moving edge, one pixel wide */
+.icb.working::before{content:'';position:absolute;inset:1px;border-radius:5px;z-index:1;
+  background:var(--raised)}
+@keyframes sparking{0%,100%{transform:rotate(0deg) scale(1);opacity:.7}
+  50%{transform:rotate(90deg) scale(1.16);opacity:1}}
+@keyframes circling{to{transform:rotate(1turn)}}
+@media (prefers-reduced-motion:reduce){
+  .icb.working svg,.tlmore.working svg,.icb.working::after{animation:none}
+  .icb.working,.tlmore.working{opacity:.65}}
 .icb.on{color:var(--accent);border-color:rgba(94,106,210,.5)}
 .mini{height:24px;padding:0 9px;font-size:11.5px;background:var(--raised);color:var(--dim);
   border:1px solid var(--line2);border-radius:5px;cursor:pointer;font-family:inherit}
@@ -1404,7 +1434,17 @@ function render(){
   })
   document.querySelectorAll('[data-more]').forEach(b=>b.onclick=async()=>{
     const keep=opts.find(x=>x.id===b.dataset.more)
-    b.textContent='Varying…'; ask.disabled=true
+    /**
+     * The icon stays and works.
+     *
+     * This wrote the word "Varying" into the button, which on a twenty six pixel square meant the
+     * sparkle was replaced by three clipped letters. The icon is the label here, and a sparkle that
+     * is visibly working says the same thing without needing room for it. Same mistake the ask
+     * button made with its canvas, one control over.
+     */
+    b.classList.add('working')
+    for (const other of document.querySelectorAll('[data-more]')) other.disabled = true
+    ask.disabled=true
     try{
       const r=await post('/__wall/refine',{id:keep.id,count:3},360000)
       // the one you liked stays on screen, with its variations beside it, so the comparison is real
@@ -1414,6 +1454,9 @@ function render(){
     }catch(e){ drops.textContent = e && e.name==='AbortError'
       ? 'That took too long and was given up on. The terminal says what it was doing.'
       : String(e && e.message ? e.message : e) }
+    // the grid is rebuilt on success, so this button is usually gone by now, which is harmless
+    b.classList.remove('working')
+    for (const other of document.querySelectorAll('[data-more]')) other.disabled = false
     ask.disabled=false
   })
   document.querySelectorAll('[data-keep]').forEach(b=>b.onclick=async(e)=>{
@@ -1871,6 +1914,8 @@ async function moreLikeCar(i){
   varying=i
   const row=document.querySelector('.tlrow[data-row="'+i+'"]')
   if(row) row.classList.add('working')
+  const pressed=document.querySelector('[data-more-car="'+i+'"]')
+  if(pressed) pressed.classList.add('working')
   document.querySelectorAll('[data-more-car]').forEach(b=>{ b.disabled=Number(b.dataset.moreCar)!==i })
   try{
     const r=await post('/__wall/refine',{id:car.motion.id,count:3},360000)
@@ -1885,6 +1930,7 @@ async function moreLikeCar(i){
       ? 'That took too long and was given up on. The terminal says what it was doing.'
       : String(e && e.message || e)
     if(row) row.classList.remove('working')
+    if(pressed) pressed.classList.remove('working')
     document.querySelectorAll('[data-more-car]').forEach(b=>{ b.disabled=false })
   }
   varying=null
