@@ -728,6 +728,90 @@ Rows carry a grip and can be dragged into a different order. Order and offset ar
 decisions, so reordering swaps places in the rail and leaves each car's own offset alone: two cars can
 begin together and still need one above the other.
 
+### An arrangement is a value
+
+`cars` was a global that five handlers edited in place, and the timeline drew from a filtered copy of
+it that shared its objects, so dragging a bar reached through a view and changed state nothing owned.
+It also wrote positions in the filtered list into the markup and read them back as indices into the
+real one, which agree exactly until a pick fails to move. An arrangement is a value now, in
+`shared/arrange.mjs`, and every edit returns a new one: rows carry the index of the car they draw, and
+undo stops copying, because the arrangement an edit replaced already is the snapshot. The motions
+cars point at are frozen, which turns "nothing writes through a shared record" from an agreement
+between call sites into a throw at the moment one breaks it.
+
+That module is served to the page the way `raster.mjs` and `mp4.mjs` already are rather than written
+into the template literal, so the arithmetic has one definition and node can check it without a
+browser. It is served from beside the file rather than from the working directory, which is what the
+other two were doing: they existed only when the studio was started from the repository root, so the
+agent tool's studio could not load its own encoder.
+
+### The timeline
+
+Rows can be selected, shift for a range and the platform modifier to toggle, and dragging any
+selected bar moves all of them, clamped as a group so the earliest meets zero with the shape intact
+rather than the set piling up on the start. Bars snap to zero, to the playhead, to their neighbours'
+edges, to markers and to a coarse grid, with alt to defeat it, read live so a magnet can be escaped
+and then let go of to land clean. The threshold is seven pixels converted to milliseconds at the
+ruler being dragged on, because a fixed millisecond figure is twenty two pixels of magnet on a short
+rail and under two on a long one.
+
+There was no playhead. The element was drawn and never written to while the comment above it claimed
+it was the scrubber. It and the ruler now measure a real track instead of repeating a hand matched
+270px that four column widths had to keep agreeing with. The drawn ruler is sticky and `fit` resets
+it: sizing it to its contents meant the scale moved under the hand, and since the grid is chosen from
+that scale, five presses of the same key moved a selection 100, 100, 250, 250 and 250ms.
+
+Arrows nudge, cmd-A takes the rail, backspace removes and cmd-D duplicates. A held arrow repeats
+thirty times a second, so a run collapses into one undo step.
+
+### Choosing, which is what a rail was missing
+
+`options` was asked for two motions per car, judged both, stored both, and handed back one. That made
+the rail the single place in a tool about comparison where you could not compare, and it cost a field
+on the response rather than a model call to fix. A row says which motion it is playing and how many
+it has, lists them on hover, and cycles; the offset is left alone when it does, because swapping
+alternatives is choosing a different performance of the same beat. `More like this` works per car
+through the refine path, and the variations join that car's set rather than replacing what it plays.
+
+The count stays at two. The command line provider allows eight sessions at once, so eight cars at two
+goes each is already two waves rather than the one the code claimed, and a third would make it three.
+
+### Cars tied to other cars
+
+A car can follow another rather than the clock: drag from the end of its bar onto the row it should
+follow, alt to start them together, drop it anywhere else to cut it loose. A ring is refused as it is
+made and says which link already points the other way; the solver survives one either way, falling
+back to the absolute offset every car still keeps, but a rail that quietly ignores what you asked is
+worse than one that says no.
+
+Two silent faults came out of building it. Dragging a tied bar wrote its absolute offset, which is
+not what puts it anywhere, so the bar sprang back and the arrangement had changed underneath; a tie
+is retimed by its gap now. And links were keyed by motion id, when a car's motion is the one thing
+about it that changes: cycling onto an alternative renamed the car and cut loose everything following
+it, which fell back to offsets it had been ignoring. The rail kept playing, at the wrong times,
+having dropped a decision without a word. Cars have a key of their own now.
+
+### Comparing arrangements
+
+Fork what you have, change one thing, watch both at the same instant, keep one. This is the wall
+applied to time rather than to layout. The transport needed nothing: `hold` already posts to every
+visible frame with its index, which is how a grid of five options has always been driven.
+
+Measured before the layout was settled. A rail of five cars is 30 animations a frame and 95 with a
+camera on every one, because a rig clones its subject twice. One frame costs a median 8.3ms and a p95
+of 8.4; two or three cost the same median and a p95 of 16.7, one dropped frame in twenty. The cost
+arrives at the second frame rather than the third, so three is affordable and three is the cap. Film
+refuses while several are on screen rather than filming whichever is on the left, which is the trap a
+grid of five options already had.
+
+Markers are dropped by double clicking a track and taken away by clicking them, and bars snap onto
+them. The strip says what the composition does with its time: how many cars, when the last lands, and
+where it goes quiet. That reports and does not judge, because whether a two second hole is a fault
+depends on what the thing is for.
+
+Still to do here: a bezier editor, since four easing presets is a ceiling on taste, and one camera
+over the whole composition with the per-car one as an override.
+
 ### Handing it over
 
 `Export` writes one html file with every option in it, the transport included, no requests at all.

@@ -9,6 +9,7 @@ tools/
 
 shared/                everything the studio uses that is not the room itself
   page.mjs             the page it serves. One template literal, so watch the backslashes
+  arrange.mjs          a rail as a value: when each car starts, snapping, and what the shape of it is
   model.mjs            which service writes the motion, and the catalogue of the ones it can
   providers.mjs        the two wire formats worth speaking, since most vendors speak one of them
   cli.mjs              the claude command, when that is what is writing
