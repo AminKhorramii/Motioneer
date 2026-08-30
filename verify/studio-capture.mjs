@@ -340,6 +340,36 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
       await room.evaluate(() => past.length) === steps + 1)
     await room.evaluate(() => undo()); await room.waitForTimeout(200)
     ok('and one undo puts the whole run back', String(await offs()) === String(before), `${await offs()}`)
+    /* the rail generates these, judges them, stores them, and used to hand back one */
+    await room.evaluate(async () => {
+      await arriving
+      arr = ARR.fromRail([
+        { id: '1', note: 'header rises', verb: 'rising,', tempo: { span: 400 }, label: 'header',
+          alts: [{ id: '1', note: 'header rises', verb: 'rising,', tempo: { span: 400 } },
+            { id: '1b', note: 'header unfolds', verb: 'unfolding,', tempo: { span: 900 } }] },
+        { id: '2', note: 'cards deal', tempo: { span: 600 }, label: 'ul',
+          alts: [{ id: '2', note: 'cards deal', tempo: { span: 600 } }] }])
+      running = false; zoom = 0; choose([]); render()
+    })
+    await room.waitForTimeout(300)
+    const chips = () => room.evaluate(() => [...document.querySelectorAll('.tlalt')].map((c) => c.textContent))
+    const playing = () => room.evaluate(() => arr.cars.map((c) => c.motion.note))
+    const starts = () => room.evaluate(() => arr.cars.map((c) => Math.round(c.at)))
+    ok('a row says how many motions it has and which it is playing',
+      String(await chips()) === '1/2,1/1', `${await chips()}`)
+    ok('a car with only one is offered nothing to press',
+      await room.evaluate(() => document.querySelector('[data-alt="1"]').classList.contains('one')))
+    const held0 = await starts()
+    await room.locator('[data-alt="0"]').click(); await room.waitForTimeout(300)
+    ok('cycling swaps which motion that car plays',
+      String(await playing()) === 'header unfolds,cards deal', `${await playing()}`)
+    ok('and leaves it where it was in time, since the beat is not what is being asked',
+      String(await starts()) === String(held0), `${held0} then ${await starts()}`)
+    ok('the frame is asked for the motion now showing',
+      /ids=1b/.test(await room.evaluate(() => ARR.urlOf(arr, ''))))
+    await room.evaluate(() => undo()); await room.waitForTimeout(250)
+    ok('and undo puts the first one back', String(await playing()) === 'header rises,cards deal')
+
     ok('the timeline drives without complaint', said.length === 0, said.join('; ').slice(0, 60))
     await seat.close()
   }

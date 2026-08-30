@@ -258,6 +258,20 @@ header.bare .whenplaying{display:none}
 .tlfit{height:16px;padding:0 6px;margin-right:7px;background:var(--raised);color:var(--dim);
   border:1px solid var(--line2);border-radius:4px;font:inherit;font-size:9.5px;cursor:pointer}
 .tlfit:hover{color:var(--ink);border-color:var(--accent)}
+/* every motion judged for this car, reachable. The rail generates them and used to show one */
+.tlalt{flex:none;width:34px;height:18px;padding:0;background:var(--raised);color:var(--dim);
+  border:1px solid var(--line2);border-radius:4px;font:inherit;font-size:10px;
+  font-variant-numeric:tabular-nums;cursor:pointer}
+.tlalt:hover{color:var(--ink);border-color:var(--accent)}
+.tlalt.one{opacity:.34;cursor:default}
+.tlmore{flex:none;width:20px;height:18px;padding:0;background:none;color:var(--faint);border:0;
+  border-radius:4px;cursor:pointer;display:grid;place-items:center}
+.tlmore:hover{color:var(--accent)}
+.tlmore svg{width:12px;height:12px}
+.tlrow.working .tlalt{color:var(--faint)}
+.tlrow.working .tlbar{animation:tlwork 1.1s ease-in-out infinite}
+@keyframes tlwork{0%,100%{opacity:1}50%{opacity:.45}}
+@media (prefers-reduced-motion:reduce){.tlrow.working .tlbar{animation:none;opacity:.7}}
 .tlbar{position:absolute;top:2px;bottom:2px;background:rgba(94,106,210,.5);
   border:1px solid var(--accent);border-radius:4px;cursor:grab;display:flex;align-items:center;
   padding:0 5px;touch-action:none}
@@ -1635,6 +1649,11 @@ function timeline(live){
         +esc(nameOf(car.motion)||car.pick.label)+'</span>'
         +'<span class="tlcam'+(car.shot?' on':'')+'">'
         +(CAMS.find(x=>x[0]===(car.shot||''))||CAMS[0])[1]+'</span>'
+        +'<button class="tlalt'+(car.alternatives.length>1?'':' one')+'" data-alt="'+i+'" tabindex="-1"'
+        +' title="'+esc(altTitle(car))+'">'
+        +(ARR.chosenAlt(car)+1)+'/'+car.alternatives.length+'</button>'
+        +'<button class="tlmore" data-more-car="'+i+'" tabindex="-1"'
+        +' title="more like this one, for this car only">'+ICON.more+'</button>'
         +'<span class="tltrack" data-track="'+i+'">'
         +'<span class="tlbar'+(sel.has(i)?' sel':'')+'" data-bar="'+i+'" style="left:'
         +(at[i]/total*100).toFixed(2)+'%;'
@@ -1689,6 +1708,68 @@ function paintSel(){
     const bar=r.querySelector('.tlbar'); if(bar) bar.classList.toggle('sel', sel.has(i))
   }
 }
+/* the chip says what it is showing and what else it has, so it is legible before you press it */
+function altTitle(car){
+  const n=ARR.chosenAlt(car)
+  if(car.alternatives.length<2) return 'the only motion that survived the gates for this element'
+  /* the separator is built rather than written: a backslash-n inside this template arrives at the
+     browser as a real newline in the middle of a string literal, which is a syntax error and is the
+     escaping hazard this whole file is a monument to */
+  return car.alternatives.map((m,k)=>(k===n?'showing: ':'')+(m.note||'untitled')
+    +(m.verb?' ('+m.verb.split(',')[0]+')':'')).join(String.fromCharCode(10))
+}
+/**
+ * A row, cycled onto another of the motions already generated for it.
+ *
+ * The offset is left alone. Swapping alternatives is choosing a different performance of the same
+ * beat, so moving the thing being judged would answer a question nobody asked, and cycling forward
+ * through three and back would not return you to where you started.
+ *
+ * A full render here, unlike a drag or a nudge: a different motion means a different id in the frame
+ * url, so the frame has to reload, and restarting is what you want because you are about to watch
+ * the new one from the top.
+ */
+function cycleAlt(i, dir){
+  const car=arr.cars[i]; if(!car||car.alternatives.length<2) return
+  mark('the motion on '+nameOf(car.motion))
+  arr=ARR.swapped(arr,i,ARR.chosenAlt(car)+dir)
+  chosenOpt=arr.cars[i].motion.id
+  held.clear(); ends.clear(); render(); drawInspector()
+}
+/**
+ * More like the one this car is playing.
+ *
+ * They join that car's alternatives rather than replacing what it plays: you asked for more choices,
+ * not for a different rail, and the frame is left alone so nothing restarts while you wait.
+ *
+ * One at a time, because post() keeps a single request in flight and aborts the last one on every
+ * call, so a second row asked while the first was working would silently kill it.
+ */
+let varying=null
+async function moreLikeCar(i){
+  if(varying!==null) return
+  const car=arr.cars[i]; if(!car||!car.motion) return
+  varying=i
+  const row=document.querySelector('.tlrow[data-row="'+i+'"]')
+  if(row) row.classList.add('working')
+  document.querySelectorAll('[data-more-car]').forEach(b=>{ b.disabled=Number(b.dataset.moreCar)!==i })
+  try{
+    const r=await post('/__wall/refine',{id:car.motion.id,count:3},360000)
+    mark('varying '+nameOf(car.motion))
+    arr=ARR.offered(arr,i,r.kept||[])
+    drops.textContent=(r.kept&&r.kept.length? r.kept.length+' more for '+nameOf(car.motion)+'. ':'')
+      +((r.dropped&&r.dropped.length)? r.dropped.length+' dropped: '
+        +r.dropped.map(d=>String(d.why).split('.')[0]).join('; ') : '')
+    held.clear(); ends.clear(); render(); drawInspector()
+  }catch(e){
+    drops.textContent = e && e.name==='AbortError'
+      ? 'That took too long and was given up on. The terminal says what it was doing.'
+      : String(e && e.message || e)
+    if(row) row.classList.remove('working')
+    document.querySelectorAll('[data-more-car]').forEach(b=>{ b.disabled=false })
+  }
+  varying=null
+}
 function selectRow(i, e){
   const car=arr&&arr.cars[i]; if(!car||!car.motion) return
   const rows=[...document.querySelectorAll('.tlrow')].map(r=>Number(r.dataset.row))
@@ -1710,6 +1791,12 @@ function wireTimeline(live){
   const total=ruler()
   const fit=document.getElementById('tlfit')
   if(fit) fit.onclick=e=>{ e.stopPropagation(); zoom=0; render() }
+  for (const chip of document.querySelectorAll('[data-alt]')){
+    chip.onclick=e=>{ e.stopPropagation(); cycleAlt(Number(chip.dataset.alt), e.shiftKey?-1:1) }
+  }
+  for (const b of document.querySelectorAll('[data-more-car]')){
+    b.onclick=e=>{ e.stopPropagation(); moreLikeCar(Number(b.dataset.moreCar)) }
+  }
   /**
    * Order, dragged.
    *

@@ -1269,7 +1269,10 @@ const saveSoon = () => {
   saving = setTimeout(() => {
     saving = null
     try {
-      const recent = [...made.entries()].slice(-40)
+      /* eighty rather than forty, because a car keeps every motion judged for it now: eight cars at
+         two each is sixteen before anybody asks for a variation, and a restore that drops one leaves
+         a row offering an alternative the store can no longer serve */
+      const recent = [...made.entries()].slice(-80)
       writeFileSync(SESSION_AT, JSON.stringify({ at: Date.now(), aim: AIM, nextId, made: recent }))
     } catch { /* a session that cannot be written is not a reason to stop working */ }
   }, 400)
@@ -1528,13 +1531,33 @@ async function railOf(picks, palette) {
    *
    * A car is a single element and it either moves or the rail has a hole in it, which is a harsher
    * standard than the options grid where four of five surviving is fine. Asking for two and keeping
-   * whichever passes turns one gate rejection from a missing car into a shrug. They still run
-   * together, so the wall clock is unchanged; it is the number of calls that doubles.
+   * whichever passes turns one gate rejection from a missing car into a shrug. Both are now kept and
+   * offered, so the second go is a choice as well as an insurance.
+   *
+   * The cars run together, but not all of them at once: the command line provider allows eight
+   * sessions at a time, so a rail of eight at two goes each is sixteen calls and two waves rather
+   * than the one this used to claim. That is the argument against asking for a third.
    */
   return Promise.all(picks.map(async (pick, i) => {
     const src = { html: pick.html, css: pick.css ?? '', label: pick.label, w: pick.w }
     const got = await options(src, 2).catch((e) => ({ kept: [], dropped: [{ why: String(e && e.message || e) }] }))
-    if (got.kept.length) return { ...got.kept[0], label: pick.label, i, ms: tempo(got.kept[0].css).span || 600 }
+    /**
+     * All of them, not the first.
+     *
+     * Both goes are judged, both are already stored under their own ids, and both are already in the
+     * session file. Returning one of them was the whole of what made a rail the one place in a tool
+     * about choosing where you could not choose, and it cost a field rather than a model call.
+     *
+     * The count stays at two. A third is not free: the command line provider runs eight sessions at
+     * once, so an eight car rail is already two waves rather than the one the note above assumes,
+     * and a third go would make it three for an option most cars never need. More like this asks for
+     * variations on the one that landed, per car, when you want them, which is also a better question
+     * than a third unrelated verb from the deck.
+     */
+    if (got.kept.length) {
+      const alts = got.kept.map((k) => ({ ...k, ms: tempo(k.css).span || 600 }))
+      return { ...alts[0], label: pick.label, i, ms: alts[0].ms, alts }
+    }
     // every reason, not just the first, because two attempts failing the same way says something
     // different from two failing differently
     const why = [...new Set((got.dropped || []).map((d) => String(d.why || '')).filter(Boolean))].join('; ')
