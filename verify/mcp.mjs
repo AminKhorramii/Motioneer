@@ -23,10 +23,23 @@ const ok = (how, cond, detail = '') => {
 }
 
 const PORT = Number(process.env.WALL_PORT || 4396)
-for (const p of [PORT]) {
-  const pids = spawnSync('lsof', ['-ti', `tcp:${p}`], { encoding: 'utf8' }).stdout.split('\n').filter(Boolean)
-  for (const pid of pids) { try { process.kill(Number(pid), 'SIGKILL') } catch { /* gone already */ } }
+/**
+ * Everything holding the port, except this process.
+ *
+ * `lsof -ti tcp:PORT` lists both ends of a connection, not just whoever is listening. This suite
+ * asks the studio a question over `fetch`, and node keeps that client socket pooled afterwards, so
+ * the suite itself turns up in its own kill list and `stop()` sends SIGKILL to its own pid. Every
+ * check printed `ok`, then the run ended with signal 9 and no failing assertion, which reads as an
+ * infrastructure flake and was `verify:all` never passing.
+ */
+const mine = String(process.pid)
+const holding = (p) => spawnSync('lsof', ['-ti', `tcp:${p}`], { encoding: 'utf8' })
+  .stdout.split('\n').filter(Boolean).filter((pid) => pid !== mine)
+const freePort = (p) => {
+  for (const pid of holding(p)) { try { process.kill(Number(pid), 'SIGKILL') } catch { /* gone already */ } }
 }
+// a studio left listening by an earlier run answers every question the new one was going to be asked
+freePort(PORT)
 
 const mcp = spawn('node', ['mcp/index.mjs'], {
   stdio: ['pipe', 'pipe', 'pipe'],
@@ -57,8 +70,7 @@ const callTool = async (name, args) => {
 }
 const stop = () => {
   try { mcp.kill('SIGKILL') } catch { /* already gone */ }
-  const pids = spawnSync('lsof', ['-ti', `tcp:${PORT}`], { encoding: 'utf8' }).stdout.split('\n').filter(Boolean)
-  for (const pid of pids) { try { process.kill(Number(pid), 'SIGKILL') } catch { /* gone */ } }
+  freePort(PORT)
 }
 process.on('exit', stop)
 
