@@ -1730,6 +1730,31 @@ figcaption b{font-weight:500}.note{color:var(--dim)}.verb{color:var(--faint);fon
 .grid.solo figure.up iframe{height:calc(100vh - 210px)}
 .backer{grid-column:1/-1;display:flex;justify-content:flex-end;margin:-4px 2px 0}
 .row{display:flex;gap:6px;margin-top:4px}
+.whenplaying{display:flex;align-items:center;gap:12px;flex:1;min-width:0}
+header.bare .whenplaying{display:none}
+.btn.pick svg{opacity:.65}
+.btn.pick.on{border-color:rgba(94,106,210,.7)}
+.btn.pick.on svg{opacity:1;color:var(--accent)}
+/* the arm light. A field evaluated per pixel into the button rather than a css gradient sweeping
+   across it, because a sweep repeats on a loop you can count and a field does not */
+#ask{position:relative;overflow:hidden;isolation:isolate}
+#askfield{position:absolute;inset:0;width:100%;height:100%;opacity:0;pointer-events:none;
+  transition:opacity 500ms ease;filter:blur(7px) saturate(1.5);mix-blend-mode:screen;z-index:0}
+#ask .lbl{position:relative;z-index:1}
+#ask.armed{border-color:rgba(94,106,210,.8);
+  box-shadow:0 0 0 1px rgba(94,106,210,.2),0 6px 22px -8px rgba(94,106,210,.75)}
+@media (prefers-reduced-motion:reduce){#askfield{display:none}}
+.foot{margin-top:auto;border-top:1px solid var(--line);padding:6px;display:grid;gap:2px;flex:none}
+.foothit{display:flex;align-items:center;gap:8px;width:100%;height:28px;padding:0 8px;background:none;
+  border:0;border-radius:6px;color:var(--dim);font:inherit;font-size:12px;cursor:pointer;text-align:left}
+.foothit:hover,.foothit.on{background:var(--raised);color:var(--ink)}
+.foothit i{margin-left:auto;font-style:normal;font-size:10.5px;color:var(--faint);
+  background:var(--bg);border-radius:20px;padding:1px 6px;min-width:18px;text-align:center}
+.foothit i:empty{display:none}
+.icb{display:grid;place-items:center;width:26px;height:26px;background:var(--raised);color:var(--faint);
+  border:1px solid var(--line);border-radius:6px;cursor:pointer;padding:0;transition:color 90ms ease}
+.icb:hover{color:var(--ink);border-color:var(--line2)}
+.icb.on{color:var(--accent);border-color:rgba(94,106,210,.5)}
 .mini{height:24px;padding:0 9px;font-size:11.5px;background:var(--raised);color:var(--dim);
   border:1px solid var(--line2);border-radius:5px;cursor:pointer;font-family:inherit}
 .mini:hover{color:var(--ink)}
@@ -1833,6 +1858,17 @@ figcaption b{font-weight:500}.note{color:var(--dim)}.verb{color:var(--faint);fon
   </div>
   <div class="files" id="files"></div>
   <div id="sel"></div>
+  <div class="foot">
+    <button class="foothit" id="savedbtn" title="Motions you kept">
+      <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor"
+        stroke-width="1.4" stroke-linejoin="round"><path d="M4 2.6h8v11.2l-4-2.7-4 2.7z"/></svg>
+      <span>Saved</span><i id="savedn"></i></button>
+    <button class="foothit" id="setbtn" title="Which model writes the motion">
+      <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor"
+        stroke-width="1.4" stroke-linecap="round"><path d="M2 4.5h12M2 11.5h12"/>
+        <circle cx="6" cy="4.5" r="1.7"/><circle cx="10.5" cy="11.5" r="1.7"/></svg>
+      <span>Settings</span></button>
+  </div>
 </aside>
 <main>
   <!--
@@ -1846,22 +1882,23 @@ figcaption b{font-weight:500}.note{color:var(--dim)}.verb{color:var(--faint);fon
     constantly.
   -->
   <header>
-    <button class="btn" id="pick">Pick</button>
-    <span class="split">
-      <button class="btn go" id="ask">Give it motion</button>
-      <select id="count" title="how many to ask for"><option>3</option><option>4</option><option selected>5</option><option>6</option></select>
+    <button class="btn pick" id="pick" title="Click elements on the page to select them">
+      <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor"
+        stroke-width="1.5" stroke-linecap="round"><path d="M8 1.6v3.1M8 11.3v3.1M1.6 8h3.1M11.3 8h3.1"/>
+        <circle cx="8" cy="8" r="2.9"/></svg><span class="lbl">Pick</span></button>
+    <button class="btn go" id="ask"><canvas id="askfield" aria-hidden="true"></canvas>
+      <span class="lbl">Give it motion</span></button>
+    <span class="whenplaying">
+      <span class="sep"></span>
+      <button class="icon" id="play" title="Play or pause (space)"><span id="glyph">❚❚</span><span id="word" hidden></span></button>
+      <span class="clock"><b id="at">0.00</b><i id="span">4.2s</i><em id="driven" title="how many previews the scrubber is driving"></em></span>
+      <input id="scrub" type="range" min="0" max="4200" value="0" step="10">
+      <span class="sep"></span>
+      <button class="icon" id="inspect" title="Adjust the chosen one">&#9707;</button>
+      <button class="icon" id="more" title="Speed, palette, camera, film shape">&#183;&#183;&#183;</button>
+      <button class="btn" id="film" title="Render what is on screen frame by frame">Film</button>
+      <button class="btn" id="save">Export</button>
     </span>
-    <span class="sep"></span>
-    <button class="icon" id="play" title="Play or pause (space)"><span id="glyph">❚❚</span><span id="word" hidden></span></button>
-    <span class="clock"><b id="at">0.00</b><i id="span">4.2s</i><em id="driven" title="how many previews the scrubber is driving"></em></span>
-    <input id="scrub" type="range" min="0" max="4200" value="0" step="10">
-    <span class="sep"></span>
-    <button class="icon" id="undo" disabled title="Nothing to undo">&#8630;</button>
-    <button class="icon" id="redo" disabled title="Nothing to redo">&#8631;</button>
-    <button class="icon" id="inspect" title="Inspect and adjust the chosen option">&#9707;</button>
-    <button class="icon" id="more" title="Speed, palette, camera">&#183;&#183;&#183;</button>
-    <button class="btn" id="film" title="Render what is on screen frame by frame">Film</button>
-    <button class="btn" id="save">Export</button>
     <div class="menu reel" id="reel" hidden>
       <p class="ihead">Film <em id="reeltag"></em></p>
       <video id="reelvid" controls loop muted playsinline></video>
@@ -1904,6 +1941,8 @@ figcaption b{font-weight:500}.note{color:var(--dim)}.verb{color:var(--faint);fon
       <p class="keys" id="mout">The key is kept in .studio on this machine and never sent to the page.</p>
     </div>
     <div class="menu" id="menu" hidden>
+      <label>How many<select id="count" title="how many options each ask returns">
+        <option>3</option><option>4</option><option selected>5</option><option>6</option></select></label>
       <label>Speed<select id="rate"><option>0.25x</option><option>0.5x</option>
         <option selected>1x</option><option>2x</option></select></label>
       <label>Palette<select id="palette">
@@ -1976,6 +2015,10 @@ let chosen=null   // the most recent pick
 let picks=[]      // everything selected, in the order it was picked
 let cars=null     // the rail, once each element has been given a motion
 let verdict=null  // why the last ask produced nothing, so the grid can say so
+let dbp=null      // the saved shelf, opened on first use
+let kept=new Set()// which options are on it, so a card can show its bookmark filled
+let viewing=null  // 'saved' when the shelf has the room instead of the options
+let glowing=0     // the arm light's frame handle, read by drawSel before its own line runs
 
 /**
  * Undo, kept over the composition rather than over the dom.
@@ -2301,8 +2344,6 @@ const reel=document.getElementById('reel'), models=document.getElementById('mode
 const PANELS=[menu,insp,reel,models]
 const pop=(panel)=>{ for(const q of PANELS) q.hidden = q!==panel || !q.hidden }
 const shut=()=>{ for(const q of PANELS) q.hidden=true }
-document.getElementById('undo').onclick=e=>{ e.stopPropagation(); undo() }
-document.getElementById('redo').onclick=e=>{ e.stopPropagation(); redo() }
 moreBtn.onclick=e=>{ e.stopPropagation(); pop(menu) }
 
 /**
@@ -2344,6 +2385,14 @@ function drawModelForm(saved){
 const modelForm=()=>({ provider:byId('mprov').value, model:byId('mmodel').value.trim(),
   base:byId('mbase').value.trim(), key:byId('mkey').value||undefined })
 byId('modelbtn').onclick=e=>{ e.stopPropagation(); pop(models); loadModels() }
+byId('setbtn').onclick=e=>{ e.stopPropagation(); shut(); models.hidden=false; loadModels() }
+byId('savedbtn').onclick=e=>{
+  e.stopPropagation(); shut()
+  viewing = viewing==='saved' ? null : 'saved'
+  byId('savedbtn').classList.toggle('on', viewing==='saved')
+  render()
+}
+
 byId('mprov').onchange=()=>drawModelForm(false)
 byId('msave').onclick=async()=>{
   const b=byId('msave'); b.disabled=true; b.textContent='Saving'
@@ -2536,6 +2585,8 @@ document.getElementById('save').onclick=async()=>{
 document.getElementById('rate').onchange=e=>{rate=parseFloat(e.target.value)}
 
 function render(){
+  dressHeader()
+  if(viewing==='saved'){ drawSaved(); return }
   if(cars && cars.some(c=>c.id)){
     const live=cars.filter(c=>c.id)
     const ids=live.map(c=>c.id).join(',')
@@ -2570,15 +2621,18 @@ function render(){
     +(cam.value?'&camera='+cam.value+'&depth='+lens:'')
   grid.innerHTML=opts.map((o,i)=>
     '<figure><iframe data-i="'+i+'" src="/__wall/preview/'+o.id+q+'"></iframe>'+
-    '<figcaption><b>'+(o.note||'untitled')+'</b>'+
+    /* the verb and the scope moved into the title. Both are worth having and neither helps you
+       choose between five of these, which is the only thing this card is for */
+    '<figcaption><b title="timing from '+esc(o.verb)+'. '+esc(o.scope)+'">'+esc(o.note||'untitled')+'</b>'+
     '<span class="facts">'+factLine(o)+'</span>'+
     '<span class="seen">'+seenLine(o)+'</span>'+
-    '<span class="verb">timing from '+o.verb+'</span>'+
-    '<span class="note">'+o.scope+'</span>'+
-    '<span class="row"><button class="mini" data-open="'+o.id+'">'+(opened===o.id?'Close':'Open')+'</button>'+
-    '<button class="mini keep" data-more="'+o.id+'">More like this</button>'+
-    '<button class="mini" data-copy="'+o.id+'">Copy CSS</button>'+
-    '<button class="mini" data-save="'+o.id+'">Save file</button></span></figcaption></figure>').join('')
+    '<span class="row">'+
+    '<button class="icb" data-open="'+o.id+'" title="'+(opened===o.id?'Close it':'Open it bigger')+'">'
+      +(opened===o.id?ICON.shut:ICON.open)+'</button>'+
+    '<button class="icb" data-more="'+o.id+'" title="More like this one">'+ICON.more+'</button>'+
+    '<button class="icb'+(kept.has(o.id)?' on':'')+'" data-keep="'+o.id+'" title="'
+      +(kept.has(o.id)?'Saved':'Save it')+'">'+(kept.has(o.id)?ICON.kept:ICON.mark)+'</button>'+
+    '</span></figcaption></figure>').join('')
   grid.classList.remove('railed')
   grid.classList.toggle('solo', !!opened)
   if(opened && !opts.some(o=>o.id===opened)) opened=null
@@ -2613,15 +2667,15 @@ function render(){
       : String(e && e.message ? e.message : e) }
     ask.disabled=false
   })
-  document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=async()=>{
-    const o=opts.find(x=>x.id===b.dataset.copy)
-    await navigator.clipboard.writeText('/* add '+o.scope+' to the root element */\\n'+o.css)
-    b.textContent='Copied'; setTimeout(()=>b.textContent='Copy CSS',1200)
-  })
-  document.querySelectorAll('[data-save]').forEach(b=>b.onclick=async()=>{
-    const r=await fetch('/__wall/save',{method:'POST',headers:{'content-type':'application/json'},
-      body:JSON.stringify({id:b.dataset.save})}).then(r=>r.json())
-    b.textContent=r.at.split('/').pop(); setTimeout(()=>b.textContent='Save file',2200)
+  document.querySelectorAll('[data-keep]').forEach(b=>b.onclick=async(e)=>{
+    e.stopPropagation()
+    const o=opts.find(x=>x.id===b.dataset.keep); if(!o) return
+    if(kept.has(o.id)){ await shelfDrop(o.id); kept.delete(o.id) }
+    else { await shelfPut(record(o)); kept.add(o.id) }
+    b.classList.toggle('on',kept.has(o.id))
+    b.title=kept.has(o.id)?'Saved':'Save it'
+    b.innerHTML=kept.has(o.id)?ICON.kept:ICON.mark
+    countSaved()
   })
 }
 
@@ -2633,8 +2687,11 @@ addEventListener('message',e=>{const d=e.data||{}
       if(Math.abs(want-span)>60){span=want;scrub.max=span;document.getElementById('span').textContent=(span/1000).toFixed(1)+'s'}}
     paint()}
   if(d.wall==='armed'||d.wall==='disarmed'){
-    document.getElementById('pick').setAttribute('aria-pressed',d.wall==='armed')
-    document.getElementById('pick').textContent=d.wall==='armed'?'Picking… (esc)':'Pick element'
+    const pb=document.getElementById('pick')
+    pb.setAttribute('aria-pressed',d.wall==='armed')
+    // the label only: setting textContent here used to replace the icon along with the word
+    pb.querySelector('.lbl').textContent=d.wall==='armed'?'Picking, esc to stop':'Pick'
+    pb.classList.toggle('on',d.wall==='armed')
   }
   if(d.wall==='picked'){
     chosen={html:d.html,css:d.css,shot:d.shot,label:d.label,w:d.w,h:d.h,n:d.n,
@@ -2656,6 +2713,168 @@ addEventListener('message',e=>{const d=e.data||{}
  * escaping it into an attribute is a bug waiting for the first component with a data attribute in it.
  */
 const tagOf = (label) => String(label || '').split('.')[0] || 'element'
+const esc = (v) => String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;')
+const svg = (d,fill) => '<svg viewBox="0 0 16 16" width="13" height="13" fill="'+(fill||'none')
+  +'" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">'
+  +'<path d="'+d+'"/></svg>'
+const ICON={
+  open: svg('M6.2 2.4H2.4v3.8M9.8 13.6h3.8v-3.8M13.6 6.2V2.4H9.8M2.4 9.8v3.8h3.8'),
+  shut: svg('M2.4 6.2h3.8V2.4M13.6 9.8H9.8v3.8M9.8 2.4v3.8h3.8M6.2 13.6V9.8H2.4'),
+  more: svg('M8 1.9l1.5 4 4 1.5-4 1.5L8 12.9 6.5 8.9l-4-1.5 4-1.5z'),
+  mark: svg('M4 2.6h8v11.2l-4-2.7-4 2.7z'),
+  kept: svg('M4 2.6h8v11.2l-4-2.7-4 2.7z','currentColor'),
+  down: svg('M8 2.6v8.1M4.9 7.6L8 10.7l3.1-3.1M3 13.2h10'),
+  drop: svg('M4.6 4.6l6.8 6.8M11.4 4.6l-6.8 6.8'),
+}
+
+/**
+ * Motions you kept, in the browser.
+ *
+ * These belong to you rather than to the session, so they outlive the server: restart the studio,
+ * aim it somewhere else, come back tomorrow, and what you saved is still there. In IndexedDB rather
+ * than localStorage because a saved motion carries the element's markup and its css, which is tens
+ * of kilobytes each, and forty of them would fill the five megabytes localStorage allows.
+ *
+ * Every record is self contained on purpose. Rendering one asks the server for nothing, so a saved
+ * motion still plays when whatever produced it is long gone, and the whole shelf is a folder of
+ * finished work rather than a list of ids that used to mean something.
+ */
+const DB='wall', SHELF='saved'
+function shelf(){
+  if(dbp) return dbp
+  dbp=new Promise((ok,no)=>{
+    const rq=indexedDB.open(DB,1)
+    rq.onupgradeneeded=()=>{ const d=rq.result
+      if(!d.objectStoreNames.contains(SHELF)) d.createObjectStore(SHELF,{keyPath:'id'}) }
+    rq.onsuccess=()=>ok(rq.result); rq.onerror=()=>no(rq.error)
+  })
+  return dbp
+}
+const shelfDo=(mode,fn)=>shelf().then(d=>new Promise((ok,no)=>{
+  const t=d.transaction(SHELF,mode), r=fn(t.objectStore(SHELF))
+  t.oncomplete=()=>ok(r&&r.result); t.onerror=()=>no(t.error)
+}))
+const shelfPut=(rec)=>shelfDo('readwrite',st=>st.put(rec))
+const shelfDrop=(id)=>shelfDo('readwrite',st=>st.delete(id))
+const shelfAll=()=>shelfDo('readonly',st=>st.getAll())
+  .then(l=>(l||[]).sort((a,b)=>b.at-a.at))
+
+/* what has to travel with a motion for it to still be one later */
+const record=(o)=>({
+  id:o.id, note:o.note||'untitled', css:o.css, scope:o.scope, verb:o.verb,
+  tempo:o.tempo, seen:o.seen, at:Date.now(), palette:palette.value,
+  from:(chosen&&chosen.label)||file||'',
+  src:{ shot:(chosen&&chosen.shot)||'', html:(chosen&&chosen.html)||'',
+    css:(chosen&&chosen.css)||'', w:(chosen&&chosen.w)||0 },
+})
+
+/**
+ * One document, no requests, built here rather than asked for.
+ *
+ * The snapshot is preferred over the markup for the same reason the server's preview prefers it: it
+ * carries every computed value on the element, so it cannot be let down by a rule that was not
+ * collected, and it needs no stylesheet from the page it came from.
+ */
+function standalone(r){
+  const body=(r.src&&(r.src.shot||r.src.html))||''
+  const cut=body.indexOf('>')
+  // the attribute the css is scoped to, put on the first tag, which is what the server does too
+  const scoped=(r.scope&&cut>0)?body.slice(0,cut)+' '+r.scope+body.slice(cut):body
+  const sheet=((r.src&&r.src.shot)?'':((r.src&&r.src.css)||''))+' '+(r.css||'')
+  return '<!doctype html><meta charset="utf-8"><style>'
+    +'html,body{margin:0;height:100%;background:#0f1011;overflow:hidden}'
+    +'#w{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:'
+    +((r.src&&r.src.w)||600)+'px}'
+    +sheet+'</style><div id="w">'+scoped+'</div>'
+    +'<scr'+'ipt>var w=document.getElementById("w"),b=w.getBoundingClientRect(),'
+    +'s=Math.min(1,(innerWidth-16)/Math.max(b.width,1),(innerHeight-16)/Math.max(b.height,1));'
+    +'w.style.transform="translate(-50%,-50%) scale("+s.toFixed(3)+")";</scr'+'ipt>'
+}
+async function countSaved(){
+  const n=(await shelfAll().catch(()=>[])).length
+  const badge=document.getElementById('savedn'); if(badge) badge.textContent=n||''
+}
+async function drawSaved(){
+  const list=await shelfAll().catch(()=>[])
+  kept=new Set(list.map(r=>r.id))
+  const badge=document.getElementById('savedn'); if(badge) badge.textContent=list.length||''
+  grid.classList.remove('railed'); grid.classList.remove('solo')
+  grid.innerHTML=list.length
+    ? list.map(r=>'<figure><iframe data-kept="'+esc(r.id)+'" scrolling="no"></iframe>'
+      +'<figcaption><b title="'+esc(r.from)+'">'+esc(r.note)+'</b>'
+      +'<span class="facts">'+(r.tempo?factLine(r):'')+'</span>'
+      +'<span class="seen">'+(r.seen?seenLine(r):'')+'</span>'
+      +'<span class="row">'
+      +'<button class="icb" data-getcss="'+esc(r.id)+'" title="Download the css">'+ICON.down+'</button>'
+      +'<button class="icb" data-forget="'+esc(r.id)+'" title="Remove it from saved">'+ICON.drop+'</button>'
+      +'</span></figcaption></figure>').join('')
+    : '<div class="empty">Nothing saved yet. The bookmark on a motion keeps it here, '
+      +'and it stays after the studio is restarted.</div>'
+  // srcdoc after the markup exists, never while it is being built
+  for(const f of grid.querySelectorAll('[data-kept]')){
+    const r=list.find(x=>x.id===f.dataset.kept); if(r) f.srcdoc=standalone(r)
+  }
+  grid.querySelectorAll('[data-forget]').forEach(b=>b.onclick=async()=>{
+    await shelfDrop(b.dataset.forget); kept.delete(b.dataset.forget); drawSaved()
+  })
+  /* written here rather than fetched: the whole record is already in this page, so asking a server
+     to hand back something it does not have any more would only be a way for this to stop working */
+  grid.querySelectorAll('[data-getcss]').forEach(b=>b.onclick=()=>{
+    const r=list.find(x=>x.id===b.dataset.getcss); if(!r) return
+    const text='/* '+r.note+String.fromCharCode(10)+'   add '+r.scope
+      +' to the root element */'+String.fromCharCode(10)+r.css
+    const url=URL.createObjectURL(new Blob([text],{type:'text/css'}))
+    const a=document.createElement('a')
+    a.href=url; a.download=(r.note||'motion').replace(/[^a-z0-9]+/gi,'-').toLowerCase()+'.css'
+    a.click(); setTimeout(()=>URL.revokeObjectURL(url),4000)
+  })
+}
+
+/**
+ * The arm light.
+ *
+ * An interference field evaluated per pixel and blurred into the button, rather than a gradient
+ * swept across it: a sweep repeats on a period you start counting after the third pass, and a field
+ * does not repeat. It runs only while something is selected, which is the moment the button is worth
+ * looking at, and stops when the tab is hidden so it is not a battery cost for a background window.
+ */
+function armGlow(on){
+  const c=document.getElementById('askfield'); if(!c) return
+  document.getElementById('ask').classList.toggle('armed',!!on)
+  if(!on){ if(glowing) cancelAnimationFrame(glowing); glowing=0; c.style.opacity=0; return }
+  if(glowing) return
+  const W=44,H=11,g=c.getContext('2d')
+  c.width=W; c.height=H
+  const img=g.createImageData(W,H), d=img.data
+  let t=0
+  const step=()=>{
+    if(!document.body.contains(c)||document.hidden){ glowing=0; c.style.opacity=0; return }
+    t+=0.03
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+      const q=Math.sin(x*0.19+t*1.05)+Math.cos(y*0.44-t*0.72)
+      const r=Math.sin((x*0.1+y*0.22)+q*0.9+t*0.6)
+      let a=(Math.sin(x*0.07-y*0.14+r*1.7+t*0.42)+1)/2
+      a=a*a*(3-2*a); a=a*a
+      const i=(y*W+x)*4
+      d[i]=110+a*130; d[i+1]=120+a*120; d[i+2]=238; d[i+3]=a*170
+    }
+    g.putImageData(img,0,0); c.style.opacity=1
+    glowing=requestAnimationFrame(step)
+  }
+  glowing=requestAnimationFrame(step)
+}
+
+/**
+ * The header, carrying only what there is something to do with.
+ *
+ * A transport, an inspector, a film button and an export sitting above an empty room are four
+ * controls that do nothing yet, and they were the first thing anybody saw. With nothing to play,
+ * the only two things worth offering are picking something and asking for motion.
+ */
+function dressHeader(){
+  const playing = opts.length>0 || !!(cars && cars.some(c=>c.id))
+  document.querySelector('header').classList.toggle('bare', !playing || viewing==='saved')
+}
 
 /* innerHTML does not run a script tag, so the field is driven by a function the page already has */
 function runShader(){ try { eval(SHADER) } catch(e) { /* the wait is cosmetic, never fatal */ } }
@@ -2807,7 +3026,8 @@ function wireTimeline(live){
 /* the selection, which is the thing a rail is built out of */
 function drawSel(){
   const el=document.getElementById('sel')
-  if(!picks.length){ el.innerHTML=''; ask.textContent='Give it motion'; return }
+  if(!picks.length){ el.innerHTML=''; ask.querySelector('.lbl').textContent='Give it motion'
+    armGlow(false); return }
   el.innerHTML='<p class="selhead">Selection'+(picks.length>1?' &middot; '+picks.length:'')+'</p>'
     +picks.map((p,i)=>'<span class="pill"><b>'+(i+1)+'</b>'
       +'<span class="shot"><iframe data-shot="'+i+'" scrolling="no" tabindex="-1"></iframe></span>'
@@ -2816,18 +3036,17 @@ function drawSel(){
       +(p.weak?'<u>'+p.weak+'</u>':'')
       +(p.opaque?'<u>'+p.opaque+' sheet'+(p.opaque>1?'s':'')+' unreadable</u>':'')+'</span>'
       +'<button data-drop="'+i+'" title="remove">&times;</button></span>').join('')
-    +(picks.length>1?'<p class="hint">These will be given one motion each and played on one '
-      +'timeline, each starting a beat after the one above it.</p>':'')
-    +(picks.some(x=>x.weak)?'<p class="hint">A pick with little inside it has nothing to stagger. '
-      +'A container with several sibling parts, like a row of cards or a list, gives motion more to '
-      +'work with.</p>':'')
+    +(picks.length>1?'<p class="hint">One motion each, on one timeline, a beat apart.</p>':'')
+    +(picks.some(x=>x.weak)?'<p class="hint">Little inside to stagger. A row of cards or a list '
+      +'gives motion more to work with.</p>':'')
   // after the markup exists, not in the middle of building it
   paintShots()
   el.querySelectorAll('[data-drop]').forEach(b=>b.onclick=()=>{
     mark('removing '+tagOf(picks[Number(b.dataset.drop)].label))
     picks.splice(Number(b.dataset.drop),1); chosen=picks[picks.length-1]||null
     cars=null; opts=[]; drawSel(); render() })
-  ask.textContent=picks.length>1?'Give them motion':'Give it motion'
+  ask.querySelector('.lbl').textContent=picks.length>1?'Give them motion':'Give it motion'
+  armGlow(picks.length>0)
 }
 function paint(){
   /* only the previews in the grid: the sidebar thumbnails and the proxied app are iframes too, and
@@ -2853,6 +3072,13 @@ function hold(ms){
 }
 function face(){document.getElementById('glyph').textContent=running?'❚❚':'▶'
   play.title=running?'Pause (space)':'Play (space)'}
+/* last, because everything below reads state and functions declared throughout this script, and
+   three separate dead zone faults in one sitting all came from booting something too early */
+shelfAll().then(l=>{ kept=new Set(l.map(r=>r.id))
+  const badge=document.getElementById('savedn'); if(badge) badge.textContent=l.length||''
+  if(opts.length) render()
+}).catch(()=>{})
+
 requestAnimationFrame(function tick(now){const s=now-last;last=now
   if(running){t=(t+s*rate)%span;hold(t)} requestAnimationFrame(tick)})
 play.onclick=()=>{running=!running;face()}
