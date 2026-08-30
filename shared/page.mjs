@@ -423,7 +423,24 @@ let APP=${AIM ? 'true' : 'false'}
 const CAN_WRITE=${CAN_WRITE ? 'true' : 'false'}
 let chosen=null   // the most recent pick
 let picks=[]      // everything selected, in the order it was picked
-let cars=null     // the rail, once each element has been given a motion
+let arr=null      // the arrangement, once each element has been given a motion
+/**
+ * The composition's arithmetic, fetched rather than written here.
+ *
+ * The same reason raster and mp4 are fetched: this file is one template literal, so a regex written
+ * in it loses its escapes before a browser sees it, and a second copy of a measurement is how 3.2s
+ * came to be read as 2s. One definition, in shared/arrange.mjs, which node imports directly to check.
+ *
+ * Eagerly, unlike those two, because the timeline reads it on every draw rather than when a button is
+ * pressed. It is awaited at the one place an arrangement can be born, which already waits minutes on
+ * a model call, so nothing downstream has to ask whether it arrived.
+ */
+let ARR=null
+const arriving=import('/__wall/arrange.mjs').then(m=>{ARR=m}).catch(()=>{})
+/* one question, asked in five places before this, each its own chance to answer differently */
+const railed=()=>!!(ARR&&arr&&ARR.live(arr).length)
+/* the cars that carry a motion, each with the index it sits at, since a dead car still owns a row */
+const onRail=()=>(railed()?ARR.live(arr):[])
 let verdict=null  // why the last ask produced nothing, so the grid can say so
 let dbp=null      // the saved shelf, opened on first use
 let kept=new Set()// which options are on it, so a card can show its bookmark filled
@@ -441,16 +458,17 @@ let glowing=0     // the arm light's frame handle, read by drawSel before its ow
  *
  * The heavy fields are shared rather than copied. An option's markup and css never change after it is
  * written, so copying them into every step would spend megabytes preserving something already
- * immutable. Cars are copied, because their offset and their camera are precisely what a step is
- * usually about.
+ * immutable. Cars are replaced rather than copied: every edit returns a new arrangement, so the one
+ * it replaced already is the snapshot and there is nothing here to keep in step with it. A step that
+ * has to remember to copy a field is a step that stops working the day a field is added, and the
+ * motions those cars point at are frozen so that sharing them cannot go wrong.
  */
 const HIST=60
 let past=[], ahead=[]
-const snap=()=>({ picks:picks.slice(), opts:opts.slice(), chosen,
-  cars: cars && cars.map(c=>({...c})), opened, chosenOpt })
+const snap=()=>({ picks:picks.slice(), opts:opts.slice(), chosen, arr, opened, chosenOpt })
 function restore(st){
   picks=st.picks.slice(); opts=st.opts.slice(); chosen=st.chosen
-  cars=st.cars && st.cars.map(c=>({...c})); opened=st.opened; chosenOpt=st.chosenOpt
+  arr=st.arr; opened=st.opened; chosenOpt=st.chosenOpt
   held.clear(); ends.clear(); drawSel(); render(); drawInspector(); drawHistory()
 }
 /* called before the change, so what lands on the stack is the state to come back to */
@@ -504,7 +522,7 @@ aimform.onsubmit=async e=>{
   const r=await fetch('/__wall/target',{method:'POST',headers:{'content-type':'application/json'},
     body:JSON.stringify({url:said})}).then(x=>x.json()).catch(e=>({error:String(e)}))
   if(r.error){ note.dataset.state='error'; note.textContent=r.error; return }
-  urlbox.value=r.at; APP=true; aimN++; quietMode=false; picks=[]; opts=[]; verdict=null; chosen=null; cars=null
+  urlbox.value=r.at; APP=true; aimN++; quietMode=false; picks=[]; opts=[]; verdict=null; chosen=null; arr=null
   // the folder list is about somewhere else now
   drawRail(r.recent||[])
   // nothing to say once it is up: the page is right there and it says it better
@@ -537,7 +555,7 @@ function drawRail(recent){
   rail.querySelectorAll('.file').forEach(b=>b.onclick=()=>{
     file=b.dataset.f
     rail.querySelectorAll('.file').forEach(x=>x.setAttribute('aria-current',x===b))
-    opts=[]; verdict=null; cars=null; held.clear(); drops.textContent=''; render()
+    opts=[]; verdict=null; arr=null; held.clear(); drops.textContent=''; render()
   })
 }
 Promise.all([fetch('/__wall/list').then(r=>r.json()), fetch('/__wall/recent').then(r=>r.json())])
@@ -717,13 +735,17 @@ ask.onclick=async()=>{
     drops.textContent=''
     try{
       const r=await post('/__wall/rail',{picks,palette:palette.value},420000)
-      cars=(r.cars||[]).map((c,i)=>({...c, at: i*420}))
+      /* the one place an arrangement is born, and so the one place worth waiting for the module. It
+         has already waited minutes on the model, so this costs nothing and every synchronous reader
+         below it can stop asking whether the import landed */
+      await arriving
+      arr=ARR.fromRail(r.cars||[])
       opts=[]; held.clear(); ends.clear(); render()
-      const moved=cars.filter(c=>c.id).length
-      const lost=cars.filter(c=>!c.id)
-      drops.innerHTML=moved+' of '+cars.length+' moved.'
+      const moved=ARR.live(arr).length
+      const lost=arr.cars.filter(c=>!c.motion)
+      drops.innerHTML=moved+' of '+arr.cars.length+' moved.'
         +(moved?' They begin a beat apart, and the sequence below can be dragged.':'')
-        +(lost.length?'<br>'+lost.map(c=>'<b>'+c.label+'</b> did not: '+String(c.why||'')).join('<br>'):'')
+        +(lost.length?'<br>'+lost.map(c=>'<b>'+c.pick.label+'</b> did not: '+String(c.why||'')).join('<br>'):'')
     }catch(e){ verdict={dropped:[],error:String(e && e.message||e)}; render() }
     ask.disabled=false; drawSel(); return
   }
@@ -733,7 +755,7 @@ ask.onclick=async()=>{
   try{
     const r=await post('/__wall/motion',
       Object.assign({count:Number(document.getElementById('count').value)}, APP?chosen:{file}), 360000)
-    opts=r.kept||[]; cars=null; opened=null; held.clear(); ends.clear()
+    opts=r.kept||[]; arr=null; opened=null; held.clear(); ends.clear()
     verdict = opts.length ? null : {dropped:r.dropped||[], error:r.error}
     render()
     drops.textContent=(r.dropped&&r.dropped.length&&opts.length? r.dropped.length+' dropped: '
@@ -856,12 +878,18 @@ addEventListener('keydown',e=>{ if(e.key==='Escape') shut() })
  * option. One subject at a time, one place that edits it, and the timeline stays a timeline instead
  * of growing a control panel on every row.
  */
+/* the car is handed back beside its motion, and o still means the thing with an id and a note, so
+   everything reading o.id or o.note is unchanged and only when-it-starts and what-films-it moved */
 function subject(){
-  if(cars){ const c=cars.find(x=>x.id&&x.id===chosenOpt); if(c) return { kind:'car', o:c } }
+  if(railed()){
+    const x=ARR.live(arr).find(y=>y.car.motion.id===chosenOpt)
+    if(x) return { kind:'car', car:x.car, i:x.i, o:x.car.motion }
+  }
   const o=opts.find(x=>x.id===chosenOpt)
   return o ? { kind:'opt', o } : null
 }
-const nameOf = (o) => String(o.note||o.label||'untitled').split(',')[0].slice(0,28)
+const nameOf = (o) => String((o&&(o.note||o.label))||(o&&o.pick&&o.pick.label)||'untitled')
+  .split(',')[0].slice(0,28)
 
 const CAMS=[['','none'],['locked','locked off'],['push','slow push'],['drift','drift'],['orbit','orbit']]
 function drawCams(now){
@@ -870,9 +898,9 @@ function drawCams(now){
     +'<span class="cambox cam-'+(c[0]||'none')+'"><i></i></span><em>'+c[1]+'</em></button>').join('')
   box.querySelectorAll('[data-campick]').forEach(b=>b.onclick=()=>{
     const s=subject(); if(!s||s.kind!=='car') return
-    if((s.o.shot||'')===b.dataset.campick) return
+    if((s.car.shot||'')===b.dataset.campick) return
     mark('the camera on '+nameOf(s.o))
-    s.o.shot=b.dataset.campick
+    arr=ARR.retimed(arr,s.i,{shot:b.dataset.campick})
     held.clear(); ends.clear(); render(); drawInspector()
   })
 }
@@ -883,7 +911,7 @@ function drawInspector(){
   const note=document.getElementById('inote')
   if(!s){
     tag.textContent='nothing chosen'
-    facts.innerHTML = cars && cars.some(c=>c.id)
+    facts.innerHTML = railed()
       ? 'Click a row in the sequence below to adjust that one.'
       : 'Click an option below to choose it.'
     btn.disabled=true; camrow.hidden=true; return
@@ -892,10 +920,13 @@ function drawInspector(){
   tag.textContent=nameOf(o)
   btn.disabled=false
   if(s.kind==='car'){
-    facts.innerHTML='Starts at '+(o.at/1000).toFixed(2)+'s and runs '+((o.ms||600)/1000).toFixed(2)+'s.'
+    /* when it starts is the resolved answer rather than the stored one, or a car pinned to another
+       would report the offset it is no longer using */
+    const at=ARR.resolve(arr).at[s.i]
+    facts.innerHTML='Starts at '+(at/1000).toFixed(2)+'s and runs '+((o.ms||600)/1000).toFixed(2)+'s.'
     btn.textContent='Apply to this one'
     note.textContent='Changes this car where it sits. The others are left alone.'
-    camrow.hidden=false; drawCams(o.shot||'')
+    camrow.hidden=false; drawCams(s.car.shot||'')
   } else {
     facts.innerHTML=factLine(o)
     btn.textContent='Add as a new option'
@@ -915,9 +946,20 @@ document.getElementById('tapply').onclick=async()=>{
   if(r.error){ document.getElementById('inote').textContent=r.error.slice(0,120); return }
   if(s.kind==='car'){
     /* a car is one voice in a composition, so retiming it replaces it where it stands. Adding a
-       sixth car nobody asked for would be answering a different question */
+       sixth car nobody asked for would be answering a different question.
+       The tuned motion joins the ones this car already has rather than replacing the record in
+       place: writing through a motion would leave every history step holding the tuned id, so
+       undoing a tune would hand back the tune. It also means a car's alternatives are one list
+       however a motion got there, dealt or refined or tuned. */
     mark('adjusting '+nameOf(o))
-    o.id=r.id; o.ms=(r.tempo && r.tempo.span) || o.ms; chosenOpt=r.id
+    const tune={ duration:Number(document.getElementById('tdur').value),
+      stagger:Number(document.getElementById('tstag').value),
+      ease:document.getElementById('tease').value }
+    const grown=ARR.offered(arr,s.i,[{ ...o, id:r.id, tempo:r.tempo,
+      ms:(r.tempo&&r.tempo.span)||o.ms, note:o.note }])
+    arr=ARR.retimed(ARR.swapped(grown,s.i,
+      grown.cars[s.i].alternatives.findIndex(m=>m.id===r.id)),s.i,{tune})
+    chosenOpt=r.id
     held.clear(); ends.clear(); render(); drawInspector()
     document.getElementById('inote').textContent='Applied. Undo puts it back the way it was.'
     return
@@ -938,7 +980,7 @@ document.getElementById('tapply').onclick=async()=>{
  * confidently is worse than a refusal, so a grid of several asks you to open one first.
  */
 function filmable(){
-  if(cars && cars.some(c=>c.id)){
+  if(railed()){
     const f=grid.querySelector('.appwrap iframe')
     return f ? { frame:f, what:'the rail' } : { why:'the rail is not on screen yet' }
   }
@@ -1057,22 +1099,23 @@ document.getElementById('save').onclick=async()=>{
   const stem=(v)=>{const k=String(v||'').lastIndexOf('.'); return k>0?String(v).slice(0,k):String(v||'')}
   /* a rail is a composition, so what it hands over is the sequencing as well as the motions. Sending
      the ids alone exported every car starting together, which is the one decision a rail records */
-  const live = (cars||[]).filter(c=>c.id)
-  const onRail = !opts.length && live.length
-  const ids = opts.length ? opts.map(o=>o.id) : live.map(c=>c.id)
+  const rail = !opts.length && railed()
+  const rows = rail ? ARR.live(arr) : []
+  const when = rail ? ARR.resolve(arr).at : []
+  const ids = opts.length ? opts.map(o=>o.id) : rows.map(x=>x.car.motion.id)
   if(!ids.length) return
   const btn=document.getElementById('save'); btn.textContent='Writing…'
   const r=await fetch('/__wall/export',{method:'POST',headers:{'content-type':'application/json'},
     body:JSON.stringify({ids,palette:palette.value,
-      at: onRail ? live.map(c=>Math.round(c.at||0)) : [],
-      shots: onRail ? live.map(c=>c.shot||'') : [],
+      at: rail ? rows.map(x=>Math.round(when[x.i])) : [],
+      shots: rail ? rows.map(x=>x.car.shot||'') : [],
       name:stem((APP?(chosen&&chosen.label):file||'').split('/').pop())})}).then(r=>r.json())
   btn.textContent='Export'
   /* cameras are not carried yet, and an export that quietly drops one is how the offsets went
      missing in the first place, so it says so rather than looking complete */
-  const shot = onRail && live.some(c=>c.shot)
+  const shot = rail && rows.some(x=>x.car.shot)
   drops.textContent='Wrote '+r.at+', '+r.kb+'kb. One file, opens anywhere, no requests.'
-    +(onRail?' The cars keep their offsets.':'')
+    +(rail?' The cars keep their offsets.':'')
     +(shot?' The cameras do not travel into an export yet, so it plays locked off.':'')
 }
 document.getElementById('rate').onchange=e=>{rate=parseFloat(e.target.value)}
@@ -1080,14 +1123,12 @@ document.getElementById('rate').onchange=e=>{rate=parseFloat(e.target.value)}
 function render(){
   dressHeader()
   if(viewing==='saved'){ drawSaved(); return }
-  if(cars && cars.some(c=>c.id)){
-    const live=cars.filter(c=>c.id)
-    const ids=live.map(c=>c.id).join(',')
-    const at=live.map(c=>Math.round(c.at)).join(',')
-    const shots=live.map(c=>c.shot||'').join(',')
-    grid.innerHTML='<div class="appwrap"><iframe data-i="0" src="/__wall/railview?ids='+ids
-      +'&at='+at+'&shots='+shots+'&palette='+encodeURIComponent(palette.value)+'"></iframe></div>'
-      + timeline(live)
+  if(railed()){
+    const live=ARR.live(arr)
+    /* the frame is asked for by the module rather than by a string built here, which is what keeps a
+       car pinned to another one from ever reaching the server: it resolves to plain offsets first */
+    grid.innerHTML='<div class="appwrap"><iframe data-i="0" src="'+ARR.urlOf(arr,palette.value)
+      +'"></iframe></div>' + timeline(live)
     grid.classList.add('railed')
     // the strip is as tall as it needs to be, and the frame gives up exactly that much
     const strip=document.getElementById('tl')
@@ -1404,7 +1445,7 @@ function armGlow(on){
  * the only two things worth offering are picking something and asking for motion.
  */
 function dressHeader(){
-  const playing = opts.length>0 || !!(cars && cars.some(c=>c.id))
+  const playing = opts.length>0 || railed()
   document.querySelector('header').classList.toggle('bare', !playing || viewing==='saved')
 }
 
@@ -1447,35 +1488,42 @@ function paintShots(){
  * time. The playhead is the same scrubber that drives the previews, so what you read here and what
  * you watch above it are the same clock.
  */
-function railSpan(live){
-  return Math.max(1200, ...live.map(c=>c.at + (c.ms||600))) * 1.04
-}
+/**
+ * Every row carries the index of the car it draws, not its position among the rows that survived.
+ *
+ * The two are the same number until a pick fails to move, and then they are not. The old draw filtered
+ * the dead cars out and then wrote the position in the filtered list into data-row, which the handlers
+ * read back as an index into the real list. It happened to work because the filtered array shared its
+ * objects with the real one, which is the alias this whole change exists to remove: dragging a bar
+ * wrote through a view and edited state nobody had said could be edited.
+ */
 function timeline(live){
-  const total=railSpan(live)
+  const total=ARR.viewSpan(arr)
+  const at=ARR.resolve(arr).at
   return '<div class="tl" id="tl"><div class="tlhead">Sequence &middot; click a row to adjust it, '
     + 'drag a bar to move it in time</div>'
-    + live.map((c,i)=>'<div class="tlrow'+(c.id===chosenOpt?' on':'')+'" data-row="'+i+'">'
+    + live.map(({car,i})=>'<div class="tlrow'+(car.motion.id===chosenOpt?' on':'')+'" data-row="'+i+'">'
         +'<span class="grip" data-grip="'+i+'" title="drag to reorder">&#8942;&#8942;</span>'
-        +'<span class="tlname" title="'+(c.note||'')+'">'
-        +((c.note||c.label||'').split(',')[0]).slice(0,24)+'</span>'
-        +'<span class="tlcam'+(c.shot?' on':'')+'">'
-        +(CAMS.find(x=>x[0]===(c.shot||''))||CAMS[0])[1]+'</span>'
+        +'<span class="tlname" title="'+esc(car.motion.note||car.pick.label)+'">'
+        +esc(nameOf(car.motion)||car.pick.label)+'</span>'
+        +'<span class="tlcam'+(car.shot?' on':'')+'">'
+        +(CAMS.find(x=>x[0]===(car.shot||''))||CAMS[0])[1]+'</span>'
         +'<span class="tltrack" data-track="'+i+'">'
-        +'<span class="tlbar" data-bar="'+i+'" style="left:'+(c.at/total*100).toFixed(2)+'%;'
-        +'width:'+Math.max(2,(c.ms||600)/total*100).toFixed(2)+'%">'
-        +'<i>'+(c.at/1000).toFixed(2)+'s</i></span></span></div>').join('')
+        +'<span class="tlbar" data-bar="'+i+'" style="left:'+(at[i]/total*100).toFixed(2)+'%;'
+        +'width:'+Math.max(2,car.motion.ms/total*100).toFixed(2)+'%">'
+        +'<i>'+(at[i]/1000).toFixed(2)+'s</i></span></span></div>').join('')
     + '<div class="tlfoot"><span>0s</span><span>'+(total/1000).toFixed(1)+'s</span></div>'
     + '<div class="tlhead" id="tlplay"></div></div>'
 }
-function selectRow(i, live){
-  const c=live[i]; if(!c) return
-  chosenOpt=c.id
-  document.querySelectorAll('.tlrow').forEach((r,j)=>r.classList.toggle('on', j===i))
+function selectRow(i){
+  const car=arr&&arr.cars[i]; if(!car||!car.motion) return
+  chosenOpt=car.motion.id
+  document.querySelectorAll('.tlrow').forEach(r=>r.classList.toggle('on', Number(r.dataset.row)===i))
   shut(); insp.hidden=false
   drawInspector()
 }
 function wireTimeline(live){
-  const total=railSpan(live)
+  const total=ARR.viewSpan(arr)
   /**
    * Order, dragged.
    *
@@ -1497,30 +1545,32 @@ function wireTimeline(live){
       // always, or the document listener below closes the panel this just opened
       e.stopPropagation()
       if(e.target.closest('[data-grip]')) return
-      selectRow(Number(row.dataset.row), live)
+      selectRow(Number(row.dataset.row))
     }
   }
   for (const grip of document.querySelectorAll('[data-grip]')){
     grip.onpointerdown=e=>{
       e.preventDefault()
-      const from=Number(grip.dataset.grip)
+      /* two different indices, and conflating them is what the old draw did. seat is where the row
+         sits on screen, which is what a pointer is compared against; data-grip is which car it
+         draws. They part company the moment one pick fails to move */
       const rows=[...document.querySelectorAll('.tlrow')]
+      const seat=rows.indexOf(grip.closest('.tlrow'))
       const tops=rows.map(r=>r.getBoundingClientRect().top+r.getBoundingClientRect().height/2)
-      rows[from].classList.add('lifting')
-      let to=from
+      rows[seat].classList.add('lifting')
+      let to=seat
       const move=ev=>{
-        to=tops.reduce((best,t,i)=>Math.abs(ev.clientY-t)<Math.abs(ev.clientY-tops[best])?i:best,from)
-        rows.forEach((r,i)=>r.style.outline = i===to&&i!==from ? '1px solid var(--accent)' : '')
+        to=tops.reduce((best,t,i)=>Math.abs(ev.clientY-t)<Math.abs(ev.clientY-tops[best])?i:best,seat)
+        rows.forEach((r,i)=>r.style.outline = i===to&&i!==seat ? '1px solid var(--accent)' : '')
       }
       const up=()=>{
         window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up)
-        rows[from].classList.remove('lifting'); rows.forEach(r=>r.style.outline='')
-        if(to!==from){
+        rows[seat].classList.remove('lifting'); rows.forEach(r=>r.style.outline='')
+        if(to!==seat){
           mark('reordering the rail')
-          const order=cars.filter(c=>c.id)
-          order.splice(to,0,order.splice(from,1)[0])
-          const rest=cars.filter(c=>!c.id)
-          cars=order.concat(rest)
+          /* a car that did not move keeps its place rather than being swept to the bottom, which is
+             what rebuilding the list as movers-then-failures used to do on every reorder */
+          arr=ARR.reordered(arr, Number(rows[seat].dataset.row), Number(rows[to].dataset.row))
           held.clear(); ends.clear(); render()
         }
       }
@@ -1531,18 +1581,23 @@ function wireTimeline(live){
     bar.onpointerdown=e=>{
       e.preventDefault()
       const i=Number(bar.dataset.bar), track=bar.parentElement
-      const w=track.getBoundingClientRect().width, from=e.clientX, was=live[i].at
-      let stepped=false
+      const w=track.getBoundingClientRect().width, from=e.clientX
+      const was=ARR.resolve(arr).at[i]
+      let stepped=false, at=was
       const move=ev=>{
-        if(!stepped){ stepped=true; mark('moving '+nameOf(live[i])+' in time') }
-        const at=Math.max(0, was + (ev.clientX-from)/w*total)
-        live[i].at=at
+        if(!stepped){ stepped=true; mark('moving '+nameOf(arr.cars[i].motion)+' in time') }
+        at=Math.max(0, was + (ev.clientX-from)/w*total)
+        /* the bar is moved by hand while the drag is live and the arrangement is written once at the
+           end. Rebuilding the value on every pointermove would be honest and would also rebuild the
+           frame sixty times a second; the old code got the same effect by writing through a filtered
+           view of the state, which worked and meant nothing could be sure what owned a car's offset */
         bar.style.left=(at/total*100).toFixed(2)+'%'
         bar.querySelector('i').textContent=(at/1000).toFixed(2)+'s'
       }
       const up=()=>{
         window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up)
-        if(!stepped) return selectRow(i, live)
+        if(!stepped) return selectRow(i)
+        arr=ARR.moved(arr,i,at)
         // only reload the frame when the drag ends, or every pixel would restart the page
         held.clear(); ends.clear(); render()
       }
@@ -1576,7 +1631,7 @@ function drawSel(){
   el.querySelectorAll('[data-drop]').forEach(b=>b.onclick=()=>{
     mark('removing '+tagOf(picks[Number(b.dataset.drop)].label))
     picks.splice(Number(b.dataset.drop),1); chosen=picks[picks.length-1]||null
-    cars=null; opts=[]; drawSel(); render() })
+    arr=null; opts=[]; drawSel(); render() })
   ask.querySelector('.lbl').textContent=picks.length>1?'Give them motion':'Give it motion'
   armGlow(picks.length>0)
 }
@@ -1587,7 +1642,7 @@ function paint(){
   /* a preview inside a hidden figure stops running and stops replying, so counting it says one of
      two are driven when the one you are looking at is fine */
   const frames=[...document.querySelectorAll('.grid iframe')].filter(f=>f.offsetParent!==null)
-  if(!opts.length&&!(cars&&cars.some(c=>c.id))){
+  if(!opts.length&&!railed()){
     link.removeAttribute('data-ok'); link.title='nothing to drive yet'; return }
   /* counted over the frames that are actually on screen rather than over everything the map still
      remembers, or closing an opened option reports five of one */
