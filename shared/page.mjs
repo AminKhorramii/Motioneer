@@ -202,7 +202,6 @@ header.bare .whenplaying{display:none}
   letter-spacing:3px;user-select:none;white-space:nowrap}
 .field i{font-style:normal;opacity:0}
 
-.hint{margin:4px 10px;font-size:12px;color:var(--faint);line-height:1.7}
 .selhead{margin:12px 12px 6px;font-size:10.5px;text-transform:none;letter-spacing:.06em;color:var(--faint)}
 .pill{display:flex;align-items:center;gap:8px;margin:5px 10px;padding:6px 6px 6px 7px;background:var(--raised);
   border:1px solid var(--line);border-radius:7px;font-size:11.5px;color:var(--dim)}
@@ -218,7 +217,6 @@ header.bare .whenplaying{display:none}
 .pill button{margin-left:auto;background:none;border:0;color:var(--faint);cursor:pointer;
   font-size:14px;line-height:1;padding:0 2px}
 .pill button:hover{color:var(--ink)}
-.hint b{color:var(--dim);font-weight:500}
 .appwrap{grid-column:1/-1;height:calc(100vh - 116px);border:1px solid var(--line);border-radius:8px;
   overflow:hidden;background:#fff}
 /* the rail and its sequence share the height: the timeline used to be laid out below the frame and
@@ -2573,9 +2571,6 @@ function drawSel(){
       +(p.weak?'<u>'+p.weak+'</u>':'')
       +(p.opaque?'<u>'+p.opaque+' sheet'+(p.opaque>1?'s':'')+' unreadable</u>':'')+'</span>'
       +'<button data-drop="'+i+'" title="remove">&times;</button></span>').join('')
-    +(picks.length>1?'<p class="hint">One motion each, on one timeline, a beat apart.</p>':'')
-    +(picks.some(x=>x.weak)?'<p class="hint">Little inside to stagger. A row of cards or a list '
-      +'gives motion more to work with.</p>':'')
   // after the markup exists, not in the middle of building it
   paintShots()
   el.querySelectorAll('[data-drop]').forEach(b=>b.onclick=()=>{
