@@ -880,10 +880,14 @@ whole interaction is to put the clock where something should happen and then do 
 needed a life to become a backdrop rather than a target: a car that never leaves has one the width
 of the whole track, and while it was clickable there was nowhere left to put the playhead.
 
-Still to do here: a bezier editor, since four easing presets is a ceiling on taste, and one camera
-over the whole composition with the per-car one as an override. The camera is the obvious next one,
-because a journey and a camera move are now the same shape and the second could be the first applied
-to the stage rather than to a component.
+**And the camera is one of those journeys applied to everything at once.** Alt drag the stage itself
+rather than a component and the whole picture travels, which is the same gesture one level up. The
+four presets and the rig per car stay, because a rig per car is what lets one component sit still
+while the one below it pushes in, and that is a different question from where the whole picture
+goes. One reader and one track builder serve both, so a camera cannot drift away from a journey in
+how it composes or how it is filmed.
+
+Still to do here: a bezier editor, since four easing presets is a ceiling on taste.
 
 ### Handing it over
 

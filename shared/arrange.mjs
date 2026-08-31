@@ -103,7 +103,9 @@ export function fromRail(got, picks = [], id = 'a1') {
       why: c.id ? '' : String(c.why ?? 'nothing came back'),
     }
   })
-  return { id, cars, camera: '', markers: [] }
+  /* the camera is the stage's own journey. A camera move and a component move turned out to be the
+     same shape, so this is that shape applied to everything at once rather than to one thing */
+  return { id, cars, camera: [], markers: [] }
 }
 
 /** a car put somewhere on the stage, or handed back to the stack when given nothing */
@@ -136,6 +138,32 @@ export function routed(arr, i, moves) {
     ease: String(m.ease || 'ease'),
   })).sort((a, b) => a.at - b.at)
   return patch(arr, i, { moves: Object.freeze(clean) })
+}
+
+/**
+ * The camera's journey, which is a component's journey applied to the stage.
+ *
+ * A camera was four presets and a rig per car, and a rig per car is what lets one component sit
+ * still while the one below it pushes in. That is a different thing from a camera over the whole
+ * composition, which is where the whole picture goes, and once a component could be sent somewhere
+ * the camera was the same operation one level up.
+ */
+export function framed(arr, moves) {
+  const clean = (moves || []).map((m) => ({
+    at: Math.max(0, Math.round(num(m.at))),
+    ms: Math.max(60, Math.round(num(m.ms, 600))),
+    x: num(m.x), y: num(m.y),
+    scale: Math.max(0.2, num(m.scale, 1)),
+    ease: String(m.ease || 'ease'),
+  })).sort((a, b) => a.at - b.at)
+  return { ...arr, camera: Object.freeze(clean) }
+}
+
+/** one more move of the camera, replacing whichever already ended at that instant */
+export function filmed(arr, move) {
+  const ends = Math.round(num(move.at) + num(move.ms, 600))
+  const rest = (arr.camera || []).filter((m) => Math.abs(m.at + m.ms - ends) > 1)
+  return framed(arr, rest.concat([move]))
 }
 
 /** one more leg of the journey, replacing whichever already ended at that instant */
@@ -186,7 +214,8 @@ export function revive(said) {
     until: c.until === null || c.until === undefined ? null : num(c.until),
     why: String(c.why || ''),
   }))
-  return { id: String(said.id || 'a1'), cars, camera: String(said.camera || ''),
+  return { id: String(said.id || 'a1'), cars,
+    camera: Object.freeze((Array.isArray(said.camera) ? said.camera : []).map((m) => ({ ...m }))),
     markers: (said.markers || []).map(num) }
 }
 
@@ -329,7 +358,9 @@ export function spanOf(arr) {
        motion is the whole point of a demo, so both count as much as the motion does */
     return Math.max(at[x.i] + runs(x.car), life.until === null ? 0 : life.until, trip)
   })
-  return Math.max(FLOOR, ...ends, 0)
+  // a camera still moving at the end of every motion is the last thing anybody is watching
+  const shot = (arr.camera || []).reduce((most, m) => Math.max(most, m.at + m.ms), 0)
+  return Math.max(FLOOR, ...ends, shot, 0)
 }
 
 /**
@@ -522,6 +553,9 @@ export function urlOf(arr, palette) {
     q('go', on.map((x) => (x.car.moves || [])
       .map((m) => `${Math.round(m.at)}_${Math.round(m.ms)}_${m.x.toFixed(2)}_${m.y.toFixed(2)}`
         + `_${m.scale.toFixed(3)}_${m.ease}`).join('|')).join(',')),
+    q('cam', (arr.camera || [])
+      .map((m) => `${Math.round(m.at)}_${Math.round(m.ms)}_${m.x.toFixed(2)}_${m.y.toFixed(2)}`
+        + `_${m.scale.toFixed(3)}_${m.ease}`).join('|')),
     q('palette', palette ?? ''),
   ].join('&')}`
 }

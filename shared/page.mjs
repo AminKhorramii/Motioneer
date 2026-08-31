@@ -1555,6 +1555,22 @@ addEventListener('message',e=>{const d=e.data||{}
     held.clear(); ends.clear(); render(); drawInspector()
     return
   }
+  /**
+   * The camera sent somewhere, which is a component's journey applied to everything at once.
+   *
+   * Alt on the stage background, the way alt on a component sends that component: the same gesture
+   * at two levels, because a camera move and a component move turned out to be the same shape.
+   */
+  if(d.wall==='panned'&&railed()&&!d.keep){
+    const lands=Math.max(200,Math.round(Number(scrub.value)||0))
+    const ms=Math.min(1200,Math.max(300,lands))
+    const now=(arr.camera||[]).reduce((v,m)=>({x:m.x,y:m.y,scale:m.scale}),{x:0,y:0,scale:1})
+    mark('moving the camera')
+    arr=ARR.filmed(arr,{ at:Math.max(0,lands-ms), ms,
+      x:now.x+Number(d.x), y:now.y+Number(d.y), scale:now.scale, ease:'ease' })
+    held.clear(); ends.clear(); render(); drawInspector()
+    return
+  }
   if(d.wall==='placed'&&railed()){
     const seat=ARR.live(arr)[Number(d.i)]; if(!seat) return
     const at=seat.i, car=seat.car

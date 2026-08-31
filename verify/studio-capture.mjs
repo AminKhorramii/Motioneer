@@ -298,6 +298,28 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
     /go=300_600_30\.00_8\.00/.test(decodeURIComponent(A.urlOf(trip, '') || '')),
     `${decodeURIComponent(A.urlOf(trip, '') || '').split('go=')[1]}`)
 
+  /**
+   * The camera, which turned out to be a component's journey applied to everything at once.
+   *
+   * A camera was four presets and a rig per car, and a rig per car is what lets one component sit
+   * still while the one below it pushes in. That is a different thing from a camera over the whole
+   * composition, and once a component could be sent somewhere the second was the first, one level up.
+   */
+  console.log('\n  the camera over the whole composition')
+  const shot = A.filmed(still, { at: 200, ms: 800, x: -20, y: -10, scale: 1.4, ease: 'ease' })
+  ok('the camera can be sent somewhere', shot.camera.length === 1 && shot.camera[0].scale === 1.4)
+  ok('and it moves the picture rather than anything in it',
+    shot.cars[0].place.x === 5 && (shot.cars[0].moves || []).length === 0)
+  ok('a camera move landing where one ends replaces it',
+    A.filmed(shot, { at: 400, ms: 600, x: 1, y: 1 }).camera.length === 1)
+  ok('the ruler contains a camera still moving after every motion has landed',
+    A.spanOf(A.filmed(still, { at: 4000, ms: 900, x: 1, y: 1 })) >= 4900)
+  ok('and the frame is told where the camera goes',
+    /cam=200_800_-20\.00_-10\.00_1\.400/.test(decodeURIComponent(A.urlOf(shot, '') || '')),
+    `${decodeURIComponent(A.urlOf(shot, '') || '').split('cam=')[1]}`)
+  ok('an arrangement read back from a file brings its camera with it',
+    A.revive(JSON.parse(JSON.stringify(shot))).camera.length === 1)
+
   console.log('\n  when each component is on the stage')
   const born = arrange([car('a', 0, 400), car('b', 600, 400)])
   ok('a component arrives when its motion starts, without anybody saying so',
