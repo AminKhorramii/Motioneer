@@ -25,6 +25,9 @@ body{margin:0;height:100vh;display:grid;grid-template-columns:250px 1fr;backgrou
 aside{border-right:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;min-height:0}
 .head{padding:11px 11px 12px;border-bottom:1px solid var(--line);display:grid;gap:7px}
 .head span{color:var(--faint);font-size:11px;word-break:break-all;padding:0 3px;line-height:1.5}
+.away{color:var(--faint);font-size:10.5px;padding:0 3px;text-decoration:none;line-height:1.5;
+  border-bottom:1px solid transparent}
+.away:hover{color:var(--dim);border-bottom-color:var(--line2)}
 /* an app being refused by its own api is not an error in the address, so it is said in the colour
    of a warning rather than a failure: the aim worked and the app will not run here */
 #aimnote[data-state=refused]{color:#c2925f}
@@ -455,6 +458,10 @@ header.bare .whenplaying{display:none}
          a site had loaded, which made a line of copy load bearing and unchangeable -->
     <span id="aimnote" data-state="${AIM ? 'ok' : 'empty'}">${AIM ? ''
       : HAS_FOLDER ? 'or pick a component below' : 'type where your app is running'}</span>
+    <!-- an app behind a sign in cannot be proxied, so there is a way to pick without proxying -->
+    <a class="away" href="/__wall/bookmarklet" target="_blank" rel="noopener"
+      title="for an app that needs an account, where proxying cannot work">pick on a page you are
+      signed into</a>
   </div>
   <div class="files" id="files"></div>
   <div id="sel"></div>
@@ -868,6 +875,42 @@ function railKey(e){
   }
   return false
 }
+
+/**
+ * A capture pasted in from somewhere the studio cannot go.
+ *
+ * An application behind a sign in cannot be proxied, so the picker runs on the real page in your own
+ * browser and the capture comes back on the clipboard. Arriving that way it is exactly what the
+ * picker sends over postMessage, because it is the same picker: a capture carries its own markup,
+ * the rules that matched it and a snapshot, so it never needed the page it came from to be open.
+ *
+ * On the document rather than on a field, because there is nothing to focus and asking somebody to
+ * click a box first is a step that exists only to make the code simpler.
+ */
+addEventListener('paste',e=>{
+  const t=e.target, tag=t&&t.tagName
+  if(tag==='INPUT'||tag==='TEXTAREA'||(t&&t.isContentEditable)) return
+  const said=(e.clipboardData||window.clipboardData); if(!said) return
+  let got=null
+  try{ got=JSON.parse(said.getData('text')||'') }catch(_){ return }
+  if(!got||got.wall!=='wall-capture'||!Array.isArray(got.picks)||!got.picks.length) return
+  e.preventDefault()
+  mark(got.picks.length>1?'pasting '+got.picks.length+' picks':'pasting a pick')
+  let n=0
+  for(const one of got.picks){
+    if(!one||!one.html) continue
+    /* the same shape the message handler builds, since it is the same picker on the other end */
+    picks.push({html:one.html,css:one.css||'',shot:one.shot||'',label:one.label||'element',
+      w:one.w,h:one.h,n:one.n,cut:one.cut,opaque:one.opaque,weak:one.weak})
+    n++
+  }
+  if(!n) return
+  chosen=picks[picks.length-1]
+  opts=[]; verdict=null; arr=null
+  drops.textContent=n+(n===1?' element pasted in':' elements pasted in')
+    +', from wherever you picked them. Give them motion when you are ready.'
+  drawSel(); render()
+})
 
 const pickBtn=document.getElementById('pick')
 pickBtn.onclick=()=>{

@@ -643,6 +643,56 @@ if(openXHR) window.XMLHttpRequest.prototype.open=function(m,u){
   return openXHR.apply(this,arguments);
 };
 var on=false,box=null,last=null;
+/**
+ * Where a capture goes, which depends on where this is running.
+ *
+ * Proxied into the studio's own frame, it goes up to the parent, which is what it has always done.
+ * Run on the page itself, as a bookmarklet, there is no parent to talk to and no way to reach the
+ * studio either: an application that needs a session sends a content security policy with it, and
+ * connect-src self forbids a request to localhost as firmly as it forbids anything else.
+ *
+ * The clipboard is the one road out that a policy does not govern, and it is enough, because a
+ * capture is already self contained. Everything picked in a visit is copied together, so clicking
+ * four things is four clicks and one paste rather than four of each.
+ */
+var framed=false; try{ framed = window.parent !== window }catch(_){ framed = true }
+var mine=[];
+function tell(n){
+  var t=document.getElementById('wall-said');
+  if(!t){ t=document.createElement('div'); t.id='wall-said';
+    t.style.cssText='position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:2147483647;'
+      +'background:#141516;color:#e6e6e6;border:1px solid rgba(255,255,255,.14);border-radius:8px;'
+      +'padding:9px 14px;font:13px ui-sans-serif,system-ui;box-shadow:0 6px 24px rgba(0,0,0,.5);'
+      +'pointer-events:none';
+    document.documentElement.appendChild(t) }
+  t.textContent = n===0 ? 'That could not be copied. The page may not allow it.'
+    : n+(n===1?' element copied':' elements copied')+'. Paste it into the studio.';
+  clearTimeout(tell.go); tell.go=setTimeout(function(){ if(t&&t.parentNode) t.parentNode.removeChild(t) },2600)
+}
+function toClipboard(text,then){
+  try{
+    if(navigator.clipboard&&navigator.clipboard.writeText&&window.isSecureContext)
+      return navigator.clipboard.writeText(text).then(function(){then(true)},function(){older(text,then)});
+  }catch(_){}
+  older(text,then);
+}
+/* a page served over plain http has no clipboard api at all, and the old way still works there */
+function older(text,then){
+  try{
+    var a=document.createElement('textarea');
+    a.value=text; a.setAttribute('readonly','');
+    a.style.cssText='position:fixed;top:-1000px;left:0;opacity:0';
+    document.body.appendChild(a); a.select(); a.setSelectionRange(0,text.length);
+    var won=document.execCommand('copy'); document.body.removeChild(a); then(won);
+  }catch(_){ then(false) }
+}
+function deliver(m){
+  if(framed){ parent.postMessage(m,'*'); return }
+  mine.push(m);
+  toClipboard(JSON.stringify({wall:'wall-capture',v:1,picks:mine}), function(won){
+    tell(won?mine.length:0)
+  });
+}
 function ensure(){if(box)return box;box=document.createElement('div');
   box.style.cssText='position:fixed;pointer-events:none;z-index:2147483647;border:2px solid #5e6ad2;'+
   'background:rgba(94,106,210,.13);border-radius:3px;box-shadow:0 0 0 1px rgba(0,0,0,.4)';
@@ -849,13 +899,14 @@ function pick(e){if(!on)return;e.preventDefault();e.stopPropagation();
     : thin ? 'too thin to stagger'
     : kids === 0 ? 'nothing inside it to move separately'
     : kids < 3 ? 'only ' + kids + ' part' + (kids === 1 ? '' : 's') : '';
-  parent.postMessage({wall:'picked',html:h,css:css,shot:shot,label:label(el),opaque:opaque,weak:weak,
+  deliver({wall:'picked',html:h,css:css,shot:shot,label:label(el),opaque:opaque,weak:weak,
     n:el.querySelectorAll('*').length+1,
-    cut:h.length<el.outerHTML.length,w:Math.round(r.width),h:Math.round(r.height)},'*')}
+    cut:h.length<el.outerHTML.length,w:Math.round(r.width),h:Math.round(r.height)})}
 function arm(v){on=v;
   document.documentElement.style.cursor=v?'crosshair':'';
   if(!v&&box)box.style.display='none';
-  parent.postMessage({wall:v?'armed':'disarmed'},'*')}
+  if(framed) parent.postMessage({wall:v?'armed':'disarmed'},'*');
+  else if(v) tell(mine.length)}
 addEventListener('mousemove',move,true);addEventListener('click',pick,true);
 /* a framework that acts on mousedown would fire before the click is stopped */
 addEventListener('mousedown',function(e){if(on){e.preventDefault();e.stopPropagation()}},true);
@@ -863,7 +914,9 @@ addEventListener('keydown',function(e){if(on&&e.key==='Escape'){e.preventDefault
 addEventListener('message',function(e){var d=e.data||{};
   if(d.wall==='pick')arm(true);
   if(d.wall==='nopick')arm(false)});
-parent.postMessage({wall:'ready'},'*');
+/* on the page itself there is nobody to ask it to start, and being run at all is the asking. Escape
+   still disarms, which is how you get the page back without reloading it */
+if(framed) parent.postMessage({wall:'ready'},'*'); else arm(true);
 })();<\/script>`
 
 /**
@@ -2286,6 +2339,51 @@ const server = createServer(async (req, res) => {
       // only while it is warm, so opening the studio tomorrow is a fresh start rather than a haunting
       const warm = bench && Date.now() - BOOT < WARM
       return json(res, warm || resumed ? (bench ?? {}) : {})
+    }
+    /**
+     * The picker as a thing you keep in your bookmarks bar.
+     *
+     * An application you have to sign into cannot be proxied: on this origin its own api is a
+     * different site, so it is refused, never authenticates, and shows a loading shell for good.
+     * The way round it is not to proxy at all. The page is already open in your browser with your
+     * session on it, so the picker goes there instead and the capture comes back on the clipboard,
+     * which is the one road out that a content security policy does not govern.
+     *
+     * The whole picker travels in the url. It cannot be fetched once it is there, because a site
+     * strict enough to need this sends connect-src self and script-src self, and localhost is
+     * neither. Seventeen kilobytes of bookmark is inelegant and it is the only shape that works.
+     */
+    if (url.pathname === '/__wall/bookmarklet') {
+      const inner = PICKER.replace(/^<script>/, '').replace(/<\/script>$/, '')
+        .replace(/<\\\/script>/g, '</script>').replace('__WALL_HOME__', '')
+      const href = `javascript:${encodeURIComponent(inner)}`
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
+      return res.end(`<!doctype html><html><head><meta charset="utf-8"><title>Pick anywhere</title>
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#08090a;color:#e6e6e6;
+  font:14px/1.7 ui-sans-serif,-apple-system,system-ui;padding:40px}
+main{max-width:560px}h1{font-size:19px;font-weight:500;margin:0 0 14px}
+p{color:#8a8f98;margin:0 0 14px}b{color:#e6e6e6;font-weight:500}
+a.bm{display:inline-block;margin:8px 0 18px;padding:9px 16px;background:#5e6ad2;color:#fff;
+  border-radius:8px;text-decoration:none;font-weight:500;cursor:grab}
+ol{color:#8a8f98;padding-left:20px;margin:0}li{margin:0 0 8px}
+code{background:#141516;border:1px solid rgba(255,255,255,.11);border-radius:4px;padding:1px 5px;
+  font:12px ui-monospace,monospace;color:#e6e6e6}</style></head><body><main>
+<h1>Pick from a page you are signed into</h1>
+<p>The studio proxies a site so it can read it, and an app that signs in against its own api on
+another host will not run that way: on this origin its api is a different site, so it refuses the
+call and the app never gets past its loading screen. Nothing can fix that from here, because the
+session belongs to a domain this is not.</p>
+<p>So pick on the real page instead. Drag this to your bookmarks bar:</p>
+<a class="bm" href="${href}">Pick for Wall</a>
+<ol>
+<li>Open the page you want, signed in as usual.</li>
+<li>Press the bookmark. The cursor becomes a crosshair.</li>
+<li>Click the elements you want. Each one is copied, all of them together.</li>
+<li>Come back to the studio and press <code>paste</code>. They arrive as picks.</li>
+</ol>
+<p><b>Escape</b> stops picking and gives the page back. Nothing is uploaded and nothing is installed:
+the capture goes onto your clipboard and no further.</p>
+</main></body></html>`)
     }
     if (url.pathname === '/__wall/live') {
       res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache',

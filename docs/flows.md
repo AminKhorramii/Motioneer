@@ -627,6 +627,31 @@ proxy cannot pass one.
 Reading a component out of a `.tsx` is a brace counter and a hope. A rendered dom is the answer, which
 is why pointing at something running beats pointing at a file.
 
+### Picking from a page that cannot be proxied
+
+Proxying puts somebody's application on the studio's origin, which is the whole trick and is also
+something the application notices. One that signs in against its own api on another host is making a
+cross origin request the moment it runs here: that api allows its own site and not localhost, so the
+call is refused, the app never authenticates, and it sits on its loading shell. Measured on a real
+one, three hundred and eighty nodes and nothing to read. Nothing can be fixed from this side, since
+the session belongs to a domain the studio is not.
+
+So the picker goes to the page instead. It is the same picker, kept in a bookmark, and where a
+capture goes is the only thing that changes: framed by the studio it posts to the parent as it always
+has, and run on the page itself it copies to the clipboard. That is the one road out a content
+security policy does not govern, and a site strict enough to need this sends `connect-src 'self'` and
+`script-src 'self'`, which forbids both fetching the studio and loading the picker from it. The whole
+picker travels in the url for that reason: twenty kilobytes of bookmark is inelegant and is the only
+shape that works.
+
+Everything picked in a visit is copied together, so four elements are four clicks and one paste. The
+studio takes a paste anywhere rather than into a field, because there is nothing to focus and asking
+for a click first is a step that exists only to make the code simpler. Anything else on the clipboard
+is left alone.
+
+None of it needs the page to still be open, which is the property that makes this work at all: a
+capture already carries the markup, the rules that matched it and a snapshot of how it looked.
+
 ### What a pick captures
 
 Two captures, for two readers. The model gets the markup and the rules that actually matched it, so a

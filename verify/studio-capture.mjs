@@ -1076,6 +1076,72 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
       await room.evaluate(() => picks.length) === had - 1
         && await room.evaluate(() => arr) === null)
 
+    /**
+     * Picking from a page the studio cannot proxy.
+     *
+     * An application behind a sign in calls its own api on another host, which is a cross origin
+     * request the moment it runs on this origin, so it is refused and never gets past its loading
+     * screen. Nothing can fix that here, because the session belongs to a domain this is not. So the
+     * picker goes to the real page instead and the capture comes back on the clipboard, which is the
+     * one road out that a content security policy does not govern.
+     *
+     * The same picker, so a capture that arrives this way is the one the message handler already
+     * knows. Checked against a page served with no studio anywhere near it.
+     */
+    const away = await seat.newContext({ viewport: { width: 1200, height: 800 },
+      permissions: ['clipboard-read', 'clipboard-write'] })
+    const shelf = await away.newPage()
+    await shelf.goto(`http://localhost:${XPORT}/__wall/bookmarklet`, { waitUntil: 'load' })
+    const code = decodeURIComponent((await shelf.getAttribute('a.bm', 'href')).replace(/^javascript:/, ''))
+    ok('the picker travels whole in the bookmarklet, since a strict site will not fetch it',
+      code.length > 8000 && code.includes('wall-capture'), `${Math.round(code.length / 1024)}kb`)
+
+    const theirs = await away.newPage()
+    await theirs.setContent('<!doctype html><html><body style="margin:0;font:16px system-ui">'
+      + '<div id="a" style="width:300px;margin:20px;padding:16px;border:1px solid #ccc">'
+      + '<h2 style="margin:0">One</h2><span>x</span><span>y</span></div>'
+      + '<div id="b" style="width:300px;margin:20px;padding:16px;border:1px solid #ccc">'
+      + '<h2 style="margin:0">Two</h2><span>p</span><span>q</span></div></body></html>')
+    await theirs.waitForTimeout(300)
+    await theirs.evaluate(code); await theirs.waitForTimeout(300)
+    ok('and arms itself, since being run at all is the asking',
+      await theirs.evaluate(() => document.documentElement.style.cursor) === 'crosshair')
+    for (const id of ['#a', '#b']) {
+      const at = await theirs.locator(id).boundingBox()
+      await theirs.mouse.click(at.x + 12, at.y + 10); await theirs.waitForTimeout(400)
+    }
+    ok('every element picked in a visit is copied together, so it is one paste and not four',
+      /2 elements copied/.test(await theirs.evaluate(() => {
+        const t = document.getElementById('wall-said'); return t ? t.textContent : '' })))
+    await theirs.keyboard.press('Escape'); await theirs.waitForTimeout(250)
+    ok('and escape gives the page back rather than needing a reload',
+      await theirs.evaluate(() => document.documentElement.style.cursor) === '')
+
+    const inbox = await away.newPage()
+    await inbox.goto(`http://localhost:${XPORT}`, { waitUntil: 'load' })
+    await inbox.waitForTimeout(1200)
+    const carried = await inbox.evaluate(() => navigator.clipboard.readText())
+    const paste = (text) => inbox.evaluate((t) => {
+      const dt = new DataTransfer(); dt.setData('text', t)
+      document.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }))
+    }, text)
+    /* against what was already there, since this studio puts back the work it was holding */
+    const already = await inbox.evaluate(() => picks.length)
+    await paste(carried); await inbox.waitForTimeout(900)
+    ok('pasting them into the studio makes them picks',
+      await inbox.evaluate(() => picks.length) === already + 2,
+      `${already} then ${await inbox.evaluate(() => picks.length)}`)
+    ok('carrying the markup and the rules that matched, so nothing needs the page still open',
+      await inbox.evaluate(() => !!picks[0].html && picks[0].w > 0))
+    const kept = await inbox.evaluate(() => picks.length)
+    await paste('just some text somebody copied'); await inbox.waitForTimeout(300)
+    ok('while anything else on the clipboard is left alone',
+      await inbox.evaluate(() => picks.length) === kept)
+    await inbox.evaluate(() => undo()); await inbox.waitForTimeout(300)
+    ok('and one undo takes the whole paste back',
+      await inbox.evaluate(() => picks.length) === kept - 2)
+    await away.close()
+
     ok('the timeline drives without complaint', said.length === 0, said.join('; ').slice(0, 60))
 
     /**
