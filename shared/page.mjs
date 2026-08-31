@@ -327,6 +327,13 @@ header.bare .whenplaying{display:none}
    dragging everything after it back into place by hand */
 .tlbar.tied{background:rgba(94,106,210,.32);border-style:dashed}
 .tlbar.knot{border-color:#c2603f;background:rgba(194,96,63,.28)}
+/* the left half of the bar's right edge trims it, the knob past it ties it to another row. Two
+   different questions about the same end of the same bar, so they are two targets rather than one */
+.tltrim{position:absolute;right:5px;top:0;bottom:0;width:8px;cursor:ew-resize;border-radius:2px;
+  opacity:0;background:rgba(255,255,255,.5);touch-action:none}
+.tlrow:hover .tltrim{opacity:.55}
+.tltrim:hover{opacity:1!important;background:#fff}
+.tlbar.working{opacity:.6}
 .tltie{position:absolute;right:-4px;top:50%;width:9px;height:9px;margin-top:-4.5px;border-radius:50%;
   background:var(--accent);border:1.5px solid var(--panel);cursor:crosshair;opacity:0}
 .tlrow:hover .tltie,.tlbar.tied .tltie{opacity:1}
@@ -1948,6 +1955,10 @@ function timeline(live){
         +(at[i]/total*100).toFixed(2)+'%;'
         +'width:'+Math.max(2,car.motion.ms/total*100).toFixed(2)+'%">'
         +'<i>'+(at[i]/1000).toFixed(2)+'s</i>'
+        /* the bar's length was the motion's own span and nothing could change it, so the one thing a
+           bar looks like it should do was the one thing it would not */
+        +'<b class="tltrim" data-trim="'+i+'" title="drag to make this motion longer or shorter. It'
+        +' is retimed rather than regenerated, so the idea is kept and only the clock changes"></b>'
         +'<b class="tltie" data-tie="'+i+'" title="drag onto another row to start this one when that'
         +' one finishes, or drop it here to cut the link"></b>'
         +'</span></span></div>').join('')
@@ -2153,6 +2164,59 @@ function wireTimeline(live){
     held.clear(); ends.clear(); render() }
   for (const chip of document.querySelectorAll('[data-alt]')){
     chip.onclick=e=>{ e.stopPropagation(); cycleAlt(Number(chip.dataset.alt), e.shiftKey?-1:1) }
+  }
+  /**
+   * A motion made longer or shorter by dragging the end of its bar.
+   *
+   * The bar's length was the motion's own span and nothing could change it, so the one thing a bar
+   * looks like it ought to do was the one thing it would not. This is a retime rather than another
+   * ask: retimed() scales the durations and the delays separately, because a slower move is not a
+   * longer wait, and the gates still run on the result, so one that flattens a stagger to nothing is
+   * refused the way any other change would be.
+   *
+   * The width follows the pointer and the server is asked once, on release. It is a model free call,
+   * but a request per pixel is still a request per pixel.
+   */
+  for (const grip of document.querySelectorAll('[data-trim]')){
+    grip.onpointerdown=e=>{
+      e.preventDefault(); e.stopPropagation()
+      const i=Number(grip.dataset.trim)
+      const bar=grip.closest('.tlbar'), track=bar.parentElement
+      const w=track.getBoundingClientRect().width
+      const was=arr.cars[i].motion.ms, from=e.clientX
+      const targets=ARR.edges(arr,[i],running?null:Number(scrub.value))
+      const tol=(7/w)*total, gridTol=(4/w)*total, step=ARR.gridStep(total,w)
+      const start=ARR.resolve(arr).at[i]
+      let want=was, stepped=false
+      const move=ev=>{
+        stepped=true
+        const raw=Math.max(60, was + (ev.clientX-from)/w*total)
+        /* snapped by where the bar would end, since lining an ending up with somebody else's start is
+           most of the reason to drag one of these */
+        const got=ev.altKey?{at:start+raw,hit:null}:ARR.snapTo(start+raw,targets,tol,step,gridTol)
+        want=Math.max(60,Math.round(got.at-start))
+        bar.style.width=Math.max(2,want/total*100).toFixed(2)+'%'
+        const say=document.getElementById('tlsay')
+        if(say) say.innerHTML=(got.hit?'Ends on <b class="tlhint">'+esc(got.hit)+'</b>, ':'')
+          +'running '+(want/1000).toFixed(2)+'s. Alt sets it freely.'
+      }
+      const up=async()=>{
+        window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up)
+        if(!stepped||want===was) return render()
+        const base=arr.cars[i].motion
+        bar.classList.add('working')
+        try{
+          const r=await post('/__wall/tune',{ id:base.origin||base.id,
+            duration:want/was, stagger:1 }, 20000)
+          if(r.error){ drops.textContent=r.error.slice(0,140); return render() }
+          mark('the length of '+nameOf(base))
+          arr=ARR.trimmed(arr,i,{ ...base, id:r.id, tempo:r.tempo, origin:base.origin||base.id,
+            ms:(r.tempo&&r.tempo.span)||want })
+          held.clear(); ends.clear(); render(); drawInspector()
+        }catch(err){ drops.textContent=String(err&&err.message||err); render() }
+      }
+      window.addEventListener('pointermove',move); window.addEventListener('pointerup',up)
+    }
   }
   /**
    * When a component comes on and when it leaves, dragged.

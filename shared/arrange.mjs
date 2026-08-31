@@ -159,8 +159,30 @@ const motionOf = (o) => (o && o.id
     ms: Math.max(1, num(o.ms, num(o.tempo && o.tempo.span, MS)) || MS),
     tempo: o.tempo ?? null,
     seen: o.seen ?? null,
+    /* which motion this was retimed from, so dragging a bar's edge a dozen times leaves one
+       alternative rather than a dozen. Absent on anything that came from the model */
+    origin: o.origin ? String(o.origin) : '',
   })
   : null)
+
+/**
+ * A motion at a length somebody chose, put in place of the one it was retimed from.
+ *
+ * Dragging a bar's edge is a retime, and every retime mints a new option on the server. Appending
+ * each one would turn the row's list of alternatives into a record of every drag, so a retime of a
+ * retime replaces its predecessor: the list stays the set of real choices, and the one that came
+ * from the model stays in it.
+ */
+export function trimmed(arr, i, made) {
+  const car = arr.cars[i]
+  const next = motionOf(made)
+  if (!car || !next) return arr
+  const root = next.origin || next.id
+  const kept = car.alternatives.filter((m) => (m.origin || m.id) !== root || m.id === root)
+  const at = kept.findIndex((m) => (m.origin || m.id) === root && m.origin)
+  const list = at >= 0 ? kept.map((m, k) => (k === at ? next : m)) : kept.concat([next])
+  return patch(arr, i, { motion: next, alternatives: Object.freeze(list) })
+}
 
 /** the cars that carry a motion, with the index they sit at, since a dead car still owns a row */
 export const live = (arr) => (arr && arr.cars ? arr.cars : [])

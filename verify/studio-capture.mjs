@@ -250,6 +250,27 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
    * written into every car at birth freezes a decision nobody made and goes stale the moment the
    * motion it was copied from is moved.
    */
+  /**
+   * A motion at a length somebody chose.
+   *
+   * Every retime mints a new option on the server, so appending each one would turn a row's list of
+   * alternatives into a record of every drag rather than the set of real choices it is meant to be.
+   */
+  console.log('\n  a motion made longer or shorter')
+  /* built the way the rail builds one, so the motion the model gave is in the list to begin with */
+  const short = A.fromRail([{ id: 'a', note: 'a', tempo: { span: 400 }, label: 'x' }])
+  const long = A.trimmed(short, 0, { id: 'a2', ms: 900, origin: 'a' })
+  ok('trimming replaces what the row is playing', long.cars[0].motion.ms === 900)
+  ok('and the motion it came from stays reachable',
+    long.cars[0].alternatives.some((m) => m.id === 'a'), `${long.cars[0].alternatives.map((m) => m.id)}`)
+  const again = A.trimmed(long, 0, { id: 'a3', ms: 250, origin: 'a' })
+  ok('and trimming again replaces the trim rather than piling another one on',
+    again.cars[0].alternatives.length === long.cars[0].alternatives.length
+      && again.cars[0].motion.id === 'a3',
+    `${again.cars[0].alternatives.map((m) => m.id)}`)
+  ok('a motion from the model carries no origin, so it is never mistaken for a retime',
+    !A.fromRail([{ id: 'm', tempo: { span: 400 }, label: 'x' }]).cars[0].motion.origin)
+
   console.log('\n  when each component is on the stage')
   const born = arrange([car('a', 0, 400), car('b', 600, 400)])
   ok('a component arrives when its motion starts, without anybody saying so',
