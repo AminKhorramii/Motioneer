@@ -262,6 +262,11 @@ header.bare .whenplaying{display:none}
 /* a camera move is a motion and a dropdown of five words cannot show one, so each choice performs
    a miniature of itself and you read it in a glance instead of applying it to find out */
 .cams{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin:1px 0 4px}
+/* the same grid in the settings menu, which is narrower than the inspector and would otherwise put
+   ten chips on one line of forty pixels each */
+.menu .cams{grid-template-columns:repeat(4,1fr)}
+.menu .camwrap{display:grid;gap:3px;margin:0 0 2px}
+.menu .camwrap>span{color:var(--dim);font-size:11px}
 .camchip{background:var(--raised);border:1px solid var(--line);border-radius:7px;padding:5px 3px 4px;
   display:grid;gap:4px;justify-items:center;cursor:pointer;color:var(--dim);font-family:inherit}
 .camchip:hover{border-color:var(--line2);color:var(--ink)}
@@ -283,12 +288,28 @@ header.bare .whenplaying{display:none}
 .cambox i{position:absolute;left:50%;top:50%;width:17px;height:10px;margin:-5px 0 0 -8.5px;
   border-radius:2px;background:linear-gradient(120deg,#7079ea,#3a3f8f)}
 .cam-none i{opacity:.3}
+/* flat on and locked off both hold still, so the miniature has to say which stillness: one is square
+   to the frame and the other is the angle, and a chip that showed neither moving would read as two
+   of the same thing */
+.cam-flat i{transform:scale(1.25)}
+.cam-locked i{transform:rotateY(-24deg) rotateX(8deg) scale(1.1)}
 .cam-push i{animation:cpush 2.4s ease-in-out infinite alternate}
+.cam-pull i{animation:cpull 2.4s ease-in-out infinite alternate}
+.cam-pan i{animation:cpan 2.6s ease-in-out infinite alternate}
+.cam-crane i{animation:ccrane 2.6s ease-in-out infinite alternate}
 .cam-drift i{animation:cdrift 2.8s ease-in-out infinite alternate}
 .cam-orbit i{animation:corbit 2.8s ease-in-out infinite alternate}
+.cam-sway i{animation:csway 3.2s ease-in-out infinite alternate}
 @keyframes cpush{from{transform:scale(.7)}to{transform:scale(1.4)}}
+@keyframes cpull{from{transform:scale(1.4)}to{transform:scale(.7)}}
+@keyframes cpan{from{transform:translateX(-5px) rotateY(-16deg) scale(1.1)}
+  to{transform:translateX(5px) rotateY(16deg) scale(1.1)}}
+@keyframes ccrane{from{transform:translateY(4px) rotateX(16deg) scale(1.1)}
+  to{transform:translateY(-4px) rotateX(-10deg) scale(1.1)}}
 @keyframes cdrift{from{transform:translate(-4px,2px) scale(1.18)}to{transform:translate(4px,-2px) scale(.88)}}
 @keyframes corbit{from{transform:rotateY(-34deg) scale(1.05)}to{transform:rotateY(34deg) scale(1.05)}}
+@keyframes csway{from{transform:translate(-1px,.6px) rotateZ(-1.5deg) scale(1.12)}
+  to{transform:translate(1px,-.6px) rotateZ(1.5deg) scale(1.18)}}
 @media (prefers-reduced-motion:reduce){.cambox i{animation:none}}
 .takes{display:flex;flex-wrap:wrap;gap:4px;margin:0}
 .take{background:var(--raised);border:1px solid var(--line);color:var(--dim);border-radius:5px;
@@ -460,8 +481,7 @@ header.bare .whenplaying{display:none}
       : HAS_FOLDER ? 'or pick a component below' : 'type where your app is running'}</span>
     <!-- an app behind a sign in cannot be proxied, so there is a way to pick without proxying -->
     <a class="away" href="/__wall/bookmarklet" target="_blank" rel="noopener"
-      title="for an app that needs an account, where proxying cannot work">pick on a page you are
-      signed into</a>
+      title="for an app that needs an account, where proxying cannot work">or pick behind a sign in</a>
   </div>
   <div class="files" id="files"></div>
   <div id="sel"></div>
@@ -556,12 +576,11 @@ header.bare .whenplaying{display:none}
       <label>Palette<select id="palette">
         ${PRESETS.map((p, i) => `<option${i === 1 ? ' selected' : ''}>${p.name}</option>`).join('')}
       </select></label>
-      <label>Shot<select id="cam">
-        <option value="">no camera</option>
-        <option value="locked">locked off</option>
-        <option value="push">slow push</option>
-        <option value="drift">drift</option>
-        <option value="orbit">orbit</option></select></label>
+      <!-- a hidden input rather than a select, so everything that reads cam.value keeps reading it
+           while the thing you actually choose from is the grid of moving chips below -->
+      <div class="camwrap"><span>Shot</span>
+        <input type="hidden" id="cam" value="">
+        <div class="cams" id="camgrid"></div></div>
       <label>Shape<select id="shape">
         <option value="wide" selected>wide 1280</option>
         <option value="square">square 1080</option>
@@ -1265,7 +1284,8 @@ ask.onclick=async()=>{
     opts=[]; render() }
   ask.disabled=false; askSays('Give it motion')
 }
-cam.onchange=render
+/* the shot is chosen by the chip grid now, which renders itself; a hidden input fires no change
+   event of its own, so drawCamMenu does the rendering where the select used to */
 document.getElementById('depth').onchange=render
 palette.onchange=render
 const menu=document.getElementById('menu'), moreBtn=document.getElementById('more')
@@ -1387,7 +1407,12 @@ function subject(){
 const nameOf = (o) => String((o&&(o.note||o.label))||(o&&o.pick&&o.pick.label)||'untitled')
   .split(',')[0].slice(0,28)
 
-const CAMS=[['','none'],['locked','locked off'],['push','slow push'],['drift','drift'],['orbit','orbit']]
+/* Paired, and in the order somebody reaches for them: nothing, the two held shots, in and out,
+   across and up, then the two that never quite settle. The opposite of every choice is next to it,
+   because the question is usually which way rather than whether. */
+const CAMS=[['','none'],['flat','flat on'],['locked','locked'],['push','push in'],
+  ['pull','pull out'],['pan','pan'],['crane','crane'],['orbit','orbit'],['drift','drift'],
+  ['sway','sway']]
 /* what a component is shown against. As picked is first, because the page's own answer is right
    until it is not, and guessing on its behalf is worse than asking */
 const PAPERS=[['','as picked'],['light','light'],['dark','dark'],['none','the stage']]
@@ -1404,10 +1429,26 @@ function drawPapers(now){
     held.clear(); ends.clear(); render(); drawInspector()
   })
 }
+/* One grid in two homes. The inspector aims at one car and the settings menu aims at whatever is on
+   screen, but it is the same question and showing it as chips in one place and a list of words in
+   the other made the menu look like a different, worse feature. */
+function camMarkup(now){
+  return CAMS.map(c=>'<button class="camchip'+(c[0]===now?' on':'')+'" data-campick="'+c[0]
+    +'" title="'+c[1]+'"><span class="cambox cam-'+(c[0]||'none')+'"><i></i></span><em>'
+    +c[1]+'</em></button>').join('')
+}
+function drawCamMenu(){
+  const box=document.getElementById('camgrid'); if(!box) return
+  box.innerHTML=camMarkup(cam.value||'')
+  box.querySelectorAll('[data-campick]').forEach(b=>b.onclick=()=>{
+    if(cam.value===b.dataset.campick) return
+    cam.value=b.dataset.campick
+    drawCamMenu(); render()
+  })
+}
 function drawCams(now){
   const box=document.getElementById('cams')
-  box.innerHTML=CAMS.map(c=>'<button class="camchip'+(c[0]===now?' on':'')+'" data-campick="'+c[0]+'">'
-    +'<span class="cambox cam-'+(c[0]||'none')+'"><i></i></span><em>'+c[1]+'</em></button>').join('')
+  box.innerHTML=camMarkup(now)
   box.querySelectorAll('[data-campick]').forEach(b=>b.onclick=()=>{
     const s=subject(); if(!s||s.kind!=='car') return
     if((s.car.shot||'')===b.dataset.campick) return
@@ -1416,6 +1457,10 @@ function drawCams(now){
     held.clear(); ends.clear(); render(); drawInspector()
   })
 }
+/* drawn here rather than beside the rest of the menu wiring, because CAMS is a const declared above
+   this line and reading it from up there is a page that stops running at boot with every listener
+   below the fault silently missing */
+drawCamMenu()
 function drawInspector(){
   const s=subject()
   const tag=document.getElementById('itag'), facts=document.getElementById('ifacts')

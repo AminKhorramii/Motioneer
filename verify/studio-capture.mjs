@@ -970,7 +970,9 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
       await room.frameLocator('.appwrap iframe').locator('.car .tag').count() === 0)
 
     await room.locator('[data-row="0"]').click(); await room.waitForTimeout(300)
-    await room.locator('[data-campick="push"]').click(); await room.waitForTimeout(700)
+    /* scoped to the inspector, because the same grid of shots is also in the settings menu now and
+       the two mean different things: this one aims at the selected car and that one at the frame */
+    await room.locator('#cams [data-campick="push"]').click(); await room.waitForTimeout(700)
     await room.evaluate(() => hold(1500)); await room.waitForTimeout(300)
     const rigged = await room.evaluate(() => {
       const f = document.querySelector('.appwrap iframe')

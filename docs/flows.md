@@ -753,11 +753,26 @@ it runs, and dragging a bar moves that car in time. The frame reloads when the d
 on every pixel, and the scrubber resizes to whatever the new arrangement needs. A rail can be exported
 too, which it could not before.
 
-The camera is four shots on that same clock: locked off, a slow push, a drift and an orbit, with a
-lens dial that moves the defocus, the bloom and the vignette together. It used to be one twelve second
-move set to infinite, and infinite was the fault: an animation with no end has an endTime of Infinity,
-the transport filters that when sizing the scrubber, and dragging it end to end played an eighth of
-the move. Every move is finite now and the ruler sizes itself to whichever runs longer.
+The camera is nine shots on that same clock, in pairs so the opposite of a choice is also a choice:
+flat on and locked, push in and pull out, pan and crane, orbit, drift and sway, with a lens dial that
+moves the defocus, the bloom and the vignette together. It used to be one twelve second move set to
+infinite, and infinite was the fault: an animation with no end has an endTime of Infinity, the
+transport filters that when sizing the scrubber, and dragging it end to end played an eighth of the
+move. Every move is finite now and the ruler sizes itself to whichever runs longer.
+
+Flat on is the one that was missing, and it was missing for years of shots. Every move here is built
+out of a rotation, so every film Wall could make was of software seen at an angle. That is the right
+look for a component on a landing page and the wrong one for a demo of a tool: type on a plane turned
+eleven degrees is type somebody leans in to read, and a film of a pipeline board whose column
+headings are illegible is not a demo of anything. It is also the only shot whose plate fits the frame
+rather than overflowing it. The others scale past the edges deliberately, because that overflow is
+most of what separates a camera from a screenshot, but doing it to the one shot chosen for legibility
+would crop the thing it was chosen to show.
+
+A shot is picked from a grid of chips that each perform a miniature of themselves, in the inspector
+where it aims at one car and in the settings menu where it aims at the frame. It was a list of five
+words in the menu, which is the one place the choice is hardest to imagine: a camera move is a motion,
+and reading the word drift tells you less than two seconds of watching one does.
 
 Each row also carries its own camera. A camera is a perspective, a moving plate and two blurred
 copies of the subject, and every one of those is per subject, so one shared rig could only ever film

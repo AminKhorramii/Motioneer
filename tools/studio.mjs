@@ -263,10 +263,30 @@ const list = () => {
  * two runs longer. Scrubbing now walks the camera and the motion together, which is what composing a
  * shot means.
  *
- * Four moves rather than one, because they answer different questions. Locked off asks what the
- * motion looks like; the other three ask what it looks like in a film.
+ * Nine moves rather than one, because they answer different questions, and they come in pairs so the
+ * opposite of a choice is also a choice: in and out, left and right, up and down, held and breathing.
+ *
+ * The first of them is the one that was missing for a long time. Every shot here used to be tilted,
+ * which is the look a component wants on a landing page and exactly the wrong one for a demo of
+ * software: text on a plane rotated eleven degrees is text somebody has to lean in to read, and a
+ * film of a pipeline board is worth nothing if the column headings are illegible. Flat on is a real
+ * answer and it is first, with the angled hold kept beside it under its own name.
+ *
+ * Scales stay near where they start rather than sweeping across the frame, because the subject is
+ * already fitted to the stage before a camera touches it: a move from 1.34 to 1.92 is not a push,
+ * it is a crop, and everything at the edge of the component leaves the picture.
  */
 const SHOTS = {
+  /* the one shot that asks the plate to fit the frame rather than overflow it. Every other move
+     scales past the edges on purpose, which is what makes them read as a camera rather than as a
+     screenshot; doing that to the shot whose whole job is legibility would crop the thing somebody
+     chose it to be able to read. */
+  flat: {
+    from: 'rotateX(0deg) rotateY(0deg) rotateZ(0deg) scale(1) translate3d(0,0,0)',
+    to: 'rotateX(0deg) rotateY(0deg) rotateZ(0deg) scale(1) translate3d(0,0,0)',
+    ease: 'linear',
+    plate: 'min(1000px,100%)',
+  },
   locked: {
     from: 'rotateX(6deg) rotateY(-9deg) rotateZ(-2deg) scale(1.6) translate3d(0,0,0)',
     to: 'rotateX(6deg) rotateY(-9deg) rotateZ(-2deg) scale(1.6) translate3d(0,0,0)',
@@ -277,14 +297,40 @@ const SHOTS = {
     to: 'rotateX(6deg) rotateY(-7deg) rotateZ(-2deg) scale(1.92) translate3d(0,-2%,0)',
     ease: 'cubic-bezier(.33,0,.2,1)',
   },
+  /* the reveal, and the one shot that ends wider than it starts: a detail first and the thing it
+     belongs to second, which is the order an explanation goes in */
+  pull: {
+    from: 'rotateX(4deg) rotateY(-5deg) rotateZ(-1deg) scale(1.9) translate3d(0,-2%,0)',
+    to: 'rotateX(8deg) rotateY(-10deg) rotateZ(-2deg) scale(1.22) translate3d(0,2%,0)',
+    ease: 'cubic-bezier(.25,0,.2,1)',
+  },
+  /* across at a constant size, because a pan that also scales is a drift, and having both means
+     neither is available on its own */
+  pan: {
+    from: 'rotateX(7deg) rotateY(-18deg) rotateZ(-2deg) scale(1.55) translate3d(7%,0,0)',
+    to: 'rotateX(7deg) rotateY(-2deg) rotateZ(-2deg) scale(1.55) translate3d(-7%,0,0)',
+    ease: 'cubic-bezier(.4,0,.3,1)',
+  },
+  crane: {
+    from: 'rotateX(14deg) rotateY(-8deg) rotateZ(-1deg) scale(1.5) translate3d(0,7%,0)',
+    to: 'rotateX(2deg) rotateY(-8deg) rotateZ(-1deg) scale(1.5) translate3d(0,-6%,0)',
+    ease: 'cubic-bezier(.4,0,.3,1)',
+  },
+  orbit: {
+    from: 'rotateX(11deg) rotateY(-30deg) rotateZ(-4deg) scale(1.66) translate3d(4%,0,0)',
+    to: 'rotateX(11deg) rotateY(12deg) rotateZ(2deg) scale(1.66) translate3d(-4%,0,0)',
+    ease: 'cubic-bezier(.45,0,.55,1)',
+  },
   drift: {
     from: 'rotateX(15deg) rotateY(-24deg) rotateZ(-9deg) scale(2.15) translate3d(6%,4%,0)',
     to: 'rotateX(9deg) rotateY(-13deg) rotateZ(-5deg) scale(1.72) translate3d(-5%,-3%,0)',
     ease: 'cubic-bezier(.4,0,.55,1)',
   },
-  orbit: {
-    from: 'rotateX(11deg) rotateY(-30deg) rotateZ(-4deg) scale(1.66) translate3d(4%,0,0)',
-    to: 'rotateX(11deg) rotateY(12deg) rotateZ(2deg) scale(1.66) translate3d(-4%,0,0)',
+  /* barely anything, on purpose. A held shot that is perfectly still reads as a screenshot, and the
+     smallest amount of breathing is what tells somebody they are watching footage */
+  sway: {
+    from: 'rotateX(6deg) rotateY(-8deg) rotateZ(-1.5deg) scale(1.56) translate3d(-1.2%,.8%,0)',
+    to: 'rotateX(8deg) rotateY(-11deg) rotateZ(-2.5deg) scale(1.62) translate3d(1.2%,-.8%,0)',
     ease: 'cubic-bezier(.45,0,.55,1)',
   },
 }
@@ -305,7 +351,7 @@ const STAGE = (shot = 'drift', ms = 3200, depth = 1) => {
     .rig{position:fixed;inset:0;display:grid;place-items:center;perspective:1500px;perspective-origin:50% 45%}
     .dolly{transform-style:preserve-3d;transform:${move.from};
       animation:dolly ${ms}ms ${move.ease} both}
-    .plate{position:relative;width:1000px;transform-style:preserve-3d;filter:brightness(1.18) contrast(1.06)}
+    .plate{position:relative;width:${move.plate || '1000px'};transform-style:preserve-3d;filter:brightness(1.18) contrast(1.06)}
     .layer{position:absolute;inset:0;display:grid;place-items:center}.layer>*{width:100%}
     .sharp{position:relative}
     .blur{filter:blur(${blur}px) saturate(1.1);
