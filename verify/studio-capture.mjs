@@ -702,6 +702,27 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
       running = false; zoom = 0; choose([]); rails = []; railN = 0; drawSel(); render()
     })
     await room.waitForTimeout(1400)
+    /**
+     * The stage taking the whole room.
+     *
+     * The grid it sits in is columns of option cards, and the stage is not one of the cards: it
+     * spans them. Everything standing in for the whole view has to say so, and when the frames were
+     * wrapped so several arrangements could sit side by side, the wrapper became the grid item and
+     * quietly inherited a single 330px column while the timeline under it stayed full width. The
+     * rail was a narrow strip beside a lot of nothing, which reads as the preview being broken.
+     */
+    const wide = await room.evaluate(() => {
+      const g = document.getElementById('grid').getBoundingClientRect()
+      const a = document.querySelector('.appwrap').getBoundingClientRect()
+      const t = document.getElementById('tl').getBoundingClientRect()
+      return { grid: g.width, stage: a.width, strip: t.width }
+    })
+    ok('the stage spans the room rather than sitting in one column of it',
+      wide.stage > wide.grid * 0.9, `${Math.round(wide.stage)} of ${Math.round(wide.grid)}`)
+    ok('and is the same width as the sequence under it',
+      Math.abs(wide.stage - wide.strip) < 2,
+      `${Math.round(wide.stage)} against ${Math.round(wide.strip)}`)
+
     ok('every row wears a picture of the element it belongs to',
       await room.evaluate(() => document.querySelectorAll('.tlface iframe').length) === 2)
     ok('and each picture has the element in it rather than being an empty box',

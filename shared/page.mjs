@@ -327,7 +327,11 @@ header.bare .whenplaying{display:none}
 /* several arrangements of the same elements, on one clock: the wall, applied to time */
 /* named apart from the film reel's takes, which is a different list of a different thing and owns
    .takes, #takes and data-take already. One of them collided and the page stopped parsing */
-.rails{height:100%}
+/* the room is a grid of option cards, and the stage is not one of the cards. Everything that stands
+   in for the whole view says so: the timeline does, the app frame did, and when the frames were
+   wrapped so several arrangements could sit side by side, the wrapper became the grid item and
+   inherited a single 330px column while the timeline under it stayed full width */
+.rails{grid-column:1/-1;height:100%}
 .rails.many{display:flex;gap:8px;height:100%}
 .rails.many .appwrap{flex:1 1 0;min-width:0;position:relative;border:1px solid var(--line);
   border-radius:8px;overflow:hidden}
