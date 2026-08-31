@@ -1624,6 +1624,14 @@ document.getElementById('film').onclick=async()=>{
   if(aim.why){ drops.textContent=aim.why; return }
   const frame=aim.frame
   const btn=document.getElementById('film'); btn.disabled=true
+  /* The transport stops for the length of the film. Filming copies this document once per frame,
+     and the rAF loop was going on seeking the original in between the copies: holdAt writes what
+     gets drawn and wins, so the picture was never visibly wrong, but it is a document being changed
+     while it is read, and it is the whole transport running for the length of a render that nobody
+     is watching. It is put back the way it was found, because pressing Film should not also be a
+     way of pausing. */
+  const wasRunning=running
+  running=false; face()
   const say=(m)=>{ btn.textContent=m; drops.textContent=m }
   const base=(APP?(chosen&&chosen.label)||'element':(file||'film')).split('/').pop().replace(/[^A-Za-z0-9_-]+/g,'-')
   const n=takes.filter(t=>t.name===base||t.name.startsWith(base+' ')).length
@@ -1650,6 +1658,7 @@ document.getElementById('film').onclick=async()=>{
     // said rather than swallowed: the browser path refuses for reasons a person can act on
     drops.textContent=String(e && e.message||e)
   }
+  running=wasRunning; face()
   btn.disabled=false; btn.textContent='Film'
 }
 document.getElementById('save').onclick=async()=>{

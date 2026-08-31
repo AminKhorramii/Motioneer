@@ -336,7 +336,22 @@ const SHOTS = {
 }
 
 /**
- * @param shot which of the four
+ * How long a camera runs, in one place because it is one number.
+ *
+ * The camera runs at least as long as the motion and never so briefly that it whips. Tied to the
+ * motion so the two share a ruler, floored at two and a half seconds because a component whose
+ * motion lasts 400ms would otherwise get a camera move that reads as a flinch, and capped so a slow
+ * ambient loop does not drag the shot out to nothing.
+ *
+ * It was computed here for the preview and written as a flat 3000ms in the rail and in the export,
+ * which meant the shot somebody approved was not the shot that got filmed: any motion longer than
+ * about 1.9 seconds was previewed with a camera that ran longer than the one in the file. Nothing
+ * looked broken at either end, which is the shape of every timing fault this studio has had.
+ */
+const shotLength = (css) => Math.max(2500, Math.min(6000, Math.round((tempo(css).span || 1200) * 1.6)))
+
+/**
+ * @param shot which of the nine
  * @param ms   how long the move runs, taken from the motion so the two share a ruler
  * @param depth how much lens: the blur, the bloom and the vignette move together, because a shallow
  *              lens and a strong bloom are the same decision about how much this is a photograph
@@ -416,15 +431,7 @@ const preview = (o, camera, palette, depth = 1) => {
    * The wrapper also keeps the fit transform off the component itself, so a motion that animates
    * transform on the root element is no longer fighting the thing that makes it visible.
    */
-  /**
-   * The camera runs at least as long as the motion and never so briefly that it whips.
-   *
-   * Tied to the motion so the two share a ruler, floored at two and a half seconds because a
-   * component whose motion lasts 400ms would otherwise get a camera move that reads as a flinch, and
-   * capped so a slow ambient loop does not drag the shot out to nothing.
-   */
-  const span = tempo(o.css).span || 1200
-  const shotMs = Math.max(2500, Math.min(6000, Math.round(span * 1.6)))
+  const shotMs = shotLength(o.css)
   const chrome = camera ? STAGE(camera, shotMs, depth) : `html,body{margin:0;height:100%;overflow:hidden;
     background:var(--background,#0b0c0d);color:var(--foreground,#e6e6e6);font:14px ui-sans-serif,system-ui}
     #fit{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);transform-origin:center center;
@@ -1759,7 +1766,7 @@ figcaption span{color:var(--faint);font-size:11px}
 figure.filmed .stage{background:#050506;border-radius:8px;overflow:hidden}
 ${parts.filter((p) => p.shot).map((p, k) => {
   const move = SHOTS[p.shot] || SHOTS.drift
-  return `.d${k}{transform:${move.from};animation:dolly${k} 3000ms ${move.ease} both}
+  return `.d${k}{transform:${move.from};animation:dolly${k} ${shotLength(p.css)}ms ${move.ease} both}
 @keyframes dolly${k}{from{transform:${move.from}}to{transform:${move.to}}}`
 }).join('\n')}
 </style></head><body>
@@ -2016,7 +2023,7 @@ ${parts.map((p) => p.css).join('\n')}
   pointer-events:none}
 ${parts.filter((p) => p.shot).map((p) => {
   const move = SHOTS[p.shot] || SHOTS.drift
-  return `.d${p.i}{transform:${move.from};animation:dolly${p.i} 3000ms ${move.ease} both}
+  return `.d${p.i}{transform:${move.from};animation:dolly${p.i} ${shotLength(p.css)}ms ${move.ease} both}
 @keyframes dolly${p.i}{from{transform:${move.from}}to{transform:${move.to}}}`
 }).join('\n')}
 /**

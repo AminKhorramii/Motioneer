@@ -1002,6 +1002,19 @@ descriptor unset, and a key that includes it matches nothing and strips every fa
 That failure is a fast film in the fallback typeface, so the narrowing only ever narrows inside a
 family that was used at all, and a family whose faces do not line up is carried whole.
 
+Three things had to agree before the film was the thing on screen. The camera length was computed
+from the motion for the preview and written as a flat 3000ms for the rail and the export, so any
+motion longer than about 1.9 seconds was approved with one camera and filmed with another; it is one
+number now and it lives in one place, beside the shots. The transport used to keep running for the
+whole render, seeking the document between the copies being taken of it: the drawn frame was right
+because a hold wins, but it was a document being changed while it was read, and it stops for the
+length of a film now and starts again after. And `limits` looked for five things and said nothing
+about two more that are just as silent: a transition in flight, which is a clock and cannot be
+written into a copy that carries declarations, and a stylesheet the document may not read, whose
+rules are absent from the picture rather than wrong in it. It is asked by whether a transition is
+running rather than by whether one is declared, because every document written this decade declares
+one and a warning that fires on all of them is a warning nobody reads.
+
 It draws in the browser rather than on the machine serving the page. There were two of these and a
 setting to choose between them, which was the wrong answer: the headless one rendered exactly what
 chromium renders, but it needed playwright and ffmpeg, and playwright is a development dependency

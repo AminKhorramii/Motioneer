@@ -456,6 +456,12 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
         + 'body{background:#fff;color:#111}',
       css: sheet('f', 400), scope: 'data-mf', tw: false, wide: 320,
       note: 'faced rises', verb: 'rising,',
+    }], ['L', {
+      /* a deliberately slow one, because the camera length is floored at 2500ms and every other car
+         here is quick enough to sit on that floor, where a wrong answer and a right one agree */
+      file: 'slow.tsx', markup: '<div data-ml><b>one</b></div>', shot: '',
+      css: sheet('L', 3200), scope: 'data-ml', tw: false, wide: 320,
+      base: '', note: 'slow rises', verb: 'rising,',
     }]]),
   }))
   const XPORT = Number(process.env.WALL_RAIL_PORT || 4390)
@@ -482,6 +488,22 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
     .catch((e) => String(e))
   ok('a preview keeps the face rules a snapshot cannot carry', faced.includes('@font-face'))
   ok('and still drops the rest of the sheet the snapshot replaces', !faced.includes('background:#fff'))
+
+  /**
+   * The camera you approved and the camera that gets filmed are the same length.
+   *
+   * The preview sized the move against the motion and the rail wrote a flat 3000ms, so any motion
+   * longer than about 1.9 seconds was previewed with one camera and filmed with another. Both ends
+   * looked right on their own, which is how this family of fault always presents.
+   */
+  const lens = (t) => (t.match(/animation:dolly\w*\s+(\d+)ms/) || t.match(/animation:dolly\s+(\d+)ms/) || [])[1]
+  const shown = lens(await fetch(`http://localhost:${XPORT}/__wall/preview/L?camera=orbit&depth=1`)
+    .then((r) => r.text()).catch(() => ''))
+  const filmedAt = lens(await fetch(`http://localhost:${XPORT}/__wall/railview?ids=L&at=0&shots=orbit&palette=`)
+    .then((r) => r.text()).catch(() => ''))
+  ok('the camera in the film runs as long as the camera in the preview', !!shown && shown === filmedAt,
+    `${shown}ms shown, ${filmedAt}ms filmed`)
+  ok('and that length came from the motion rather than from a number in the file', shown !== '3000')
 
   if (wrote.at) {
     const seat = await chromium.launch()

@@ -257,6 +257,36 @@ try {
   check(Array.isArray(caveats) && caveats.length >= 8 && caveats.every((c) => typeof c === 'string' && c.length > 30),
     `CAVEATS names ${caveats.length} things that do not survive, in sentences the studio can show`)
 
+  /**
+   * What limits() actually finds, which nothing asked before this.
+   *
+   * The list of caveats was checked for its length and the detector that decides which of them to
+   * say out loud was never called at all, so a film could carry a hole and report itself clean. The
+   * two at the end are the ones that had no detector: a transition is only unrepresentable while it
+   * is running, and a sheet the document may not read takes its rules out of the picture silently.
+   */
+  const seen = await page.evaluate(async () => {
+    const doc = document
+    const say = () => R.limits(doc).map((l) => `${l.n} ${l.what.slice(0, 26)}`)
+    const clean = say()
+    const box = doc.createElement('div')
+    box.innerHTML = '<canvas width="10" height="10"></canvas><iframe title="x"></iframe>'
+    const fade = doc.createElement('div')
+    fade.style.cssText = 'transition:opacity 4s linear;opacity:1;width:20px;height:20px;background:#333'
+    doc.body.append(box, fade)
+    fade.getBoundingClientRect()
+    fade.style.opacity = '0'
+    await new Promise((r) => setTimeout(r, 120))
+    const dirty = say()
+    box.remove(); fade.remove()
+    return { clean, dirty }
+  })
+  check(seen.clean.length === 0, `a document with none of them says nothing at all (${seen.clean.join(', ') || 'silent'})`)
+  check(seen.dirty.some((s) => s.includes('a canvas')) && seen.dirty.some((s) => s.includes('a nested frame')),
+    `and names the canvas and the frame when they are there (${seen.dirty.join(' / ')})`)
+  check(seen.dirty.some((s) => s.includes('a css transition in flight')),
+    'and the transition that is running, which is held in the page and cannot be written into the copy')
+
   /* ── three instants, three pictures ─────────────────────────────────────────────────────────── */
 
   const moved = await page.evaluate(async () => {

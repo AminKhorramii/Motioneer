@@ -54,8 +54,8 @@ export const CAVEATS = [
  *
  * A list of everything that can go wrong is a thing nobody reads. What is worth saying is that the
  * component you are about to film has a backdrop filter in it, on the film where it happens, once.
- * So this looks for the three that change a frame visibly and silently, and says nothing at all the
- * rest of the time, which is almost always.
+ * So this looks only for the ones that change a frame visibly and silently, and says nothing at all
+ * the rest of the time, which is almost always.
  *
  * Deliberately not exhaustive. Scroll position and a missing caret are real and nobody cares; the
  * ones here are the ones that make somebody post a film with a hole in it.
@@ -78,6 +78,32 @@ export function limits(doc) {
     styled('backdropFilter', () => true))
   count('mix-blend-mode, which blends against the copy rather than the page',
     styled('mixBlendMode', () => true))
+  /**
+   * The two that are not a property of any one element.
+   *
+   * A transition is asked about by whether one is running, not by whether one is declared: a
+   * document where some element declares a transition is every document written this decade, and a
+   * check that fires on all of them is a check somebody turns off. What cannot be drawn is the one
+   * in flight, because a copy carries declarations and a transition in flight is a clock.
+   *
+   * Asked by instance rather than by constructor name, for the same reason the font rules are read
+   * by their text: a name is a thing a minifier is free to change out from under this.
+   */
+  const view = doc.defaultView
+  try {
+    const moving = view && view.CSSTransition
+      ? doc.getAnimations().filter((a) => a instanceof view.CSSTransition).length : 0
+    if (moving) {
+      found.push({ n: moving, what: 'a css transition in flight, which is held in the page but not written into the copy' })
+    }
+  } catch { /* a document that will not list its animations has nothing to say here */ }
+  /* and a sheet the document is not allowed to read, whose rules are simply absent from the picture
+     rather than wrong in it, which is the kind of missing nobody spots until they look for it */
+  let shut = 0
+  for (const sheet of doc.styleSheets || []) { try { void sheet.cssRules } catch { shut++ } }
+  if (shut) {
+    found.push({ n: shut, what: 'a stylesheet that cannot be read from here, so its rules are missing from the frame' })
+  }
   return found
 }
 
