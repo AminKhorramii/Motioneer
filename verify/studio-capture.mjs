@@ -1165,6 +1165,51 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
       await inbox.evaluate(() => picks.length) === kept - 1)
     await away.close()
 
+    /**
+     * What there is to write motion for, which is not where the studio is aimed.
+     *
+     * The guards on that button were written when a pick could only come from an app the studio was
+     * proxying, so asking whether one was aimed at answered it. A capture picked on a page the
+     * studio can never reach arrives without any of that, and the button then refused with pick a
+     * component first while holding two of them and offering to give them motion.
+     */
+    const asked = await seat.newContext({ viewport: { width: 1200, height: 800 } })
+    const gate = async (how) => {
+      const one = await asked.newPage()
+      const sent = []
+      const alerts = []
+      one.on('dialog', async (d) => { alerts.push(d.message()); await d.dismiss() })
+      await one.route('**/__wall/rail', (r) => { sent.push(['rail', r.request().postDataJSON()]); r.abort() })
+      await one.route('**/__wall/motion', (r) => { sent.push(['motion', r.request().postDataJSON()]); r.abort() })
+      await one.goto(`http://localhost:${XPORT}`, { waitUntil: 'load' })
+      await one.waitForTimeout(1300)
+      await one.evaluate(() => { picks = []; arr = null; opts = []; file = null; drawSel(); render() })
+      await how(one)
+      await one.click('#ask'); await one.waitForTimeout(1000)
+      const got = { which: sent.length ? sent[0][0] : 'none', body: sent.length ? sent[0][1] : null,
+        said: alerts[0] || '' }
+      await one.close()
+      return got
+    }
+    const pasteIn = (n) => async (one) => one.evaluate((k) => {
+      const some = [{ html: '<div data-p1><b>x</b></div>', css: '', shot: '', label: 'div.a', w: 240, h: 80, n: 2 },
+        { html: '<div data-p2><b>y</b></div>', css: '', shot: '', label: 'div.b', w: 240, h: 80, n: 2 }].slice(0, k)
+      const dt = new DataTransfer()
+      dt.setData('text', JSON.stringify({ wall: 'wall-capture', v: 1, picks: some }))
+      document.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }))
+    }, n)
+
+    const two = await gate(pasteIn(2))
+    ok('several picks make a rail however they arrived, with nothing aimed at',
+      two.which === 'rail' && two.body.picks.length === 2, `${two.which} ${two.said}`)
+    const solo = await gate(pasteIn(1))
+    ok('and one pick is asked about as itself rather than as a file that is not there',
+      solo.which === 'motion' && !!solo.body.html, `${solo.which} ${JSON.stringify(solo.body)}`)
+    const none = await gate(async () => {})
+    ok('with nothing at all it says so, and says both ways of getting something',
+      none.which === 'none' && /paste it in/.test(none.said), `${none.said.slice(0, 60)}`)
+    await asked.close()
+
     ok('the timeline drives without complaint', said.length === 0, said.join('; ').slice(0, 60))
 
     /**

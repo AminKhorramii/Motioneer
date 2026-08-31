@@ -1159,13 +1159,26 @@ async function post(where, body, ms){
     return await r.json()
   }finally{ clearTimeout(bell); if(inflight===c) inflight=null }
 }
+/**
+ * What there is to write motion for, which is not the same question as where the studio is aimed.
+ *
+ * These guards were written when a pick could only come from an app the studio was proxying, so
+ * asking whether one was aimed at answered it. A capture picked on a page the studio could never
+ * reach arrives without any of that, and the button then said to pick a component first while
+ * holding two of them and offering to give them motion.
+ *
+ * So it asks what it has. Several picks are a rail however they arrived, one is one, and a file is
+ * what is left when there are no picks at all.
+ */
 ask.onclick=async()=>{
-  if(APP && !picks.length) return alert('Press Pick element, then click something in your app.')
-  if(!APP && !file) return alert('Pick a component first.')
+  if(!picks.length && !file) return alert(APP
+    ? 'Press Pick element, then click something in your app.'
+    : 'Nothing to give motion to yet. Aim at a site and pick something, open a component on the '
+      + 'left, or pick on a page you are signed into and paste it in.')
   if(ask.disabled) return
   verdict=null
   ask.disabled=true; askSays('Writing…')
-  if(APP && picks.length>1){
+  if(picks.length>1){
     grid.innerHTML=WAITER(); runShader()
     drops.textContent=''
     try{
@@ -1192,7 +1205,9 @@ ask.onclick=async()=>{
   drops.textContent=''
   try{
     const r=await post('/__wall/motion',
-      Object.assign({count:Number(document.getElementById('count').value)}, APP?chosen:{file}), 360000)
+      /* a pick if there is one, whatever brought it, and the file only when there is not */
+      Object.assign({count:Number(document.getElementById('count').value)},
+        picks.length?chosen:{file}), 360000)
     opts=r.kept||[]; arr=null; opened=null; held.clear(); ends.clear()
     verdict = opts.length ? null : {dropped:r.dropped||[], error:r.error}
     render()
