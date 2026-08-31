@@ -1075,6 +1075,56 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
       await room.evaluate(() => takes.length) === reels)
 
     /**
+     * Saying what it should do, which is the one thing a deck cannot be asked for.
+     *
+     * The motion itself needs a model, so what is checked here is the half that does not: that the
+     * field is the last card and not an option, that what was typed is what gets sent, and that a
+     * refusal comes back as a reason next to a field still holding the sentence that earned it. The
+     * answer is stubbed at the route, because a suite inside verify:all has no key and no network.
+     */
+    let inWords = null
+    let refuse = true
+    await room.route('**/__wall/described', async (route) => {
+      inWords = JSON.parse(route.request().postData() || '{}').words
+      await route.fulfill({ status: 200, contentType: 'application/json',
+        body: JSON.stringify(refuse ? { why: 'it never comes back to where it started' }
+          : { id: '2', verb: inWords, scope: 'data-m2', note: 'what was asked for', css: '',
+            tempo: { span: 500 } }) })
+    })
+    await room.evaluate(() => {
+      arr = null; opened = null; file = 'card.tsx'
+      opts = [{ id: '1', note: 'one', verb: 'rising,', scope: 'data-m1', css: '', tempo: { span: 400 } }]
+      render()
+    })
+    await room.waitForTimeout(600)
+    ok('the options end with a field for saying what it should do instead',
+      await room.evaluate(() => {
+        const all = [...document.querySelectorAll('.grid figure')]
+        return all.length === 2 && all[all.length - 1].classList.contains('saycard')
+      }))
+    ok('and the field is not one of the options, so clicking it chooses nothing',
+      await room.evaluate(() => {
+        chosenOpt = '1'
+        document.getElementById('saywhat').click()
+        return chosenOpt
+      }) === '1')
+    const sentence = 'the rows deal in from the left, the top one first'
+    await room.fill('#saywhat', sentence)
+    await room.press('#saywhat', 'Enter')
+    await room.waitForTimeout(500)
+    ok('what was typed is what gets asked for', inWords === sentence, String(inWords))
+    ok('a motion the gates turn down says why rather than failing quietly',
+      /never comes back/.test(await room.evaluate(() => document.getElementById('saynote').textContent)))
+    ok('and the sentence stays in the field, since a near miss is the thing worth editing',
+      await room.inputValue('#saywhat') === sentence)
+    refuse = false
+    await room.press('#saywhat', 'Enter')
+    await room.waitForTimeout(600)
+    ok('and one that passes joins the row as another option',
+      await room.evaluate(() => opts.length) === 2 && await room.evaluate(() => chosenOpt) === '2')
+    await room.unroute('**/__wall/described')
+
+    /**
      * Choosing, before composing.
      *
      * One element got the whole room: several motions side by side, open one bigger, ask for more

@@ -135,6 +135,22 @@ figure{margin:0;background:var(--panel);border:1px solid var(--line);border-radi
   display:flex;flex-direction:column}
 iframe{width:100%;height:280px;border:0;background:#0b0c0d;display:block}
 .solo{grid-column:1/-1}.solo iframe{height:min(58vh,460px)}
+/* the same card as the ones beside it, holding the question instead of an answer. Dashed, because
+   it is the one in the row that is not yet a motion, and it should not read as an option that
+   failed to render */
+.saycard{cursor:default;border-style:dashed}
+.saybox{display:grid;gap:7px;align-content:center;padding:16px;height:100%}
+.saybox label{color:var(--dim);font-size:12px}
+.saybox input{box-sizing:border-box;width:100%;background:none;border:0;border-radius:0;
+  border-bottom:1px solid var(--line2);color:var(--ink);font-family:inherit;font-size:12.5px;
+  padding:7px 1px}
+.saybox input:focus{outline:none;border-bottom-color:var(--accent)}
+.saybox input:disabled{opacity:.55}
+/* nothing is said here until there is something to say. It carried a standing note about the motion
+   being judged, which is true and was in the way: a line of explanation under every empty field is
+   read once and skipped after, and this is the line a refusal has to arrive on */
+.saynote{color:var(--faint);font-size:10.5px;line-height:1.45;margin:0}
+.saynote:empty{display:none}
 figcaption{padding:10px 12px;border-top:1px solid var(--line);display:grid;gap:4px;font-size:12px}
 figcaption b{font-weight:500}.note{color:var(--dim)}.verb{color:var(--faint);font-size:11px;line-height:1.5}
 .facts{color:var(--dim);font-size:11px;font-variant-numeric:tabular-nums;letter-spacing:.01em}
@@ -1915,20 +1931,59 @@ function render(){
     '<button class="icb'+(kept.has(o.id)?' on':'')+'" data-keep="'+o.id+'" title="'
       +(kept.has(o.id)?'Saved':'Save it')+'">'+(kept.has(o.id)?ICON.kept:ICON.mark)+'</button>'+
     '</span></figcaption></figure>').join('')
+    /* A card for saying it instead of choosing it, last because it belongs to the same question the
+       others answer. The decks are for not having to know what you want; this is for when you do,
+       and until it existed the only way to say so was to shoot another five and keep the nearest. */
+    +'<figure class="saycard"><div class="saybox">'
+    +'<label for="saywhat">Or say what it should do</label>'
+    +'<input id="saywhat" type="text" autocomplete="off" spellcheck="false"'
+    +' placeholder="the rows deal in from the left, one after another">'
+    +'<p class="saynote" id="saynote"></p></div></figure>'
   grid.classList.remove('railed')
   grid.classList.toggle('solo', !!opened)
   if(opened && !opts.some(o=>o.id===opened)) opened=null
-  document.querySelectorAll('figure').forEach((f,i)=>{
+  /* the card you type into is a figure too, and it is not an option: left in, it took an index the
+     options do not have and clicking the field deselected whatever was chosen */
+  document.querySelectorAll('figure:not(.saycard)').forEach((f,i)=>{
     if(opts[i] && opts[i].id===opened) f.classList.add('up')
     if(opts[i] && opts[i].id===chosenOpt) f.classList.add('chosen')
     f.onclick=e=>{
       if(e.target.closest('button')) return
       chosenOpt = opts[i] ? opts[i].id : null
-      document.querySelectorAll('figure').forEach(x=>x.classList.remove('chosen'))
+      document.querySelectorAll('figure:not(.saycard)').forEach(x=>x.classList.remove('chosen'))
       f.classList.add('chosen')
       drawInspector()
     }
   })
+  /**
+   * Saying it rather than choosing it.
+   *
+   * Enter sends, because this is one line and a button beside a one line field is a second thing to
+   * aim at for nothing. The field keeps what was typed when a gate turns the motion down: a sentence
+   * that was nearly right is exactly the thing somebody wants to edit, and clearing it would make
+   * the quickest way to try again typing the whole thing out from the start.
+   */
+  const said=document.getElementById('saywhat')
+  if(said) said.onkeydown=async(e)=>{
+    if(e.key!=='Enter') return
+    const words=said.value.trim()
+    const note=document.getElementById('saynote')
+    if(!words){ note.textContent='Say what it should do, then press enter.'; return }
+    said.disabled=true; note.textContent='Asking for that one'
+    try{
+      /* any of them will do as the source: they are all motions of the same element, and what this
+         needs from one is the markup and the sheet it was captured with */
+      const r=await post('/__wall/described',{id:opts[0].id,words},360000)
+      if(!r||!r.id){
+        note.textContent=(r&&r.why)?'Turned down, because '+r.why:'Nothing came back.'
+        said.disabled=false; said.focus(); return }
+      opts=opts.concat([r]); chosenOpt=r.id
+      held.clear(); ends.clear(); render()
+    }catch(err){
+      note.textContent=String(err&&err.message||err)
+      said.disabled=false; said.focus()
+    }
+  }
   /* one option filling the room, because a card three hundred pixels wide is a thumbnail of a
      decision rather than the decision. Escape comes back, and the transport keeps driving it */
   document.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>{

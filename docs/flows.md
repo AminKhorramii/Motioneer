@@ -728,6 +728,18 @@ that cannot be seen when you first look at it is worse than one that can. How mu
 and deliberately not scored, since an emphasis motion stirs three percent and an entrance stirs ninety
 and neither is better.
 
+The last card in the row is a field rather than an answer. The decks exist so nobody has to know what
+they want, and until this there was nothing to do with knowing: somebody who could say the rows deal
+in from the left, the top one first, could only shoot another five and keep whichever landed nearest,
+which is a slow way of being ignored. What is typed goes through the same gates as a dealt motion,
+deliberately, because a movement asked for by name is not a reason to accept one that never comes
+back to rest. Measured on a real list, that sentence came back in six seconds as a 400ms rise with
+the rows seventy milliseconds apart, and asking for one that slides away and stays gone came back
+turned down, saying it would sit 512px from where it started, permanently. The reason lands under the
+field and the sentence stays in it, since a near miss is the thing worth editing. Nothing is written
+under the field until there is something to say: a standing note on an empty field is read once and
+skipped afterwards, and that is the line a refusal has to arrive on.
+
 Two of those measurements were wrong before they were right, and calibration caught both. Bounding box
 displacement reported that fifteen of twenty one motions barely moved, including rows typing onto a
 page, because a clip-path reveal and a scaleX move no box. And sampling only real elements reported

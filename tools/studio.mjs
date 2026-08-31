@@ -1579,6 +1579,39 @@ async function refine(base, count) {
   return { kept: tried.filter((t) => t.id), dropped: tried.filter((t) => !t.id), styled: 'the same as before' }
 }
 
+/**
+ * One motion, from a sentence somebody typed rather than from a deck.
+ *
+ * The two decks exist so nobody has to know what they want: ask, and five answers arrive to choose
+ * between. Somebody who does know what they want had no way to say it. They could shoot another five
+ * and keep whichever landed nearest, which is a slow way of being ignored, and the studio had a
+ * hundred ways of describing a movement and no way at all of being told one.
+ *
+ * Held to the same gates as a dealt motion, deliberately: a movement asked for by name is not a
+ * reason to accept one that never comes back to rest or that blanks its own first frame. When a gate
+ * turns it down the reason goes back to the field, because "it did not work" is not something
+ * anybody can rewrite a sentence from.
+ */
+async function described(from, words) {
+  const about = 'This element was picked out of a running app. It is the rendered dom, so it is '
+    + 'exactly what a user sees, and the css below is the rules that actually matched it.\n\n'
+    + `${String(from.markup || '').slice(0, 6000)}\n\n`
+    + (from.base ? `Its stylesheet:\n${from.base.slice(0, 3000)}\n\n` : '')
+  const ask = `${about}Move it so that ${words}\n\nTake the timing from that description: it is how `
+    + 'the thing behaves. Do what it asks and not more than it asks.'
+  const got = await askModel(ask)
+  if (!got.raw) return { why: got.why }
+  const ok = judge(got.raw, undefined, true)
+  if (!ok.css) return { why: ok.why }
+  const rest = await drifts({ markup: from.markup, base: from.base, css: ok.css, scope: ok.scope, wide: from.wide })
+  const settled = resting(rest)
+  if (settled.length) return { why: settled[0] }
+  const id = String(nextId++)
+  keep(id, { ...from, id, css: ok.css, scope: ok.scope, note: ok.note, verb: words })
+  return { id, verb: words, scope: ok.scope, note: ok.note, css: ok.css, tempo: tempo(ok.css),
+    seen: { reach: rest.reach, stir: rest.stir, escape: rest.escape, blank: rest.blank } }
+}
+
 async function options(src, count) {
   // a picked element arrives already rendered and already carrying the rules that matched it, so
   // there is nothing to parse and nothing to guess
@@ -2380,6 +2413,19 @@ const server = createServer(async (req, res) => {
       console.log(`  refining "${base.note}"`)
       const got = await refine(base, Math.max(1, Math.min(4, body.count || 3)))
       console.log(`    ${got.kept.length} kept, ${got.dropped.length} dropped`)
+      return json(res, got)
+    }
+    if (url.pathname === '/__wall/described' && req.method === 'POST') {
+      const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))
+      const from = made.get(body.id)
+      if (!from) { res.writeHead(404); return res.end('gone') }
+      /* trimmed and bounded here rather than trusted, since this is the one thing in the studio a
+         person types straight into a prompt */
+      const words = String(body.words ?? '').replace(/\s+/g, ' ').trim().slice(0, 400)
+      if (!words) return json(res, { why: 'nothing was asked for' })
+      console.log(`  asked for "${words}"`)
+      const got = await described(from, words)
+      console.log(got.id ? `    kept as ${got.id}` : `    dropped: ${got.why}`)
       return json(res, got)
     }
     if (url.pathname === '/__wall/export' && req.method === 'POST') {
