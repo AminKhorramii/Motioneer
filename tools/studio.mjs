@@ -1695,6 +1695,10 @@ ${tw ? `<style>${themeFor(palette)}</style>` : ''}
   z-index:6;border-radius:3px;background:rgba(94,106,210,.75);opacity:0;transition:opacity 90ms ease}
 .car.put:hover .wide{opacity:1}
 .car.lifted{z-index:9}
+/* the component the timeline is pointed at, said on the stage as well, because a selection that is
+   only true in one of the two places somebody is looking is not a selection */
+.car.chosen::after{content:'';position:absolute;inset:-5px;border-radius:7px;pointer-events:none;
+  outline:1px solid rgba(94,106,210,.75);outline-offset:0}
 .car.lifted .grab{outline:1px solid var(--pin,#5e6ad2);outline-offset:-4px}
 /* every car's sheet, not just the first, and each walked into the car it belongs to. Two pages'
    rules in one document are two sites arguing: whichever came last won body and repainted this
@@ -1789,14 +1793,20 @@ for (var handle of document.querySelectorAll('[data-grab]')){
     /* the grab point inside the car, so it does not jump to the cursor on the first pixel */
     var hold={ x:(e.clientX-spot.left)/box.width*100, y:(e.clientY-spot.top)/box.height*100 }
     var wide=spot.width/box.width*100
+    var moved=false
     car.classList.add('lifted')
     function move(ev){
+      moved=true
       var p=pct(ev, box)
       tell(i, { x:Math.max(0,p.x-hold.x), y:Math.max(0,p.y-hold.y), w:wide }, false)
     }
     function up(ev){
       window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up)
       car.classList.remove('lifted')
+      /* a press that never moved is a click, and a click on a component means that component. The
+         stage had no selection at all, so you dragged whatever you happened to grab and the row it
+         belonged to was somewhere else entirely */
+      if(!moved){ parent.postMessage({wall:'chose', i:i}, '*'); return }
       var p=pct(ev, box)
       tell(i, { x:Math.max(0,p.x-hold.x), y:Math.max(0,p.y-hold.y), w:wide }, true)
     }

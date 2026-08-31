@@ -314,11 +314,13 @@ header.bare .whenplaying{display:none}
 .tlmore:hover{color:var(--accent)}
 .tlmore svg{width:12px;height:12px}
 /* when a component is on the stage, drawn behind when it moves: two decisions sharing one row */
+/* a backdrop, not a target: a car that never leaves has a life the width of the whole track, so
+   leaving it clickable meant there was no empty track left to put the playhead on */
 .tllife{position:absolute;top:4px;bottom:4px;background:rgba(255,255,255,.05);border-radius:3px;
-  border:1px solid rgba(255,255,255,.08)}
+  border:1px solid rgba(255,255,255,.08);pointer-events:none}
 .tlrow:hover .tllife,.tlrow.on .tllife{background:rgba(255,255,255,.085)}
 .lin,.lout{position:absolute;top:-2px;bottom:-2px;width:7px;cursor:ew-resize;border-radius:3px;
-  touch-action:none}
+  touch-action:none;pointer-events:auto}
 .lin{left:-3px}.lout{right:-3px}
 .tlrow:hover .lin,.tlrow:hover .lout{background:rgba(255,255,255,.3)}
 .lin:hover,.lout:hover{background:var(--accent)}
@@ -1523,11 +1525,19 @@ addEventListener('message',e=>{const d=e.data||{}
    * the timeline is, and the arrangement is written once at the end, because rebuilding the frame per
    * pointermove would reload the document under the cursor sixty times a second.
    */
+  /* data-rail counts the cars that move, and a car index counts every row. They agree until one
+     pick fails, which is exactly the conflation the timeline already had and had to be taken out of */
+  if(d.wall==='chose'&&railed()){
+    const x=ARR.live(arr)[Number(d.i)]
+    if(x){ anchor=x.i; choose([x.i],x.i); shut(); insp.hidden=false }
+    return
+  }
   if(d.wall==='placed'&&railed()){
-    const car=arr.cars[d.i]; if(!car) return
+    const seat=ARR.live(arr)[Number(d.i)]; if(!seat) return
+    const at=seat.i, car=seat.car
     if(!d.done){
       const f=grid.querySelector('.appwrap.on iframe')||grid.querySelector('.appwrap iframe')
-      const box=f&&f.contentDocument&&f.contentDocument.querySelector('[data-rail="'+d.i+'"]')
+      const box=f&&f.contentDocument&&f.contentDocument.querySelector('[data-rail="'+Number(d.i)+'"]')
       if(box){
         const stage=f.contentDocument.querySelector('.rail')
         if(stage) stage.classList.add('staged')
@@ -1537,7 +1547,7 @@ addEventListener('message',e=>{const d=e.data||{}
       return
     }
     mark('moving '+nameOf(car.motion)+' on the stage')
-    arr=ARR.placed(arr,d.i,{x:d.x,y:d.y,w:d.w})
+    arr=ARR.placed(arr,at,{x:d.x,y:d.y,w:d.w})
     held.clear(); ends.clear(); render()
     return
   }
@@ -2015,6 +2025,17 @@ function paintSel(){
     r.classList.toggle('on', i===lead)
     const bar=r.querySelector('.tlbar'); if(bar) bar.classList.toggle('sel', sel.has(i))
   }
+  /* reached into rather than reloaded, because the frame is showing the same cars at the same
+     offsets and rebuilding it to light one up would restart every motion in it */
+  try{
+    const f=grid.querySelector('.appwrap.on iframe')||grid.querySelector('.appwrap iframe')
+    const d=f&&f.contentDocument
+    const on=ARR.live(arr)
+    if(d) for(const car of d.querySelectorAll('.car')){
+      const seat=on[Number(car.dataset.rail)]
+      car.classList.toggle('chosen', !!seat&&seat.i===lead)
+    }
+  }catch(_){ /* a frame still loading has nothing to mark */ }
 }
 /**
  * What the composition does with its time, said out loud.
@@ -2177,6 +2198,31 @@ function wireTimeline(live){
    * The width follows the pointer and the server is asked once, on release. It is a model free call,
    * but a request per pixel is still a request per pixel.
    */
+  /**
+   * The playhead, driven from the strip.
+   *
+   * It was drawn and read only, which makes it a readout rather than a cursor. An editor's whole
+   * interaction is to put the clock where you want something to happen and then do the thing, and
+   * that is not available when the only way to move the clock is a slider in the header, above and
+   * away from the rows being aimed at.
+   *
+   * On the empty part of a track, so it never argues with a bar, a life, or any of their handles.
+   */
+  for (const track of document.querySelectorAll('.tltrack')){
+    track.onpointerdown=e=>{
+      if(e.target.closest('.tlbar, .lin, .lout')) return
+      e.preventDefault(); e.stopPropagation()
+      const box=track.getBoundingClientRect()
+      const to=ev=>{
+        const want=Math.max(0,Math.min(total,(ev.clientX-box.left)/box.width*total))
+        running=false; face(); hold(Math.round(want))
+      }
+      const up=()=>{ window.removeEventListener('pointermove',to)
+        window.removeEventListener('pointerup',up) }
+      to(e)
+      window.addEventListener('pointermove',to); window.addEventListener('pointerup',up)
+    }
+  }
   for (const grip of document.querySelectorAll('[data-trim]')){
     grip.onpointerdown=e=>{
       e.preventDefault(); e.stopPropagation()

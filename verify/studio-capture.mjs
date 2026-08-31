@@ -828,6 +828,42 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
     ok('and undo puts it back in the stack',
       (await room.evaluate(() => arr.cars[1].place)) === null)
 
+    /**
+     * One selection, and a clock somebody can put where they want it.
+     *
+     * The timeline had a selection and the stage had none, so you dragged whatever you happened to
+     * grab and the row it belonged to was somewhere else. And the playhead was drawn and read only,
+     * which makes it a readout: an editor's whole interaction is to put the clock where something
+     * should happen and then do the thing, and that is not available when the only way to move it is
+     * a slider in the header, above and away from the rows being aimed at.
+     */
+    await lay(); await room.waitForTimeout(500)
+    await room.evaluate(() => hold(1500)); await room.waitForTimeout(250)
+    const stage = room.frameLocator('.appwrap iframe')
+    const knob = await stage.locator('[data-grab="2"]').boundingBox()
+    await room.mouse.click(knob.x + knob.width / 2, knob.y + knob.height / 2)
+    await room.waitForTimeout(450)
+    ok('clicking a component on the stage selects its row',
+      String(await room.evaluate(() => [...sel])) === '2' && await room.evaluate(() => lead) === 2,
+      `${await room.evaluate(() => [...sel])}`)
+    ok('and the stage says which one is chosen, since a selection true in one place is not one',
+      await stage.locator('.car.chosen').count() === 1)
+
+    const ruled = await room.evaluate(() => ruler())
+    const lane = await room.locator('[data-track="0"]').boundingBox()
+    await room.mouse.click(lane.x + lane.width * 0.35, lane.y + lane.height / 2)
+    await room.waitForTimeout(400)
+    const put = await room.evaluate(() => Number(scrub.value))
+    ok('the playhead goes where the strip is clicked',
+      Math.abs(put - ruled * 0.35) < ruled * 0.05, `${put} of ${Math.round(ruled)}`)
+    ok('and putting it somewhere stops the transport rather than fighting it',
+      await room.evaluate(() => !running))
+    /* a car that never leaves has a life the width of the whole track, so leaving that clickable
+       left no empty track to put the playhead on at all */
+    ok('a life is a backdrop rather than a target, or there is nowhere left to click',
+      await room.evaluate(() =>
+        getComputedStyle(document.querySelector('.tllife')).pointerEvents) === 'none')
+
     ok('the timeline drives without complaint', said.length === 0, said.join('; ').slice(0, 60))
 
     /**
