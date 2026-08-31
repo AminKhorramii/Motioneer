@@ -583,8 +583,19 @@ header.bare .whenplaying{display:none}
         <div class="cams" id="camgrid"></div></div>
       <label>Shape<select id="shape">
         <option value="wide" selected>wide 1280</option>
+        <option value="hd">wide 1920</option>
         <option value="square">square 1080</option>
         <option value="tall">tall 1080</option></select></label>
+      <!-- both of these used to be numbers in the script. Sixty is worth offering because the frames
+           are cheap now and a push at thirty judders on a big screen; the tail is worth offering
+           because a demo that cuts on the last keyframe gives nobody time to read what it landed on -->
+      <label>Frames<select id="fps">
+        <option value="30" selected>30 a second</option>
+        <option value="60">60 a second</option></select></label>
+      <label>Tail<select id="tail">
+        <option value="0">cut on the end</option>
+        <option value="700" selected>hold briefly</option>
+        <option value="1600">hold longer</option></select></label>
       <label>Lens<select id="depth">
         <option value="0.4">shallow</option><option value="1" selected>as shot</option>
         <option value="1.6">heavy</option></select></label>
@@ -1587,14 +1598,23 @@ async function filmHere(frame, want, say){
   /* the preview drives its own clock and would fight the raster, so it is held first */
   try{ frame.contentWindow.postMessage({wall:'hold',t:0,i:0},'*') }catch{}
   await new Promise(r=>setTimeout(r,120))
-  const total=Math.max(1,Math.round(want.ms/1000*want.fps))
+  /* the tail is frames rather than time: the same last instant drawn again, so a film ends on what
+     it landed on instead of cutting the moment the last keyframe fires. Holding a still is what
+     gives somebody time to read the thing the motion was pointing at, and a clip that loops needs
+     somewhere to loop from that is not mid gesture */
+  const tail=Math.max(0,Math.round((want.tail||0)/1000*want.fps))
+  const total=Math.max(1,Math.round(want.ms/1000*want.fps))+tail
+  const last=Math.round(want.ms)
   say('Reading what it needs')
   // once for the whole film: refetching a font ninety times is most of the wall clock
   const inlined=await R.inline(doc,{fetchVia:(u)=>fetch('/__wall/asset?u='+encodeURIComponent(u))})
   async function* stream(){
     for(let i=0;i<total;i++){
+      /* asked every frame rather than once, because the only moment a long film can be called off
+         is between two of them: there is no other await to interrupt */
+      if(want.stopped&&want.stopped()) throw new Error('STOPPED')
       yield await R.rasterize(doc,{width:want.w,height:want.h,
-        ms:Math.round(i/want.fps*1000),inlined})
+        ms:Math.min(last,Math.round(i/want.fps*1000)),inlined})
     }
   }
   // streamed rather than collected: ninety canvases at 1280 by 720 is a third of a gigabyte held
@@ -1603,7 +1623,12 @@ async function filmHere(frame, want, say){
     onProgress:(done)=>say('Drawing frame '+done+' of '+total)})
   return {bytes,total,notes:(inlined&&inlined.notes)||[],limits:R.limits(doc)}
 }
-const SHAPES={wide:{w:1280,h:720},square:{w:1080,h:1080},tall:{w:1080,h:1350}}
+/* 1920 is here because it stopped being expensive. A frame used to cost 298ms and four times the
+   pixels was four times a number already too big to offer; carrying only the faces the page uses
+   took it to 35ms, and a wide film at the size people actually watch things at became affordable
+   rather than aspirational. 1280 stays the default, because most of these get posted rather than
+   projected and the file is a third of the size. */
+const SHAPES={wide:{w:1280,h:720},hd:{w:1920,h:1080},square:{w:1080,h:1080},tall:{w:1080,h:1350}}
 let takes=[]
 /* every take kept and switchable, because comparing two is the only reason to shoot a second */
 function showReel(t){
@@ -1619,11 +1644,18 @@ function showReel(t){
   box.querySelectorAll('[data-take]').forEach(b=>b.onclick=()=>showReel(takes[Number(b.dataset.take)]))
   shut(); reel.hidden=false
 }
+/* Filming is the one thing here that takes long enough to want back. The button becomes the way out
+   rather than growing a second one beside it, because there is exactly one thing to do while a film
+   is being drawn and a disabled button that says Film is a button that looks broken for a minute. */
+let filming=false, dropped=false
 document.getElementById('film').onclick=async()=>{
+  if(filming){ dropped=true; drops.textContent='Stopping'; return }
   const aim=filmable()
   if(aim.why){ drops.textContent=aim.why; return }
   const frame=aim.frame
-  const btn=document.getElementById('film'); btn.disabled=true
+  const btn=document.getElementById('film')
+  filming=true; dropped=false; btn.textContent='Stop'
+  btn.title='Stop drawing and keep nothing'
   /* The transport stops for the length of the film. Filming copies this document once per frame,
      and the rAF loop was going on seeking the original in between the copies: holdAt writes what
      gets drawn and wins, so the picture was never visibly wrong, but it is a document being changed
@@ -1632,16 +1664,21 @@ document.getElementById('film').onclick=async()=>{
      way of pausing. */
   const wasRunning=running
   running=false; face()
-  const say=(m)=>{ btn.textContent=m; drops.textContent=m }
+  /* the progress goes to the status line only now, because the button is saying Stop and a label
+     that flickers between a verb and a count is not offering either */
+  const say=(m)=>{ drops.textContent=m }
   const base=(APP?(chosen&&chosen.label)||'element':(file||'film')).split('/').pop().replace(/[^A-Za-z0-9_-]+/g,'-')
   const n=takes.filter(t=>t.name===base||t.name.startsWith(base+' ')).length
   const name=n?base+' '+(n+1):base
   const shape=document.getElementById('shape').value
   const size=SHAPES[shape]||SHAPES.wide
-  const ms=Math.max(1200, span+400), fps=30
+  const fps=Number(document.getElementById('fps').value)||30
+  const tail=Number(document.getElementById('tail').value)||0
+  const ms=Math.max(1200, span+400)
   try{
     say('Filming')
-    const {bytes,total,notes,limits}=await filmHere(frame,{ms,fps,w:size.w,h:size.h},say)
+    const {bytes,total,notes,limits}=await filmHere(frame,
+      {ms,fps,tail,w:size.w,h:size.h,stopped:()=>dropped},say)
     const url=URL.createObjectURL(new Blob([bytes],{type:'video/mp4'}))
     /* said only when it applies. A film of a component with no canvas and no blend mode in it has
        nothing to warn about, and a standing disclaimer on every one of them teaches you to skip
@@ -1655,11 +1692,15 @@ document.getElementById('film').onclick=async()=>{
           :'Drawn here, so nothing was installed and nothing was uploaded.') })
     showReel(takes[takes.length-1]); drops.textContent=''
   }catch(e){
-    // said rather than swallowed: the browser path refuses for reasons a person can act on
-    drops.textContent=String(e && e.message||e)
+    /* stopping is a thing somebody chose, so it is reported as done rather than as gone wrong.
+       Everything else is said rather than swallowed: this path refuses for reasons a person can
+       act on */
+    drops.textContent=String(e&&e.message)==='STOPPED'
+      ? 'Stopped, and nothing was kept.' : String(e && e.message||e)
   }
+  filming=false; dropped=false
   running=wasRunning; face()
-  btn.disabled=false; btn.textContent='Film'
+  btn.textContent='Film'; btn.title='Render what is on screen frame by frame'
 }
 document.getElementById('save').onclick=async()=>{
   // a rail is a thing worth handing over too, and it was the one result you could not export

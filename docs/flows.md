@@ -1002,6 +1002,19 @@ descriptor unset, and a key that includes it matches nothing and strips every fa
 That failure is a fast film in the fallback typeface, so the narrowing only ever narrows inside a
 family that was used at all, and a family whose faces do not line up is carried whole.
 
+What a film is shaped like is now asked rather than assumed. The frame rate and the length were
+numbers in the script: thirty a second always, and a film that ended the instant the last keyframe
+fired. Sixty is offered because a frame stopped being expensive and a push at thirty judders on a
+large screen, and a tail is offered because a demo that cuts on the landing gives nobody time to read
+what it landed on, and a clip that loops needs somewhere to loop from that is not mid gesture. The
+tail is frames rather than time: the same last instant drawn again, so holding longer never changes
+the motion, only how long you sit with what it left. 1920 joined the shapes for the same reason
+sixty did, and 1280 stays the default because most of these are posted rather than projected.
+
+Filming is also the one thing here long enough to want back, so the button that starts it becomes the
+way out of it, and a film that is stopped is not kept. A disabled button reading Film is a button
+that looks broken for a minute, and there is only ever one thing to do while a film is drawing.
+
 Three things had to agree before the film was the thing on screen. The camera length was computed
 from the motion for the preview and written as a flat 3000ms for the rail and the export, so any
 motion longer than about 1.9 seconds was approved with one camera and filmed with another; it is one

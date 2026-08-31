@@ -1027,6 +1027,54 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
       await room.evaluate(() => arr.cars[1].paper) === '')
 
     /**
+     * Pressing Film, which nothing did until this.
+     *
+     * Every part of the film path was covered and the path itself was not: holdAt had a suite, the
+     * mp4 boxes had a suite that parsed them byte by byte, and no check anywhere had ever clicked
+     * the button that puts the two together. The frame loop the studio runs is not even the one
+     * raster exports and tests, so the covered code and the shipped code were different code.
+     *
+     * The span is pinned first because it is measured from whatever the previews last reported, and
+     * a frame count that moves on its own cannot be asserted against.
+     */
+    const filmWith = async (fps, tail) => {
+      await room.evaluate(() => { span = 2000 })
+      await room.locator('#more').click(); await room.waitForTimeout(200)
+      await room.selectOption('#fps', String(fps))
+      await room.selectOption('#tail', String(tail))
+      await room.keyboard.press('Escape'); await room.waitForTimeout(150)
+      await room.locator('#film').click()
+      await room.waitForFunction(() => document.getElementById('film').textContent === 'Film',
+        null, { timeout: 120000 })
+      return room.evaluate(() => (takes.length ? takes[takes.length - 1].facts : ''))
+    }
+    const cut = await filmWith(30, 0)
+    ok('a rail films, in the page, with nothing installed', /^72 frames at 30fps/.test(cut), cut)
+    const tailed = await filmWith(30, 1600)
+    ok('and a tail holds the last instant rather than lengthening the motion',
+      /^120 frames at 30fps/.test(tailed), tailed)
+    ok('while sixty a second is twice the frames of the same film',
+      /^144 frames at 60fps/.test(await filmWith(60, 0)))
+
+    /* the way out of a long one. Filming is the only thing here that can run for a minute, and a
+       button that says Film while refusing to do anything is a button that looks broken */
+    await room.evaluate(() => { span = 20000 })
+    await room.locator('#more').click(); await room.waitForTimeout(200)
+    await room.selectOption('#shape', 'hd'); await room.selectOption('#fps', '60')
+    await room.keyboard.press('Escape'); await room.waitForTimeout(150)
+    const reels = await room.evaluate(() => takes.length)
+    await room.locator('#film').click(); await room.waitForTimeout(400)
+    ok('a film in progress offers the way out on the button that started it',
+      await room.evaluate(() => document.getElementById('film').textContent) === 'Stop')
+    await room.locator('#film').click()
+    await room.waitForFunction(() => document.getElementById('film').textContent === 'Film',
+      null, { timeout: 60000 })
+    ok('and stopping says so rather than failing',
+      /Stopped/.test(await room.evaluate(() => document.getElementById('drops').textContent)))
+    ok('and keeps nothing, since half a film is not a take',
+      await room.evaluate(() => takes.length) === reels)
+
+    /**
      * Choosing, before composing.
      *
      * One element got the whole room: several motions side by side, open one bigger, ask for more
