@@ -203,6 +203,9 @@ header.bare .whenplaying{display:none}
 .field i{font-style:normal;opacity:0}
 
 .selhead{margin:12px 12px 6px;font-size:10.5px;text-transform:none;letter-spacing:.06em;color:var(--faint)}
+.pill.on{border-color:var(--accent);background:rgba(94,106,210,.13)}
+.pill[data-pick]{cursor:pointer;transition:border-color 120ms ease,background 120ms ease}
+.pill[data-pick]:hover{border-color:var(--line2)}
 .pill{display:flex;align-items:center;gap:8px;margin:5px 10px;padding:6px 6px 6px 7px;background:var(--raised);
   border:1px solid var(--line);border-radius:7px;font-size:11.5px;color:var(--dim)}
 .shot{flex:none;width:86px;height:52px;border-radius:4px;overflow:hidden;background:#0b0c0d;
@@ -689,6 +692,12 @@ const comparing=()=>rails.length>1
  */
 let stage=null      // 'choosing', or null for the rail
 let subjectN=0      // which picked element the grid is showing the motions for
+/* whether a pick is the one being chosen for, so the sidebar and the room say the same thing */
+const onSubject=(i)=>{
+  if(stage!=='choosing'||!ARR||!arr) return false
+  const on=ARR.live(arr); const at=on[Math.min(subjectN,on.length-1)]
+  return !!at&&at.i===i
+}
 /* the cars that carry a motion, each with the index it sits at, since a dead car still owns a row */
 const onRail=()=>(railed()?ARR.live(arr):[])
 let verdict=null  // why the last ask produced nothing, so the grid can say so
@@ -1539,7 +1548,7 @@ function render(){
     grid.style.removeProperty('--tl')
     paintFaces()
     for(const t of document.querySelectorAll('[data-subject]')) t.onclick=()=>{
-      subjectN=Number(t.dataset.subject); held.clear(); ends.clear(); render() }
+      subjectN=Number(t.dataset.subject); held.clear(); ends.clear(); render(); drawSel() }
     for(const bK of document.querySelectorAll('[data-pick-alt]')) bK.onclick=()=>{
       mark('the motion for '+subjectOf(car.pick.label))
       arr=ARR.swapped(arr,seat.i,Number(bK.dataset.pickAlt))
@@ -1547,7 +1556,7 @@ function render(){
     for(const bM of document.querySelectorAll('[data-more-alt]')) bM.onclick=()=>
       moreLikeCar(seat.i, Number(bM.dataset.moreAlt))
     const go=document.getElementById('chmake')
-    if(go) go.onclick=()=>{ stage=null; held.clear(); ends.clear(); render(); drawInspector() }
+    if(go) go.onclick=()=>{ stage=null; held.clear(); ends.clear(); render(); drawSel(); drawInspector() }
     drops.textContent=done+' of '+on.length+' chosen.'
     return
   }
@@ -2359,7 +2368,7 @@ function wireTimeline(live){
   }
   const back=document.getElementById('tlback')
   if(back) back.onclick=e=>{ e.stopPropagation()
-    stage='choosing'; held.clear(); ends.clear(); render() }
+    stage='choosing'; held.clear(); ends.clear(); render(); drawSel() }
   const fork=document.getElementById('tlfork')
   if(fork) fork.onclick=e=>{ e.stopPropagation()
     mark(rails.length?'forking the arrangement':'comparing two arrangements')
@@ -2718,7 +2727,11 @@ function drawSel(){
   if(!picks.length){ el.innerHTML=''; askSays('Give it motion')
     armGlow(false); return }
   el.innerHTML='<p class="selhead">Selection'+(picks.length>1?' &middot; '+picks.length:'')+'</p>'
-    +picks.map((p,i)=>'<span class="pill"><b>'+(i+1)+'</b>'
+    /* the pill is the element, so pressing it should go to that element's motions. It was inert
+       except for its own remove button, which meant the sidebar could name what you had picked and
+       do nothing whatever about it */
+    +picks.map((p,i)=>'<span class="pill'+(onSubject(i)?' on':'')+'" data-pick="'+i+'"'
+      +(arr&&arr.cars[i]&&arr.cars[i].motion?' title="choose the motion for this one"':'')+'><b>'+(i+1)+'</b>'
       +'<span class="shot"><iframe data-shot="'+i+'" scrolling="no" tabindex="-1"></iframe></span>'
       /* the whole label in the title, since a class stack is worth having and not worth showing */
       +'<span class="who" title="'+esc(p.label)+'"><em>'+esc(subjectOf(p.label))
@@ -2729,6 +2742,21 @@ function drawSel(){
       +'<button data-drop="'+i+'" title="remove">&times;</button></span>').join('')
   // after the markup exists, not in the middle of building it
   paintShots()
+  el.querySelectorAll('[data-pick]').forEach(pill=>pill.onclick=e=>{
+    if(e.target.closest('[data-drop]')) return
+    const i=Number(pill.dataset.pick)
+    const car=arr&&arr.cars[i]
+    if(!car){ drops.textContent='Nothing has been written for these yet. '
+      +'Press Give them motion first.'; return }
+    if(!car.motion){ drops.textContent=subjectOf(picks[i].label)+' did not move: '
+      +String(car.why||'nothing came back'); return }
+    const at=ARR.live(arr).findIndex(x=>x.i===i)
+    if(at<0) return
+    /* to the cards rather than to the row, because the pill is the element and what you want from an
+       element you are looking at is what it could be doing */
+    stage='choosing'; subjectN=at
+    held.clear(); ends.clear(); render(); drawSel()
+  })
   el.querySelectorAll('[data-drop]').forEach(b=>b.onclick=()=>{
     mark('removing '+tagOf(picks[Number(b.dataset.drop)].label))
     picks.splice(Number(b.dataset.drop),1); chosen=picks[picks.length-1]||null

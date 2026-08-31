@@ -1024,9 +1024,31 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
       await room.evaluate(() => document.querySelectorAll('.tlrow').length) === 2
         && String(await room.evaluate(() => arr.cars.map((c) => c.motion.note))) === 'unfolds,deals')
     await room.locator('#tlback').click(); await room.waitForTimeout(700)
+    /* the pill is the element, and it was inert except for its own remove button, so the sidebar
+       could name what you had picked and do nothing whatever about it */
+    await room.evaluate(() => { stage = null; render(); drawSel() })
+    await room.waitForTimeout(600)
+    await room.locator('.pill[data-pick="1"]').click(); await room.waitForTimeout(800)
+    ok('clicking a pick in the sidebar opens that element\'s motions, from the timeline',
+      await room.evaluate(() => stage) === 'choosing'
+        && String(await room.evaluate(() =>
+          [...document.querySelectorAll('.chgrid figcaption b')].map((e) => e.textContent))) === 'deals,slides')
+    ok('and the sidebar marks the one being chosen for, so it and the room agree',
+      String(await room.evaluate(() =>
+        [...document.querySelectorAll('.pill')].map((x) => x.classList.contains('on')))) === 'false,true')
+    await room.evaluate(() => { stage = 'choosing'; subjectN = 0; render(); drawSel() })
+    await room.waitForTimeout(500)
     ok('and going back to choose again loses nothing, since both are the same arrangement',
       await room.evaluate(() => stage) === 'choosing'
         && await room.evaluate(() => arr.cars[0].motion.note) === 'unfolds')
+
+    /* last, because taking a pick out of the selection ends the arrangement that was built from it,
+       which is right and leaves nothing for the checks above to read */
+    const had = await room.evaluate(() => picks.length)
+    await room.locator('.pill[data-pick="1"] [data-drop]').click(); await room.waitForTimeout(500)
+    ok('while its remove button still removes rather than navigating',
+      await room.evaluate(() => picks.length) === had - 1
+        && await room.evaluate(() => arr) === null)
 
     ok('the timeline drives without complaint', said.length === 0, said.join('; ').slice(0, 60))
 
