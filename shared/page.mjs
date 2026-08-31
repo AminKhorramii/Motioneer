@@ -25,6 +25,10 @@ body{margin:0;height:100vh;display:grid;grid-template-columns:250px 1fr;backgrou
 aside{border-right:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;min-height:0}
 .head{padding:11px 11px 12px;border-bottom:1px solid var(--line);display:grid;gap:7px}
 .head span{color:var(--faint);font-size:11px;word-break:break-all;padding:0 3px;line-height:1.5}
+/* an app being refused by its own api is not an error in the address, so it is said in the colour
+   of a warning rather than a failure: the aim worked and the app will not run here */
+#aimnote[data-state=refused]{color:#c2925f}
+#aimnote[data-state=refused] b{color:var(--ink);font-weight:500}
 .aim{display:flex;align-items:center;gap:6px;height:30px;padding:0 4px 0 8px;background:var(--bg);
   border:1px solid var(--line2);border-radius:7px;transition:border-color 120ms ease,box-shadow 120ms ease}
 .aim:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(94,106,210,.18)}
@@ -589,16 +593,31 @@ let aimN=0   // bumped on every aim so the frame refetches instead of reusing th
 let quietMode=false
 /* a frame that has navigated to somebody else's origin is one we can no longer read, and the only
    answer that works is to load it again with its scripts refused */
+/* which of the app's own hosts refused it, if any, kept until the frame has had time to render */
+let turnedAway=null
 function watchFrame(){
   const f=grid.querySelector('.appwrap iframe'); if(!f) return
   let tries=0
   const check=()=>{
     if(!document.contains(f)) return
-    let ours=true, alive=0
+    let ours=true, alive=0, reads=0
     try{ ours = f.contentWindow.location.host===location.host
       const d=f.contentWindow.document
       alive = d && d.documentElement ? d.querySelectorAll('*').length : 0
+      /* what is actually on the page rather than how many nodes it has: an app shell waiting on an
+         api it cannot reach is hundreds of nodes and nothing to read */
+      reads = d && d.body ? (d.body.innerText||'').trim().length : 0
     }catch(_){ ours=false }
+    /* both, and only after it has had a fair chance to render */
+    if(ours && tries>4 && reads<40 && turnedAway && !quietMode){
+      const note=document.getElementById('aimnote')
+      if(note && note.dataset.state!=='refused'){
+        note.dataset.state='refused'
+        note.innerHTML='nothing rendered, and this app is being refused by <b>'+esc(turnedAway)
+          +'</b>. On this origin its own back end is a different site, so it cannot sign in and sits '
+          +'on its loading screen. A page that does not need an account will proxy fine.'
+      }
+    }
     /* two ways a page refuses to be looked at: it takes the frame somewhere else, or it destroys its
        own document where it stands. railway does the second, deciding it has hit a server error and
        emptying itself, which leaves the frame ours and completely blank. Both want the same answer */
@@ -1769,6 +1788,26 @@ addEventListener('message',e=>{const d=e.data||{}
     if(d.end>0){ends.set(d.i,d.end); const want=Math.max(1200,Math.min(20000,Math.max(...ends.values())+300))
       if(Math.abs(want-span)>60){span=want;scrub.max=span;document.getElementById('span').textContent=(span/1000).toFixed(1)+'s'}}
     paint()}
+  /**
+   * The app saying its own api will not talk to it here.
+   *
+   * Proxying puts somebody's application on this origin, and an application that calls its own api
+   * on another host is making a cross origin request the moment it runs here. That api allows its
+   * own site and not this one, so the call is refused, the app never authenticates and it sits on
+   * its shell. Nothing is broken and nothing can be fixed from here, so what matters is saying it:
+   * a dark empty frame with no explanation is the tool looking broken on the app's behalf.
+   */
+  /**
+   * The app saying its own back end will not talk to it here.
+   *
+   * Kept rather than announced. Plenty of healthy sites have a call refused on this origin and do
+   * not care: stripe.com renders every one of its two and a half thousand nodes while its own
+   * telemetry host is turned away, and telling somebody their app is broken because a beacon failed
+   * would be worse than saying nothing. What makes this worth saying is the two together, a page
+   * with nothing on it and its own back end refusing it, which is the difference between an app
+   * that cannot run here and an app that simply does not need that request.
+   */
+  if(d.wall==='refused'&&d.host){ turnedAway=String(d.host); return }
   if(d.wall==='armed'||d.wall==='disarmed'){
     const pb=document.getElementById('pick')
     pb.setAttribute('aria-pressed',d.wall==='armed')

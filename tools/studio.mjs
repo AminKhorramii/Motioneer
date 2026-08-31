@@ -552,7 +552,11 @@ async function proxy(req, res, url, quiet) {
     })
   })
   const at = html.search(/<\/body>/i)
-  html = at === -1 ? html + PICKER : html.slice(0, at) + PICKER + html.slice(at)
+  /* the aimed host is substituted here rather than baked into the constant, which is built once at
+     startup when nothing has been aimed at yet and would carry an empty string for the session */
+  const picker = PICKER.replace('__WALL_HOME__',
+    String(HOST || '').replace(/^https?:\/\//, '').split('/')[0])
+  html = at === -1 ? html + picker : html.slice(0, at) + picker + html.slice(at)
   /**
    * Some sites navigate their own frame back to their canonical host.
    *
@@ -589,6 +593,55 @@ async function proxy(req, res, url, quiet) {
  * Clicks are taken on the capture phase and stopped, so picking a button does not also press it.
  */
 const PICKER = `<script>(function(){
+/**
+ * An app whose own api refuses it, said out loud.
+ *
+ * Proxying puts somebody's application on this origin, which is the whole trick and is also a thing
+ * the application can notice. One that talks to its own api on another host, api.theirs.com from
+ * theirs.com, is making a cross origin call the moment it runs here, and that api allows its own
+ * site and not localhost. So the fetch is refused, the app never authenticates, and it sits on its
+ * loading shell for good.
+ *
+ * There is nothing to fix in the page: it is behaving correctly and so is the browser. What was
+ * wrong is that the studio showed a dark empty box and said nothing, leaving somebody to wonder
+ * whether they had picked badly or the tool was broken. This counts the refusals and names the host,
+ * which is enough to know it is an authentication wall rather than a bad address.
+ */
+var refused={},toldAt=0;
+/* the app's own back end rather than anybody's. A blocked tracker is somebody's ad blocker doing its
+   job and says nothing about whether this app can run here; an api on the same registrable domain
+   as the site being proxied is the app talking to itself and being told no */
+var HOME="__WALL_HOME__";
+function ours(host){
+  var a=String(host).split('.'), b=String(HOME).split('.');
+  if(a.length<2||b.length<2)return false;
+  return a.slice(-2).join('.')===b.slice(-2).join('.');
+}
+function refusing(url){
+  try{
+    var host=new URL(url, location.href).host;
+    if(!host||host===location.host||!ours(host))return;
+    refused[host]=(refused[host]||0)+1;
+    /* twice, so one flaky request on a page that is otherwise fine says nothing */
+    if(refused[host]<2)return;
+    if(Date.now()-toldAt<1500)return; toldAt=Date.now();
+    /* the first one refused rather than the one refused most. An app asks whether it is signed in
+       before it does anything else and gives up once; its telemetry keeps retrying and would win a
+       count while having nothing to do with why the page is empty */
+    var first=Object.keys(refused)[0];
+    parent.postMessage({wall:'refused',host:first,n:refused[first]},'*');
+  }catch(_){}
+}
+var realFetch=window.fetch;
+if(realFetch) window.fetch=function(){
+  var url=arguments[0]&&arguments[0].url?arguments[0].url:String(arguments[0]||'');
+  return realFetch.apply(this,arguments).catch(function(e){ refusing(url); throw e });
+};
+var openXHR=window.XMLHttpRequest&&window.XMLHttpRequest.prototype.open;
+if(openXHR) window.XMLHttpRequest.prototype.open=function(m,u){
+  try{ this.addEventListener('error',function(){ refusing(u) }) }catch(_){}
+  return openXHR.apply(this,arguments);
+};
 var on=false,box=null,last=null;
 function ensure(){if(box)return box;box=document.createElement('div');
   box.style.cssText='position:fixed;pointer-events:none;z-index:2147483647;border:2px solid #5e6ad2;'+
