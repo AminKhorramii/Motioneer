@@ -138,7 +138,10 @@ iframe{width:100%;height:280px;border:0;background:#0b0c0d;display:block}
 /* the same card as the ones beside it, holding the question instead of an answer. Dashed, because
    it is the one in the row that is not yet a motion, and it should not read as an option that
    failed to render */
-.saycard{cursor:default;border-style:dashed}
+/* and the same height, so a row of results does not end on a stub. Inside a row the grid stretches
+   it to its neighbours anyway; this governs the row it starts on its own, which is where a card a
+   quarter the height of the others read as one that had failed to load */
+.saycard{cursor:default;border-style:dashed;min-height:380px}
 .saybox{display:grid;gap:7px;align-content:center;padding:16px;height:100%}
 .saybox label{color:var(--dim);font-size:12px}
 .saybox input{box-sizing:border-box;width:100%;background:none;border:0;border-radius:0;
@@ -191,8 +194,19 @@ header.bare .whenplaying{display:none}
   background:var(--bg);border-radius:20px;padding:1px 6px;min-width:18px;text-align:center}
 .foothit i:empty{display:none}
 .icb{display:grid;place-items:center;width:26px;height:26px;background:var(--raised);color:var(--faint);
-  border:1px solid var(--line);border-radius:6px;cursor:pointer;padding:0;transition:color 90ms ease}
+  border:1px solid var(--line);border-radius:6px;cursor:pointer;padding:0;transition:color 90ms ease;
+  position:relative}
 .icb:hover{color:var(--ink);border-color:var(--line2)}
+/* said in the room rather than by the operating system. Four icons in a row on a card is four things
+   to guess at, and a native title arrives about a second late, in a font from somewhere else, often
+   after somebody has already clicked to find out. Upwards because the row sits at the foot of a card
+   and a bubble below it would be outside a figure that clips */
+.icb[data-tip]:hover::after,.icb[data-tip]:focus-visible::after{content:attr(data-tip);
+  position:absolute;left:50%;bottom:calc(100% + 6px);transform:translateX(-50%);white-space:nowrap;
+  background:var(--panel);color:var(--ink);border:1px solid var(--line2);border-radius:5px;
+  padding:3px 7px;font-size:10.5px;line-height:1.3;pointer-events:none;z-index:6;
+  box-shadow:0 4px 12px rgba(0,0,0,.45)}
+@media (prefers-reduced-motion:reduce){.icb{transition:none}}
 /**
  * A request in flight, on a button with no room for a word.
  *
@@ -641,6 +655,23 @@ const play=document.getElementById('play'),ask=document.getElementById('ask')
 const palette=document.getElementById('palette')
 let file=null, opts=[], running=true, t=0, last=performance.now(), held=new Map()
 let ends=new Map(), span=4200, rate=1
+/**
+ * The one place the ruler is set, because it is also the length of a film.
+ *
+ * Two minutes rather than the twenty seconds this was capped at. The ceiling was chosen when the
+ * only thing being timed was one component's motion, where anything past a few seconds is a runaway
+ * loop rather than a decision. A rail is a composition and a demo of a product is a minute of one,
+ * so composing that and being handed twenty seconds of it is the tool refusing to make the thing it
+ * exists for. Still bounded, because an animation that never ends is a real fault and a scrubber the
+ * length of an afternoon helps nobody find it.
+ */
+function setSpan(ms){
+  const want=Math.max(1200,Math.min(120000,Math.round(ms)))
+  if(Math.abs(want-span)<=60) return
+  span=want
+  const bar=document.getElementById('scrub'); if(bar) bar.max=span
+  const said=document.getElementById('span'); if(said) said.textContent=(span/1000).toFixed(1)+'s'
+}
 /* the frames the scrubber drives, which is not every frame in the room. The timeline's row
    thumbnails live inside .grid too, and counting them would post hold to a still picture and, far
    worse, shift the index every rail frame is addressed by, since held and ends are keyed by position */
@@ -1939,9 +1970,18 @@ function render(){
   }
   if(railed()){
     const live=ARR.live(arr)
-    /* the one place every change already ends, so it is the one place the list is brought back into
-       step with the arrangement being edited */
+    /**
+     * A rail knows how long it is, so it says so rather than waiting to be told.
+     *
+     * The transport learned its length only from what a preview reported back after being asked to
+     * hold, which is right for one component, whose motion is the only thing that knows how long it
+     * runs. A composition is different: the offsets, the life windows, the journeys and the camera
+     * are all in the arrangement, and spanOf already adds them up. Waiting for a frame to answer
+     * meant a rail composed across a minute sat on a four second ruler until something happened to
+     * play, and a paused one never corrected at all, so Film cut it at four seconds.
+     */
     if(rails.length) rails[railN]=arr
+    setSpan(ARR.spanOf(arr))
     /* the frame is asked for by the module rather than by a string built here, which is what keeps a
        car pinned to another one from ever reaching the server: it resolves to plain offsets first */
     const frames = comparing()
@@ -1988,15 +2028,19 @@ function render(){
     '<span class="facts">'+factLine(o)+'</span>'+
     '<span class="seen">'+seenLine(o)+'</span>'+
     '<span class="row">'+
-    '<button class="icb" data-open="'+o.id+'" title="'+(opened===o.id?'Close it':'Open it bigger')+'">'
+    '<button class="icb" data-open="'+o.id+'" data-tip="'+(opened===o.id?'Close it':'Open it bigger')
+      +'" aria-label="'+(opened===o.id?'Close it':'Open it bigger')+'">'
       +(opened===o.id?ICON.shut:ICON.open)+'</button>'+
     /* the pen sits before the sparkle because they answer different questions and the specific one
        is asked more often: this one changes this motion, the sparkle asks for more like it */
-    '<button class="icb'+(editing===o.id?' on':'')+'" data-pen="'+o.id+'" title="'
+    '<button class="icb'+(editing===o.id?' on':'')+'" data-pen="'+o.id+'" data-tip="'
+      +(editing===o.id?'Leave it as it is':'Change this one')+'" aria-label="'
       +(editing===o.id?'Leave it as it is':'Change this one')+'">'+ICON.pen+'</button>'+
-    '<button class="icb" data-more="'+o.id+'" title="More like this one">'+ICON.more+'</button>'+
-    '<button class="icb'+(kept.has(o.id)?' on':'')+'" data-keep="'+o.id+'" title="'
-      +(kept.has(o.id)?'Saved':'Save it')+'">'+(kept.has(o.id)?ICON.kept:ICON.mark)+'</button>'+
+    '<button class="icb" data-more="'+o.id+'" data-tip="More like this one" '
+    +'aria-label="More like this one">'+ICON.more+'</button>'+
+    '<button class="icb'+(kept.has(o.id)?' on':'')+'" data-keep="'+o.id+'" data-tip="'
+      +(kept.has(o.id)?'Saved':'Save it')+'" aria-label="'+(kept.has(o.id)?'Saved':'Save it')+'">'
+      +(kept.has(o.id)?ICON.kept:ICON.mark)+'</button>'+
     '</span>'
     /* the field opens inside the card it belongs to rather than in a panel somewhere else, because
        what you are changing is the thing playing six inches above it and a dialog covering that up
@@ -2217,8 +2261,16 @@ addEventListener('message',e=>{const d=e.data||{}
   if(d.wall==='held'){held.set(d.i,d.n)
     // a motion that runs six seconds cannot be scrubbed to its end on a four second ruler, and the
     // only thing that knows how long it runs is the animation itself
-    if(d.end>0){ends.set(d.i,d.end); const want=Math.max(1200,Math.min(20000,Math.max(...ends.values())+300))
-      if(Math.abs(want-span)>60){span=want;scrub.max=span;document.getElementById('span').textContent=(span/1000).toFixed(1)+'s'}}
+    /* Two minutes rather than twenty seconds.
+       The ceiling was set when the only thing being timed was one component's motion, where anything
+       past a few seconds is a runaway loop rather than a decision. A rail is a composition, and a
+       demo of a product is a minute of one: cars placed a beat apart, each staying on stage while
+       the next arrives. Composing that and then being handed twenty seconds of it is the tool
+       refusing to make the thing it is for. It is still bounded, because an animation that never
+       ends is a real fault and a scrubber the length of an afternoon helps nobody find it. */
+    /* a rail sets its own ruler from the arrangement, so what a frame reports is not asked there:
+       two answers to one question is how the playhead and the bars came to disagree */
+    if(d.end>0&&!railed()){ends.set(d.i,d.end); setSpan(Math.max(...ends.values())+300)}
     paint()}
   /**
    * The app saying its own api will not talk to it here.

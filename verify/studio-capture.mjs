@@ -1048,6 +1048,18 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
         null, { timeout: 120000 })
       return room.evaluate(() => (takes.length ? takes[takes.length - 1].facts : ''))
     }
+    /* the ruler a rail films at comes from the arrangement rather than from whatever a preview last
+       reported, which is what a composition longer than the old twenty second ceiling needs */
+    await room.evaluate(() => {
+      arr = ARR.moved(arr, 1, 40000); render()
+    })
+    await room.waitForTimeout(900)
+    ok('a rail composed past a minute keeps its own length rather than a ceiling',
+      await room.evaluate(() => Math.round(span)) > 20000,
+      `${await room.evaluate(() => Math.round(span))}ms`)
+    await room.evaluate(() => { arr = ARR.moved(arr, 1, 800); render() })
+    await room.waitForTimeout(600)
+
     const cut = await filmWith(30, 0)
     ok('a rail films, in the page, with nothing installed', /^72 frames at 30fps/.test(cut), cut)
     const tailed = await filmWith(30, 1600)
