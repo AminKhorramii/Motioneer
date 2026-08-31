@@ -457,10 +457,20 @@ export function holdAt(doc, ms) {
     const from = Number(el.getAttribute(FROM)) || 0
     const said = el.getAttribute(UNTIL)
     const until = said === null || said === '' ? null : Number(said)
-    if (at >= from && (until === null || at < until)) continue
+    /**
+     * Said either way, not only when it should be hidden.
+     *
+     * The live preview hides a component by setting a style on it as the clock moves, and filming
+     * holds the frame at zero before it starts, so every component that has not come on yet is
+     * carrying an inline hidden when the first frame is drawn. A rule that only ever adds hidden
+     * cannot take that back, so the whole film showed the one component that happens to start at
+     * zero and nothing else ever arrived. Both halves have to be written, or the copy inherits
+     * whatever the last listener happened to leave behind.
+     */
+    const on = at >= from && (until === null || at < until)
     el.setAttribute(HELD, String(n))
     marked.push(el)
-    rules.push(`[${HELD}="${n}"]{visibility:hidden !important}`)
+    rules.push(`[${HELD}="${n}"]{visibility:${on ? 'visible' : 'hidden'} !important}`)
     n += 1
   }
 

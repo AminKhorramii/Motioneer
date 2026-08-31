@@ -577,6 +577,19 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
       if (typeof undo === 'function') undo()
       return v
     }, ms)
+    /**
+     * The stale hide, which is what made a whole film show one component and nothing else.
+     *
+     * Filming holds the frame at zero before it starts, so the live listener sets an inline hidden on
+     * every component that has not come on yet. A rule that only ever adds hidden cannot take that
+     * back, so every later frame inherited the first one's answer and nothing ever arrived. Both
+     * halves have to be written, which is why this holds at zero first and then asks.
+     */
+    await lived.evaluate(() => window.postMessage({ wall: 'hold', t: 0, i: 0 }, '*'))
+    await lived.waitForTimeout(200)
+    ok('a component held out of the picture at zero is put back into it later',
+      String(await onStage(1400)) === 'hidden,visible,visible', `${await onStage(1400)}`)
+
     ok('a filmed component is not in the picture before it comes on',
       String(await onStage(0)) === 'visible,hidden,hidden', `${await onStage(0)}`)
     ok('and is gone from it after it leaves',
