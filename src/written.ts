@@ -352,6 +352,96 @@ export function leaks(css: string, scope: string): string[] {
  * and every animation that references it move together, and a name that already carries the scope is
  * left alone so running this twice changes nothing.
  */
+/** where the block opened at `from` closes, counting the ones nested inside it */
+function balanced(css: string, from: number): number {
+  let depth = 0
+  for (let i = from; i < css.length; i += 1) {
+    if (css[i] === '{') depth += 1
+    else if (css[i] === '}') { depth -= 1; if (!depth) return i }
+  }
+  return css.length
+}
+
+/**
+ * A page's stylesheet, lifted out of that page and made safe to stand beside another one.
+ *
+ * The rules that matched a picked element arrive with the page they were on: `:root`, `html`, `body`,
+ * `*, ::after, ::before`. In a frame those are still page rules and still mean the page, so a
+ * component lifted off a light site repaints the studio's own dark frame white and takes its chrome
+ * with it. Every site measured carries six of them.
+ *
+ * With one component that is untidy. With several it stops being cosmetic, because two sheets in one
+ * document are two sites arguing: whichever comes last wins `body`, and a `.title` rule written for
+ * one component quietly restyles the other. So every selector is walked into the car it belongs to,
+ * and the page-level ones become the car itself, which keeps the font and the background they were
+ * carrying without letting either escape the box it was picked into.
+ *
+ * Keyframe bodies are left alone: their steps are `from` and `50%` rather than selectors, and
+ * prefixing one produces a percentage nothing can parse.
+ */
+const CONTAINER = /^(html|body|:root)$/i
+export function grounded(css: string, scope: string): string {
+  if (!scope || !css) return css || ''
+  const put = (selector: string): string => selector.split(',').flatMap((one) => {
+    const t = one.trim()
+    if (!t) return []
+    // already inside the car, and saying it twice only makes the selector longer
+    if (t.includes(`[${scope}]`)) return [t]
+    const head = t.split(/[\s>+~]/)[0]
+    /* the page becomes the car. What those rules declare is worth keeping, because a font or a
+       colour set on body is what the component was inheriting at the moment it was picked */
+    if (CONTAINER.test(head)) {
+      const rest = t.slice(head.length).trim()
+      return [rest ? `[${scope}] ${rest}` : `[${scope}]`]
+    }
+    /**
+     * Everything means the car and everything in it, which is two selectors and not one.
+     *
+     * A reset written as `*, ::after, ::before` is the commonest rule on the web and the descendant
+     * form alone misses the car's own root, so the component that was picked is the one element the
+     * reset stops reaching. That reads as one box laid out differently from its own children.
+     */
+    if (head.startsWith('*') || t.startsWith(':')) {
+      const rest = head.startsWith('*') ? t.slice(1) : t
+      return [`[${scope}]${rest}`, `[${scope}] *${rest}`]
+    }
+    return [`[${scope}] ${t}`]
+  }).join(', ')
+
+  let out = ''
+  let i = 0
+  while (i < css.length) {
+    const lead = /^\s*/.exec(css.slice(i))?.[0] ?? ''
+    i += lead.length
+    out += lead
+    if (i >= css.length) break
+    if (css[i] === '@') {
+      const open = css.indexOf('{', i)
+      const semi = css.indexOf(';', i)
+      // an at rule with no block of its own, like @import, is copied and left alone
+      if (open < 0 || (semi >= 0 && semi < open)) {
+        const end = semi < 0 ? css.length : semi + 1
+        out += css.slice(i, end); i = end; continue
+      }
+      const name = css.slice(i, open).trim()
+      const shut = balanced(css, open)
+      const body = css.slice(open + 1, shut)
+      // one that wraps other rules is recursed into; one that does not is copied whole
+      out += /^@(media|supports|layer|container)\b/i.test(name)
+        ? `${name}{${grounded(body, scope)}}`
+        : `${name}{${body}}`
+      i = shut + 1
+      continue
+    }
+    const open = css.indexOf('{', i)
+    if (open < 0) { out += css.slice(i); break }
+    const shut = balanced(css, open)
+    out += `${put(css.slice(i, open))}{${css.slice(open + 1, shut)}}`
+    i = shut + 1
+  }
+  return out
+}
+
 export function namespaced(css: string, scope: string): string {
   const tail = (scope || '').replace(/^data-motion-?/, '').replace(/[^-\w]/g, '')
   if (!tail) return css

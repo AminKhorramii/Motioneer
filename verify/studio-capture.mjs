@@ -200,6 +200,47 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
     A.resolve(arrange([car('x', 0, 400), { ...car('y', 0, 400), motion: { id: 'x', note: 'x', ms: 400 } },
       car('z', 9999, 200, { key: 'y', mode: 'after', gap: 0 })])).at[2] === 400)
 
+  /**
+   * A page's sheet standing beside another page's sheet.
+   *
+   * The rules that matched a picked element arrive with the page they were on, and every real site
+   * measured carries six that mean the page itself: :root, html, body, and the box sizing reset.
+   * Dropped into a frame those still mean the page, so a component lifted off a light site repainted
+   * the studio's own dark frame white and took its chrome with it. With two picks it is worse than
+   * cosmetic, because whichever sheet comes last wins body and a .title written for one component
+   * restyles the other.
+   */
+  console.log('\n  a stylesheet lifted out of the page it belonged to')
+  const core = await import('../dist-core/core.js')
+  const page = ':root{--x:1}\nbody{background:#fff;font:16px Inter}\n'
+    + '*, ::after, ::before{box-sizing:border-box}\n.title{color:#111}\n'
+    + '@media (min-width:600px){body{padding:20px}.title{font-size:40px}}\n'
+    + '@keyframes rise{from{opacity:0}50%{opacity:.5}to{opacity:1}}\n'
+    + '@font-face{font-family:X;src:url(a.woff2)}'
+  const hemmed = core.grounded(page, "data-m1")
+  ok('the page itself becomes the component, so its background cannot repaint the frame',
+    !/(^|\n|\})\s*body\s*\{/.test(hemmed) && /\[data-m1\]\{background:#fff/.test(hemmed))
+  ok('and :root goes with it, since a custom property set there is the page speaking',
+    !/:root/.test(hemmed))
+  /* the car and everything in it, which is two selectors: the descendant form alone misses the root,
+     so the component that was picked is the one element the reset stops reaching */
+  ok('a reset that named everything now names this component and everything in it',
+    /\[data-m1\], \[data-m1\] \*, \[data-m1\]::after, \[data-m1\] \*::after/.test(hemmed),
+    `${hemmed.split('\n')[2]}`)
+  ok('an ordinary rule is walked into the component rather than left loose',
+    /\[data-m1\] \.title\{color:#111\}/.test(hemmed))
+  ok('a media query is gone into rather than copied whole',
+    /@media \(min-width:600px\)\{\[data-m1\]\{padding:20px\}\[data-m1\] \.title/.test(hemmed))
+  /* their steps are from and 50%, and prefixing one produces a percentage nothing can parse */
+  ok('keyframe steps are left alone, because they are not selectors',
+    /@keyframes rise\{from\{opacity:0\}50%\{opacity:\.5\}/.test(hemmed))
+  ok('and an at rule with no rules inside it is copied as it stands',
+    /@font-face\{font-family:X;src:url\(a\.woff2\)\}/.test(hemmed))
+  ok('a sheet already inside the component is not walked in twice',
+    core.grounded('[data-m1] .a{color:red}', 'data-m1') === '[data-m1] .a{color:red}')
+  ok('and nothing without a scope to go into is left as it was',
+    core.grounded(page, '') === page)
+
   console.log('\n  where each component sits')
   const stack = arrange([car('a', 0, 400), car('b', 420, 400)])
   ok('a rail opens as a stack, with nobody placed', !A.staged(stack))
@@ -296,6 +337,13 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
     made: [1, 2, 3].map((n) => [String(n), {
       file: `card${n}.tsx`, markup: `<div data-m${n}><b>one</b><b>two</b></div>`, base: '', shot: '',
       css: sheet(n, 300 + n * 100), scope: `data-m${n}`, tw: false, wide: 320,
+      /* the rules that matched it on the page it came from, page level ones and all, which is what
+         every real pick carries and what used to repaint this frame */
+      /* the rules that matched it on the page it came from, page level ones and all, which is what
+         every real pick carries and what used to repaint this frame. The letter spacing differs per
+         pick so a car wearing its neighbour's sheet is visible rather than merely plausible */
+      base: `:root{--paper:#fff}body{background:#fff;color:#111;letter-spacing:${n}px}`
+        + '*, ::after, ::before{box-sizing:border-box}',
       note: `card ${n} rises`, verb: 'rising,',
     }]),
   }))
@@ -399,6 +447,18 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
     const drewEarly = await drawnAt(200)
     const drewMid = await drawnAt(900)
     const drewLate = await drawnAt(2400)
+    /* the seeded picks carry a real page's rules, so this is the frame refusing to be repainted */
+    ok('a component lifted off a light page does not repaint the frame it is shown in',
+      await rail.evaluate(() => getComputedStyle(document.body).backgroundColor) === 'rgb(11, 12, 13)',
+      `${await rail.evaluate(() => getComputedStyle(document.body).backgroundColor)}`)
+    /* only the first car's sheet used to be emitted, so every car after it lost its matched rules
+       and wore whichever page happened to be first */
+    ok('and every car keeps its own sheet rather than wearing the first one\'s',
+      String(await rail.evaluate(() => [...document.querySelectorAll('.car .in > *')]
+        .map((c) => getComputedStyle(c).letterSpacing))) === '1px,2px,3px',
+      `${await rail.evaluate(() => [...document.querySelectorAll('.car .in > *')]
+        .map((c) => getComputedStyle(c).letterSpacing))}`)
+
     ok('a filmed rail draws only the car whose turn has come',
       drewEarly[0] > 0.2 && drewEarly[1] < 0.02 && drewEarly[2] < 0.02, `${drewEarly.map((v) => v.toFixed(2))}`)
     ok('and lets the next one in at its own offset rather than at the first one',
