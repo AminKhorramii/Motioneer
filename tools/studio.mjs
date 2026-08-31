@@ -1676,7 +1676,7 @@ const trackOf = (name, moves, span, offset) => {
     frames: `@keyframes ${name}{${stops.join('')}}` }
 }
 
-const railView = (ids, palette, offsets = [], shots = [], places = [], lives = [], goes = [], cam = '') => {
+const railView = (ids, palette, offsets = [], shots = [], places = [], lives = [], goes = [], cam = '', papers = []) => {
   const parts = ids.map((id, asked) => ({ o: made.get(id), asked })).filter((x) => x.o)
     .map(({ o, asked }, i) => {
       const tag = o.scope ? `${o.scope}-r${i + 1}` : ''
@@ -1694,7 +1694,7 @@ const railView = (ids, palette, offsets = [], shots = [], places = [], lives = [
         : null
       const moves = journeyOf(goes[asked])
       return { ...o, css, markup, tag, i, at: offsets[asked] ?? i * 420, shot: shots[asked] || '',
-        place, life, moves }
+        place, life, moves, paper: String(papers[asked] || '') }
     })
   if (!parts.length) return null
   const tw = parts.some((o) => o.tw)
@@ -1717,7 +1717,35 @@ ${tw ? `<style>${themeFor(palette)}</style>` : ''}
  */
 .rail.staged{display:block;position:relative}
 .rail.staged .car.put{position:absolute;display:block;place-items:initial}
-.rail.staged .car.put > .in{width:100%!important}
+/* a descendant rather than a child: a camera wraps the component in a rig, so the direct child of a
+   placed car is the rig and the component is three levels down still carrying its own inline width */
+.rail.staged .car.put .in{width:100%!important}
+/**
+ * A camera on a component that has been put somewhere.
+ *
+ * A rig is absolutely positioned, which is right for a car sharing the stack because that car has a
+ * height of its own from the row it fills. A placed car has no height except what its contents give
+ * it, and a rig gives it none, so applying a camera to one collapsed it to nothing and the plate
+ * kept the fixed width it was sized to for a full width stage. The camera applied and there was
+ * simply nothing to see, which reads as the camera not working.
+ */
+.rail.staged .car.put .rig{position:relative;inset:auto}
+/* the dolly is a grid item and shrinks to its contents, so a plate asking for all of it got all of
+   nothing. Both have to be told, or the rig has a height and no width */
+.rail.staged .car.put .dolly,.rail.staged .car.put .plate{width:100%}
+/**
+ * What a component is shown against, when its own page's answer is not the one you want.
+ *
+ * The rules that matched it arrive with the page it was on, so a component lifted off a light site
+ * carries a white box onto a dark stage. Important, because that background is one of those matched
+ * rules and it is sitting on the component's own root; this has to win against a page rather than
+ * against nothing.
+ */
+.car.paper-light,.car.paper-light .in > *{background:#fff !important}
+.car.paper-dark,.car.paper-dark .in > *{background:#0b0c0d !important}
+.car.paper-none,.car.paper-none .in > *{background:transparent !important}
+.car.paper-light{border-radius:8px}
+.car.paper-dark{border-radius:8px}
 .rail.staged .loose{position:absolute;inset:14px;display:flex;flex-direction:column;
   justify-content:center;gap:10px}
 .grab{position:absolute;inset:-6px;cursor:move;z-index:5}
@@ -1809,11 +1837,11 @@ ${(() => {
      out with every car starting together and the sequencing, the thing being filmed, was gone */
   const put = p.place
     ? ` style="left:${p.place.x}%;top:${p.place.y}%;width:${p.place.w}%"` : ''
-  return `<div class="car${p.shot ? ' shot' : ''}${p.place ? ' put' : ''}" data-rail="${p.i}"${put}
+  return `<div class="car${p.shot ? ' shot' : ''}${p.place ? ' put' : ''}${
+    p.paper ? ` paper-${p.paper}` : ''}" data-rail="${p.i}"${put}
     data-wall-at="${Math.round(p.at)}"${p.life
       ? ` data-wall-from="${Math.round(p.life.from)}"${p.life.until === null ? '' : ` data-wall-until="${Math.round(p.life.until)}"`}`
       : ` data-wall-from="${Math.round(p.at)}"`}>
-    <span class="tag">${p.i + 1}. ${String(p.file || p.note || '').slice(0, 44)}</span>
     ${body}<i class="grab" data-grab="${p.i}"></i><i class="wide" data-wide="${p.i}"></i></div>`
 }).join('')}</div>
 <script>
@@ -2125,7 +2153,7 @@ const server = createServer(async (req, res) => {
       const lives = (url.searchParams.get('life') ?? '').split(',')
       const goes = (url.searchParams.get('go') ?? '').split(',')
       const html = railView(ids, url.searchParams.get('palette'), at, shots, places, lives, goes,
-        url.searchParams.get('cam') ?? '')
+        url.searchParams.get('cam') ?? '', (url.searchParams.get('paper') ?? '').split(','))
       if (!html) { res.writeHead(404); return res.end('gone') }
       res.writeHead(200, { 'content-type': 'text/html' })
       return res.end(html)

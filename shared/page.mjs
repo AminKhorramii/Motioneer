@@ -257,6 +257,17 @@ header.bare .whenplaying{display:none}
 .camchip:hover{border-color:var(--line2);color:var(--ink)}
 .camchip.on{border-color:var(--accent);color:var(--ink);background:rgba(94,106,210,.14)}
 .camchip em{font-style:normal;font-size:9.5px;line-height:1.15;text-align:center}
+.papers{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin:1px 0 4px}
+.paperchip{background:var(--raised);border:1px solid var(--line);border-radius:7px;padding:5px 3px 4px;
+  display:grid;gap:4px;justify-items:center;cursor:pointer;color:var(--dim);font-family:inherit}
+.paperchip:hover{border-color:var(--line2);color:var(--ink)}
+.paperchip.on{border-color:var(--accent);color:var(--ink);background:rgba(94,106,210,.14)}
+.paperchip em{font-style:normal;font-size:9.5px;line-height:1.15;text-align:center}
+.papbox{width:100%;height:18px;border-radius:4px;display:block;border:1px solid var(--line2)}
+.pap-as{background:linear-gradient(120deg,#fff 0 50%,#0b0c0d 50% 100%)}
+.pap-light{background:#fff}
+.pap-dark{background:#0b0c0d}
+.pap-none{background:repeating-linear-gradient(45deg,#232427 0 4px,#161719 4px 8px)}
 .cambox{width:100%;height:24px;border-radius:4px;background:#000;overflow:hidden;position:relative;
   display:block;perspective:60px}
 .cambox i{position:absolute;left:50%;top:50%;width:17px;height:10px;margin:-5px 0 0 -8.5px;
@@ -466,7 +477,8 @@ header.bare .whenplaying{display:none}
         <option value="cubic-bezier(.34,1.56,.64,1)">overshoot</option>
         <option value="steps(6,end)">stepped</option>
         <option value="cubic-bezier(.4,0,1,1)">leave</option></select></label>
-      <div id="icam" hidden><p class="ihead">Camera</p><div class="cams" id="cams"></div></div>
+      <div id="icam" hidden><p class="ihead">Camera</p><div class="cams" id="cams"></div>
+        <p class="ihead">Shown against</p><div class="papers" id="papers"></div></div>
       <button class="btn go" id="tapply">Add as a new option</button>
       <p class="keys" id="inote">The original stays. Adjusting makes another one beside it.</p>
     </div>
@@ -1163,6 +1175,22 @@ const nameOf = (o) => String((o&&(o.note||o.label))||(o&&o.pick&&o.pick.label)||
   .split(',')[0].slice(0,28)
 
 const CAMS=[['','none'],['locked','locked off'],['push','slow push'],['drift','drift'],['orbit','orbit']]
+/* what a component is shown against. As picked is first, because the page's own answer is right
+   until it is not, and guessing on its behalf is worse than asking */
+const PAPERS=[['','as picked'],['light','light'],['dark','dark'],['none','the stage']]
+function drawPapers(now){
+  const box=document.getElementById('papers'); if(!box) return
+  box.innerHTML=PAPERS.map(k=>'<button class="paperchip'+(k[0]===now?' on':'')
+    +'" data-paper="'+k[0]+'"><span class="papbox pap-'+(k[0]||'as')+'"></span><em>'
+    +k[1]+'</em></button>').join('')
+  box.querySelectorAll('[data-paper]').forEach(b=>b.onclick=()=>{
+    const s=subject(); if(!s||s.kind!=='car') return
+    if((s.car.paper||'')===b.dataset.paper) return
+    mark('what '+nameOf(s.o)+' is shown against')
+    arr=ARR.papered(arr,s.i,b.dataset.paper)
+    held.clear(); ends.clear(); render(); drawInspector()
+  })
+}
 function drawCams(now){
   const box=document.getElementById('cams')
   box.innerHTML=CAMS.map(c=>'<button class="camchip'+(c[0]===now?' on':'')+'" data-campick="'+c[0]+'">'
@@ -1197,7 +1225,7 @@ function drawInspector(){
     facts.innerHTML='Starts at '+(at/1000).toFixed(2)+'s and runs '+((o.ms||600)/1000).toFixed(2)+'s.'
     btn.textContent='Apply to this one'
     note.textContent='Changes this car where it sits. The others are left alone.'
-    camrow.hidden=false; drawCams(s.car.shot||'')
+    camrow.hidden=false; drawCams(s.car.shot||''); drawPapers(s.car.paper||'')
   } else {
     facts.innerHTML=factLine(o)
     btn.textContent='Add as a new option'

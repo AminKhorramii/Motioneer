@@ -90,6 +90,15 @@ export function fromRail(got, picks = [], id = 'a1') {
       from: null,
       until: null,
       /**
+       * What this component is shown against.
+       *
+       * A component arrives wearing whatever its page had, which is honest and is often a white box
+       * on a dark stage. That is right until it is not: the same element in a demo may want the
+       * stage showing through it, or the opposite of what it was picked off. Empty means as picked,
+       * which is what it opens on, because guessing is worse than the page's own answer.
+       */
+      paper: '',
+      /**
        * Where this component goes, and when, after it has arrived.
        *
        * A motion is what the model wrote and it happens once, at the start. A move is authored: this
@@ -186,6 +195,13 @@ export function wandered(car, t) {
   return { x, y, scale }
 }
 
+/** what a component is shown against: as it was picked, or something chosen instead */
+export const PAPERS = ['', 'light', 'dark', 'none']
+export function papered(arr, i, paper) {
+  if (!arr.cars[i]) return arr
+  return patch(arr, i, { paper: PAPERS.includes(paper) ? paper : '' })
+}
+
 /** whether anybody has been moved, which is what tells a stage from a stack */
 export const staged = (arr) => live(arr).some((x) => !!x.car.place)
 
@@ -209,6 +225,7 @@ export function revive(said) {
     shot: String(c.shot || ''),
     tune: c.tune || null,
     place: c.place ? { ...c.place } : null,
+    paper: String(c.paper || ''),
     moves: Object.freeze((c.moves || []).map((m) => ({ ...m }))),
     from: c.from === null || c.from === undefined ? null : num(c.from),
     until: c.until === null || c.until === undefined ? null : num(c.until),
@@ -556,6 +573,7 @@ export function urlOf(arr, palette) {
     q('cam', (arr.camera || [])
       .map((m) => `${Math.round(m.at)}_${Math.round(m.ms)}_${m.x.toFixed(2)}_${m.y.toFixed(2)}`
         + `_${m.scale.toFixed(3)}_${m.ease}`).join('|')),
+    q('paper', on.map((x) => x.car.paper || '').join(',')),
     q('palette', palette ?? ''),
   ].join('&')}`
 }

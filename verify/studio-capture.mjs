@@ -926,6 +926,62 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
       await room.evaluate(() =>
         getComputedStyle(document.querySelector('.tllife')).pointerEvents) === 'none')
 
+    /**
+     * A camera on a component that has been put somewhere.
+     *
+     * A rig is absolutely positioned, which is right for a car sharing the stack because that car
+     * has a height from the row it fills. A placed car has only what its contents give it, and a rig
+     * gives it none, so the camera applied and collapsed the component to nothing. Then the plate
+     * kept the fixed width it was sized to for a full width stage, and the component underneath kept
+     * the inline width it was captured with, which an override matching only a direct child could
+     * not reach through the rig. Three sizes to get wrong and all three read as the camera doing
+     * nothing at all.
+     */
+    await room.evaluate(async () => {
+      await arriving
+      picks = [1, 2].map((n) => ({ label: `div.card${n}`, html: '<div></div>', css: '', shot: '', w: 0, h: 90 }))
+      arr = ARR.fromRail([1, 2].map((n) => ({ id: String(n), note: `card ${n}`,
+        tempo: { span: 400 }, label: `div.card${n}` })), picks)
+      arr = ARR.placed(ARR.placed(arr, 0, { x: 8, y: 14, w: 40 }), 1, { x: 52, y: 14, w: 40 })
+      running = false; zoom = 0; choose([]); rails = []; railN = 0; drawSel(); render()
+    })
+    await room.waitForTimeout(1200)
+    ok('a component on the stage is not labelled with the selector it was picked by',
+      await room.frameLocator('.appwrap iframe').locator('.car .tag').count() === 0)
+
+    await room.locator('[data-row="0"]').click(); await room.waitForTimeout(300)
+    await room.locator('[data-campick="push"]').click(); await room.waitForTimeout(700)
+    await room.evaluate(() => hold(1500)); await room.waitForTimeout(300)
+    const rigged = await room.evaluate(() => {
+      const f = document.querySelector('.appwrap iframe')
+      const car = f.contentDocument.querySelector('[data-rail="0"]')
+      const plain = f.contentDocument.querySelector('[data-rail="1"]')
+      const box = (el, q) => { const t = q ? el.querySelector(q) : el; if (!t) return null
+        const r = t.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height) } }
+      return { car: box(car), rig: box(car, '.rig'), inner: box(car, '.sharp .in'),
+        plain: box(plain) }
+    })
+    /* measured against the car beside it rather than a number, since how tall a component is depends
+       on the component and the one thing that must not happen is it becoming nothing */
+    ok('a camera on a placed component leaves it the height it had rather than collapsing it',
+      rigged.car.h > 0 && Math.abs(rigged.car.h - rigged.plain.h) <= 2
+        && rigged.rig.h === rigged.car.h, `${JSON.stringify(rigged)}`)
+    ok('and the component fills the box it was put in rather than the width it was captured at',
+      rigged.inner.w > rigged.car.w * 0.8, `${rigged.inner.w} of ${rigged.car.w}`)
+
+    /* a component arrives wearing whatever its page had, which is often a white box on a dark stage */
+    ok('what a component is shown against can be chosen',
+      String(await room.evaluate(() =>
+        [...document.querySelectorAll('[data-paper]')].map((b) => b.dataset.paper))) === ',light,dark,none')
+    await room.locator('[data-paper="dark"]').click(); await room.waitForTimeout(600)
+    ok('and choosing one reaches the page rules sitting on the component itself',
+      await room.evaluate(() => {
+        const f = document.querySelector('.appwrap iframe')
+        return getComputedStyle(f.contentDocument.querySelector('[data-rail="0"]')).backgroundColor
+      }) === 'rgb(11, 12, 13)')
+    ok('and the one nobody chose for keeps the answer its own page gave',
+      await room.evaluate(() => arr.cars[1].paper) === '')
+
     ok('the timeline drives without complaint', said.length === 0, said.join('; ').slice(0, 60))
 
     /**
