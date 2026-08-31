@@ -1369,12 +1369,26 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
     })
     await room.waitForTimeout(1500)
     const wasThere = await held()
+    /* the films shot earlier in this leg are still in the reel, and the point of the store is that
+       this reload does not take them: a blob url dies with the document, and the studio does this to
+       itself on every save while somebody is working on it */
+    const filmsBefore = await room.evaluate(() => takes.map((t) => t.facts))
     await room.reload({ waitUntil: 'load' })
     await room.waitForTimeout(2200)
     const cameBack = await held()
     ok('a composition survives the page being reloaded under it',
       JSON.stringify(cameBack) === JSON.stringify(wasThere),
       `${JSON.stringify(wasThere)} then ${JSON.stringify(cameBack)}`)
+    const filmsAfter = await room.evaluate(() => takes.map((t) => t.facts))
+    ok('and so do the films, which a blob url alone would not',
+      filmsBefore.length > 0 && JSON.stringify(filmsAfter) === JSON.stringify(filmsBefore),
+      `${filmsBefore.length} before, ${filmsAfter.length} after`)
+    ok('and each is still bytes a player would take, rather than a url with nothing behind it',
+      await room.evaluate(async () => {
+        if (!takes.length) return false
+        const got = await fetch(takes[0].url).then((r) => r.blob())
+        return got.type === 'video/mp4' && got.size > 1000
+      }))
 
     // the studio bounced exactly the way an edit bounces it
     for (const pid of spawnSync('lsof', ['-ti', `tcp:${XPORT}`], { encoding: 'utf8' })

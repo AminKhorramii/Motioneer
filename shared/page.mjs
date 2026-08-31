@@ -1592,9 +1592,14 @@ function filmable(){
  */
 async function filmHere(frame, want, say){
   const doc=frame.contentDocument
-  if(!doc) throw new Error('that frame cannot be read from here, so the server has to film it')
+  /* Both of these used to end "so the server has to film it", which was true until the headless path
+     was deleted and has been a sentence pointing at nothing since. What somebody can actually do
+     about each is different, so each says its own thing. */
+  if(!doc) throw new Error('that frame is from another origin, so this page is not allowed to read '
+    +'it. Pick the element and film it here instead.')
   const [R,M]=await Promise.all([import('/__wall/raster.mjs'),import('/__wall/mp4.mjs')])
-  if(!M.supported()) throw new Error('this browser has no video encoder, so the server has to film it')
+  if(!M.supported()) throw new Error('this browser has no video encoder. Filming needs Chrome or '
+    +'Edge 94, Safari 16.4, or Firefox 130.')
   /* the preview drives its own clock and would fight the raster, so it is held first */
   try{ frame.contentWindow.postMessage({wall:'hold',t:0,i:0},'*') }catch{}
   await new Promise(r=>setTimeout(r,120))
@@ -1630,6 +1635,44 @@ async function filmHere(frame, want, say){
    projected and the file is a third of the size. */
 const SHAPES={wide:{w:1280,h:720},hd:{w:1920,h:1080},square:{w:1080,h:1080},tall:{w:1080,h:1350}}
 let takes=[]
+/**
+ * Films outlive the tab.
+ *
+ * An object url dies with the document that made it, and this document is reloaded far more often
+ * than anybody expects: the page reloads itself whenever a different studio starts answering it, and
+ * the studio watches its own sources, so every save on a source file threw away every film shot that
+ * session. The same argument the arrangement is kept for applies harder here, because a film is the
+ * artifact rather than a step towards one.
+ *
+ * The browser's own store on this machine rather than the server's disk, which keeps what the reel
+ * says about nothing being uploaded literally true, lets the browser answer for the quota, and means
+ * a film is not something left lying in a folder after the studio is closed.
+ */
+function filmStore(mode){
+  return new Promise((ok,no)=>{
+    let r; try{ r=indexedDB.open('wall-films',1) }catch(e){ return no(e) }
+    r.onupgradeneeded=()=>{ const db=r.result
+      if(!db.objectStoreNames.contains('takes')) db.createObjectStore('takes',{keyPath:'at'}) }
+    r.onerror=()=>no(r.error)
+    r.onsuccess=()=>{ try{ ok(r.result.transaction('takes',mode).objectStore('takes')) }catch(e){ no(e) } }
+  })
+}
+/* every one of these swallows its failure. A browser in private mode refuses to open a store at all,
+   and a studio that cannot film because it could not remember a film is a worse studio than one that
+   forgets */
+async function keepTake(t){
+  try{ (await filmStore('readwrite')).put({at:t.at,name:t.name,facts:t.facts,note:t.note,blob:t.blob}) }
+  catch(_){}
+}
+async function dropTake(at){ try{ (await filmStore('readwrite')).delete(at) }catch(_){} }
+async function pastTakes(){
+  try{
+    const s=await filmStore('readonly')
+    const all=await new Promise((ok,no)=>{ const q=s.getAll()
+      q.onsuccess=()=>ok(q.result||[]); q.onerror=()=>no(q.error) })
+    return all.sort((a,b)=>a.at-b.at)
+  }catch(_){ return [] }
+}
 /* every take kept and switchable, because comparing two is the only reason to shoot a second */
 function showReel(t){
   document.getElementById('reeltag').textContent=t.name
@@ -1684,12 +1727,21 @@ document.getElementById('film').onclick=async()=>{
        nothing to warn about, and a standing disclaimer on every one of them teaches you to skip
        the line that will one day matter */
     const trouble=(limits||[]).map(l=>l.n+' '+l.what).join('. ')
-    takes.push({ name, url,
+    const take={ name, url, at:Date.now(), blob:new Blob([bytes],{type:'video/mp4'}),
       facts:total+' frames at '+fps+'fps, '+(total/fps).toFixed(1)+'s, '+size.w+' by '+size.h
         +', of '+aim.what,
       note:(notes.length?notes.length+' asset'+(notes.length>1?'s':'')+' would not load. ':'')
         +(trouble?'This one has '+trouble+', so check the film against the preview.'
-          :'Drawn here, so nothing was installed and nothing was uploaded.') })
+          :'Drawn here, so nothing was installed and nothing was uploaded.') }
+    takes.push(take); keepTake(take)
+    /* An mp4 held by an object url is held until the tab closes, and every take was keeping its
+       own for the life of the session: a morning of filming a 1080p rail is a browser holding
+       hundreds of megabytes of video nobody is going to look at again. The oldest go first, and
+       the url is handed back rather than merely dropped, because dropping the reference is not
+       what frees the bytes. */
+    while(takes.length>12){ const old=takes.shift()
+      try{ URL.revokeObjectURL(old.url) }catch{}
+      dropTake(old.at) }
     showReel(takes[takes.length-1]); drops.textContent=''
   }catch(e){
     /* stopping is a thing somebody chose, so it is reported as done rather than as gone wrong.
@@ -3061,6 +3113,17 @@ function face(){document.getElementById('glyph').textContent=running?'❚❚':'�
 shelfAll().then(l=>{ kept=new Set(l.map(r=>r.id))
   const badge=document.getElementById('savedn'); if(badge) badge.textContent=l.length||''
   if(opts.length) render()
+}).catch(()=>{})
+
+/* the films from before this tab, given fresh urls. Nothing is shown on its own: the reel opens
+   because somebody asked for it, and a panel that opened itself on load would be the studio
+   interrupting to say it remembered something */
+pastTakes().then(all=>{
+  if(!all.length) return
+  for(const t of all.slice(-12)){
+    takes.push({...t, url:URL.createObjectURL(t.blob)})
+  }
+  for(const t of all.slice(0,-12)) dropTake(t.at)
 }).catch(()=>{})
 
 /**

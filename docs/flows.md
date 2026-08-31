@@ -1015,6 +1015,16 @@ Filming is also the one thing here long enough to want back, so the button that 
 way out of it, and a film that is stopped is not kept. A disabled button reading Film is a button
 that looks broken for a minute, and there is only ever one thing to do while a film is drawing.
 
+The reel outlives the tab, which matters more than it sounds because this tab is reloaded constantly:
+the page reloads itself whenever a different studio answers it, and the studio watches its own
+sources, so a save on any source file used to throw away every film shot that session. An object url
+dies with the document that made it, so the bytes go into the browser's own store on this machine.
+That keeps what the reel says about nothing being uploaded literally true, lets the browser answer
+for the quota rather than leaving video in a folder after the studio is closed, and every call into
+it swallows its own failure, because a studio that will not film since it could not remember a film
+is worse than one that forgets. Twelve are kept and the oldest go first, url handed back rather than
+merely dropped, since dropping the reference is not what frees the bytes.
+
 Three things had to agree before the film was the thing on screen. The camera length was computed
 from the motion for the preview and written as a flat 3000ms for the rail and the export, so any
 motion longer than about 1.9 seconds was approved with one camera and filmed with another; it is one
