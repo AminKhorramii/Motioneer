@@ -89,6 +89,17 @@ export function fromRail(got, picks = [], id = 'a1') {
        */
       from: null,
       until: null,
+      /**
+       * Where this component goes, and when, after it has arrived.
+       *
+       * A motion is what the model wrote and it happens once, at the start. A move is authored: this
+       * thing travels from where it is to there, over that long, because you dragged it while the
+       * clock was somewhere. That is the whole of a product demo and none of it needs a model.
+       *
+       * Ordered by when they start, kept as offsets from where the car sits rather than as absolute
+       * places, so moving the component moves its whole journey with it.
+       */
+      moves: [],
       why: c.id ? '' : String(c.why ?? 'nothing came back'),
     }
   })
@@ -107,6 +118,44 @@ export function placed(arr, i, at) {
       w: clamp(at.w === undefined ? (arr.cars[i].place ? arr.cars[i].place.w : 40) : at.w, 4, 100),
     },
   })
+}
+
+/**
+ * A journey for one component, kept in the order it happens.
+ *
+ * A move landing where one already ends replaces it rather than stacking on top, because dragging
+ * the same thing to the same instant twice is one decision made twice, not two decisions.
+ */
+export function routed(arr, i, moves) {
+  if (!arr.cars[i]) return arr
+  const clean = (moves || []).map((m) => ({
+    at: Math.max(0, Math.round(num(m.at))),
+    ms: Math.max(60, Math.round(num(m.ms, 400))),
+    x: num(m.x), y: num(m.y),
+    scale: Math.max(0.05, num(m.scale, 1)),
+    ease: String(m.ease || 'ease'),
+  })).sort((a, b) => a.at - b.at)
+  return patch(arr, i, { moves: Object.freeze(clean) })
+}
+
+/** one more leg of the journey, replacing whichever already ended at that instant */
+export function travels(arr, i, move) {
+  const car = arr.cars[i]
+  if (!car) return arr
+  const ends = Math.round(num(move.at) + num(move.ms, 400))
+  const rest = (car.moves || []).filter((m) => Math.abs(m.at + m.ms - ends) > 1)
+  return routed(arr, i, rest.concat([move]))
+}
+
+/** where a component has got to by an instant, as an offset from where it sits */
+export function wandered(car, t) {
+  let x = 0, y = 0, scale = 1
+  for (const m of (car && car.moves) || []) {
+    if (t <= m.at) break
+    // a move still running counts as arrived, since this is for the strip rather than the picture
+    x = m.x; y = m.y; scale = m.scale
+  }
+  return { x, y, scale }
 }
 
 /** whether anybody has been moved, which is what tells a stage from a stack */
@@ -132,6 +181,7 @@ export function revive(said) {
     shot: String(c.shot || ''),
     tune: c.tune || null,
     place: c.place ? { ...c.place } : null,
+    moves: Object.freeze((c.moves || []).map((m) => ({ ...m }))),
     from: c.from === null || c.from === undefined ? null : num(c.from),
     until: c.until === null || c.until === undefined ? null : num(c.until),
     why: String(c.why || ''),
@@ -274,8 +324,10 @@ export function spanOf(arr) {
   const { at } = resolve(arr)
   const ends = live(arr).map((x) => {
     const life = lifeOf(arr, x.i)
-    // a car that leaves still had to be watched leaving, so its exit counts as much as its motion
-    return Math.max(at[x.i] + runs(x.car), life.until === null ? 0 : life.until)
+    const trip = (x.car.moves || []).reduce((most, m) => Math.max(most, m.at + m.ms), 0)
+    /* a car that leaves still had to be watched leaving, and one still travelling at the end of its
+       motion is the whole point of a demo, so both count as much as the motion does */
+    return Math.max(at[x.i] + runs(x.car), life.until === null ? 0 : life.until, trip)
   })
   return Math.max(FLOOR, ...ends, 0)
 }
@@ -466,6 +518,10 @@ export function urlOf(arr, palette) {
       const own = arr.cars[x.i].from != null || arr.cars[x.i].until != null
       return own ? `${Math.round(life.from)}_${life.until === null ? '' : Math.round(life.until)}` : ''
     }).join(',')),
+    /* each car's journey as at_ms_x_y_scale steps joined by a pipe, empty where it never travels */
+    q('go', on.map((x) => (x.car.moves || [])
+      .map((m) => `${Math.round(m.at)}_${Math.round(m.ms)}_${m.x.toFixed(2)}_${m.y.toFixed(2)}`
+        + `_${m.scale.toFixed(3)}_${m.ease}`).join('|')).join(',')),
     q('palette', palette ?? ''),
   ].join('&')}`
 }

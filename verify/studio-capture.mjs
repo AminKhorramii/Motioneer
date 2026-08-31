@@ -271,6 +271,33 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
   ok('a motion from the model carries no origin, so it is never mistaken for a retime',
     !A.fromRail([{ id: 'm', tempo: { span: 400 }, label: 'x' }]).cars[0].motion.origin)
 
+  /**
+   * Where a component goes, and when.
+   *
+   * A motion is what the model wrote and it happens once, at the start. A move is authored: this
+   * thing travels from where it is to there, over that long, because somebody dragged it while the
+   * clock was somewhere. That is the whole of a product demo and none of it needs a model.
+   */
+  console.log('\n  where each component goes')
+  const still = A.placed(arrange([car('a', 0, 400)]), 0, { x: 5, y: 10, w: 40 })
+  const trip = A.travels(still, 0, { at: 300, ms: 600, x: 30, y: 8, scale: 1, ease: 'ease' })
+  ok('a component can be sent somewhere by a moment', trip.cars[0].moves.length === 1)
+  ok('and where it sits is untouched, because where and when it goes are other decisions',
+    trip.cars[0].place.x === 5 && trip.cars[0].place.y === 10)
+  ok('a journey is kept in the order it happens',
+    A.routed(trip, 0, [{ at: 900, ms: 200, x: 1, y: 1 }, { at: 100, ms: 200, x: 2, y: 2 }])
+      .cars[0].moves.map((m) => m.at).join(',') === '100,900')
+  /* dragging the same thing to the same instant twice is one decision made twice */
+  ok('a leg landing where one already ends replaces it rather than stacking on it',
+    A.travels(trip, 0, { at: 500, ms: 400, x: 9, y: 9 }).cars[0].moves.length === 1)
+  ok('and one landing elsewhere is another leg',
+    A.travels(trip, 0, { at: 1200, ms: 300, x: 9, y: 9 }).cars[0].moves.length === 2)
+  ok('the ruler contains a journey that outlasts every motion in the rail',
+    A.spanOf(A.travels(still, 0, { at: 3000, ms: 800, x: 1, y: 1 })) >= 3800)
+  ok('and the frame is told the journey it has to draw',
+    /go=300_600_30\.00_8\.00/.test(decodeURIComponent(A.urlOf(trip, '') || '')),
+    `${decodeURIComponent(A.urlOf(trip, '') || '').split('go=')[1]}`)
+
   console.log('\n  when each component is on the stage')
   const born = arrange([car('a', 0, 400), car('b', 600, 400)])
   ok('a component arrives when its motion starts, without anybody saying so',

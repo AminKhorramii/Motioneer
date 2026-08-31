@@ -1646,7 +1646,7 @@ async function railOf(picks, palette) {
  * the camera belonging to its neighbour. The rail still plays, in the wrong order, which is the kind
  * of wrong nobody reports because it looks like a composition somebody chose.
  */
-const railView = (ids, palette, offsets = [], shots = [], places = [], lives = []) => {
+const railView = (ids, palette, offsets = [], shots = [], places = [], lives = [], goes = []) => {
   const parts = ids.map((id, asked) => ({ o: made.get(id), asked })).filter((x) => x.o)
     .map(({ o, asked }, i) => {
       const tag = o.scope ? `${o.scope}-r${i + 1}` : ''
@@ -1662,8 +1662,14 @@ const railView = (ids, palette, offsets = [], shots = [], places = [], lives = [
       const life = told.length === 2 && told[0] !== ''
         ? { from: Number(told[0]) || 0, until: told[1] === '' ? null : Number(told[1]) }
         : null
+      /* at_ms_x_y_scale_ease steps joined by a pipe */
+      const moves = String(goes[asked] ?? '').split('|').filter(Boolean).map((one) => {
+        const bit = one.split('_')
+        return { at: Number(bit[0]) || 0, ms: Number(bit[1]) || 400, x: Number(bit[2]) || 0,
+          y: Number(bit[3]) || 0, scale: Number(bit[4]) || 1, ease: bit[5] || 'ease' }
+      }).filter((m) => Number.isFinite(m.at)).sort((a, b) => a.at - b.at)
       return { ...o, css, markup, tag, i, at: offsets[asked] ?? i * 420, shot: shots[asked] || '',
-        place, life }
+        place, life, moves }
     })
   if (!parts.length) return null
   const tw = parts.some((o) => o.tw)
@@ -1723,6 +1729,35 @@ ${parts.filter((p) => p.shot).map((p) => {
   const move = SHOTS[p.shot] || SHOTS.drift
   return `.d${p.i}{transform:${move.from};animation:dolly${p.i} 3000ms ${move.ease} both}
 @keyframes dolly${p.i}{from{transform:${move.from}}to{transform:${move.to}}}`
+}).join('\n')}
+/**
+ * Each component's journey, as one animation rather than one per leg.
+ *
+ * Several animations on the same element fight: a later one held before its own start still applies
+ * its first frame, so it overrides whatever the leg before it finished at, and a component that
+ * moved twice would snap back between them. One track spanning the whole composition, with a stop at
+ * each end of each leg, composes by construction and takes its easing per stop, which css allows.
+ *
+ * The delay is minus the car's own offset. Everything in a car runs on the car's clock, t minus when
+ * it starts, and a journey is written in the composition's time; this is what puts the two back on
+ * the same footing, for the transport and for the film alike.
+ */
+${parts.filter((p) => p.moves && p.moves.length).map((p) => {
+  const span = Math.max(1, ...parts.flatMap((q) => (q.moves || []).map((m) => m.at + m.ms)))
+  const at = (ms) => `${Math.max(0, Math.min(100, (ms / span) * 100)).toFixed(3)}%`
+  const put = (x, y, k) => `transform:translate(${x}%, ${y}%) scale(${k})`
+  const stops = []
+  let x = 0, y = 0, k = 1
+  stops.push(`0%{${put(0, 0, 1)};animation-timing-function:linear}`)
+  for (const m of p.moves) {
+    stops.push(`${at(m.at)}{${put(x, y, k)};animation-timing-function:${m.ease}}`)
+    x = m.x; y = m.y; k = m.scale
+    stops.push(`${at(m.at + m.ms)}{${put(x, y, k)};animation-timing-function:linear}`)
+  }
+  stops.push(`100%{${put(x, y, k)}}`)
+  return `.car[data-rail="${p.i}"]{animation:go${p.i} ${span}ms linear both;`
+    + `animation-delay:${-Math.round(p.at)}ms}
+@keyframes go${p.i}{${stops.join('')}}`
 }).join('\n')}
 .tag{position:absolute;left:0;top:0;font:10px ui-monospace,monospace;color:#5c6068;letter-spacing:.04em}
 </style></head><body>
@@ -1808,6 +1843,13 @@ for (var handle of document.querySelectorAll('[data-grab]')){
          belonged to was somewhere else entirely */
       if(!moved){ parent.postMessage({wall:'chose', i:i}, '*'); return }
       var p=pct(ev, box)
+      /* alt says this is a journey rather than a placement: the component travels to here by the
+         instant the clock is at, instead of simply being here from the start */
+      if(ev.altKey){
+        parent.postMessage({wall:'travelled', i:i,
+          x:Math.max(0,p.x-hold.x), y:Math.max(0,p.y-hold.y)}, '*')
+        return
+      }
       tell(i, { x:Math.max(0,p.x-hold.x), y:Math.max(0,p.y-hold.y), w:wide }, true)
     }
     window.addEventListener('pointermove',move); window.addEventListener('pointerup',up)
@@ -2035,7 +2077,8 @@ const server = createServer(async (req, res) => {
       const shots = (url.searchParams.get('shots') ?? '').split(',')
       const places = (url.searchParams.get('place') ?? '').split(',')
       const lives = (url.searchParams.get('life') ?? '').split(',')
-      const html = railView(ids, url.searchParams.get('palette'), at, shots, places, lives)
+      const goes = (url.searchParams.get('go') ?? '').split(',')
+      const html = railView(ids, url.searchParams.get('palette'), at, shots, places, lives, goes)
       if (!html) { res.writeHead(404); return res.end('gone') }
       res.writeHead(200, { 'content-type': 'text/html' })
       return res.end(html)

@@ -325,6 +325,11 @@ header.bare .whenplaying{display:none}
 .tlrow:hover .lin,.tlrow:hover .lout{background:rgba(255,255,255,.3)}
 .lin:hover,.lout:hover{background:var(--accent)}
 .tlbar{z-index:2}
+/* where a component was sent, on the same row as what it does and plainly not the same thing: one
+   is what the model wrote and happens once, the other is a decision that can happen all afternoon */
+.tlgo{position:absolute;top:6px;bottom:6px;background:rgba(58,143,111,.55);border-radius:3px;
+  border:1px solid rgba(88,190,150,.85);cursor:pointer;z-index:3}
+.tlgo:hover{background:rgba(58,143,111,.85)}
 /* a car can be pinned to another rather than to the clock, so changing one duration stops meaning
    dragging everything after it back into place by hand */
 .tlbar.tied{background:rgba(94,106,210,.32);border-style:dashed}
@@ -1532,6 +1537,24 @@ addEventListener('message',e=>{const d=e.data||{}
     if(x){ anchor=x.i; choose([x.i],x.i); shut(); insp.hidden=false }
     return
   }
+  /**
+   * A component sent somewhere by a moment in time.
+   *
+   * Where it sits is one decision and where it goes is another, so alt on the drag says which one is
+   * being made. The leg ends at the playhead, because the playhead is where you already put the
+   * clock to decide this, and starts a little before it, which is the shortest thing worth watching.
+   */
+  if(d.wall==='travelled'&&railed()){
+    const seat=ARR.live(arr)[Number(d.i)]; if(!seat) return
+    const base=seat.car.place||{x:0,y:0,w:100}
+    const lands=Math.max(120,Math.round(Number(scrub.value)||0))
+    const ms=Math.min(900,Math.max(200,Math.round(lands-ARR.resolve(arr).at[seat.i])))
+    mark('sending '+nameOf(seat.car.motion)+' across the stage')
+    arr=ARR.travels(arr,seat.i,{ at:Math.max(0,lands-ms), ms,
+      x:Number(d.x)-base.x, y:Number(d.y)-base.y, scale:1, ease:'ease' })
+    held.clear(); ends.clear(); render(); drawInspector()
+    return
+  }
   if(d.wall==='placed'&&railed()){
     const seat=ARR.live(arr)[Number(d.i)]; if(!seat) return
     const at=seat.i, car=seat.car
@@ -1971,7 +1994,14 @@ function timeline(live){
         +' is retimed rather than regenerated, so the idea is kept and only the clock changes"></b>'
         +'<b class="tltie" data-tie="'+i+'" title="drag onto another row to start this one when that'
         +' one finishes, or drop it here to cut the link"></b>'
-        +'</span></span></div>').join('')
+        +'</span>'
+        /* the journey, on the same row and plainly not the motion: one is what the model wrote and
+           happens once, the other is where you sent the thing and can happen all afternoon */
+        +(car.moves||[]).map((m,k)=>'<b class="tlgo" data-go="'+i+'" data-leg="'+k+'" style="left:'
+          +(m.at/total*100).toFixed(2)+'%;width:'+Math.max(1.2,m.ms/total*100).toFixed(2)+'%"'
+          +' title="travels here over '+(m.ms/1000).toFixed(2)+'s. Click to take this leg away">'
+          +'</b>').join('')
+        +'</span></div>').join('')
     + '<div class="tlmarks" id="tlmarks">'
     + (arr.markers||[]).map(m=>'<b class="tlmark" data-mark="'+m+'" title="a beat to align to, and a'
         +' thing bars snap onto. Click to take it away" style="left:'
@@ -2183,6 +2213,15 @@ function wireTimeline(live){
     mark('keeping one arrangement and dropping the others')
     rails=[]; railN=0
     held.clear(); ends.clear(); render() }
+  for (const leg of document.querySelectorAll('[data-go]')){
+    leg.onclick=e=>{
+      e.stopPropagation()
+      const i=Number(leg.dataset.go), k=Number(leg.dataset.leg)
+      mark('taking a leg out of '+nameOf(arr.cars[i].motion)+' journey')
+      arr=ARR.routed(arr,i,(arr.cars[i].moves||[]).filter((_,n)=>n!==k))
+      held.clear(); ends.clear(); render()
+    }
+  }
   for (const chip of document.querySelectorAll('[data-alt]')){
     chip.onclick=e=>{ e.stopPropagation(); cycleAlt(Number(chip.dataset.alt), e.shiftKey?-1:1) }
   }
