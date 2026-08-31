@@ -2403,28 +2403,20 @@ ol{color:#8a8f98;padding-left:20px;margin:0}li{margin:0 0 8px}
 code{background:#141516;border:1px solid rgba(255,255,255,.11);border-radius:4px;padding:1px 5px;
   font:12px ui-monospace,monospace;color:#e6e6e6}</style></head><body><main>
 <h1>Pick from a page you are signed into</h1>
-<p>The studio proxies a site so it can read it, and an app that signs in against its own api on
-another host will not run that way: on this origin its api is a different site, so it refuses the
-call and the app never gets past its loading screen. Nothing can fix that from here, because the
-session belongs to a domain this is not.</p>
-<p>So pick on the real page instead, in the browser where you are already signed in.</p>
+<p>An app that signs in against its own api on another host cannot be proxied: here that api is a
+different site, so it refuses the call and the app never gets past its loading screen. Pick on the
+real page instead, in the browser you are already signed into.</p>
 <a class="bm" href="${href}">Pick for Wall</a>
 <ol>
-<li>Drag the button above onto your bookmarks bar. It becomes a bookmark like any other, except
-that pressing it runs the picker on whatever page you are looking at instead of going somewhere.</li>
-<li>Open your own app and sign in as normal.</li>
-<li><b>Click that bookmark.</b> Your cursor turns into a crosshair, which is how you know the picker
-is listening. The page carries on working; it is only your clicks that mean something else now.</li>
-<li>Click the elements you want. Each one is taken as you click it, and a line at the bottom of the
-screen says how many you have.</li>
-<li>Press <b>Escape</b> when you are done. The cursor goes back to normal and the page is yours again.</li>
+<li>Drag that button to your bookmarks bar. It holds the picker rather than an address.</li>
+<li>Open your app and sign in as usual.</li>
+<li>Click the bookmark. A crosshair cursor means it is listening; the page still works.</li>
+<li>Click the elements you want. A line at the bottom counts them.</li>
+<li>Press escape to stop and give the page back.</li>
 </ol>
-<p>They arrive in the studio on their own if it is open, and the line at the bottom will say
-<b>sent to the studio</b>. Some sites refuse to talk to anything running on your own machine, and
-there the capture goes onto your clipboard instead and the line says <b>copied</b>: switch to the
-studio and press <code>${MAC ? '⌘V' : 'ctrl V'}</code> anywhere on it.</p>
-<p>Nothing is installed and nothing is uploaded. The bookmark is the picker itself, and a capture
-goes to the studio on this machine or no further than your clipboard.</p>
+<p>They arrive in the studio on their own. A site that refuses to talk to your machine puts them on
+your clipboard instead, and the line says which, so paste with <code>${MAC ? '⌘V' : 'ctrl V'}</code>
+anywhere on the studio. Nothing is installed and nothing leaves this machine.</p>
 </main></body></html>`)
     }
     /**
