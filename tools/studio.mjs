@@ -779,13 +779,19 @@ function pack(list,cap){
     if(n+r.length>cap)break;
     out.push(r);n+=r.length}
   return out.join('')}
-var opaque=0;
+var opaque=0,shut=[];
 function rules(el){
-  var roots=[],out=[],keys=[];opaque=0;
+  var roots=[],out=[],keys=[];opaque=0;shut=[];
   for(var i=0;i<document.styleSheets.length;i++){var rs;
     /* a sheet served from another origin without cors cannot be read at all. Skipping it quietly
        would hand over a component with a third of its styling missing and no way to tell */
-    try{rs=document.styleSheets[i].cssRules}catch(_){opaque++;continue}
+    try{rs=document.styleSheets[i].cssRules}catch(_){opaque++
+      /* the address as well as the count. Read from here it is nothing, but the studio has no origin
+         to be refused by and can fetch it afterwards, which is the difference between a component
+         that lost its typeface and one that kept it */
+      var href=document.styleSheets[i].href
+      if(href&&shut.indexOf(href)<0)shut.push(href)
+      continue}
     collect(rs,el,roots,out,keys,'')}
   var body=pack(out,13000);
   var base=pack(roots,1500);
@@ -927,7 +933,7 @@ function pick(e){if(!on)return;e.preventDefault();e.stopPropagation();
     : thin ? 'too thin to stagger'
     : kids === 0 ? 'nothing inside it to move separately'
     : kids < 3 ? 'only ' + kids + ' part' + (kids === 1 ? '' : 's') : '';
-  deliver({wall:'picked',html:h,css:css,shot:shot,label:label(el),opaque:opaque,weak:weak,
+  deliver({wall:'picked',html:h,css:css,shot:shot,label:label(el),opaque:opaque,shut:shut,weak:weak,
     n:el.querySelectorAll('*').length+1,
     cut:h.length<el.outerHTML.length,w:Math.round(r.width),h:Math.round(r.height)})}
 function arm(v){on=v;

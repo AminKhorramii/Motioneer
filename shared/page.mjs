@@ -895,6 +895,39 @@ async function takeInbox(){
     if(got&&Array.isArray(got.picks)&&got.picks.length) tookPicks(got.picks,'picked')
   }catch(_){}
 }
+/**
+ * The stylesheets the page would not let the picker read, fetched from the one side that can.
+ *
+ * A sheet served from another origin without cors headers cannot be read from a script running on
+ * the page, which on a real app is nearly always its typefaces: three of them on the one this was
+ * built against. The studio has no origin to be refused by, so it fetches them itself, and what
+ * comes back is appended to the capture that lost them.
+ *
+ * Only the parts worth having. A font sheet is font-face rules and a variable sheet is custom
+ * properties, and neither is large; anything else is left where it is rather than doubling a
+ * capture with rules that were never going to match.
+ */
+async function mendSheets(pick){
+  if(!pick.shut||!pick.shut.length) return pick
+  const got=[]
+  for(const href of pick.shut.slice(0,6)){
+    try{
+      const css=await fetch('/__wall/asset?u='+encodeURIComponent(href)).then(r=>r.ok?r.text():'')
+      if(!css) continue
+      /* the pieces a lifted component actually needs from a page level sheet */
+      let keep=''
+      for(const bit of css.split('}')){
+        const head=bit.slice(0,bit.indexOf('{')).trim()
+        if(!head) continue
+        if(head.indexOf('@font-face')===0||head===':root'||head==='html') keep+=bit+'}'
+        if(keep.length>9000) break
+      }
+      if(keep) got.push(keep)
+    }catch(_){}
+  }
+  if(!got.length) return pick
+  return {...pick, css:got.join('')+pick.css, mended:got.length}
+}
 /* one way in, whether it was pasted or handed over */
 function tookPicks(some,how){
   let n=0
@@ -902,10 +935,21 @@ function tookPicks(some,how){
   for(const one of some){
     if(!one||!one.html) continue
     picks.push({html:one.html,css:one.css||'',shot:one.shot||'',label:one.label||'element',
-      w:one.w,h:one.h,n:one.n,cut:one.cut,opaque:one.opaque,weak:one.weak})
+      w:one.w,h:one.h,n:one.n,cut:one.cut,opaque:one.opaque,weak:one.weak,shut:one.shut||[]})
     n++
   }
   if(!n) return 0
+  /* after they are in, since fetching a stylesheet is slower than showing what arrived */
+  Promise.all(picks.slice(-n).map(async (k,i)=>{
+    const mended=await mendSheets(k)
+    if(mended!==k){ picks[picks.length-n+i]=mended; return mended.mended }
+    return 0
+  })).then(counts=>{
+    const won=counts.reduce((a,c)=>a+c,0)
+    if(won){ drops.textContent+=' '+won+' stylesheet'+(won>1?'s':'')
+      +' the page would not let it read were fetched here instead.'
+      drawSel() }
+  }).catch(()=>{})
   chosen=picks[picks.length-1]
   opts=[]; verdict=null; arr=null
   drops.textContent=n+(n===1?' element ':' elements ')

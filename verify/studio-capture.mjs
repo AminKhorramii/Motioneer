@@ -21,6 +21,7 @@
 
 import { chromium } from 'playwright'
 import { spawn, spawnSync } from 'node:child_process'
+import { createServer } from 'node:http'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -1209,6 +1210,44 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
     ok('with nothing at all it says so, and says both ways of getting something',
       none.which === 'none' && /paste it in/.test(none.said), `${none.said.slice(0, 60)}`)
     await asked.close()
+
+    /**
+     * The stylesheets a page will not let the picker read, fetched from the one side that can.
+     *
+     * A sheet served from another origin without cors cannot be read by a script on the page, and on
+     * a real app that is nearly always its typefaces: three of them on the one this was built
+     * against, so a component lifted off it came back in whatever the fallback happened to be. The
+     * studio has no origin to be refused by, so it fetches them itself.
+     */
+    /* served rather than intercepted, because the studio fetches it from its own side where nothing
+       in the browser can stand in the way, which is the entire point of doing it there */
+    const SHEET = Number(process.env.WALL_SHEET_PORT || 4372)
+    const stall = createServer((q, r) => { r.writeHead(200, { 'content-type': 'text/css' })
+      r.end('@font-face{font-family:Ghost;src:local("Georgia")}:root{--said:#c0ffee}p{color:red}') })
+    await new Promise((r) => stall.listen(SHEET, r))
+    const mending = await seat.newContext({ viewport: { width: 1100, height: 760 } })
+    const faced = await mending.newPage()
+    await faced.goto(`http://localhost:${XPORT}`, { waitUntil: 'load' })
+    await faced.waitForTimeout(1200)
+    const hadPicks = await faced.evaluate(() => picks.length)
+    await faced.evaluate((where) => {
+      const dt = new DataTransfer()
+      dt.setData('text', JSON.stringify({ wall: 'wall-capture', v: 1, picks: [{
+        html: '<div data-q><b>x</b></div>', css: '[data-q]{display:block}', shot: '',
+        label: 'div.q', w: 200, h: 60, n: 2, opaque: 1, shut: [where] }] }))
+      document.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }))
+    }, `http://localhost:${SHEET}/hidden.css`)
+    await faced.waitForTimeout(2500)
+    const mended = await faced.evaluate(() => picks[picks.length - 1].css)
+    ok('a stylesheet the page refused is fetched by the studio and put back',
+      /@font-face/.test(mended) && /Ghost/.test(mended), `${mended.slice(0, 50)}`)
+    ok('with the page level parts kept and the rest left where it was',
+      /--said/.test(mended) && !/color:red/.test(mended))
+    ok('and the capture it belongs to is still the one that arrived',
+      await faced.evaluate(() => picks.length) === hadPicks + 1
+        && /data-q/.test(await faced.evaluate(() => picks[picks.length - 1].html)))
+    await mending.close()
+    stall.close()
 
     ok('the timeline drives without complaint', said.length === 0, said.join('; ').slice(0, 60))
 
