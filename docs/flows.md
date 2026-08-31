@@ -709,6 +709,24 @@ Six gates read the sheet and a seventh renders it.
   the text and still leave the component twelve pixels down for good, or invisible, or animating
   nothing whatever. Both of those were built and confirmed to pass all six before this was written.
 
+The seventh was wrong twice, and both were found by asking a real model for a shine and watching three
+of four good sheets get refused. It counted the animations after seeking them to the end, and an
+animation with no fill is removed from the timeline the moment it finishes, so what came back was zero
+and the sheet was reported as reaching for parts the markup does not have. That is a false refusal
+aimed squarely at correct work: a sweep is short, and the sheets that avoid `fill` are the careful
+ones. Every animation is now held at its first frame from the moment the page exists, so counting them
+asks about the sheet rather than racing it. Asked again on the same component with the same words,
+four of four were kept. The refusal still fires on a sheet whose selectors really do reach for
+nothing, which was checked in the same sitting rather than assumed.
+
+The other was the wording. `off` is the largest difference in x, y, width or height across every
+element, and the refusal said "sits Npx from where it started" whichever of the four had changed, so a
+component ending in the right place at the wrong size was described as displaced. It also named one
+cause, a keyframe ending on a transform, when there are two: a sheet that adds `overflow` or
+`position` or `display` to make its technique work moves the resting layout without any keyframe being
+involved. Both are permanent and they need different fixes, so it says which one it measured and
+offers both causes. A refusal nobody can act on is a refusal that gets asked again identically.
+
 `namespaced` fixes rather than complains: every keyframe is renamed to carry the scope, because
 `@keyframes` is one flat namespace shared by every stylesheet on a page and a sheet defining `rise`
 replaces whatever the host already called `rise`.

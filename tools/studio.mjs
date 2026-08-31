@@ -1084,11 +1084,23 @@ async function eyes() {
   return lens
 }
 
-const restPage = (o, css) => `<html><head><meta charset="utf-8"><style>
+/**
+ * @param freeze hold every animation at its first frame from the moment the page exists.
+ *
+ * An animation with no fill is removed from the timeline the instant it finishes, and a removed
+ * animation is indistinguishable from one that was never created. This page is loaded and then
+ * inspected over a round trip, so a 400ms sweep could be gone before anything asked about it, and
+ * the answer that came back was that the component has no animation on it at all. Frozen at the
+ * first frame nothing can finish, so counting them is a question about the sheet rather than a race
+ * against it.
+ */
+const restPage = (o, css, freeze) => `<html><head><meta charset="utf-8"><style>
   html,body{margin:0;padding:0}
   #r{position:absolute;left:0;top:0;width:${o.wide ? o.wide + 'px' : 'max-content'}}
   ${o.base}
-  ${css}</style></head><body><div id="r">${o.scope ? o.markup.replace(/<(\w+)/, `<$1 ${o.scope}`) : o.markup}</div></body></html>`
+  ${css}
+  ${freeze ? '*,*::before,*::after{animation-play-state:paused !important}' : ''}</style></head>`
+  + `<body><div id="r">${o.scope ? o.markup.replace(/<(\w+)/, `<$1 ${o.scope}`) : o.markup}</div></body></html>`
 
 async function drifts(o) {
   const eye = await eyes()
@@ -1097,9 +1109,14 @@ async function drifts(o) {
   try {
     page = await eye.browser.newPage({ viewport: { width: 1280, height: 900 } })
     const measure = async (css, settle) => {
-      await page.setContent(restPage(o, css), { waitUntil: 'load' })
+      await page.setContent(restPage(o, css, settle), { waitUntil: 'load' })
+      let running = 0
       if (settle) {
-        // held well past the end, which is where the component comes to rest and stays
+        /* counted first, while everything is still held at its first frame. Seeking to the end is
+           what makes an unfilled animation finish and leave the timeline, so counting after the
+           seek counts nothing and reports a working sheet as one that animates nothing at all */
+        running = await page.evaluate(() => document.getAnimations().length)
+        // then held well past the end, which is where the component comes to rest and stays
         await page.evaluate(() => {
           for (const a of document.getAnimations()) { try { a.pause(); a.currentTime = 60_000 } catch {} }
         })
@@ -1107,14 +1124,14 @@ async function drifts(o) {
       await page.waitForTimeout(70)
       // every element, because a transform on a child never moves its parent's box and the drift
       // this is looking for is almost always in the parts rather than in the whole
-      return page.evaluate(() => ({
+      const got = await page.evaluate(() => ({
         boxes: [...document.querySelectorAll('#r, #r *')].slice(0, 400).map((e) => {
           const b = e.getBoundingClientRect(), c = getComputedStyle(e)
           return [Math.round(b.x), Math.round(b.y), Math.round(b.width), Math.round(b.height),
             Math.round(parseFloat(c.opacity) * 100)]
         }),
-        running: document.getAnimations().length,
       }))
+      return { ...got, running }
     }
     const still = await measure('', false)
     const after = await measure(o.css, true)
@@ -1207,14 +1224,21 @@ async function drifts(o) {
     const atRest = Math.max(1, inkAt(frames[frames.length - 1]))
     const blank = Math.max(0, 1 - inkAt(frames[0]) / atRest)
     if (!still.boxes.length || !after.boxes.length) return { skipped: 'nothing rendered to measure' }
-    let off = 0, ghost = 0
+    /* which of the four it was, and not only how much. The message said "sits Npx from where it
+       started" whatever moved, so a component that ends the right place at the wrong size was
+       reported as displaced, and the cause it named was always a keyframe ending on a transform
+       even when the sheet had simply added a property that changes layout */
+    const AXES = ['sideways', 'up or down', 'wider or narrower', 'taller or shorter']
+    let off = 0, ghost = 0, offAxis = null
     still.boxes.forEach((a, i) => {
       const b = after.boxes[i] || a
-      off = Math.max(off, Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]),
-        Math.abs(a[2] - b[2]), Math.abs(a[3] - b[3]))
+      const gaps = [Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]),
+        Math.abs(a[2] - b[2]), Math.abs(a[3] - b[3])]
+      const worst = Math.max(...gaps)
+      if (worst > off) { off = worst; offAxis = AXES[gaps.indexOf(worst)] }
       ghost = Math.max(ghost, a[4] - b[4])
     })
-    return { off, ghost, running: after.running,
+    return { off, offAxis, ghost, running: after.running,
       travel: Math.round(travel), reach: Math.round(travel / size * 100),
       stir: Math.round(stirred.size / Math.max(1, frames[0].filter(Boolean).length) * 100),
       escape: Math.round(Math.max(0, escape)), blank: Math.round(blank * 100) }
@@ -1224,7 +1248,7 @@ async function drifts(o) {
 }
 
 /** the two ways a sheet can pass every reading and still be wrong once it stops */
-function resting({ off, ghost, running, skipped }) {
+function resting({ off, offAxis, ghost, running, skipped }) {
   if (skipped) return []
   const out = []
   /**
@@ -1238,9 +1262,26 @@ function resting({ off, ghost, running, skipped }) {
    */
   if (running === 0) out.push('rendered, nothing on the component is animating. The sheet is valid and '
     + 'its selectors reach for parts this markup does not have, so it applies to nothing.')
-  if (off > 2) out.push(`when the animation is over the component sits ${off}px from where it started, `
-    + 'permanently. A keyframe that ends on a transform rather than returning to none does this, and '
-    + 'it nudges the layout of whatever ships it for good.')
+  /**
+   * What differs, said as what it is.
+   *
+   * This used to read "sits Npx from where it started" whichever of the four had changed, so a
+   * component that ends in the right place at the wrong size was described as displaced, and the
+   * cause it offered was always a keyframe ending on a transform. That is one of two causes and
+   * often not the one: a sheet that adds overflow, position, display or padding to make its
+   * technique work changes the resting layout without any keyframe being involved, which is just as
+   * permanent and needs a different fix. Naming both is the difference between a refusal somebody
+   * can act on and one they can only try again against.
+   */
+  const size = offAxis === 'wider or narrower' || offAxis === 'taller or shorter'
+  if (off > 2) {
+    out.push((size
+      ? `when the animation is over the component is ${off}px ${offAxis} than it was`
+      : `when the animation is over the component sits ${off}px ${offAxis || 'away'} from where it started`)
+      + ', permanently. Either a keyframe ends on a transform rather than returning to none, or the '
+      + 'sheet adds a property that changes layout, like overflow or position or display, to make '
+      + 'its technique work. Both nudge the layout of whatever ships it for good.')
+  }
   if (ghost > 8) out.push(`when the animation is over the component is ${ghost}% more transparent than `
     + 'it was, so it stays faded or invisible. An entrance has to end at the component, not at a ghost '
     + 'of it.')
