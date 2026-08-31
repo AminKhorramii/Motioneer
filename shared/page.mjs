@@ -386,6 +386,11 @@ header.bare .whenplaying{display:none}
 .chsay{margin:0;font-size:12px;color:var(--faint)}
 .chgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px;
   align-content:start;overflow:auto;min-height:0;padding-bottom:4px}
+/* one option filling the room, for the same reason the single element grid does it: a card three
+   hundred pixels wide is a thumbnail of a decision rather than the decision */
+.chgrid.solo{grid-template-columns:1fr}
+.chgrid.solo figure:not(.up){display:none}
+.chgrid.solo figure.up iframe{height:calc(100vh - 268px)}
 .chgrid figure{margin:0;background:var(--panel);border:1px solid var(--line);border-radius:8px;
   overflow:hidden;display:flex;flex-direction:column;
   transition:border-color 140ms ease,transform 140ms ease}
@@ -1517,6 +1522,9 @@ function render(){
     const on=ARR.live(arr)
     const at=Math.min(subjectN,on.length-1)
     const seat=on[at], car=seat.car
+    /* before the markup rather than after it: an opened card belonging to the element you were on a
+       moment ago would otherwise put the grid into its one card view with no card to show */
+    if(opened&&!car.alternatives.some(m=>m.id===opened)) opened=null
     const lens=document.getElementById('depth').value
     const q='?palette='+encodeURIComponent(palette.value)
       +(cam.value?'&camera='+cam.value+'&depth='+lens:'')
@@ -1531,20 +1539,27 @@ function render(){
       + '<p class="chsay">Choosing for <b>'+esc(subjectOf(car.pick.label))+'</b>. '
       + car.alternatives.length+' motion'+(car.alternatives.length>1?'s':'')+' for it, '
       + 'and the one you keep is what it plays on the timeline.</p>'
-      + '<div class="chgrid">'
-      + car.alternatives.map((m,k)=>'<figure'+(car.motion&&car.motion.id===m.id?' class="chosen"':'')
-          +'><iframe data-i="'+k+'" src="/__wall/preview/'+m.id+q+'"></iframe>'
+      + '<div class="chgrid'+(opened?' solo':'')+'">'
+      + car.alternatives.map((m,k)=>'<figure class="'
+          +(car.motion&&car.motion.id===m.id?'chosen ':'')+(opened===m.id?'up':'')+'">'
+          +'<iframe data-i="'+k+'" src="/__wall/preview/'+m.id+q+'"></iframe>'
           +'<figcaption><b title="timing from '+esc(m.verb)+'. '+esc(m.scope)+'">'
           +esc(m.note||'untitled')+'</b>'
           +'<span class="facts">'+factLine(m)+'</span>'
           +'<span class="seen">'+seenLine(m)+'</span>'
           +'<span class="row">'
+          /* the same three a single element's cards have always had. A card three hundred pixels
+             wide is a thumbnail of a decision rather than the decision, and that is as true of one
+             of several elements as it was of the only one */
+          +'<button class="icb" data-open-alt="'+m.id+'" title="'
+          +(opened===m.id?'Close it':'Open it bigger')+'">'
+          +(opened===m.id?ICON.shut:ICON.open)+'</button>'
           +'<button class="icb" data-pick-alt="'+k+'" title="Keep this one for this element">'
           +(car.motion&&car.motion.id===m.id?ICON.kept:ICON.mark)+'</button>'
           +'<button class="icb" data-more-alt="'+k+'" title="More like this one">'+ICON.more+'</button>'
           +'</span></figcaption></figure>').join('')
       + '</div></div>'
-    grid.classList.remove('railed'); grid.classList.remove('solo')
+    grid.classList.remove('railed')
     grid.style.removeProperty('--tl')
     paintFaces()
     for(const t of document.querySelectorAll('[data-subject]')) t.onclick=()=>{
@@ -1555,6 +1570,9 @@ function render(){
       held.clear(); ends.clear(); render() }
     for(const bM of document.querySelectorAll('[data-more-alt]')) bM.onclick=()=>
       moreLikeCar(seat.i, Number(bM.dataset.moreAlt))
+    for(const bO of document.querySelectorAll('[data-open-alt]')) bO.onclick=()=>{
+      opened = opened===bO.dataset.openAlt ? null : bO.dataset.openAlt
+      held.clear(); ends.clear(); render() }
     const go=document.getElementById('chmake')
     if(go) go.onclick=()=>{ stage=null; held.clear(); ends.clear(); render(); drawSel(); drawInspector() }
     drops.textContent=done+' of '+on.length+' chosen.'

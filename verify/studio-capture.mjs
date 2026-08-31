@@ -1015,7 +1015,33 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
     await room.locator('[data-pick-alt="1"]').click(); await room.waitForTimeout(500)
     ok('keeping one is what that element then plays',
       await room.evaluate(() => arr.cars[0].motion.note) === 'unfolds')
+    /* a card three hundred pixels wide is a thumbnail of a decision rather than the decision, which
+       is as true of one of several elements as it was of the only one */
+    const tall = () => room.evaluate(() => {
+      const f = document.querySelector('.chgrid figure.up iframe')
+        || document.querySelector('.chgrid figure iframe')
+      return f ? Math.round(f.getBoundingClientRect().height) : 0
+    })
+    const small = await tall()
+    await room.locator('[data-open-alt="2"]').click(); await room.waitForTimeout(700)
+    /* against the window rather than a ratio, since what filling the room means depends on the room */
+    const big = await tall()
+    ok('a card in the chooser opens to fill the room, the way one option always has',
+      big > small && big > await room.evaluate(() => innerHeight) * 0.5,
+      `${small} then ${big} in a ${await room.evaluate(() => innerHeight)} window`)
+    ok('and it is the card that was pressed',
+      await room.evaluate(() =>
+        document.querySelector('.chgrid figure.up figcaption b').textContent) === 'unfolds')
+    ok('with only what is on screen being driven',
+      await room.evaluate(() =>
+        [...document.querySelectorAll(DRIVEN)].filter((f) => f.offsetParent !== null).length) === 1)
+
     await room.locator('[data-subject="1"]').click(); await room.waitForTimeout(700)
+    /* an opened card belonging to the element you were on a moment ago would otherwise leave the
+       grid in its one card view with no card to show */
+    ok('and moving to another element does not leave an empty room behind',
+      await room.evaluate(() => document.querySelectorAll('.chgrid figure').length) === 2
+        && await room.evaluate(() => opened) === null)
     ok('and the next element brings its own motions rather than the first one\'s',
       String(await room.evaluate(() =>
         [...document.querySelectorAll('.chgrid figcaption b')].map((e) => e.textContent))) === 'deals,slides')
