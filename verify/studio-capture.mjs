@@ -444,7 +444,19 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
       base: `:root{--paper:#fff}body{background:#fff;color:#111;letter-spacing:${n}px}`
         + '*, ::after, ::before{box-sizing:border-box}',
       note: `card ${n} rises`, verb: 'rising,',
-    }]),
+    }]).concat([['f', {
+      /* A pick that arrived with a snapshot, which is what every picked element arrives with.
+         The snapshot is trusted over the matched sheet because it cannot leak, so the sheet is
+         dropped, and a @font-face is the one thing in that sheet no snapshot can stand in for: it
+         names no selector, so nothing inline carries it and the component silently loses its
+         typeface somewhere between being picked and being given motion. */
+      file: 'faced.tsx', markup: '<div data-mf><b>one</b></div>',
+      shot: '<div data-mf style="font-family:Inter"><b style="font-family:Inter">one</b></div>',
+      base: '@font-face{font-family:"Inter";src:url(https://x/i.woff2)}\n'
+        + 'body{background:#fff;color:#111}',
+      css: sheet('f', 400), scope: 'data-mf', tw: false, wide: 320,
+      note: 'faced rises', verb: 'rising,',
+    }]]),
   }))
   const XPORT = Number(process.env.WALL_RAIL_PORT || 4390)
   for (const pid of spawnSync('lsof', ['-ti', `tcp:${XPORT}`], { encoding: 'utf8' })
@@ -463,6 +475,13 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
     body: JSON.stringify({ ids: ['1', '2', '3'], at: [0, 800, 1600], shots: ['', '', ''], name: 'railleg' }),
   }).then((r) => r.json()).catch((e) => ({ error: String(e) }))
   ok('a rail exports', !!wrote.at && !wrote.error, wrote.at ? `${wrote.kb}kb` : String(wrote.error))
+
+  /* Measured on a real app before this was written: a pick off it carried thirty-nine face rules and
+     the preview registered none of them, so every option in the grid was rendered in the fallback. */
+  const faced = await fetch(`http://localhost:${XPORT}/__wall/preview/f`).then((r) => r.text())
+    .catch((e) => String(e))
+  ok('a preview keeps the face rules a snapshot cannot carry', faced.includes('@font-face'))
+  ok('and still drops the rest of the sheet the snapshot replaces', !faced.includes('background:#fff'))
 
   if (wrote.at) {
     const seat = await chromium.launch()

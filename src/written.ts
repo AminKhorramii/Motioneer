@@ -363,6 +363,31 @@ function balanced(css: string, from: number): number {
 }
 
 /**
+ * The typeface definitions out of a lifted sheet, and nothing else from it.
+ *
+ * A preview normally renders the computed-style snapshot instead of the matched rules, because the
+ * snapshot cannot leak and the rules can. But a snapshot writes what the browser computed, and what
+ * it computed for a typeface is a name: `font-family: Inter`. The thing that turns that name into a
+ * typeface is an `@font-face` rule, which names no selector, so no snapshot can carry it and dropping
+ * the sheet drops it. The component then renders in whatever the fallback is, which reads as the
+ * capture having quietly lost its font somewhere between being picked and being given motion.
+ *
+ * So these come back on their own. They are safe to keep when the rest of the sheet is not, for the
+ * same reason they are useless to a snapshot: a face rule styles nothing by itself and can only be
+ * reached by a name something else already asked for.
+ */
+export function typefaces(css: string): string {
+  if (!css) return ''
+  const out: string[] = []
+  for (let at = css.indexOf('@font-face'); at >= 0; at = css.indexOf('@font-face', at + 1)) {
+    const open = css.indexOf('{', at)
+    if (open < 0) break
+    out.push(css.slice(at, balanced(css, open) + 1))
+  }
+  return out.join('\n')
+}
+
+/**
  * A page's stylesheet, lifted out of that page and made safe to stand beside another one.
  *
  * The rules that matched a picked element arrive with the page they were on: `:root`, `html`, `body`,

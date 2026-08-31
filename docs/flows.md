@@ -661,6 +661,21 @@ collected rules and cannot be let down by one that was missed. Measured across f
 that laid out at 31 percent of its height came back at 100, a button at 57 came back at 100, and
 nothing got worse.
 
+A typeface is the exception the snapshot cannot cover, and it takes two fixes because it goes wrong in
+two places. A snapshot writes what the browser computed, and what it computed is the name `Inter`; the
+`@font-face` rule that turns that name into a typeface names no selector, so nothing inline can carry
+it and dropping the sheet drops it. The preview therefore keeps the face rules on their own and drops
+the rest, which is safe for the same reason it is necessary: a face rule styles nothing by itself and
+is only reachable through a name something else already asked for. The other half is which faces get
+captured at all. A page of this era ships every weight of every typeface it might use, and on a real
+app that is thirty-nine rules and eight kilobytes against the fifteen hundred characters the picker
+allowed the page-level rules — so the survivors were whichever sheet parsed first, and since families
+are cut into unicode ranges those seven could be the cyrillic of a typeface whose latin never came.
+The faces now get a budget of their own and are filtered to the families the element actually asks
+for, read off the computed style of its tree and its pseudo elements, since an icon font sits on a
+`::before` and is the case where a missing face reads as a letter where a glyph should be. A filter
+that matches nothing keeps everything, because it must never be the reason a capture has no typeface.
+
 The picker stays armed until Escape, since a rail is built from several picks and disarming after each
 one made the second click look broken. Each pick reports its own size and node count, and says when it
 is a poor subject: a strip too thin to stagger, an element with nothing inside it, an svg cut short,

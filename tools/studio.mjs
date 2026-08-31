@@ -36,7 +36,7 @@ import { streamText } from '../shared/providers.mjs'
 import { listenNear, movedFrom } from '../shared/port.mjs'
 import {
   MOTION_SYSTEM, dealMotions, dealErrands, grabJson, safeStyle, unmoved, brittle, janky, scopeOf, retimed,
-  tempo, unstill, leaks, grounded, namespaced,
+  tempo, unstill, leaks, grounded, namespaced, typefaces,
   PRESETS, themeOf, themeCss,
 } from '../dist-core/core.js'
 
@@ -384,8 +384,11 @@ const preview = (o, camera, palette, depth = 1) => {
     #fit{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);transform-origin:center center;
       width:${o.wide ? o.wide + 'px' : 'max-content'}}`
   // chrome first, then the ground the element was standing on, or ours would overrule the page's
-  // own background and a light site would be previewed on black with black text
-  const head = `<meta charset="utf-8">${tw}${vars}<style>${chrome}\n${o.shot ? '' : o.base}\n${o.css}</style>`
+  // own background and a light site would be previewed on black with black text. A snapshot carries
+  // the rest of that ground inline and is trusted over the sheet, but it cannot carry a typeface,
+  // so the face rules come back on their own rather than riding a sheet we chose not to keep
+  const ground = o.shot ? typefaces(o.base) : o.base
+  const head = `<meta charset="utf-8">${tw}${vars}<style>${chrome}\n${ground}\n${o.css}</style>`
   /**
    * A dashboard component is eight hundred pixels wide and the card it is being compared in is three
    * hundred. Left alone you see the first tier of a pricing table and a sliver of the second, which is
@@ -737,7 +740,7 @@ function ground(t){return t===':root'||t==='html'||t==='body'||t==='*'||t===':ho
    reads as "this element has almost no styling" and is completely wrong. Layers are flattened, since
    a preview has nothing to order against; media and supports keep their wrapper because dropping it
    would apply a narrow-screen rule unconditionally. */
-function collect(rs,el,roots,out,keys,cond){
+function collect(rs,el,roots,out,keys,cond,faces){
   for(var j=0;j<rs.length;j++){var r=rs[j];
     if(r.selectorText){
       var t=r.selectorText.trim();
@@ -746,8 +749,51 @@ function collect(rs,el,roots,out,keys,cond){
     else if(r.cssRules){
       var head=r.cssText.slice(0,r.cssText.indexOf('{')).trim();
       if(head.indexOf('@keyframes')===0){keys.push(r.cssText);continue}
-      collect(r.cssRules,el,roots,out,keys,head.indexOf('@layer')===0?cond:(head||cond))}
-    else if(r.cssText&&r.cssText.indexOf('@font-face')===0)roots.push(r.cssText)}}
+      collect(r.cssRules,el,roots,out,keys,head.indexOf('@layer')===0?cond:(head||cond),faces)}
+    else if(r.cssText&&r.cssText.indexOf('@font-face')===0)faces.push(r.cssText)}}
+/* The typefaces this element actually asks for, read off what the browser computed.
+   A face rule is only reachable through the name it declares, so the used names are the whole test.
+   Pseudo elements are asked too, because an icon font is normally mounted on a ::before and is the
+   case where a missing face is most obvious: the glyph becomes a letter. */
+function families(el){
+  var want={},all=[el],kids=el.querySelectorAll('*'),i,j;
+  for(i=0;i<kids.length&&all.length<400;i++)all.push(kids[i]);
+  var spots=[null,'::before','::after'];
+  for(i=0;i<all.length;i++)for(j=0;j<spots.length;j++){
+    var cs;try{cs=getComputedStyle(all[i],spots[j])}catch(_){continue}
+    var stack=(cs&&cs.fontFamily||'').split(',');
+    for(var k=0;k<stack.length;k++){var n=bare(stack[k]);if(n)want[n]=1}}
+  return want}
+function bare(s){
+  var v=(s||'').trim().toLowerCase();
+  if(v.charAt(0)==='"'||v.charAt(0)==="'")v=v.slice(1,-1);
+  return v.trim()}
+/* Keeping the faces whose family is named, in the order they were declared.
+   A page of this era ships every weight of every typeface it might use, and on the app this was
+   measured against that is thirty-nine rules and eight kilobytes competing with :root for fifteen
+   hundred characters, so the survivors were whichever sheet happened to be parsed first. Which is
+   worse than it sounds: the families are cut into unicode ranges, so the seven that fitted could be
+   the cyrillic of a typeface whose latin never arrived, and the component renders in the fallback
+   with no sign anything was dropped. A component names one or two families, so asking which ones is
+   most of the saving. If the names do not line up with any rule the whole set is kept, because a
+   filter that matches nothing must not be the reason a capture has no typeface at all. */
+function facing(faces,want){
+  var keep=[],i;
+  for(i=0;i<faces.length;i++)if(asked(want,named(faces[i])))keep.push(faces[i]);
+  return keep.length?keep:faces}
+/* A face may declare a longer name than the stack asks for. "Inter var" and "Inter" are the same
+   typeface to everyone but a string compare, so a name that begins with a wanted one counts. */
+function asked(want,name){
+  if(!name)return false;
+  if(want[name])return true;
+  for(var u in want)if(u&&(name.indexOf(u+' ')===0||u.indexOf(name+' ')===0))return true;
+  return false}
+function named(rule){
+  var at=rule.indexOf('font-family:');
+  if(at<0)return '';
+  var from=at+12,stop=from;
+  while(stop<rule.length&&rule.charAt(stop)!==';'&&rule.charAt(stop)!=='}')stop++;
+  return bare(rule.slice(from,stop))}
 /* Only the custom properties the captured rules actually reach for.
    An app of this era declares hundreds on :root, and shipping all of them ate the whole budget and
    left no room for the rules that lay the component out. Two passes: gather the rules, then keep the
@@ -781,7 +827,7 @@ function pack(list,cap){
   return out.join('')}
 var opaque=0,shut=[];
 function rules(el){
-  var roots=[],out=[],keys=[];opaque=0;shut=[];
+  var roots=[],out=[],keys=[],faces=[];opaque=0;shut=[];
   for(var i=0;i<document.styleSheets.length;i++){var rs;
     /* a sheet served from another origin without cors cannot be read at all. Skipping it quietly
        would hand over a component with a third of its styling missing and no way to tell */
@@ -792,13 +838,15 @@ function rules(el){
       var href=document.styleSheets[i].href
       if(href&&shut.indexOf(href)<0)shut.push(href)
       continue}
-    collect(rs,el,roots,out,keys,'')}
+    collect(rs,el,roots,out,keys,'',faces)}
   var body=pack(out,13000);
   var base=pack(roots,1500);
+  /* a budget of its own, because a face crowded out by a :root is a component in the wrong typeface */
+  var type=pack(facing(faces,families(el)),6000);
   /* keyframes only matter here if something kept actually names them */
   var used=pack(keys.filter(function(k){var n=k.slice(10,k.indexOf('{')).trim();
     return n&&body.indexOf(n)>-1}),2000);
-  return needed(body+base,el)+context(el)+base+used+body}
+  return needed(body+base,el)+context(el)+type+base+used+body}
 /**
  * A second capture that does not reconstruct anything.
  *
