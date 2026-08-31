@@ -982,6 +982,52 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
     ok('and the one nobody chose for keeps the answer its own page gave',
       await room.evaluate(() => arr.cars[1].paper) === '')
 
+    /**
+     * Choosing, before composing.
+     *
+     * One element got the whole room: several motions side by side, open one bigger, ask for more
+     * like it, keep the one that lands. Several elements skipped all of it and went straight to a
+     * rail carrying whichever motion happened to be judged best for each, so the moment a
+     * composition had two things in it the tool stopped doing the one thing it exists for.
+     */
+    await room.evaluate(async () => {
+      await arriving
+      picks = [1, 2].map((n) => ({ label: `div.card${n}.flex`, html: `<div data-p${n}></div>`,
+        css: `[data-p${n}]{display:block;width:200px;height:60px;background:#556}`, shot: '', w: 200, h: 60 }))
+      arr = ARR.fromRail([
+        { id: '1', note: 'rises', verb: 'rising,', tempo: { span: 400 }, label: picks[0].label,
+          alts: [{ id: '1', note: 'rises', tempo: { span: 400 } },
+            { id: '2', note: 'unfolds', tempo: { span: 500 } }] },
+        { id: '3', note: 'deals', verb: 'dealing,', tempo: { span: 600 }, label: picks[1].label,
+          alts: [{ id: '3', note: 'deals', tempo: { span: 600 } },
+            { id: '4', note: 'slides', tempo: { span: 700 } }] }], picks)
+      stage = 'choosing'; subjectN = 0; zoom = 0; choose([]); rails = []; railN = 0; drawSel(); render()
+    })
+    await room.waitForTimeout(1200)
+    ok('a rail of several elements offers each of them its motions to choose between',
+      await room.evaluate(() => document.querySelectorAll('.chgrid figure').length) === 2
+        && String(await room.evaluate(() =>
+          [...document.querySelectorAll('.chgrid figcaption b')].map((e) => e.textContent))) === 'rises,unfolds')
+    ok('and says which element is being chosen for, with the others one press away',
+      await room.evaluate(() => document.querySelectorAll('.chtab').length) === 2)
+    ok('the one it is playing is marked, so choosing again is visibly a change',
+      await room.evaluate(() => document.querySelectorAll('.chgrid figure.chosen').length) === 1)
+    await room.locator('[data-pick-alt="1"]').click(); await room.waitForTimeout(500)
+    ok('keeping one is what that element then plays',
+      await room.evaluate(() => arr.cars[0].motion.note) === 'unfolds')
+    await room.locator('[data-subject="1"]').click(); await room.waitForTimeout(700)
+    ok('and the next element brings its own motions rather than the first one\'s',
+      String(await room.evaluate(() =>
+        [...document.querySelectorAll('.chgrid figcaption b')].map((e) => e.textContent))) === 'deals,slides')
+    await room.locator('#chmake').click(); await room.waitForTimeout(900)
+    ok('making a film takes the whole set to the timeline with what was chosen',
+      await room.evaluate(() => document.querySelectorAll('.tlrow').length) === 2
+        && String(await room.evaluate(() => arr.cars.map((c) => c.motion.note))) === 'unfolds,deals')
+    await room.locator('#tlback').click(); await room.waitForTimeout(700)
+    ok('and going back to choose again loses nothing, since both are the same arrangement',
+      await room.evaluate(() => stage) === 'choosing'
+        && await room.evaluate(() => arr.cars[0].motion.note) === 'unfolds')
+
     ok('the timeline drives without complaint', said.length === 0, said.join('; ').slice(0, 60))
 
     /**

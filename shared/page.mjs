@@ -360,6 +360,40 @@ header.bare .whenplaying{display:none}
 /* several arrangements of the same elements, on one clock: the wall, applied to time */
 /* named apart from the film reel's takes, which is a different list of a different thing and owns
    .takes, #takes and data-take already. One of them collided and the page stopped parsing */
+/**
+ * Choosing a motion for each element, before any of them are composed.
+ *
+ * The cards are the ones the single element path has always shown, at the same size, because a card
+ * three hundred pixels wide is a thumbnail of a decision rather than the decision. What is new is
+ * only the strip that says which element you are choosing for.
+ */
+.chooser{grid-column:1/-1;display:flex;flex-direction:column;gap:10px;min-height:0}
+.chhead{display:flex;align-items:center;gap:10px}
+.chwho{display:flex;gap:6px;flex:1;min-width:0;overflow:auto;padding-bottom:2px}
+.chtab{display:flex;align-items:center;gap:7px;background:var(--panel);border:1px solid var(--line);
+  border-radius:8px;padding:5px 9px 5px 5px;cursor:pointer;color:var(--dim);font-family:inherit;
+  flex:none;transition:border-color 120ms ease,color 120ms ease,background 120ms ease}
+.chtab:hover{border-color:var(--line2);color:var(--ink)}
+.chtab.on{border-color:var(--accent);color:var(--ink);background:rgba(94,106,210,.13)}
+.chtab em{font-style:normal;font-size:11.5px;white-space:nowrap}
+.chface{width:38px;height:24px;border-radius:4px;overflow:hidden;background:#0b0c0d;
+  border:1px solid var(--line);flex:none;display:block}
+.chface iframe{width:100%;height:100%;border:0;display:block;pointer-events:none}
+.chgo{flex:none;height:30px;padding:0 14px}
+.chsay{margin:0;font-size:12px;color:var(--faint)}
+.chgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px;
+  align-content:start;overflow:auto;min-height:0;padding-bottom:4px}
+.chgrid figure{margin:0;background:var(--panel);border:1px solid var(--line);border-radius:8px;
+  overflow:hidden;display:flex;flex-direction:column;
+  transition:border-color 140ms ease,transform 140ms ease}
+.chgrid figure.chosen{border-color:var(--accent)}
+.chgrid figure iframe{width:100%;height:280px;border:0;background:#0b0c0d;display:block}
+/* the room changing hands, said rather than swapped. Cheap, once, and it is the difference between
+   a tool that moves and one that blinks */
+@keyframes roomin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.chooser,.grid.railed .rails,.grid.railed .tl{animation:roomin 180ms cubic-bezier(.2,.7,.3,1) both}
+@media (prefers-reduced-motion:reduce){
+  .chooser,.grid.railed .rails,.grid.railed .tl{animation:none}}
 /* the room is a grid of option cards, and the stage is not one of the cards. Everything that stands
    in for the whole view says so: the timeline does, the app frame did, and when the frames were
    wrapped so several arrangements could sit side by side, the wrapper became the grid item and
@@ -641,6 +675,20 @@ const ruler=()=>{ zoom=ARR.viewSpan(arr,zoom); return zoom }
  */
 let rails=[], railN=0
 const comparing=()=>rails.length>1
+/**
+ * Choosing, before composing.
+ *
+ * One element got the whole room: five motions side by side, open one bigger, ask for more like it,
+ * keep the one that lands. Several elements skipped all of that and went straight to a rail with
+ * whichever motion happened to be judged best for each, so the moment a composition had two things
+ * in it the tool stopped doing the one thing it is for.
+ *
+ * So the ask lands here instead. The same grid, one element at a time, and the rail is what you go
+ * to when you have chosen. Nothing is thrown away by moving between them: both are views of the same
+ * arrangement, and every alternative stays reachable from the row afterwards.
+ */
+let stage=null      // 'choosing', or null for the rail
+let subjectN=0      // which picked element the grid is showing the motions for
 /* the cars that carry a motion, each with the index it sits at, since a dead car still owns a row */
 const onRail=()=>(railed()?ARR.live(arr):[])
 let verdict=null  // why the last ask produced nothing, so the grid can say so
@@ -806,7 +854,21 @@ aimform.onsubmit=async e=>{
   const r=await fetch('/__wall/target',{method:'POST',headers:{'content-type':'application/json'},
     body:JSON.stringify({url:said})}).then(x=>x.json()).catch(e=>({error:String(e)}))
   if(r.error){ note.dataset.state='error'; note.textContent=r.error; return }
-  urlbox.value=r.at; APP=true; aimN++; quietMode=false; picks=[]; opts=[]; verdict=null; chosen=null; arr=null
+  /**
+   * The picks survive going somewhere else.
+   *
+   * A pick carries the markup it was captured with, the rules that matched it and a snapshot of how
+   * it looked, so nothing about it needs the page it came from to still be open. Throwing them away
+   * on every aim was the tidiest thing to do when a rail was one page's elements, and it makes the
+   * one composition worth building out of two products impossible: a header from your app beside a
+   * chart from theirs is exactly the demo somebody wants, and it cost a line to forbid.
+   *
+   * The options go, because they were written against the elements of a page you have left, and the
+   * arrangement goes with them. The selection stays, and each pill still has its own way out.
+   */
+  urlbox.value=r.at; APP=true; aimN++; quietMode=false; opts=[]; verdict=null; arr=null
+  if(picks.length) drops.textContent=picks.length+' picked so far, kept. '
+    +'Anything picked here joins them, and a pill takes one out.'
   // the folder list is about somewhere else now
   drawRail(r.recent||[])
   // nothing to say once it is up: the page is right there and it says it better
@@ -1024,6 +1086,9 @@ ask.onclick=async()=>{
          below it can stop asking whether the import landed */
       await arriving
       arr=ARR.fromRail(r.cars||[], picks); zoom=0; sel=new Set(); lead=null; anchor=null; rails=[]; railN=0
+      /* choosing first, composing second, which is the order the single element path has always had
+         and the several element path skipped entirely */
+      stage='choosing'; subjectN=0
       opts=[]; held.clear(); ends.clear(); render()
       const moved=ARR.live(arr).length
       const lost=arr.cars.filter(c=>!c.motion)
@@ -1431,6 +1496,61 @@ function render(){
   /* every change ends in a render, so this is the one place worth leaving the work from */
   keepWork()
   if(viewing==='saved'){ drawSaved(); return }
+  /**
+   * The room, choosing a motion for one picked element at a time.
+   *
+   * The same cards the single element path has always shown, because they are the thing that makes
+   * this a tool for choosing rather than a generator with a preview. The strip above them says which
+   * element you are choosing for and how far through you are; the button below appears once every
+   * one of them has something, and takes the whole set to the rail.
+   */
+  if(stage==='choosing'&&railed()){
+    const on=ARR.live(arr)
+    const at=Math.min(subjectN,on.length-1)
+    const seat=on[at], car=seat.car
+    const lens=document.getElementById('depth').value
+    const q='?palette='+encodeURIComponent(palette.value)
+      +(cam.value?'&camera='+cam.value+'&depth='+lens:'')
+    const done=on.filter(x=>x.car.alternatives.length<2||ARR.chosenAlt(x.car)>=0).length
+    grid.innerHTML='<div class="chooser">'
+      + '<div class="chhead"><div class="chwho">'
+      + on.map((x,k)=>'<button class="chtab'+(k===at?' on':'')+'" data-subject="'+k+'">'
+          +'<span class="chface"><iframe data-face="'+x.i+'" scrolling="no" tabindex="-1"></iframe></span>'
+          +'<em>'+esc(subjectOf(x.car.pick.label))+'</em></button>').join('')
+      + '</div>'
+      + '<button class="btn go chgo" id="chmake">Make a film</button></div>'
+      + '<p class="chsay">Choosing for <b>'+esc(subjectOf(car.pick.label))+'</b>. '
+      + car.alternatives.length+' motion'+(car.alternatives.length>1?'s':'')+' for it, '
+      + 'and the one you keep is what it plays on the timeline.</p>'
+      + '<div class="chgrid">'
+      + car.alternatives.map((m,k)=>'<figure'+(car.motion&&car.motion.id===m.id?' class="chosen"':'')
+          +'><iframe data-i="'+k+'" src="/__wall/preview/'+m.id+q+'"></iframe>'
+          +'<figcaption><b title="timing from '+esc(m.verb)+'. '+esc(m.scope)+'">'
+          +esc(m.note||'untitled')+'</b>'
+          +'<span class="facts">'+factLine(m)+'</span>'
+          +'<span class="seen">'+seenLine(m)+'</span>'
+          +'<span class="row">'
+          +'<button class="icb" data-pick-alt="'+k+'" title="Keep this one for this element">'
+          +(car.motion&&car.motion.id===m.id?ICON.kept:ICON.mark)+'</button>'
+          +'<button class="icb" data-more-alt="'+k+'" title="More like this one">'+ICON.more+'</button>'
+          +'</span></figcaption></figure>').join('')
+      + '</div></div>'
+    grid.classList.remove('railed'); grid.classList.remove('solo')
+    grid.style.removeProperty('--tl')
+    paintFaces()
+    for(const t of document.querySelectorAll('[data-subject]')) t.onclick=()=>{
+      subjectN=Number(t.dataset.subject); held.clear(); ends.clear(); render() }
+    for(const bK of document.querySelectorAll('[data-pick-alt]')) bK.onclick=()=>{
+      mark('the motion for '+subjectOf(car.pick.label))
+      arr=ARR.swapped(arr,seat.i,Number(bK.dataset.pickAlt))
+      held.clear(); ends.clear(); render() }
+    for(const bM of document.querySelectorAll('[data-more-alt]')) bM.onclick=()=>
+      moreLikeCar(seat.i, Number(bM.dataset.moreAlt))
+    const go=document.getElementById('chmake')
+    if(go) go.onclick=()=>{ stage=null; held.clear(); ends.clear(); render(); drawInspector() }
+    drops.textContent=done+' of '+on.length+' chosen.'
+    return
+  }
   if(railed()){
     const live=ARR.live(arr)
     /* the one place every change already ends, so it is the one place the list is brought back into
@@ -1978,6 +2098,8 @@ function timeline(live){
     + '<div class="tlrails">'
     + (comparing()? rails.map((t,n)=>'<button class="railtab'+(n===railN?' on':'')+'" data-arr-to="'+n+'">'
         +esc('take '+(n+1))+'</button>').join('') : '')
+    + '<button class="railtab" id="tlback" title="back to the cards, to choose a different motion for'
+      +' any of these">choosing</button>'
     + (rails.length<3
         ? '<button class="railtab add" id="tlfork" title="a copy of this arrangement, so one thing can'
           +' be changed and both watched at the same instant">fork</button>' : '')
@@ -2162,9 +2284,12 @@ function cycleAlt(i, dir){
  * call, so a second row asked while the first was working would silently kill it.
  */
 let varying=null
-async function moreLikeCar(i){
+async function moreLikeCar(i, from){
   if(varying!==null) return
   const car=arr.cars[i]; if(!car||!car.motion) return
+  /* varied from the card that was pressed rather than from whatever the row happens to be playing,
+     since in the chooser you are asking about one of several on screen */
+  const base=from===undefined?car.motion:(car.alternatives[from]||car.motion)
   varying=i
   const row=document.querySelector('.tlrow[data-row="'+i+'"]')
   if(row) row.classList.add('working')
@@ -2172,10 +2297,10 @@ async function moreLikeCar(i){
   if(pressed) pressed.classList.add('working')
   document.querySelectorAll('[data-more-car]').forEach(b=>{ b.disabled=Number(b.dataset.moreCar)!==i })
   try{
-    const r=await post('/__wall/refine',{id:car.motion.id,count:3},360000)
-    mark('varying '+nameOf(car.motion))
+    const r=await post('/__wall/refine',{id:base.id,count:3},360000)
+    mark('varying '+nameOf(base))
     arr=ARR.offered(arr,i,r.kept||[])
-    drops.textContent=(r.kept&&r.kept.length? r.kept.length+' more for '+nameOf(car.motion)+'. ':'')
+    drops.textContent=(r.kept&&r.kept.length? r.kept.length+' more for '+nameOf(base)+'. ':'')
       +((r.dropped&&r.dropped.length)? r.dropped.length+' dropped: '
         +r.dropped.map(d=>String(d.why).split('.')[0]).join('; ') : '')
     held.clear(); ends.clear(); render(); drawInspector()
@@ -2232,6 +2357,9 @@ function wireTimeline(live){
       render()
     }
   }
+  const back=document.getElementById('tlback')
+  if(back) back.onclick=e=>{ e.stopPropagation()
+    stage='choosing'; held.clear(); ends.clear(); render() }
   const fork=document.getElementById('tlfork')
   if(fork) fork.onclick=e=>{ e.stopPropagation()
     mark(rails.length?'forking the arrangement':'comparing two arrangements')
