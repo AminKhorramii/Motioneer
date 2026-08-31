@@ -843,8 +843,47 @@ blob is opaque on the server, because the page is the only thing that knows what
 means, and it is revived rather than trusted on the way back, since everything here leans on the
 motions being frozen and json carries values and not that promise.
 
+### From a rail to an editor
+
+A car was an element with exactly one motion welded to it. The bar's position was when that motion
+started and the bar's length was the motion's own span, which nothing could change. That is a
+comparison instrument that grew a timeline, and it cannot say the thing a product demo is made of:
+this element appears here, does something there, moves aside, and leaves.
+
+Four changes turn it into one, and each is separately useful.
+
+**A component has a life.** When it comes on and when it goes, drawn behind its motion on the same
+row and draggable at either end. Both defaults are derived rather than stored: it arrives when its
+motion starts, because that is what putting the motion there meant, and it stays unless told
+otherwise. Writing either into every car at birth would freeze a decision nobody made and go stale
+the moment the motion moved. This is also what made a rail look like nothing was happening, since
+every car was in the document from the first frame and a light component showed its own white box
+for the whole composition while only its contents staggered in.
+
+**A bar can be trimmed.** Dragging its end retimes the motion through the same `retimed` the
+inspector uses, so the idea is kept and only the clock changes, and the gates still run on the
+result. A retime replaces the retime before it rather than being appended, or a row's alternatives
+become a record of every drag instead of the set of real choices they exist to be.
+
+**A component can be sent somewhere.** Alt drag it on the stage and it travels there, arriving at
+wherever the clock is. Where it sits and where it goes are different decisions, so a plain drag still
+places it. Each journey renders as one keyframe track spanning the whole composition rather than one
+animation per leg, because several animations on one element fight: a later one held before its own
+start still applies its first frame and overrides whatever the leg before it finished at, so a
+component that moved twice would snap back in between. The track's delay is minus the car's own
+offset, which is what puts a journey written in composition time back onto the car's own clock.
+
+**The stage is part of the editor.** Clicking a component selects its row and the row lights the
+component, because a selection that is only true in one of the two places somebody is looking is not
+a selection. And the playhead can be put where you want it by clicking the strip, since an editor's
+whole interaction is to put the clock where something should happen and then do the thing. That
+needed a life to become a backdrop rather than a target: a car that never leaves has one the width
+of the whole track, and while it was clickable there was nowhere left to put the playhead.
+
 Still to do here: a bezier editor, since four easing presets is a ceiling on taste, and one camera
-over the whole composition with the per-car one as an override.
+over the whole composition with the per-car one as an override. The camera is the obvious next one,
+because a journey and a camera move are now the same shape and the second could be the first applied
+to the stage rather than to a component.
 
 ### Handing it over
 

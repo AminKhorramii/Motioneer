@@ -539,11 +539,26 @@ export function density(arr) {
   if (!on.length) return null
   const starts = on.map((x) => at[x.i]).sort((a, b) => a - b)
   const total = spanOf(arr)
-  const last = starts[starts.length - 1] + runs(on[on.length - 1].car)
+  /**
+   * Everything the composition is still doing, not only what its motions are doing.
+   *
+   * This counted the last motion and said the rail had landed, which stopped being true the moment a
+   * component could travel after arriving or leave after staying. It read "all landed by 1.5s" over
+   * a ruler running to 2.7, which is the readout being wrong about the one thing it is for.
+   */
+  const busyTo = (x) => Math.max(
+    at[x.i] + runs(x.car),
+    (x.car.moves || []).reduce((most, m) => Math.max(most, m.at + m.ms), 0),
+    lifeOf(arr, x.i).until === null ? 0 : lifeOf(arr, x.i).until,
+  )
+  const last = Math.max(...on.map(busyTo))
+  // the quiet is measured between what each is still doing and when the next one starts
+  const order = on.slice().sort((a, b) => at[a.i] - at[b.i])
   let hole = 0, holeAt = 0
-  for (let i = 1; i < starts.length; i += 1) {
-    const gap = starts[i] - (starts[i - 1] + runs(on[i - 1].car))
-    if (gap > hole) { hole = gap; holeAt = starts[i - 1] + runs(on[i - 1].car) }
+  for (let i = 1; i < order.length; i += 1) {
+    const done = busyTo(order[i - 1])
+    const gap = at[order[i].i] - done
+    if (gap > hole) { hole = gap; holeAt = done }
   }
   return {
     cars: on.length,
