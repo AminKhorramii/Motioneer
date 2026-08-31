@@ -1013,6 +1013,32 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
     ok('and the component fills the box it was put in rather than the width it was captured at',
       rigged.inner.w > rigged.car.w * 0.8, `${rigged.inner.w} of ${rigged.car.w}`)
 
+    /**
+     * Leaving one out of the film without taking it out of the composition.
+     *
+     * The flag travels as one entry per car rather than by dropping the car from the list, because
+     * data-rail is what the stage maps back to a row and a filtered list moves every index after the
+     * hidden one. That is the conflation that once handed every car its neighbour's timing.
+     */
+    const inShot = () => room.evaluate(() => {
+      const f = document.querySelector('.appwrap iframe')
+      return [...f.contentDocument.querySelectorAll('.car')]
+        .map((c) => `${c.dataset.rail}${c.classList.contains('off') ? ':out' : ':in'}`).join(' ')
+    })
+    ok('every row offers to leave its element out',
+      await room.evaluate(() => document.querySelectorAll('[data-eye]').length)
+        === await room.evaluate(() => document.querySelectorAll('.tlrow').length))
+    const wholeRail = await inShot()
+    await room.locator('[data-eye="0"]').click(); await room.waitForTimeout(1200)
+    ok('and one left out goes out of the picture', /^0:out/.test(await inShot()), await inShot())
+    ok('while every car keeps the index the stage addresses it by',
+      (await inShot()).split(' ').map((v) => v.split(':')[0]).join() === '0,1')
+    ok('and the row stays, dimmed, with its offset untouched',
+      await room.evaluate(() => document.querySelector('.tlrow[data-row="0"]').classList.contains('hush'))
+      && await room.evaluate(() => Math.round(ARR.resolve(arr).at[0])) === 0)
+    await room.locator('[data-eye="0"]').click(); await room.waitForTimeout(1200)
+    ok('and putting it back is the same click', await inShot() === wholeRail, await inShot())
+
     /* a component arrives wearing whatever its page had, which is often a white box on a dark stage */
     ok('what a component is shown against can be chosen',
       String(await room.evaluate(() =>

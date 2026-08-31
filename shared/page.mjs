@@ -284,6 +284,17 @@ header.bare .whenplaying{display:none}
 .tlface{width:44px;height:26px;flex:none;border:1px solid var(--line);border-radius:4px;
   overflow:hidden;background:#0b0c0d;display:block}
 .tlface iframe{width:100%;height:100%;border:0;display:block;pointer-events:none}
+/* an eye per row, quiet until it is doing something. A row left out of the film is dimmed rather
+   than struck through or greyed to nothing, because it is still a row you are composing with */
+.tleye{flex:none;width:22px;height:22px;display:grid;place-items:center;background:none;border:0;
+  padding:0;color:var(--faint);cursor:pointer;border-radius:5px;position:relative}
+.tleye:hover{color:var(--ink);background:var(--raised)}
+.tleye.shut{color:var(--accent)}
+.tlrow.hush .tlname,.tlrow.hush .tlface,.tlrow.hush .tlbar{opacity:.38}
+.tleye[data-tip]:hover::after{content:attr(data-tip);position:absolute;left:50%;
+  bottom:calc(100% + 6px);transform:translateX(-50%);white-space:nowrap;background:var(--panel);
+  color:var(--ink);border:1px solid var(--line2);border-radius:5px;padding:3px 7px;font-size:10.5px;
+  pointer-events:none;z-index:8;box-shadow:0 4px 12px rgba(0,0,0,.45)}
 .tlname{display:block;width:172px;flex:none;font-size:11.5px;color:var(--dim);overflow:hidden}
 .tlname b{display:block;font-weight:400;color:var(--ink);font-size:11px;
   overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
@@ -2370,6 +2381,8 @@ const ICON={
   drop: svg('M4.6 4.6l6.8 6.8M11.4 4.6l-6.8 6.8'),
   code: svg('M5.6 5.2L2.6 8l3 2.8M10.4 5.2L13.4 8l-3 2.8M9.2 3.4l-2.4 9.2'),
   pen: svg('M11.3 2.4l2.3 2.3-7.7 7.7-3.1.8.8-3.1zM9.7 4l2.3 2.3'),
+  eye: svg('M1.5 8s2.6-4.2 6.5-4.2S14.5 8 14.5 8s-2.6 4.2-6.5 4.2S1.5 8 1.5 8zM8 6.3a1.7 1.7 0 100 3.4 1.7 1.7 0 000-3.4'),
+  blind: svg('M2.5 2.5l11 11M6.3 6.4A1.7 1.7 0 008 9.7c.5 0 .9-.2 1.2-.5M4.2 4.6C2.6 5.8 1.5 8 1.5 8s2.6 4.2 6.5 4.2c1.2 0 2.2-.4 3.1-.9M9.6 4a5.9 5.9 0 00-1.6-.2C7.4 3.8 7 3.9 6.6 4M12 5.4c1.6 1.2 2.5 2.6 2.5 2.6s-.6 1-1.6 2'),
 }
 /* one place that puts bytes on somebody's disk, since three buttons wanted it and each writing its
    own anchor is three chances to leak an object url */
@@ -2659,8 +2672,15 @@ function timeline(live){
     + '</div></div><div class="tlgrid" id="tlgrid">'
     + '<div class="tlplay off" id="tlplay"><i></i></div>'
     + live.map(({car,i})=>'<div class="tlrow'+(i===lead?' on':'')
-        +(sel.has(i)?' sel':'')+'" data-row="'+i+'">'
+        +(sel.has(i)?' sel':'')+(car.off?' hush':'')+'" data-row="'+i+'">'
         +'<span class="grip" data-grip="'+i+'" title="drag to reorder">&#8942;&#8942;</span>'
+        /* the way to find out whether a row is earning its place, which is to watch the thing
+           without it. Removing the car answers the same question and costs its motion, its timing
+           and its camera to ask */
+        +'<button class="tleye'+(car.off?' shut':'')+'" data-eye="'+i+'" data-tip="'
+        +(car.off?'Put it back in the film':'Leave it out of the film')+'" aria-label="'
+        +(car.off?'Put it back in the film':'Leave it out of the film')+'">'
+        +(car.off?ICON.blind:ICON.eye)+'</button>'
         /* the element, rather than a description of it. The selection has shown a thumbnail of every
            pick since the picker existed and the rail never used one, so a row read div.something
            when it could show the thing */
@@ -2886,6 +2906,18 @@ function wireTimeline(live){
   const total=ruler()
   const fit=document.getElementById('tlfit')
   if(fit) fit.onclick=e=>{ e.stopPropagation(); zoom=0; render() }
+  /* the row keeps everything it had. What changes is one flag the frame is told about, so putting it
+     back is the same click and nothing had to be remembered in between */
+  for (const eye of document.querySelectorAll('[data-eye]')){
+    eye.onclick=e=>{
+      e.stopPropagation()
+      const i=Number(eye.dataset.eye), car=arr.cars[i]
+      if(!car) return
+      mark((car.off?'showing ':'hiding ')+subjectOf(car.pick.label))
+      arr=ARR.hidden(arr,i,!car.off)
+      held.clear(); ends.clear(); render(); drawInspector()
+    }
+  }
   /* a marker is dropped by double clicking the track it belongs on, which is where you are already
      looking, and taken away by clicking it. Bars snap onto them, so this is how a beat gets
      something to be aligned to rather than being lined up against another bar by eye */

@@ -202,6 +202,23 @@ export function papered(arr, i, paper) {
   return patch(arr, i, { paper: PAPERS.includes(paper) ? paper : '' })
 }
 
+/**
+ * Taking one out of the picture without taking it out of the composition.
+ *
+ * A rail is a set of decisions about several elements at once, and the way you find out whether one
+ * of them is carrying its weight is to watch the thing without it. Removing the car answers that and
+ * costs the arrangement: its motion, its offset, its camera, everything chosen for it, and undo is
+ * the only way back. Hidden, the row stays where it is with its timing intact and comes back the
+ * same way it went.
+ */
+export function hidden(arr, i, off) {
+  if (!arr.cars[i]) return arr
+  return patch(arr, i, { off: !!off })
+}
+
+/** the cars that will actually be in the picture, which is what a frame and a film are built from */
+export const shown = (arr) => live(arr).filter((x) => !x.car.off)
+
 /** whether anybody has been moved, which is what tells a stage from a stack */
 export const staged = (arr) => live(arr).some((x) => !!x.car.place)
 
@@ -368,7 +385,9 @@ export function living(arr, i, life) {
 /** how long the composition runs, which is not the same number as how long the ruler is drawn */
 export function spanOf(arr) {
   const { at } = resolve(arr)
-  const ends = live(arr).map((x) => {
+  /* a car nobody is going to see must not keep the film running to wait for it: hide the last one
+     on the rail and the composition ends where the last visible one does */
+  const ends = shown(arr).map((x) => {
     const life = lifeOf(arr, x.i)
     const trip = (x.car.moves || []).reduce((most, m) => Math.max(most, m.at + m.ms), 0)
     /* a car that leaves still had to be watched leaving, and one still travelling at the end of its
@@ -558,6 +577,10 @@ export function urlOf(arr, palette) {
     q('place', on.map((x) => (x.car.place
       ? `${Math.round(x.car.place.x)}_${Math.round(x.car.place.y)}_${Math.round(x.car.place.w)}`
       : '')).join(',')),
+    /* which are out of the picture, one entry per car like the rest of these. Filtered out of the
+       list instead, every index after a hidden car would shift, and data-rail is what the stage
+       maps back to a row: the same conflation that once handed every car its neighbour's timing */
+    q('off', on.map((x) => (x.car.off ? '1' : '')).join(',')),
     /* when each is on stage, as from_until, empty where both are the default */
     q('life', on.map((x) => {
       const life = lifeOf(arr, x.i)

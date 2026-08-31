@@ -839,6 +839,19 @@ copies of the subject, and every one of those is per subject, so one shared rig 
 the whole rail as a single flat picture. Each car with a shot gets its own rig, which is what lets one
 sit locked off while the one below it pushes in.
 
+Each row carries an eye. A rail is a set of decisions about several elements at once, and the way to
+find out whether one of them is earning its place is to watch the thing without it. Removing the car
+answers that question and charges the arrangement for it: the motion, the offset, the camera and
+everything else chosen for that element, with undo the only way back. Left out, the row stays exactly
+where it is with its timing intact and comes back on the same click. A car nobody is going to see
+also stops holding the film open, so hiding the last one on the rail ends the composition where the
+last visible one does.
+
+It travels to the frame as one entry per car rather than by dropping the car from the list, and that
+is not tidiness. `data-rail` is what a click on the stage maps back to a row, so filtering a hidden
+car out would move every index after it: the same conflation that once handed every car its
+neighbour's timing on the way out to an export.
+
 Rows carry a grip and can be dragged into a different order. Order and offset are different
 decisions, so reordering swaps places in the rail and leaves each car's own offset alone: two cars can
 begin together and still need one above the other.

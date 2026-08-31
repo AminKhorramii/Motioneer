@@ -2023,7 +2023,7 @@ const trackOf = (name, moves, span, offset) => {
     frames: `@keyframes ${name}{${stops.join('')}}` }
 }
 
-const railView = (ids, palette, offsets = [], shots = [], places = [], lives = [], goes = [], cam = '', papers = []) => {
+const railView = (ids, palette, offsets = [], shots = [], places = [], lives = [], goes = [], cam = '', papers = [], offs = []) => {
   const parts = ids.map((id, asked) => ({ o: made.get(id), asked })).filter((x) => x.o)
     .map(({ o, asked }, i) => {
       const tag = o.scope ? `${o.scope}-r${i + 1}` : ''
@@ -2041,7 +2041,7 @@ const railView = (ids, palette, offsets = [], shots = [], places = [], lives = [
         : null
       const moves = journeyOf(goes[asked])
       return { ...o, css, markup, tag, i, at: offsets[asked] ?? i * 420, shot: shots[asked] || '',
-        place, life, moves, paper: String(papers[asked] || '') }
+        place, life, moves, paper: String(papers[asked] || ''), off: String(offs[asked] || '') === '1' }
     })
   if (!parts.length) return null
   const tw = parts.some((o) => o.tw)
@@ -2052,6 +2052,9 @@ ${tw ? `<style>${themeFor(palette)}</style>` : ''}
   font:13px ui-sans-serif,system-ui}
 .rail{height:100%;display:flex;flex-direction:column;justify-content:center;gap:10px;padding:14px}
 .car{flex:1 1 0;display:grid;place-items:center;min-height:0;position:relative}
+/* taken out of the picture but not out of the arrangement, so the row it belongs to keeps its place
+   and its timing. display rather than visibility, or a stack holds a gap where nothing is */
+.car.off{display:none !important}
 /**
  * A stage rather than a stack.
  *
@@ -2184,7 +2187,7 @@ ${(() => {
      out with every car starting together and the sequencing, the thing being filmed, was gone */
   const put = p.place
     ? ` style="left:${p.place.x}%;top:${p.place.y}%;width:${p.place.w}%"` : ''
-  return `<div class="car${p.shot ? ' shot' : ''}${p.place ? ' put' : ''}${
+  return `<div class="car${p.shot ? ' shot' : ''}${p.place ? ' put' : ''}${p.off ? ' off' : ''}${
     p.paper ? ` paper-${p.paper}` : ''}" data-rail="${p.i}"${put}
     data-wall-at="${Math.round(p.at)}"${p.life
       ? ` data-wall-from="${Math.round(p.life.from)}"${p.life.until === null ? '' : ` data-wall-until="${Math.round(p.life.until)}"`}`
@@ -2536,8 +2539,9 @@ const server = createServer(async (req, res) => {
       const places = (url.searchParams.get('place') ?? '').split(',')
       const lives = (url.searchParams.get('life') ?? '').split(',')
       const goes = (url.searchParams.get('go') ?? '').split(',')
+      const offs = (url.searchParams.get('off') ?? '').split(',')
       const html = railView(ids, url.searchParams.get('palette'), at, shots, places, lives, goes,
-        url.searchParams.get('cam') ?? '', (url.searchParams.get('paper') ?? '').split(','))
+        url.searchParams.get('cam') ?? '', (url.searchParams.get('paper') ?? '').split(','), offs)
       if (!html) { res.writeHead(404); return res.end('gone') }
       res.writeHead(200, { 'content-type': 'text/html' })
       return res.end(html)
