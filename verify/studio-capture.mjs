@@ -1097,49 +1097,72 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
       code.length > 8000 && code.includes('wall-capture'), `${Math.round(code.length / 1024)}kb`)
 
     const theirs = await away.newPage()
-    await theirs.setContent('<!doctype html><html><body style="margin:0;font:16px system-ui">'
+    const sheet = '<!doctype html><html><body style="margin:0;font:16px system-ui">'
       + '<div id="a" style="width:300px;margin:20px;padding:16px;border:1px solid #ccc">'
       + '<h2 style="margin:0">One</h2><span>x</span><span>y</span></div>'
       + '<div id="b" style="width:300px;margin:20px;padding:16px;border:1px solid #ccc">'
-      + '<h2 style="margin:0">Two</h2><span>p</span><span>q</span></div></body></html>')
+      + '<h2 style="margin:0">Two</h2><span>p</span><span>q</span></div></body></html>'
+    await theirs.setContent(sheet)
     await theirs.waitForTimeout(300)
     await theirs.evaluate(code); await theirs.waitForTimeout(300)
     ok('and arms itself, since being run at all is the asking',
       await theirs.evaluate(() => document.documentElement.style.cursor) === 'crosshair')
+
+    const inbox = await away.newPage()
+    await inbox.goto(`http://localhost:${XPORT}`, { waitUntil: 'load' })
+    await inbox.waitForTimeout(1400)
+    const already = await inbox.evaluate(() => picks.length)
     for (const id of ['#a', '#b']) {
       const at = await theirs.locator(id).boundingBox()
-      await theirs.mouse.click(at.x + 12, at.y + 10); await theirs.waitForTimeout(400)
+      await theirs.mouse.click(at.x + 12, at.y + 10); await theirs.waitForTimeout(500)
     }
-    ok('every element picked in a visit is copied together, so it is one paste and not four',
-      /2 elements copied/.test(await theirs.evaluate(() => {
+    ok('a page whose policy allows it hands the capture straight over',
+      /2 elements sent/.test(await theirs.evaluate(() => {
         const t = document.getElementById('wall-said'); return t ? t.textContent : '' })))
+    await inbox.waitForTimeout(1600)
+    ok('and it arrives in the studio with nothing to paste',
+      await inbox.evaluate(() => picks.length) === already + 2,
+      `${already} then ${await inbox.evaluate(() => picks.length)}`)
+    ok('carrying the markup and the rules that matched, so nothing needs the page still open',
+      await inbox.evaluate(() => !!picks[picks.length - 1].html && picks[picks.length - 1].w > 0))
     await theirs.keyboard.press('Escape'); await theirs.waitForTimeout(250)
     ok('and escape gives the page back rather than needing a reload',
       await theirs.evaluate(() => document.documentElement.style.cursor) === '')
 
-    const inbox = await away.newPage()
-    await inbox.goto(`http://localhost:${XPORT}`, { waitUntil: 'load' })
-    await inbox.waitForTimeout(1200)
+    /**
+     * The clipboard, which is the road that always works.
+     *
+     * A site whose policy forbids reaching localhost cannot hand anything over, and that is the case
+     * this was built for. Forced here by pointing the picker at a door nobody is behind, which is
+     * the same refusal from the picker's side as a policy blocking it.
+     */
+    const shut = await away.newPage()
+    await shut.setContent(sheet); await shut.waitForTimeout(200)
+    await shut.evaluate(code.replace(`http://localhost:${XPORT}`, 'http://localhost:1'))
+    await shut.waitForTimeout(300)
+    const one = await shut.locator('#a').boundingBox()
+    await shut.mouse.click(one.x + 12, one.y + 10); await shut.waitForTimeout(1500)
+    ok('and falls back to the clipboard when it cannot',
+      /1 element copied/.test(await shut.evaluate(() => {
+        const t = document.getElementById('wall-said'); return t ? t.textContent : '' })))
+
     const carried = await inbox.evaluate(() => navigator.clipboard.readText())
     const paste = (text) => inbox.evaluate((t) => {
       const dt = new DataTransfer(); dt.setData('text', t)
       document.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }))
     }, text)
-    /* against what was already there, since this studio puts back the work it was holding */
-    const already = await inbox.evaluate(() => picks.length)
-    await paste(carried); await inbox.waitForTimeout(900)
-    ok('pasting them into the studio makes them picks',
-      await inbox.evaluate(() => picks.length) === already + 2,
-      `${already} then ${await inbox.evaluate(() => picks.length)}`)
-    ok('carrying the markup and the rules that matched, so nothing needs the page still open',
-      await inbox.evaluate(() => !!picks[0].html && picks[0].w > 0))
+    const wasAt = await inbox.evaluate(() => picks.length)
+    await paste(carried); await inbox.waitForTimeout(800)
+    ok('which pastes into the studio as the same pick',
+      await inbox.evaluate(() => picks.length) === wasAt + 1,
+      `${wasAt} then ${await inbox.evaluate(() => picks.length)}`)
     const kept = await inbox.evaluate(() => picks.length)
     await paste('just some text somebody copied'); await inbox.waitForTimeout(300)
     ok('while anything else on the clipboard is left alone',
       await inbox.evaluate(() => picks.length) === kept)
     await inbox.evaluate(() => undo()); await inbox.waitForTimeout(300)
-    ok('and one undo takes the whole paste back',
-      await inbox.evaluate(() => picks.length) === kept - 2)
+    ok('and one undo takes a whole arrival back',
+      await inbox.evaluate(() => picks.length) === kept - 1)
     await away.close()
 
     ok('the timeline drives without complaint', said.length === 0, said.join('; ').slice(0, 60))

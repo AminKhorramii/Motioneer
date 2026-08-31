@@ -657,7 +657,7 @@ var on=false,box=null,last=null;
  */
 var framed=false; try{ framed = window.parent !== window }catch(_){ framed = true }
 var mine=[];
-function tell(n){
+function tell(n,sent){
   var t=document.getElementById('wall-said');
   if(!t){ t=document.createElement('div'); t.id='wall-said';
     t.style.cssText='position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:2147483647;'
@@ -666,6 +666,7 @@ function tell(n){
       +'pointer-events:none';
     document.documentElement.appendChild(t) }
   t.textContent = n===0 ? 'That could not be copied. The page may not allow it.'
+    : sent ? n+(n===1?' element sent':' elements sent')+' to the studio.'
     : n+(n===1?' element copied':' elements copied')+'. Paste it into the studio.';
   clearTimeout(tell.go); tell.go=setTimeout(function(){ if(t&&t.parentNode) t.parentNode.removeChild(t) },2600)
 }
@@ -686,11 +687,38 @@ function older(text,then){
     var won=document.execCommand('copy'); document.body.removeChild(a); then(won);
   }catch(_){ then(false) }
 }
+/**
+ * Straight to the studio when the page allows it, and the clipboard when it does not.
+ *
+ * The clipboard is the road that always works, and it costs a paste. A site whose policy does not
+ * forbid it can be handed the capture directly instead, and then picking on your own page feels the
+ * same as picking in the studio: click, and it is there. Both are kept because which one is possible
+ * is the site's decision rather than ours, and finding out is one request.
+ */
+var STUDIO="__WALL_STUDIO__";
+function toStudio(text,then){
+  try{
+    var r=new XMLHttpRequest();
+    r.open('POST',STUDIO+'/__wall/picked',true);
+    r.setRequestHeader('content-type','text/plain');
+    r.timeout=4000;
+    r.onload=function(){ then(r.status>=200&&r.status<300) };
+    r.onerror=function(){ then(false) };
+    r.ontimeout=function(){ then(false) };
+    r.send(text);
+  }catch(_){ then(false) }
+}
 function deliver(m){
   if(framed){ parent.postMessage(m,'*'); return }
   mine.push(m);
-  toClipboard(JSON.stringify({wall:'wall-capture',v:1,picks:mine}), function(won){
-    tell(won?mine.length:0)
+  var n=mine.length;
+  /* the one just picked when it is handed straight over, since it arrives at once and there is
+     nothing to accumulate for; all of them when it goes by clipboard, since one paste should bring
+     everything rather than the last thing clicked */
+  toStudio(JSON.stringify({wall:'wall-capture',v:1,picks:[m]}),function(sent){
+    if(sent){ tell(n,true); return }
+    toClipboard(JSON.stringify({wall:'wall-capture',v:1,picks:mine}),function(won){
+      tell(won?n:0,false) });
   });
 }
 function ensure(){if(box)return box;box=document.createElement('div');
@@ -1393,6 +1421,8 @@ const saveSoon = () => {
  * the page is the only thing that knows what an arrangement means.
  */
 let bench = null
+/* the last set of captures handed in from a page the studio could not reach itself */
+let inbox = null
 const resumed = (() => {
   try {
     const was = JSON.parse(readFileSync(SESSION_AT, 'utf8'))
@@ -2354,8 +2384,12 @@ const server = createServer(async (req, res) => {
      * neither. Seventeen kilobytes of bookmark is inelegant and it is the only shape that works.
      */
     if (url.pathname === '/__wall/bookmarklet') {
+      // the paste key is one of two things and saying the wrong one is worse than saying neither
+      const MAC = /mac/i.test(String(req.headers['user-agent'] ?? ''))
       const inner = PICKER.replace(/^<script>/, '').replace(/<\/script>$/, '')
         .replace(/<\\\/script>/g, '</script>').replace('__WALL_HOME__', '')
+        /* the studio's own address, known here because this is the studio serving it */
+        .replace('__WALL_STUDIO__', `http://localhost:${PORT}`)
       const href = `javascript:${encodeURIComponent(inner)}`
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
       return res.end(`<!doctype html><html><head><meta charset="utf-8"><title>Pick anywhere</title>
@@ -2373,17 +2407,60 @@ code{background:#141516;border:1px solid rgba(255,255,255,.11);border-radius:4px
 another host will not run that way: on this origin its api is a different site, so it refuses the
 call and the app never gets past its loading screen. Nothing can fix that from here, because the
 session belongs to a domain this is not.</p>
-<p>So pick on the real page instead. Drag this to your bookmarks bar:</p>
+<p>So pick on the real page instead, in the browser where you are already signed in.</p>
 <a class="bm" href="${href}">Pick for Wall</a>
 <ol>
-<li>Open the page you want, signed in as usual.</li>
-<li>Press the bookmark. The cursor becomes a crosshair.</li>
-<li>Click the elements you want. Each one is copied, all of them together.</li>
-<li>Come back to the studio and press <code>paste</code>. They arrive as picks.</li>
+<li>Drag the button above onto your bookmarks bar. It becomes a bookmark like any other, except
+that pressing it runs the picker on whatever page you are looking at instead of going somewhere.</li>
+<li>Open your own app and sign in as normal.</li>
+<li><b>Click that bookmark.</b> Your cursor turns into a crosshair, which is how you know the picker
+is listening. The page carries on working; it is only your clicks that mean something else now.</li>
+<li>Click the elements you want. Each one is taken as you click it, and a line at the bottom of the
+screen says how many you have.</li>
+<li>Press <b>Escape</b> when you are done. The cursor goes back to normal and the page is yours again.</li>
 </ol>
-<p><b>Escape</b> stops picking and gives the page back. Nothing is uploaded and nothing is installed:
-the capture goes onto your clipboard and no further.</p>
+<p>They arrive in the studio on their own if it is open, and the line at the bottom will say
+<b>sent to the studio</b>. Some sites refuse to talk to anything running on your own machine, and
+there the capture goes onto your clipboard instead and the line says <b>copied</b>: switch to the
+studio and press <code>${MAC ? '⌘V' : 'ctrl V'}</code> anywhere on it.</p>
+<p>Nothing is installed and nothing is uploaded. The bookmark is the picker itself, and a capture
+goes to the studio on this machine or no further than your clipboard.</p>
 </main></body></html>`)
+    }
+    /**
+     * A capture arriving from a page the studio never saw.
+     *
+     * Open to any origin, deliberately and narrowly: this accepts captures and answers nothing, and
+     * the picker running on somebody's signed in page is by definition on an origin this cannot know
+     * in advance. It holds what arrives until the page asks, which it does the moment it is told
+     * something is waiting.
+     */
+    if (url.pathname === '/__wall/picked') {
+      if (req.method === 'OPTIONS') {
+        res.writeHead(204, { 'access-control-allow-origin': '*',
+          'access-control-allow-methods': 'POST, OPTIONS',
+          'access-control-allow-headers': 'content-type' })
+        return res.end()
+      }
+      if (req.method === 'POST') {
+        const body = await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) })
+        let got = null
+        try { got = JSON.parse(body) } catch { got = null }
+        const some = got && Array.isArray(got.picks) ? got.picks.filter((k) => k && k.html) : []
+        if (some.length) {
+          inbox = some
+          for (const s of streams) {
+            try { s.write(`data: ${JSON.stringify({ boot: BOOT, caught: some.length, at: Date.now() })}\n\n`) } catch { /* gone */ }
+          }
+        }
+        res.writeHead(200, { 'access-control-allow-origin': '*', 'content-type': 'application/json' })
+        return res.end(JSON.stringify({ took: some.length }))
+      }
+      res.writeHead(405, { 'access-control-allow-origin': '*' }); return res.end('')
+    }
+    if (url.pathname === '/__wall/inbox') {
+      const had = inbox
+      return json(res, { picks: had || [] })
     }
     if (url.pathname === '/__wall/live') {
       res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache',

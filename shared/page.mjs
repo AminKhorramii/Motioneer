@@ -887,6 +887,33 @@ function railKey(e){
  * On the document rather than on a field, because there is nothing to focus and asking somebody to
  * click a box first is a step that exists only to make the code simpler.
  */
+/* the same arrival as a paste, by a shorter road: a page whose policy allows it hands the capture
+   straight over, and the only difference is that nobody had to carry it */
+async function takeInbox(){
+  try{
+    const got=await fetch('/__wall/inbox').then(r=>r.json())
+    if(got&&Array.isArray(got.picks)&&got.picks.length) tookPicks(got.picks,'picked')
+  }catch(_){}
+}
+/* one way in, whether it was pasted or handed over */
+function tookPicks(some,how){
+  let n=0
+  mark(some.length>1?'taking in '+some.length+' picks':'taking in a pick')
+  for(const one of some){
+    if(!one||!one.html) continue
+    picks.push({html:one.html,css:one.css||'',shot:one.shot||'',label:one.label||'element',
+      w:one.w,h:one.h,n:one.n,cut:one.cut,opaque:one.opaque,weak:one.weak})
+    n++
+  }
+  if(!n) return 0
+  chosen=picks[picks.length-1]
+  opts=[]; verdict=null; arr=null
+  drops.textContent=n+(n===1?' element ':' elements ')
+    +(how==='picked'?'came in from the page you picked on':'pasted in, from wherever you picked them')
+    +'. Give them motion when you are ready.'
+  drawSel(); render()
+  return n
+}
 addEventListener('paste',e=>{
   const t=e.target, tag=t&&t.tagName
   if(tag==='INPUT'||tag==='TEXTAREA'||(t&&t.isContentEditable)) return
@@ -895,21 +922,7 @@ addEventListener('paste',e=>{
   try{ got=JSON.parse(said.getData('text')||'') }catch(_){ return }
   if(!got||got.wall!=='wall-capture'||!Array.isArray(got.picks)||!got.picks.length) return
   e.preventDefault()
-  mark(got.picks.length>1?'pasting '+got.picks.length+' picks':'pasting a pick')
-  let n=0
-  for(const one of got.picks){
-    if(!one||!one.html) continue
-    /* the same shape the message handler builds, since it is the same picker on the other end */
-    picks.push({html:one.html,css:one.css||'',shot:one.shot||'',label:one.label||'element',
-      w:one.w,h:one.h,n:one.n,cut:one.cut,opaque:one.opaque,weak:one.weak})
-    n++
-  }
-  if(!n) return
-  chosen=picks[picks.length-1]
-  opts=[]; verdict=null; arr=null
-  drops.textContent=n+(n===1?' element pasted in':' elements pasted in')
-    +', from wherever you picked them. Give them motion when you are ready.'
-  drawSel(); render()
+  tookPicks(got.picks,'pasted')
 })
 
 const pickBtn=document.getElementById('pick')
@@ -2949,10 +2962,13 @@ putBack()
 /* a different process answering is the only reliable sign that the code under this page moved */
 try{
   const watch=new EventSource('/__wall/live')
-  let born=null
+  let born=null, caughtAt=0
   watch.onmessage=(e)=>{
     try{
       const said=JSON.parse(e.data||'{}')
+      /* something picked on a page the studio could not reach, handed in and waiting. Fetched rather
+         than carried on the stream, since a capture is a snapshot and a heartbeat is not the place */
+      if(said.caught&&said.at&&said.at!==caughtAt){ caughtAt=said.at; takeInbox(); return }
       if(born===null){ born=said.boot; return }
       if(said.boot&&said.boot!==born){ watch.close(); location.reload() }
     }catch(_){}
