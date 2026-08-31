@@ -97,6 +97,16 @@ const HELD = 'data-wall-held'
  * car at the same instant and the sequencing, which is the whole thing being filmed, is gone.
  */
 const OFFSET = 'data-wall-at'
+/**
+ * An element saying when it is on the stage at all, which is not the same as when it moves.
+ *
+ * The live preview hides it by setting a style as the clock moves, and that is invisible to anything
+ * drawing the document rather than watching it. A copy carries declarations, not whatever a listener
+ * last did, so without this a filmed rail showed every element from its first frame however
+ * carefully its arrival had been placed.
+ */
+const FROM = 'data-wall-from'
+const UNTIL = 'data-wall-until'
 
 /** an element, and the two children css can give it that no inline style can reach */
 const PARTS = [null, '::before', '::after']
@@ -432,6 +442,26 @@ export function holdAt(doc, ms) {
     retimed.add(el)
     rules.push(...lines)
     n++
+  }
+
+  /**
+   * Anything not on the stage at this instant, taken out of the picture.
+   *
+   * A component with a life declares it in the markup, and the live preview hides it by setting a
+   * style as the clock moves. That is invisible to anything that draws the document rather than
+   * watching it: a copy carries declarations and not whatever a listener last did, so a filmed rail
+   * showed every element from the first frame however carefully its arrival had been placed.
+   * Important, because the copy inherits the inline style the preview left behind.
+   */
+  for (const el of doc.querySelectorAll(`[${FROM}]`)) {
+    const from = Number(el.getAttribute(FROM)) || 0
+    const said = el.getAttribute(UNTIL)
+    const until = said === null || said === '' ? null : Number(said)
+    if (at >= from && (until === null || at < until)) continue
+    el.setAttribute(HELD, String(n))
+    marked.push(el)
+    rules.push(`[${HELD}="${n}"]{visibility:hidden !important}`)
+    n += 1
   }
 
   const sheet = doc.createElement('style')

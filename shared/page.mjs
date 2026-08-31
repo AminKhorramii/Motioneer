@@ -313,6 +313,16 @@ header.bare .whenplaying{display:none}
   border-radius:4px;cursor:pointer;display:grid;place-items:center}
 .tlmore:hover{color:var(--accent)}
 .tlmore svg{width:12px;height:12px}
+/* when a component is on the stage, drawn behind when it moves: two decisions sharing one row */
+.tllife{position:absolute;top:4px;bottom:4px;background:rgba(255,255,255,.05);border-radius:3px;
+  border:1px solid rgba(255,255,255,.08)}
+.tlrow:hover .tllife,.tlrow.on .tllife{background:rgba(255,255,255,.085)}
+.lin,.lout{position:absolute;top:-2px;bottom:-2px;width:7px;cursor:ew-resize;border-radius:3px;
+  touch-action:none}
+.lin{left:-3px}.lout{right:-3px}
+.tlrow:hover .lin,.tlrow:hover .lout{background:rgba(255,255,255,.3)}
+.lin:hover,.lout:hover{background:var(--accent)}
+.tlbar{z-index:2}
 /* a car can be pinned to another rather than to the clock, so changing one duration stops meaning
    dragging everything after it back into place by hand */
 .tlbar.tied{background:rgba(94,106,210,.32);border-style:dashed}
@@ -1872,6 +1882,7 @@ function paintShots(){
 function timeline(live){
   const total=ruler()
   const solved=ARR.resolve(arr), at=solved.at, cyclic=solved.cyclic
+  const life=arr.cars.map((_,k)=>ARR.lifeOf(arr,k))
   /* what a car follows, by the name of the row rather than by an id nobody chose or can read */
   const follows=(car)=>{
     if(!car.after) return ''
@@ -1918,6 +1929,20 @@ function timeline(live){
         +'<button class="tlmore" data-more-car="'+i+'" tabindex="-1"'
         +' title="more like this one, for this car only">'+ICON.more+'</button>'
         +'<span class="tltrack" data-track="'+i+'">'
+        /**
+         * The life behind the bar: when this component is on the stage at all.
+         *
+         * A car used to be there from the first frame and stay for good, so a rail of three opened as
+         * three boxes and only their contents arrived in order. The bar is when it moves; this is
+         * when it exists, and the two are different decisions that happen to share a row. Drawn
+         * behind, because the motion is the thing you are usually aiming at.
+         */
+        +'<b class="tllife" data-life="'+i+'" style="left:'+(life[i].from/total*100).toFixed(2)+'%;'
+        +'width:'+Math.max(0.4,((life[i].until===null?total:life[i].until)-life[i].from)/total*100).toFixed(2)+'%"'
+        +' title="on stage from '+(life[i].from/1000).toFixed(2)+'s'
+        +(life[i].until===null?' and stays':' until '+(life[i].until/1000).toFixed(2)+'s')
+        +'. Drag either end to change it">'
+        +'<i class="lin" data-lin="'+i+'"></i><i class="lout" data-lout="'+i+'"></i></b>'
         +'<span class="tlbar'+(sel.has(i)?' sel':'')+(car.after?' tied':'')
         +(cyclic.includes(car.key)?' knot':'')+'" data-bar="'+i+'" style="left:'
         +(at[i]/total*100).toFixed(2)+'%;'
@@ -2128,6 +2153,55 @@ function wireTimeline(live){
     held.clear(); ends.clear(); render() }
   for (const chip of document.querySelectorAll('[data-alt]')){
     chip.onclick=e=>{ e.stopPropagation(); cycleAlt(Number(chip.dataset.alt), e.shiftKey?-1:1) }
+  }
+  /**
+   * When a component comes on and when it leaves, dragged.
+   *
+   * The same snapping the bars get, because an entrance landing on the instant another thing finishes
+   * is the whole reason to place one by hand. Dragging the out point past the end of the ruler means
+   * it never leaves, which is the default and is worth being able to get back to without a control
+   * that says so.
+   */
+  for (const end of document.querySelectorAll('[data-lin],[data-lout]')){
+    const isIn=end.dataset.lin!==undefined
+    const i=Number(isIn?end.dataset.lin:end.dataset.lout)
+    end.onpointerdown=e=>{
+      e.preventDefault(); e.stopPropagation()
+      const track=end.closest('.tltrack')
+      const w=track.getBoundingClientRect().width, box=track.getBoundingClientRect()
+      const targets=ARR.edges(arr,[i],running?null:Number(scrub.value))
+      const tol=(7/w)*total, gridTol=(4/w)*total, step=ARR.gridStep(total,w)
+      let stepped=false, now=ARR.lifeOf(arr,i)
+      const move=ev=>{
+        if(!stepped){ stepped=true; mark((isIn?'when ':'how long ')+nameOf(arr.cars[i].motion)
+          +(isIn?' comes on':' stays')) }
+        const want=Math.max(0,(ev.clientX-box.left)/w*total)
+        const got=ev.altKey?{at:want,hit:null}:ARR.snapTo(want,targets,tol,step,gridTol)
+        const life=ARR.lifeOf(arr,i)
+        /* dragged past the end of the ruler it stops being an exit, which is how you get back to the
+           default without a control whose only job is to say never */
+        const gone=!isIn&&got.at>=total*0.985
+        arr=ARR.living(arr,i, isIn
+          ? { from:Math.min(got.at, life.until===null?got.at:life.until), until:life.until }
+          : { from:life.from, until:gone?null:Math.max(life.from,got.at) })
+        const say=document.getElementById('tlsay')
+        if(say) say.innerHTML = gone ? 'Stays for the rest of the composition.'
+          : (got.hit?'Snapped to <b class="tlhint">'+esc(got.hit)+'</b>. Alt places it freely.'
+            :(isIn?'Comes on at ':'Leaves at ')+(got.at/1000).toFixed(2)+'s')
+        /* the strip only, while the drag is live: the frame is rebuilt on release, because reloading
+           it per pointermove would restart every motion under the cursor */
+        const el=document.querySelector('[data-life="'+i+'"]')
+        const fresh=ARR.lifeOf(arr,i)
+        if(el){ el.style.left=(fresh.from/total*100).toFixed(2)+'%'
+          el.style.width=Math.max(0.4,((fresh.until===null?total:fresh.until)-fresh.from)/total*100).toFixed(2)+'%' }
+      }
+      const up=()=>{
+        window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up)
+        if(!stepped) return
+        held.clear(); ends.clear(); render()
+      }
+      window.addEventListener('pointermove',move); window.addEventListener('pointerup',up)
+    }
   }
   /**
    * Tying one car to another, by dragging from the end of its bar onto the row it should follow.

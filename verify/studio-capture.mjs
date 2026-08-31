@@ -84,7 +84,7 @@ const ok = (how, cond, detail = '') => {
      loose everything that followed it */
   const car = (id, at, ms, after = null) => ({
     key: id, pick: { label: id, w: 100, h: 40 }, motion: { id, note: id, ms }, alternatives: [],
-    at, after, shot: '', tune: null, place: null, why: '',
+    at, after, shot: '', tune: null, place: null, from: null, until: null, why: '',
   })
   const arrange = (cars) => ({ id: 'a1', cars, camera: '', markers: [] })
 
@@ -240,6 +240,34 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
     core.grounded('[data-m1] .a{color:red}', 'data-m1') === '[data-m1] .a{color:red}')
   ok('and nothing without a scope to go into is left as it was',
     core.grounded(page, '') === page)
+
+  /**
+   * When a component is on the stage, which is not the same as when it moves.
+   *
+   * A car was in the document from the first frame and stayed for good, so a rail of three opened as
+   * three boxes and only their contents arrived in order. Every element in a demo has a life: it
+   * comes on, does things, and goes. The defaults are derived rather than stored, because a number
+   * written into every car at birth freezes a decision nobody made and goes stale the moment the
+   * motion it was copied from is moved.
+   */
+  console.log('\n  when each component is on the stage')
+  const born = arrange([car('a', 0, 400), car('b', 600, 400)])
+  ok('a component arrives when its motion starts, without anybody saying so',
+    A.lifeOf(born, 1).from === 600 && A.lifeOf(born, 1).until === null)
+  ok('and moving the motion moves the arrival with it, since it was never written down',
+    A.lifeOf(A.moved(born, 1, 900), 1).from === 900)
+  const leaves = A.living(born, 0, { from: null, until: 1000 })
+  ok('a component can be given an exit', A.lifeOf(leaves, 0).until === 1000)
+  ok('and told nothing it goes back to staying', A.lifeOf(A.living(leaves, 0, {}), 0).until === null)
+  ok('an exit before the arrival is not an exit', A.lifeOf(A.living(born, 1, { until: 10 }), 1).until >= 600)
+  /* a car that leaves still had to be watched leaving, so the ruler has to contain it */
+  ok('the ruler contains a component that outlives its own motion',
+    A.spanOf(A.living(born, 0, { until: 5000 })) >= 5000)
+  /* decoded, because a comma encodes as %2C and the 2 in it reads as a number nobody wrote */
+  const lifeIn = (a) => decodeURIComponent(A.urlOf(a, '') || '').split('life=')[1].split('&')[0]
+  ok('the frame is told a life only when one was chosen',
+    lifeIn(born) === ',' && lifeIn(leaves) === '0_1000,',
+    `${lifeIn(born)} then ${lifeIn(leaves)}`)
 
   console.log('\n  where each component sits')
   const stack = arrange([car('a', 0, 400), car('b', 420, 400)])
@@ -458,6 +486,34 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
         .map((c) => getComputedStyle(c).letterSpacing))) === '1px,2px,3px',
       `${await rail.evaluate(() => [...document.querySelectorAll('.car .in > *')]
         .map((c) => getComputedStyle(c).letterSpacing))}`)
+
+    /**
+     * A life, in the picture rather than only on the screen.
+     *
+     * The preview hides a component by setting a style as the clock moves, and a copy carries
+     * declarations rather than whatever a listener last did. Without holdAt knowing about it, a
+     * filmed rail shows every element from its first frame however carefully its arrival was placed,
+     * which is the same fault the offsets had and is just as quiet.
+     */
+    const lived = await seat.newPage()
+    await lived.goto(`http://localhost:${XPORT}/__wall/railview`
+      + '?ids=1,2,3&at=0,600,1200&shots=,,&place=,,&life=0_1000,600_,1200_&palette=',
+    { waitUntil: 'load' })
+    await lived.waitForTimeout(800)
+    const onStage = (ms) => lived.evaluate(async (t) => {
+      const R = await import('/__wall/raster.mjs')
+      const undo = R.holdAt(document, t)
+      const v = [...document.querySelectorAll('.car')].map((c) => getComputedStyle(c).visibility)
+      if (typeof undo === 'function') undo()
+      return v
+    }, ms)
+    ok('a filmed component is not in the picture before it comes on',
+      String(await onStage(0)) === 'visible,hidden,hidden', `${await onStage(0)}`)
+    ok('and is gone from it after it leaves',
+      String(await onStage(1100)) === 'hidden,visible,hidden', `${await onStage(1100)}`)
+    ok('and the last one arrives at its own instant',
+      String(await onStage(1400)) === 'hidden,visible,visible', `${await onStage(1400)}`)
+    await lived.close()
 
     ok('a filmed rail draws only the car whose turn has come',
       drewEarly[0] > 0.2 && drewEarly[1] < 0.02 && drewEarly[2] < 0.02, `${drewEarly.map((v) => v.toFixed(2))}`)

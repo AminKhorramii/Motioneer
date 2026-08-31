@@ -1646,7 +1646,7 @@ async function railOf(picks, palette) {
  * the camera belonging to its neighbour. The rail still plays, in the wrong order, which is the kind
  * of wrong nobody reports because it looks like a composition somebody chose.
  */
-const railView = (ids, palette, offsets = [], shots = [], places = []) => {
+const railView = (ids, palette, offsets = [], shots = [], places = [], lives = []) => {
   const parts = ids.map((id, asked) => ({ o: made.get(id), asked })).filter((x) => x.o)
     .map(({ o, asked }, i) => {
       const tag = o.scope ? `${o.scope}-r${i + 1}` : ''
@@ -1657,7 +1657,13 @@ const railView = (ids, palette, offsets = [], shots = [], places = []) => {
       const said = String(places[asked] ?? '').split('_').map(Number)
       const place = said.length === 3 && said.every((v) => Number.isFinite(v))
         ? { x: said[0], y: said[1], w: said[2] } : null
-      return { ...o, css, markup, tag, i, at: offsets[asked] ?? i * 420, shot: shots[asked] || '', place }
+      /* from_until in milliseconds, empty where this car keeps the default life */
+      const told = String(lives[asked] ?? '').split('_')
+      const life = told.length === 2 && told[0] !== ''
+        ? { from: Number(told[0]) || 0, until: told[1] === '' ? null : Number(told[1]) }
+        : null
+      return { ...o, css, markup, tag, i, at: offsets[asked] ?? i * 420, shot: shots[asked] || '',
+        place, life }
     })
   if (!parts.length) return null
   const tw = parts.some((o) => o.tw)
@@ -1741,7 +1747,9 @@ ${parts.filter((p) => p.shot).map((p) => {
   const put = p.place
     ? ` style="left:${p.place.x}%;top:${p.place.y}%;width:${p.place.w}%"` : ''
   return `<div class="car${p.shot ? ' shot' : ''}${p.place ? ' put' : ''}" data-rail="${p.i}"${put}
-    data-wall-at="${Math.round(p.at)}">
+    data-wall-at="${Math.round(p.at)}"${p.life
+      ? ` data-wall-from="${Math.round(p.life.from)}"${p.life.until === null ? '' : ` data-wall-until="${Math.round(p.life.until)}"`}`
+      : ` data-wall-from="${Math.round(p.at)}"`}>
     <span class="tag">${p.i + 1}. ${String(p.file || p.note || '').slice(0, 44)}</span>
     ${body}<i class="grab" data-grab="${p.i}"></i><i class="wide" data-wide="${p.i}"></i></div>`
 }).join('')}</div>
@@ -1829,7 +1837,25 @@ function seat(a){ try{ var n=a.effect&&a.effect.target; while(n&&n!==document.bo
 function delay(a){ var i=seat(a); return AT[i]||0 }
 requestAnimationFrame(function(){document.getAnimations().forEach(function(a){
   try{a.pause();a.currentTime=0}catch(_){}})})
+/**
+ * Whether each car is on the stage at this instant.
+ *
+ * A car used to be in the document from the first frame and stay for good, so a rail of three opened
+ * as three boxes and only their contents arrived in order. Hidden rather than removed, because taking
+ * it out of the flow would move everything else and the composition would rearrange itself as it
+ * played. holdAt does the same thing in css for the film, since a copy carries declarations and not
+ * whatever this listener last set.
+ */
+function alive(t){
+  for (var car of document.querySelectorAll('.car')){
+    var from=Number(car.dataset.wallFrom||0)
+    var until=car.dataset.wallUntil===undefined?null:Number(car.dataset.wallUntil)
+    var on=t>=from&&(until===null||t<until)
+    car.style.visibility=on?'':'hidden'
+  }
+}
 addEventListener('message',function(e){var d=e.data||{};if(d.wall!=='hold')return
+  alive(d.t)
   var a=document.getAnimations(),end=0
   a.forEach(function(x){try{
     var off=delay(x)
@@ -1998,7 +2024,8 @@ const server = createServer(async (req, res) => {
       const at = (url.searchParams.get('at') ?? '').split(',').map(Number).filter((n) => !Number.isNaN(n))
       const shots = (url.searchParams.get('shots') ?? '').split(',')
       const places = (url.searchParams.get('place') ?? '').split(',')
-      const html = railView(ids, url.searchParams.get('palette'), at, shots, places)
+      const lives = (url.searchParams.get('life') ?? '').split(',')
+      const html = railView(ids, url.searchParams.get('palette'), at, shots, places, lives)
       if (!html) { res.writeHead(404); return res.end('gone') }
       res.writeHead(200, { 'content-type': 'text/html' })
       return res.end(html)

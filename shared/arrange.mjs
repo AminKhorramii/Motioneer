@@ -79,6 +79,16 @@ export function fromRail(got, picks = [], id = 'a1') {
        * and so a film at 1080 square shows the arrangement you made at whatever your window was.
        */
       place: null,
+      /**
+       * When this component is on the stage at all, which is not the same as when it moves.
+       *
+       * A car was in the document from the first frame and stayed there for good, so a rail of three
+       * opened as three boxes and only their contents arrived in order. In a demo an element has a
+       * life: it comes on, does things, and leaves. Null means the sensible default rather than a
+       * number nobody chose, so `from` is when its first motion starts and `until` is never.
+       */
+      from: null,
+      until: null,
       why: c.id ? '' : String(c.why ?? 'nothing came back'),
     }
   })
@@ -122,6 +132,8 @@ export function revive(said) {
     shot: String(c.shot || ''),
     tune: c.tune || null,
     place: c.place ? { ...c.place } : null,
+    from: c.from === null || c.from === undefined ? null : num(c.from),
+    until: c.until === null || c.until === undefined ? null : num(c.until),
     why: String(c.why || ''),
   }))
   return { id: String(said.id || 'a1'), cars, camera: String(said.camera || ''),
@@ -208,10 +220,41 @@ export function resolve(arr) {
   return { at, cyclic }
 }
 
+/**
+ * When a car is on the stage, resolved.
+ *
+ * Defaults rather than stored numbers: a component arrives when its motion starts, because that is
+ * what you meant by putting the motion there, and it stays unless somebody says otherwise. Writing
+ * either of those into every car at birth would freeze a decision nobody made and would go stale the
+ * moment the motion moved.
+ */
+export function lifeOf(arr, i) {
+  const car = (arr && arr.cars && arr.cars[i]) || null
+  if (!car) return { from: 0, until: null }
+  const { at } = resolve(arr)
+  const from = car.from == null ? at[i] : Math.max(0, num(car.from))
+  const until = car.until == null ? null : Math.max(from, num(car.until))
+  return { from, until }
+}
+
+/** a car given a life of its own, or handed back the default when told nothing */
+export function living(arr, i, life) {
+  if (!arr.cars[i]) return arr
+  const has = (v) => v !== undefined && v !== null
+  return patch(arr, i, {
+    from: has(life && life.from) ? Math.max(0, Math.round(num(life.from))) : null,
+    until: has(life && life.until) ? Math.max(0, Math.round(num(life.until))) : null,
+  })
+}
+
 /** how long the composition runs, which is not the same number as how long the ruler is drawn */
 export function spanOf(arr) {
   const { at } = resolve(arr)
-  const ends = live(arr).map((x) => at[x.i] + runs(x.car))
+  const ends = live(arr).map((x) => {
+    const life = lifeOf(arr, x.i)
+    // a car that leaves still had to be watched leaving, so its exit counts as much as its motion
+    return Math.max(at[x.i] + runs(x.car), life.until === null ? 0 : life.until)
+  })
   return Math.max(FLOOR, ...ends, 0)
 }
 
@@ -393,6 +436,14 @@ export function urlOf(arr, palette) {
     q('place', on.map((x) => (x.car.place
       ? `${Math.round(x.car.place.x)}_${Math.round(x.car.place.y)}_${Math.round(x.car.place.w)}`
       : '')).join(',')),
+    /* when each is on stage, as from_until, empty where both are the default */
+    q('life', on.map((x) => {
+      const life = lifeOf(arr, x.i)
+      /* loose, so a car built somewhere that never set the fields reads as having chosen nothing
+         rather than as having chosen undefined */
+      const own = arr.cars[x.i].from != null || arr.cars[x.i].until != null
+      return own ? `${Math.round(life.from)}_${life.until === null ? '' : Math.round(life.until)}` : ''
+    }).join(',')),
     q('palette', palette ?? ''),
   ].join('&')}`
 }
