@@ -2205,7 +2205,20 @@ function scriptsParse() {
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x')
   try {
-    if (url.pathname === '/') { res.writeHead(200, { 'content-type': 'text/html' }); return res.end(PAGE()) }
+    /**
+     * The root belongs to the studio, except when the frame is the one asking for it.
+     *
+     * Most sites are entered at their root, so sending the frame to the path the app expects sends
+     * it here, and here answered with the studio: the studio loaded inside its own frame, a hundred
+     * and eighty five nodes of it, on nearly every site there is. Four of nineteen survived that.
+     *
+     * The mark the entry redirect leaves is what tells the two apart. A query this side writes
+     * rather than a header a browser decides, because the whole point is being certain which of them
+     * is asking, and sec-fetch-dest is right until something does not send it.
+     */
+    if (url.pathname === '/' && !(HOST && url.searchParams.has('__wall'))) {
+      res.writeHead(200, { 'content-type': 'text/html' }); return res.end(PAGE())
+    }
     if (url.pathname === '/__wall/list') return json(res, HAS_FOLDER ? list() : [])
     if (url.pathname === '/__wall/recent') return json(res, recent)
     if (url.pathname === '/__wall/tailwind.js') {
@@ -2529,7 +2542,25 @@ anywhere on the studio. Nothing is installed and nothing leaves this machine.</p
         return res.end(`<body style="font:14px ui-monospace;color:#8a8f98;background:#0f1011;padding:24px">`
           + `Cannot reach ${HOST}.<br><br>${landed.error}</body>`)
       }
-      return proxy(req, res, new URL(ENTRY, 'http://x'), quiet)
+      /**
+       * Handed on to the path the app thinks it is at, rather than served here.
+       *
+       * This served the entry page's content while the frame's address stayed /__wall/app, which is
+       * invisible to anything rendered on a server and fatal to anything routed in the browser: an
+       * application reads location.pathname, finds /__wall/app among its routes, and renders the one
+       * it keeps for addresses that do not exist. Measured on a real app, its own not found page at
+       * a hundred and nineteen nodes where the page itself is a hundred and thirty seven.
+       *
+       * So the entry is resolved here, where the redirects are followed, and the frame is then sent
+       * to that path. Everything below already treats an unclaimed path as the app's own, injects
+       * the picker and pulls the stylesheets back onto this origin, so what arrives is the same page
+       * it was serving, at the address the app is expecting to be asked for.
+       */
+      const going = new URL(ENTRY, 'http://x')
+      if (url.searchParams.has('n')) going.searchParams.set('__wall', url.searchParams.get('n'))
+      if (quiet) going.searchParams.set('__wallquiet', '1')
+      res.writeHead(302, { location: going.pathname + going.search, 'cache-control': 'no-store' })
+      return res.end('')
     }
     if (url.pathname === '/__wall/target' && req.method === 'POST') {
       const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))
@@ -2589,7 +2620,24 @@ anywhere on the studio. Nothing is installed and nothing leaves this machine.</p
     }
     // anything not ours belongs to the app being proxied, which is how its root-relative assets
     // resolve without a single url being rewritten
-    if (HOST && !OURS.test(url.pathname)) return proxy(req, res, url)
+    /**
+     * Anything not ours belongs to the app, and the root is ours only when nobody framed it.
+     *
+     * OURS claims the root, which is right for the studio and wrong for the frame standing on it: a
+     * site entered at its root sends the frame to / and this refused to forward it, so the app got
+     * two bytes of no. Five nodes on nearly every site there is, which is emptier than the studio it
+     * was serving before and just as wrong.
+     *
+     * The marks the redirect leaves are stripped before anything is forwarded, since an app that
+     * reads its own query would otherwise be handed one it never wrote.
+     */
+    const asFrame = url.searchParams.has('__wall')
+    if (HOST && (!OURS.test(url.pathname) || (asFrame && url.pathname === '/'))) {
+      const quiet = url.searchParams.has('__wallquiet')
+      const clean = new URL(url.href)
+      clean.searchParams.delete('__wall'); clean.searchParams.delete('__wallquiet')
+      return proxy(req, res, clean, quiet)
+    }
     res.writeHead(404); res.end('no')
   } catch (e) {
     const why = String(e && e.message ? e.message : e).slice(0, 300)
