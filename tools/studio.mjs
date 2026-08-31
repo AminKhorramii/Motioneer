@@ -1612,6 +1612,36 @@ async function described(from, words) {
     seen: { reach: rest.reach, stir: rest.stir, escape: rest.escape, blank: rest.blank } }
 }
 
+/**
+ * The same motion, changed the way somebody asked.
+ *
+ * Next to described rather than folded into it, because the two are asking for different things and
+ * the brief is most of the difference. Described starts from the element and gets a motion; this
+ * starts from a motion that already works and is told what about it is wrong, which is why the sheet
+ * goes in and why it is asked to stay recognisably the same rather than to have another go.
+ *
+ * It keeps the scope it was given, the way refine does, so a change is a version of a motion rather
+ * than a new one wearing its name.
+ */
+async function altered(from, words) {
+  const ask = `This motion works. Here is its sheet:\n\n${from.css}\n\n`
+    + `It was described as: ${from.note}\n\nThe markup it moves:\n${String(from.markup || '').slice(0, 5000)}\n\n`
+    + `Change it so that ${words}\n\nKeep the same scope attribute, ${from.scope || 'the one it already uses'}, `
+    + 'and keep it recognisably the same motion rather than a new one. Change what was asked for and '
+    + 'leave the rest of it alone.'
+  const got = await askModel(ask)
+  if (!got.raw) return { why: got.why }
+  const ok = judge(got.raw, from.scope)
+  if (!ok.css) return { why: ok.why }
+  const rest = await drifts({ markup: from.markup, base: from.base, css: ok.css, scope: ok.scope, wide: from.wide })
+  const settled = resting(rest)
+  if (settled.length) return { why: settled[0] }
+  const id = String(nextId++)
+  keep(id, { ...from, id, css: ok.css, scope: ok.scope, note: ok.note, verb: words })
+  return { id, verb: words, scope: ok.scope, note: ok.note, css: ok.css, tempo: tempo(ok.css),
+    seen: { reach: rest.reach, stir: rest.stir, escape: rest.escape, blank: rest.blank } }
+}
+
 async function options(src, count) {
   // a picked element arrives already rendered and already carrying the rules that matched it, so
   // there is nothing to parse and nothing to guess
@@ -2425,6 +2455,17 @@ const server = createServer(async (req, res) => {
       if (!words) return json(res, { why: 'nothing was asked for' })
       console.log(`  asked for "${words}"`)
       const got = await described(from, words)
+      console.log(got.id ? `    kept as ${got.id}` : `    dropped: ${got.why}`)
+      return json(res, got)
+    }
+    if (url.pathname === '/__wall/changed' && req.method === 'POST') {
+      const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))
+      const from = made.get(body.id)
+      if (!from) { res.writeHead(404); return res.end('gone') }
+      const words = String(body.words ?? '').replace(/\s+/g, ' ').trim().slice(0, 400)
+      if (!words) return json(res, { why: 'nothing was asked for' })
+      console.log(`  changing "${from.note}" so that ${words}`)
+      const got = await altered(from, words)
       console.log(got.id ? `    kept as ${got.id}` : `    dropped: ${got.why}`)
       return json(res, got)
     }

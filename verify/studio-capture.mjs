@@ -1125,6 +1125,64 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
     await room.unroute('**/__wall/described')
 
     /**
+     * Changing one of them, which is a different question from asking for another.
+     *
+     * The thing worth checking beyond the wiring is where the new card lands. A change that appends
+     * to the end of the row makes you hunt for what your sentence did, and one that overwrites the
+     * card makes the motion you were comparing against gone. It goes in next to the one it came
+     * from, and the one it came from stays.
+     */
+    let penWords = null
+    let penRefuse = true
+    await room.route('**/__wall/changed', async (route) => {
+      penWords = JSON.parse(route.request().postData() || '{}')
+      await route.fulfill({ status: 200, contentType: 'application/json',
+        body: JSON.stringify(penRefuse ? { why: 'it never comes back to where it started' }
+          : { id: '9', verb: penWords.words, scope: 'data-m1', note: 'the same one, slower',
+            css: '', tempo: { span: 900 } }) })
+    })
+    await room.evaluate(() => {
+      opts = [1, 2, 3].map((n) => ({ id: String(n), note: `option ${n}`, verb: 'rising,',
+        scope: `data-m${n}`, css: '', tempo: { span: 400 } }))
+      editing = null; render()
+    })
+    await room.waitForTimeout(400)
+    ok('every result carries a pen, and none of them is open until it is asked for',
+      await room.evaluate(() => document.querySelectorAll('[data-pen]').length) === 3
+      && await room.evaluate(() => document.querySelectorAll('[data-penfor]').length) === 0)
+    await room.locator('[data-pen="2"]').click(); await room.waitForTimeout(300)
+    ok('the pen opens a field in the card it belongs to and puts the cursor in it',
+      await room.evaluate(() => {
+        const all = [...document.querySelectorAll('[data-penfor]')]
+        return all.length === 1 && all[0].dataset.penfor === '2'
+          && document.activeElement === all[0]
+      }))
+    await room.locator('[data-penfor="2"]').press('Escape'); await room.waitForTimeout(250)
+    ok('and escape leaves it alone, since opening the field agreed to nothing',
+      await room.evaluate(() => document.querySelectorAll('[data-penfor]').length) === 0
+      && await room.evaluate(() => opts.length) === 3)
+    await room.locator('[data-pen="2"]').click(); await room.waitForTimeout(250)
+    const change = 'slower, and starting from the right'
+    await room.fill('[data-penfor="2"]', change)
+    await room.locator('[data-penfor="2"]').press('Enter'); await room.waitForTimeout(500)
+    ok('it asks about the card it was opened on, in the words that were typed',
+      penWords && penWords.id === '2' && penWords.words === change, JSON.stringify(penWords))
+    ok('a change the gates turn down says why and keeps the sentence',
+      /never comes back/.test(await room.evaluate(() =>
+        document.querySelector('[data-pennote="2"]').textContent))
+      && await room.inputValue('[data-penfor="2"]') === change)
+    penRefuse = false
+    await room.locator('[data-penfor="2"]').press('Enter'); await room.waitForTimeout(600)
+    ok('and one that lands sits next to the card it came from rather than at the end',
+      await room.evaluate(() => opts.map((o) => o.id).join(',')) === '1,2,9,3',
+      await room.evaluate(() => opts.map((o) => o.id).join(',')))
+    ok('with the card it came from still there, since a motion you cannot get back is one nobody edits twice',
+      await room.evaluate(() => opts.filter((o) => o.id === '2').length) === 1)
+    ok('and the field closed behind it', await room.evaluate(() =>
+      document.querySelectorAll('[data-penfor]').length) === 0)
+    await room.unroute('**/__wall/changed')
+
+    /**
      * Choosing, before composing.
      *
      * One element got the whole room: several motions side by side, open one bigger, ask for more

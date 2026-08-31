@@ -740,6 +740,22 @@ field and the sentence stays in it, since a near miss is the thing worth editing
 under the field until there is something to say: a standing note on an empty field is read once and
 skipped afterwards, and that is the line a refusal has to arrive on.
 
+Each card also carries a pen, which is the other half of that and a different question. The field at
+the end of the row asks for a motion; the pen asks for a change to one that already works, so the
+sheet goes into the brief and the model is told to keep it recognisably the same and to leave alone
+what was not mentioned. It keeps the scope it was given, the way a refinement does, because a change
+is a version of a motion rather than a new one wearing its name. Measured on a real list, changing a
+400ms fade of the whole thing so that it is slower and the rows come in from the right came back as
+520ms per row, seventy apart, translating 28px, on the same scope.
+
+Three decisions in that, and they are all about not losing your place. The field opens inside the
+card rather than in a panel, because what you are changing is playing six inches above it and a
+dialog over the top would make you describe it from memory. The change makes a card instead of
+overwriting one, which the tune panel had already decided for itself: a motion you cannot get back is
+a motion nobody edits twice. And the new card goes in next to the one it came from rather than at the
+end of the row, since the difference between a sentence that worked and one that did not is only
+visible when the two are adjacent. Escape closes the field, because opening it agreed to nothing.
+
 Two of those measurements were wrong before they were right, and calibration caught both. Bounding box
 displacement reported that fifteen of twenty one motions barely moved, including rows typing onto a
 page, because a clip-path reveal and a scaleX move no box. And sampling only real elements reported

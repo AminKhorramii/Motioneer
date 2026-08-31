@@ -151,6 +151,15 @@ iframe{width:100%;height:280px;border:0;background:#0b0c0d;display:block}
    read once and skipped after, and this is the line a refusal has to arrive on */
 .saynote{color:var(--faint);font-size:10.5px;line-height:1.45;margin:0}
 .saynote:empty{display:none}
+/* the same underline as the card that has nothing but a field in it, so the two ways of saying what
+   you want look like one thing said in two places */
+.penrow{display:grid;gap:5px;margin:7px 0 1px}
+.penput{box-sizing:border-box;width:100%;background:none;border:0;border-radius:0;
+  border-bottom:1px solid var(--line2);color:var(--ink);font-family:inherit;font-size:12px;
+  padding:5px 1px}
+.penput:focus{outline:none;border-bottom-color:var(--accent)}
+.penput:disabled{opacity:.55}
+.penrow em{font-style:normal}
 figcaption{padding:10px 12px;border-top:1px solid var(--line);display:grid;gap:4px;font-size:12px}
 figcaption b{font-weight:500}.note{color:var(--dim)}.verb{color:var(--faint);font-size:11px;line-height:1.5}
 .facts{color:var(--dim);font-size:11px;font-variant-numeric:tabular-nums;letter-spacing:.01em}
@@ -642,6 +651,10 @@ const DRIVEN='.grid .appwrap iframe, .grid figure iframe'
    whole page script and takes every listener below it with it */
 let keeping=null
 let opened=null   // the option filling the room, or null for the grid
+/* which card is being written to, by id rather than by index: a change inserts a card next to the
+   one it came from, so every index after it moves and one held here would come back pointing at
+   the neighbour */
+let editing=null
 let aimN=0   // bumped on every aim so the frame refetches instead of reusing the last page
 let quietMode=false
 /* a frame that has navigated to somebody else's origin is one we can no longer read, and the only
@@ -1927,10 +1940,22 @@ function render(){
     '<span class="row">'+
     '<button class="icb" data-open="'+o.id+'" title="'+(opened===o.id?'Close it':'Open it bigger')+'">'
       +(opened===o.id?ICON.shut:ICON.open)+'</button>'+
+    /* the pen sits before the sparkle because they answer different questions and the specific one
+       is asked more often: this one changes this motion, the sparkle asks for more like it */
+    '<button class="icb'+(editing===o.id?' on':'')+'" data-pen="'+o.id+'" title="'
+      +(editing===o.id?'Leave it as it is':'Change this one')+'">'+ICON.pen+'</button>'+
     '<button class="icb" data-more="'+o.id+'" title="More like this one">'+ICON.more+'</button>'+
     '<button class="icb'+(kept.has(o.id)?' on':'')+'" data-keep="'+o.id+'" title="'
       +(kept.has(o.id)?'Saved':'Save it')+'">'+(kept.has(o.id)?ICON.kept:ICON.mark)+'</button>'+
-    '</span></figcaption></figure>').join('')
+    '</span>'
+    /* the field opens inside the card it belongs to rather than in a panel somewhere else, because
+       what you are changing is the thing playing six inches above it and a dialog covering that up
+       would make you describe from memory */
+    +(editing===o.id?'<span class="penrow">'
+      +'<input class="penput" type="text" autocomplete="off" spellcheck="false"'
+      +' data-penfor="'+o.id+'" placeholder="slower, and start from the right">'
+      +'<em class="saynote" data-pennote="'+o.id+'"></em></span>':'')
+    +'</figcaption></figure>').join('')
     /* A card for saying it instead of choosing it, last because it belongs to the same question the
        others answer. The decks are for not having to know what you want; this is for when you do,
        and until it existed the only way to say so was to shoot another five and keep the nearest. */
@@ -1953,6 +1978,46 @@ function render(){
       document.querySelectorAll('figure:not(.saycard)').forEach(x=>x.classList.remove('chosen'))
       f.classList.add('chosen')
       drawInspector()
+    }
+  })
+  /**
+   * Changing one of them, in the card it belongs to.
+   *
+   * A change makes a card rather than overwriting one, and it lands next to the one it came from
+   * instead of at the end of the row. The house already answered the first half of that for the tune
+   * panel, which says out loud that the original stays: a motion you can no longer get back is a
+   * motion nobody edits twice. The second half is the difference between seeing what your sentence
+   * did and hunting for it four cards away.
+   */
+  document.querySelectorAll('[data-pen]').forEach(b=>b.onclick=()=>{
+    editing = editing===b.dataset.pen ? null : b.dataset.pen
+    render()
+    const box=document.querySelector('[data-penfor="'+editing+'"]')
+    if(box) box.focus()
+  })
+  document.querySelectorAll('[data-penfor]').forEach(box=>{
+    box.onkeydown=async(e)=>{
+      // escape leaves it alone, since opening the field is not agreeing to change anything
+      if(e.key==='Escape'){ editing=null; render(); return }
+      if(e.key!=='Enter') return
+      const id=box.dataset.penfor
+      const note=document.querySelector('[data-pennote="'+id+'"]')
+      const words=box.value.trim()
+      if(!words){ note.textContent='Say what to change, then press enter.'; return }
+      box.disabled=true; note.textContent='Changing it'
+      try{
+        const r=await post('/__wall/changed',{id,words},360000)
+        if(!r||!r.id){
+          note.textContent=(r&&r.why)?'Turned down, because '+r.why:'Nothing came back.'
+          box.disabled=false; box.focus(); return }
+        const at=opts.findIndex(x=>x.id===id)
+        opts=opts.slice(0,at+1).concat([r],opts.slice(at+1))
+        chosenOpt=r.id; editing=null
+        held.clear(); ends.clear(); render()
+      }catch(err){
+        note.textContent=String(err&&err.message||err)
+        box.disabled=false; box.focus()
+      }
     }
   })
   /**
@@ -2202,6 +2267,7 @@ const ICON={
   down: svg('M8 2.6v8.1M4.9 7.6L8 10.7l3.1-3.1M3 13.2h10'),
   drop: svg('M4.6 4.6l6.8 6.8M11.4 4.6l-6.8 6.8'),
   code: svg('M5.6 5.2L2.6 8l3 2.8M10.4 5.2L13.4 8l-3 2.8M9.2 3.4l-2.4 9.2'),
+  pen: svg('M11.3 2.4l2.3 2.3-7.7 7.7-3.1.8.8-3.1zM9.7 4l2.3 2.3'),
 }
 /* one place that puts bytes on somebody's disk, since three buttons wanted it and each writing its
    own anchor is three chances to leak an object url */
