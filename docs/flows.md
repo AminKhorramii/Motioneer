@@ -815,10 +815,24 @@ rather than overflowing it. The others scale past the edges deliberately, becaus
 most of what separates a camera from a screenshot, but doing it to the one shot chosen for legibility
 would crop the thing it was chosen to show.
 
-A shot is picked from a grid of chips that each perform a miniature of themselves, in the inspector
-where it aims at one car and in the settings menu where it aims at the frame. It was a list of five
-words in the menu, which is the one place the choice is hardest to imagine: a camera move is a motion,
-and reading the word drift tells you less than two seconds of watching one does.
+A shot is picked from a grid of chips that each perform a miniature of themselves. It was a list of
+five words in the settings menu, which is the one place the choice is hardest to imagine: a camera
+move is a motion, and reading the word drift tells you less than two seconds of watching one does.
+
+The shot belongs to the thing being shot. It was one value for the whole room, which is wrong in both
+directions: choosing an orbit for one element and then picking another gave the second an orbit
+nobody had asked it for, and it followed you between sites. In the chooser it was worse than untidy,
+because every car already carries its own shot, chosen from this same grid in the inspector, and the
+previews were drawn with the global one instead, so the cards you were choosing between were not
+showing the camera that car is set to. A car keeps it on the car, a pick on the pick, and a component
+on the left in a lookup, since a file is browsed rather than picked and has no object of its own to
+hang one on. The grid reads and writes whichever of those is current.
+
+It is redrawn on the way open rather than from `render`, and that is a constraint rather than a
+preference: there is a top level `render()` call above the line `CAMS` is declared on, so a render
+that redrew the grid would be reading a const before its line and would take the whole page script
+down with it. Opening is enough, because every click shuts the panels, so the element cannot change
+underneath an open menu.
 
 Each row also carries its own camera. A camera is a perspective, a moving plate and two blurred
 copies of the subject, and every one of those is per subject, so one shared rig could only ever film

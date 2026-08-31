@@ -601,10 +601,9 @@ header.bare .whenplaying{display:none}
       <label>Palette<select id="palette">
         ${PRESETS.map((p, i) => `<option${i === 1 ? ' selected' : ''}>${p.name}</option>`).join('')}
       </select></label>
-      <!-- a hidden input rather than a select, so everything that reads cam.value keeps reading it
-           while the thing you actually choose from is the grid of moving chips below -->
+      <!-- no value of its own. The shot belongs to whatever is being shot, so this grid shows the
+           current element's and writes back to it -->
       <div class="camwrap"><span>Shot</span>
-        <input type="hidden" id="cam" value="">
         <div class="cams" id="camgrid"></div></div>
       <label>Shape<select id="shape">
         <option value="wide" selected>wide 1280</option>
@@ -638,7 +637,7 @@ header.bare .whenplaying{display:none}
 <script>
 const grid=document.getElementById('grid'),drops=document.getElementById('drops')
 const scrub=document.getElementById('scrub'),at=document.getElementById('at'),link=document.getElementById('driven')
-const play=document.getElementById('play'),ask=document.getElementById('ask'),cam=document.getElementById('cam')
+const play=document.getElementById('play'),ask=document.getElementById('ask')
 const palette=document.getElementById('palette')
 let file=null, opts=[], running=true, t=0, last=performance.now(), held=new Map()
 let ends=new Map(), span=4200, rate=1
@@ -655,6 +654,9 @@ let opened=null   // the option filling the room, or null for the grid
    one it came from, so every index after it moves and one held here would come back pointing at
    the neighbour */
 let editing=null
+/* a shot per component on the left, since a file is browsed rather than picked and has no object of
+   its own to hang one on. A pick and a car both keep theirs on themselves */
+let fileShot={}
 let aimN=0   // bumped on every aim so the frame refetches instead of reusing the last page
 let quietMode=false
 /* a frame that has navigated to somebody else's origin is one we can no longer read, and the only
@@ -1241,8 +1243,9 @@ const factLine = (o)=>{
 /** the component as it is, so the left rail is a thing you browse rather than a thing you submit */
 function peek(){
   const lens=document.getElementById('depth').value
+  const shot=shotOf()
   const q='?file='+encodeURIComponent(file)+'&palette='+encodeURIComponent(palette.value)
-    +(cam.value?'&camera='+cam.value+'&depth='+lens:'')
+    +(shot?'&camera='+shot+'&depth='+lens:'')
   grid.innerHTML='<figure class="solo"><iframe data-i="0" src="/__wall/peek'+q+'"></iframe><figcaption>'
     +'<b>'+file.split('/').pop()+'</b><span class="verb">as written, nothing added yet. '
     +'Press <b>Give it motion</b> for options.</span></figcaption></figure>'
@@ -1335,7 +1338,10 @@ const reel=document.getElementById('reel'), models=document.getElementById('mode
 const PANELS=[menu,insp,reel,models]
 const pop=(panel)=>{ for(const q of PANELS) q.hidden = q!==panel || !q.hidden }
 const shut=()=>{ for(const q of PANELS) q.hidden=true }
-moreBtn.onclick=e=>{ e.stopPropagation(); pop(menu) }
+/* the shot grid is redrawn on the way open rather than on every render. It shows whichever element
+   is current, and there is a top level render() above the line CAMS is declared on, so a render that
+   redrew this would be reading a const before its line and would take the whole page script with it */
+moreBtn.onclick=e=>{ e.stopPropagation(); pop(menu); if(!menu.hidden) drawCamMenu() }
 
 /**
  * The model panel.
@@ -1477,13 +1483,54 @@ function camMarkup(now){
     +'" title="'+c[1]+'"><span class="cambox cam-'+(c[0]||'none')+'"><i></i></span><em>'
     +c[1]+'</em></button>').join('')
 }
+/**
+ * The shot belongs to the thing being shot.
+ *
+ * It was one value for the whole room, which is wrong in both directions. Choosing an orbit for one
+ * element and then picking another gave the second an orbit nobody had asked it for, and it followed
+ * you across sites. Worse in the chooser: every car already carries its own shot, chosen from this
+ * same grid in the inspector, and the previews were drawn with the global one instead, so the cards
+ * you were choosing between were not showing the camera that car is actually set to.
+ *
+ * A car keeps it on the car, a pick on the pick, and a file in a lookup, since a file is browsed
+ * rather than picked and has no object of its own. Everything else asks these two.
+ */
+function seatCar(){
+  if(!railed()) return null
+  if(stage==='choosing'){
+    const on=ARR.live(arr)
+    return on[Math.min(subjectN,on.length-1)]||null
+  }
+  const s=subject()
+  return s&&s.kind==='car'?s:null
+}
+function shotOf(){
+  const seat=seatCar()
+  if(seat) return seat.car.shot||''
+  if(chosen) return chosen.cam||''
+  if(file) return fileShot[file]||''
+  return ''
+}
+function setShot(v){
+  const seat=seatCar()
+  if(seat){
+    if((seat.car.shot||'')===v) return
+    mark('the camera on '+subjectOf(seat.car.pick.label))
+    arr=ARR.retimed(arr,seat.i,{shot:v})
+    held.clear(); ends.clear(); return
+  }
+  if(chosen){ chosen.cam=v; return }
+  if(file) fileShot[file]=v
+}
 function drawCamMenu(){
   const box=document.getElementById('camgrid'); if(!box) return
-  box.innerHTML=camMarkup(cam.value||'')
+  box.innerHTML=camMarkup(shotOf())
   box.querySelectorAll('[data-campick]').forEach(b=>b.onclick=()=>{
-    if(cam.value===b.dataset.campick) return
-    cam.value=b.dataset.campick
-    drawCamMenu(); render()
+    if(shotOf()===b.dataset.campick) return
+    setShot(b.dataset.campick)
+    /* redrawn here as well, or the chip you just pressed never takes the mark: the menu is open in
+       front of you and only gets rebuilt on the way open */
+    held.clear(); ends.clear(); drawCamMenu(); render(); drawInspector()
   })
 }
 function drawCams(now){
@@ -1836,8 +1883,10 @@ function render(){
        moment ago would otherwise put the grid into its one card view with no card to show */
     if(opened&&!car.alternatives.some(m=>m.id===opened)) opened=null
     const lens=document.getElementById('depth').value
+    /* this car's own, not the room's: the cards below are alternatives for this element and the
+       camera they are judged under has to be the one the element is set to */
     const q='?palette='+encodeURIComponent(palette.value)
-      +(cam.value?'&camera='+cam.value+'&depth='+lens:'')
+      +(car.shot?'&camera='+car.shot+'&depth='+lens:'')
     const done=on.filter(x=>x.car.alternatives.length<2||ARR.chosenAlt(x.car)>=0).length
     grid.innerHTML='<div class="chooser">'
       + '<div class="chhead"><div class="chwho">'
@@ -1928,8 +1977,9 @@ function render(){
     grid.innerHTML='<div class="empty">Type a site or a local address on the left to start.</div>'
     return }
   const lens=document.getElementById('depth').value
+  const shot=shotOf()
   const q='?palette='+encodeURIComponent(palette.value)
-    +(cam.value?'&camera='+cam.value+'&depth='+lens:'')
+    +(shot?'&camera='+shot+'&depth='+lens:'')
   grid.innerHTML=opts.map((o,i)=>
     '<figure><iframe data-i="'+i+'" src="/__wall/preview/'+o.id+q+'"></iframe>'+
     /* the verb and the scope moved into the title. Both are worth having and neither helps you

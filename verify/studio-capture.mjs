@@ -1183,6 +1183,53 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
     await room.unroute('**/__wall/changed')
 
     /**
+     * The shot belongs to the element, not to the room.
+     *
+     * It was one value for everything on screen. Choosing an orbit for one element and then picking
+     * another gave the second an orbit nobody asked it for, and it followed you between sites. The
+     * reading that matters is the preview's own url, since that is what actually gets rendered.
+     */
+    const shotIn = () => room.evaluate(() => {
+      const f = document.querySelector('.grid figure iframe')
+      return f ? new URL(f.src, location.href).searchParams.get('camera') : null
+    })
+    const aimAtPick = (n) => room.evaluate((k) => {
+      chosen = picks[k]
+      opts = [{ id: String(k + 1), note: `for ${k}`, verb: 'x', scope: `data-m${k + 1}`, css: '', tempo: { span: 400 } }]
+      editing = null; render()
+    }, n)
+    await room.evaluate(() => {
+      arr = null; file = null
+      picks = [{ label: 'div.alpha', html: '<div></div>', css: '', shot: '', w: 280, h: 90 },
+        { label: 'div.beta', html: '<div></div>', css: '', shot: '', w: 280, h: 90 }]
+      drawSel()
+    })
+    await aimAtPick(0); await room.waitForTimeout(400)
+    ok('an element with no shot chosen for it is previewed without one', await shotIn() === null)
+    /* through the grid rather than by assignment, because the question is whether the control writes
+       to the element it is aimed at */
+    await room.evaluate(() => shut()); await room.locator('#more').click()
+    await room.waitForTimeout(250)
+    await room.locator('#camgrid [data-campick="orbit"]').click(); await room.waitForTimeout(400)
+    ok('choosing one puts it on the element being looked at', await shotIn() === 'orbit')
+    await aimAtPick(1); await room.waitForTimeout(400)
+    ok('and the next element does not inherit it', await shotIn() === null)
+    await room.evaluate(() => shut()); await room.locator('#more').click()
+    await room.waitForTimeout(250)
+    ok('with the grid showing that one has none of its own',
+      await room.evaluate(() => [...document.querySelectorAll('#camgrid .camchip.on')]
+        .map((c) => c.dataset.campick).join()) === '')
+    await room.locator('#camgrid [data-campick="crane"]').click(); await room.waitForTimeout(400)
+    await aimAtPick(0); await room.waitForTimeout(400)
+    ok('and going back finds the first one still wearing its own', await shotIn() === 'orbit')
+    await room.evaluate(() => shut()); await room.locator('#more').click()
+    await room.waitForTimeout(250)
+    ok('which is what the grid marks when it opens on it',
+      await room.evaluate(() => [...document.querySelectorAll('#camgrid .camchip.on')]
+        .map((c) => c.dataset.campick).join()) === 'orbit')
+    await room.evaluate(() => shut())
+
+    /**
      * Choosing, before composing.
      *
      * One element got the whole room: several motions side by side, open one bigger, ask for more
