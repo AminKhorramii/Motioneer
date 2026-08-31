@@ -82,10 +82,15 @@ const CASES = {
     @keyframes dim{from{opacity:0}to{opacity:1}}`,
     `<div class="p"></div>`),
 
-  /* a font that is really fetched and really used, and a picture in both of the places one lives */
+  /* a font that is really fetched and really used, and a picture in both of the places one lives.
+     Probe is declared at three weights and the page sets only one of them, which is what an app of
+     this era looks like: it ships every weight it might use and draws with two. A frame that carries
+     the weights nobody asked for is a frame several megabytes larger for no visible difference. */
   assets: shell(`
-    @font-face{font-family:'Probe';src:url(/font.woff2) format('woff2');font-display:block}
-    body{font-family:'Probe',serif}
+    @font-face{font-family:'Probe';src:url(/font.woff2) format('woff2');font-weight:400;font-display:block}
+    @font-face{font-family:'Probe';src:url(/font-600.woff2) format('woff2');font-weight:600;font-display:block}
+    @font-face{font-family:'Probe';src:url(/font-700.woff2) format('woff2');font-weight:700;font-display:block}
+    body{font-family:'Probe',serif;font-weight:400}
     h1{font-size:34px;margin:20px}
     .tile{width:80px;height:80px;margin:0 20px;background-image:url(/pic.png);background-size:cover}`,
     `<h1>Probed</h1><img src="/pic.png" width="80" height="80" alt=""><div class="tile"></div>`),
@@ -207,7 +212,12 @@ const here = createServer((req, res) => {
   if (url.pathname === '/') return send(res, 200, 'text/html; charset=utf-8', HARNESS)
   if (url.pathname === '/shared/raster.mjs')
     return send(res, 200, 'text/javascript; charset=utf-8', readFileSync(path.join(root, 'shared/raster.mjs')))
-  if (url.pathname === '/font.woff2') return send(res, 200, 'font/woff2', FONT)
+  /* the same bytes at three addresses, so a face that is carried can be told apart from a face that
+     is merely declared. Sharing one url would let the fetch pool fold them into a single want and
+     the count would read as correct however many faces had been kept */
+  if (url.pathname === '/font.woff2' || url.pathname === '/font-600.woff2' || url.pathname === '/font-700.woff2') {
+    return send(res, 200, 'font/woff2', FONT)
+  }
   if (url.pathname === '/pic.png' || url.pathname === '/css/pic.png') return send(res, 200, 'image/png', PNG)
   if (url.pathname === '/css/outside.css')
     return send(res, 200, 'text/css', `.tile{width:120px;height:120px;margin:30px;`
@@ -377,6 +387,7 @@ try {
     const plain = await R.serialize(doc, {})
     return {
       asked, fonts: inlined.fonts.size, images: inlined.images.size, notes: inlined.notes,
+      faces: [...inlined.fonts.keys()].map((u) => u.split('/').pop()).sort(),
       font: /data:font\/woff2;base64,[A-Za-z0-9+/]{200}/.test(xml),
       image: (xml.match(/data:image\/png;base64,/g) || []).length,
       bare: /data:image\/png;base64,/.test(plain),
@@ -384,7 +395,13 @@ try {
     }
   })
   check(assets.asked > 0, `fetchVia is used for every resource, so the studio can route one through its proxy (${assets.asked} calls)`)
-  check(assets.fonts === 1, `the one web font in use is inlined and the unused faces are not (${assets.fonts})`)
+  /* Measured on a real capture before this was written: twenty-three faces carried where three were
+     ever loaded, and the twenty nobody asked for were ninety-nine point seven per cent of every
+     frame. Asking the loader for families rather than for faces is what let a family in use carry
+     every weight it declares. */
+  check(assets.faces.join(',') === 'font-700.woff2,font.woff2',
+    `only the weights the page draws with are inlined: body at 400 and the h1 at its default bold, `
+    + `while the 600 nobody asked for is left behind (${assets.faces.join(' ') || 'none'})`)
   check(assets.images >= 1, `the images are inlined (${assets.images})`)
   check(assets.font, 'the serialized page carries the font as a data uri')
   check(assets.image >= 2, `both the img src and the background-image are data uris in the output (${assets.image} of them)`)

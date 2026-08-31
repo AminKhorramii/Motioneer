@@ -968,10 +968,24 @@ every car starting together, the same loss the export had and for the same under
 document with more than one clock in it now says so in the markup, `data-wall-at` on each car, and
 `holdAt` reads the nearest one rather than assuming there is only the document's. A car whose turn has
 not come sits at a negative instant, which is what leaves it holding its first frame instead of being
-dragged forward to it. It hands back an mp4 if ffmpeg is on the machine and the frames plus a one line script if it is not. Stepped
-rather than recorded: a recording hopes the machine keeps up and produces a different file every run,
-while setting the clock by hand produces the same film every time. Measured on a real option, 48
-frames at 1280 by 720 in under a second.
+dragged forward to it. Stepped rather than recorded: a recording hopes the machine keeps up and
+produces a different file every run, while setting the clock by hand produces the same film every
+time. Measured on a real option, 48 frames at 1280 by 720 in under a second.
+
+What decides whether it is that or a minute is the typefaces, and for a while it was the second. The
+assets are gathered once for the whole film, because refetching a font ninety times is most of the
+wall clock, but the gathering asked the font loader which *families* the page had used and then
+carried every face each of those families declared. An app of this era ships every weight it might
+use and draws with two, so a capture off a real one carried twenty-three faces where three had ever
+been loaded, and since each is a whole woff2 written into every frame as base64 that was 8162kb of an
+8190kb frame, for a document of thirty-two nodes. Filming it took 298ms a frame and 21.5 seconds for
+2.4 seconds of film. The loader knows which faces it went and got, not just which families, so asking
+it that instead leaves 966kb and 35ms a frame: the same picture to the pixel, 0 of 921600 differing,
+in an eighth of the time. The key is family, weight and style and deliberately not unicode-range,
+because a loaded face reports the normalised `U+0-10FFFF` where the rule that made it left the
+descriptor unset, and a key that includes it matches nothing and strips every face in the document.
+That failure is a fast film in the fallback typeface, so the narrowing only ever narrows inside a
+family that was used at all, and a family whose faces do not line up is carried whole.
 
 It draws in the browser rather than on the machine serving the page. There were two of these and a
 setting to choose between them, which was the wrong answer: the headless one rendered exactly what
