@@ -833,6 +833,88 @@ export async function rasterize(doc, { width, height, ms = 0, inlined, scale = 1
 const source = (svg) => `data:image/svg+xml;base64,${base64(new TextEncoder().encode(svg))}`
 
 /**
+ * A film's worth of frames, without rebuilding what does not change.
+ *
+ * Measured on a real capture at 1280 by 720: a frame costs 33ms, of which 5.6ms is serializing the
+ * document, 8.9ms is base64 and 12.3ms is the browser parsing the copy. The fonts are 937kb of the
+ * 966kb frame, and between two instants of the same film not one of those bytes differs. Only the
+ * hold sheet does, and the hold sheet is a couple of kilobytes at the end of the head, after
+ * everything expensive.
+ *
+ * So the document is serialized once, cut in two at the hold sheet's own text, and the front half is
+ * base64 encoded once and kept. Per frame the rules are recomputed, the back half is encoded, and
+ * the two strings are joined. Base64 encodes in three byte groups, so a front half padded to a
+ * multiple of three encodes independently of whatever follows it: the join is exact rather than
+ * approximate, which is the only reason this is allowed to be a string operation.
+ *
+ * The guard is the marked count. holdAt names the elements it retimes by walking the document, and
+ * that walk is instant independent because animation-name and the life attributes are. If it ever
+ * is not, the count moves and this falls back to serializing that frame in full rather than
+ * splicing new rules into a document they no longer describe.
+ */
+export async function filmstrip(doc, { width, height, inlined, scale = 1 } = {}) {
+  const w = Math.max(1, Math.round(Number(width) || doc.documentElement.clientWidth || 1))
+  const h = Math.max(1, Math.round(Number(height) || doc.documentElement.clientHeight || 1))
+  const factor = Math.max(0.1, Number(scale) || 1)
+  const head = `<svg xmlns="${SVGNS}" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">`
+    + `<foreignObject x="0" y="0" width="${w}" height="${h}">`
+  const foot = '</foreignObject></svg>'
+
+  const sheetOf = () => doc.querySelector('[data-wall-hold]')
+  const shape = (() => {
+    const release = holdAt(doc, 0)
+    try {
+      const el = sheetOf()
+      return { text: el ? el.textContent : null, marks: doc.querySelectorAll(`[${HELD}]`).length }
+    } finally { release() }
+  })()
+
+  let cut = null
+  if (shape.text) {
+    const release = holdAt(doc, 0)
+    let xml
+    try { xml = await serialize(doc, { inlined, width: w, height: h }) } finally { release() }
+    const at = xml.indexOf(shape.text)
+    if (at > 0) {
+      /* padded so the front half is a whole number of base64 groups. Spaces, and inside the sheet's
+         own text, where css does not care */
+      let front = `${head}${xml.slice(0, at)}`
+      const bytes = () => new TextEncoder().encode(front).length
+      while (bytes() % 3) front += ' '
+      cut = { front, back: xml.slice(at + shape.text.length) + foot,
+        b64: base64(new TextEncoder().encode(front)), marks: shape.marks }
+    }
+  }
+
+  const owner = (typeof document !== 'undefined' && document) || doc
+  return async function frame(ms) {
+    let uri = null
+    if (cut) {
+      const release = holdAt(doc, ms)
+      try {
+        const el = sheetOf()
+        if (el && doc.querySelectorAll(`[${HELD}]`).length === cut.marks) {
+          uri = `data:image/svg+xml;base64,${cut.b64}`
+            + base64(new TextEncoder().encode(el.textContent + cut.back))
+        }
+      } finally { release() }
+    }
+    if (!uri) return rasterize(doc, { width: w, height: h, ms, inlined, scale })
+    const image = await new Promise((ok, no) => {
+      const img = new Image()
+      img.onload = () => ok(img)
+      img.onerror = () => no(new Error(`the browser refused the svg copy of the page at ${ms}ms (${Math.round(uri.length / 1024)}kb), which is what an unparseable frame looks like from here`))
+      img.src = uri
+    })
+    const canvas = owner.createElement('canvas')
+    canvas.width = Math.round(w * factor)
+    canvas.height = Math.round(h * factor)
+    canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height)
+    return canvas
+  }
+}
+
+/**
  * Every frame of a film, in order.
  *
  * Inlining happens once. The resources do not change between frames, and fetching a font ninety

@@ -578,6 +578,39 @@ try {
   check(film.seen.every((f) => f.w === 1280 && f.h === 720), 'every frame is the size the film asked for')
   console.log(`     ${Math.round(film.took)}ms for 30 frames of 1280 by 720, ${film.per.toFixed(1)}ms a frame`)
 
+  /**
+   * The strip, which is the same frames without rebuilding what does not change.
+   *
+   * It serializes the document once and splices new hold rules into the string, joining two base64
+   * halves. Both of those are the kind of shortcut that is either exactly right or quietly wrong, so
+   * what is checked is not that it is faster but that it draws the same picture: every frame against
+   * the one the per frame path produces, at instants where the stagger has the parts in different
+   * places. Measured on a real capture it took a frame from 31ms to 14ms.
+   */
+  const spliced = await page.evaluate(async () => {
+    const doc = (await load('stagger')).contentDocument
+    const inlined = await R.inline(doc)
+    const draw = await R.filmstrip(doc, { width: 400, height: 300, inlined })
+    const px = (c) => c.getContext('2d').getImageData(0, 0, c.width, c.height).data
+    const out = []
+    for (const ms of [0, 60, 150, 260, 400]) {
+      const a = px(await R.rasterize(doc, { width: 400, height: 300, ms, inlined }))
+      const b = px(await draw(ms))
+      let diff = 0
+      let ink = 0
+      for (let i = 0; i < a.length; i += 4) {
+        if (a[i] !== b[i] || a[i + 1] !== b[i + 1] || a[i + 2] !== b[i + 2]) diff++
+        if (a[i] + a[i + 1] + a[i + 2] > 60) ink++
+      }
+      out.push({ ms, diff, ink })
+    }
+    return out
+  })
+  check(spliced.every((f) => f.diff === 0),
+    `the strip draws the same picture as serializing every frame (${spliced.map((f) => f.diff).join()})`)
+  check(new Set(spliced.map((f) => f.ink)).size >= 3,
+    `and the frames still differ from each other rather than repeating one (${spliced.map((f) => f.ink).join()})`)
+
   const once = await page.evaluate(async () => {
     const doc = (await load('assets')).contentDocument
     let asked = 0

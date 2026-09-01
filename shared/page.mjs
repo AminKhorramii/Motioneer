@@ -1809,13 +1809,15 @@ async function filmHere(frame, want, say){
   say('Reading what it needs')
   // once for the whole film: refetching a font ninety times is most of the wall clock
   const inlined=await R.inline(doc,{fetchVia:(u)=>fetch('/__wall/asset?u='+encodeURIComponent(u))})
+  /* the document is serialized once for the whole film rather than once a frame. Between two
+     instants only the hold sheet differs, and everything expensive is the same bytes */
+  const draw=await R.filmstrip(doc,{width:want.w,height:want.h,inlined})
   async function* stream(){
     for(let i=0;i<total;i++){
       /* asked every frame rather than once, because the only moment a long film can be called off
          is between two of them: there is no other await to interrupt */
       if(want.stopped&&want.stopped()) throw new Error('STOPPED')
-      yield await R.rasterize(doc,{width:want.w,height:want.h,
-        ms:Math.min(last,from+Math.round(i/want.fps*1000)),inlined})
+      yield await draw(Math.min(last,from+Math.round(i/want.fps*1000)))
     }
   }
   // streamed rather than collected: ninety canvases at 1280 by 720 is a third of a gigabyte held

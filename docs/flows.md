@@ -1078,6 +1078,27 @@ dragged forward to it. Stepped rather than recorded: a recording hopes the machi
 produces a different file every run, while setting the clock by hand produces the same film every
 time. Measured on a real option, 48 frames at 1280 by 720 in under a second.
 
+A film serializes the document once rather than once a frame. Broken down on a real capture at 1280
+by 720, a frame cost 33ms: 5.6ms serializing, 8.9ms in base64, 12.3ms of the browser parsing the
+copy, and the rest drawing. The fonts were 937kb of the 966kb frame, and between two instants of the
+same film not one of those bytes differs. What differs is the hold sheet, which is a couple of
+kilobytes and sits after everything expensive.
+
+So the copy is made once, cut in two at the hold sheet's own text, and the front half is base64
+encoded once and kept. Each frame recomputes the rules, encodes the short back half and joins the
+two strings. That join is exact rather than approximate: base64 encodes in three byte groups, so a
+front half padded to a multiple of three encodes independently of whatever follows it, which is the
+only reason this is allowed to be string work at all. A frame went from 31ms to 14ms, and a minute of
+film from 56 seconds to 25.
+
+Both halves of that are the kind of shortcut that is either exactly right or quietly wrong, so what
+is checked is not that it is faster. Eight instants of a rail with three clocks, a life window, a
+camera and pseudo elements were drawn both ways and compared pixel by pixel: zero differ, and the
+frames still differ from each other rather than the cache handing back one picture. The guard in the
+code is the number of elements holdAt marked, since that walk is instant independent; if it ever
+moves, that frame is serialized in full instead of having new rules spliced into a document they no
+longer describe.
+
 What decides whether it is that or a minute is the typefaces, and for a while it was the second. The
 assets are gathered once for the whole film, because refetching a font ninety times is most of the
 wall clock, but the gathering asked the font loader which *families* the page had used and then
