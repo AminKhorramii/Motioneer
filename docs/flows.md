@@ -839,6 +839,24 @@ copies of the subject, and every one of those is per subject, so one shared rig 
 the whole rail as a single flat picture. Each car with a shot gets its own rig, which is what lets one
 sit locked off while the one below it pushes in.
 
+A rail says which stretch of itself is worth watching. Two handles on the strip mark where the film
+starts and stops, snapping to the same targets the bars do, so an in point lands exactly on the beat a
+component arrives rather than four pixels before it. This exists because the ruler stopped being
+capped at twenty seconds: a minute of composing is rarely a minute worth watching, and the thirty
+seconds that matter are somewhere inside it. Nothing is drawn until something is cut, since a control
+for a decision nobody has made is noise on every rail, and the shading falls on what is left out so
+the part about to be filmed is the part that looks like itself.
+
+The way back sits in the foot beside fit rather than on the band. Double clicking the band was the
+first answer and it is the wrong one: a band that takes clicks has to take them across everything it
+shades, and what is under there is the rows you are still composing with. The cut is held on the
+arrangement next to the offsets and the markers, so forking a rail carries it, and a rail cut back to
+its full length forgets it was ever cut rather than storing a range that happens to match.
+
+Verified by decoding both: the first frame of a film cut to start at four seconds is the same picture
+as the whole film at four seconds, two pixels of grain apart, and 12455 pixels away from the whole
+film's own first frame.
+
 Each row carries an eye. A rail is a set of decisions about several elements at once, and the way to
 find out whether one of them is earning its place is to watch the thing without it. Removing the car
 answers that question and charges the arrangement for it: the motion, the offset, the camera and

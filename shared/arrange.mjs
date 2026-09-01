@@ -400,6 +400,42 @@ export function spanOf(arr) {
 }
 
 /**
+ * The stretch of the composition a film is of.
+ *
+ * A rail can run for a minute now, and a minute of composing is rarely a minute worth watching: the
+ * thirty seconds that matter are somewhere inside it and the rest is setting up. This is the
+ * difference between filming what you made and filming the part of it you meant.
+ *
+ * Held on the arrangement rather than beside the film controls, because it is a decision about the
+ * composition, it belongs with the offsets and the markers, and forking a rail should carry it.
+ * Absent means the whole thing, which is what every rail starts as and most stay.
+ *
+ * Named cut rather than trim because trimmed is already an operation here, on a car's alternatives.
+ * Two things called the same thing in one module is how the wrong one gets called.
+ */
+export function cutOf(arr) {
+  const total = spanOf(arr)
+  const cut = arr && arr.cut
+  if (!cut) return { from: 0, to: total, whole: true }
+  const from = Math.max(0, Math.min(num(cut.from), total))
+  /* never inverted and never nothing, since a film of no frames is not a thing anybody asked for and
+     a handle dragged past its partner is a slip rather than an instruction */
+  const to = Math.max(from + 200, Math.min(num(cut.to, total), total))
+  return { from: Math.round(from), to: Math.round(to), whole: false }
+}
+
+export function cutTo(arr, cut) {
+  if (!cut) return { ...arr, cut: null }
+  const total = spanOf(arr)
+  const from = Math.max(0, Math.min(num(cut.from), total))
+  const to = Math.max(from + 200, Math.min(num(cut.to, total), total))
+  /* the whole thing is stored as no cut at all rather than as a range that happens to match it, so a
+     rail nobody cut carries nothing and one cut back to full forgets that it ever was */
+  if (from <= 0 && to >= total) return { ...arr, cut: null }
+  return { ...arr, cut: { from: Math.round(from), to: Math.round(to) } }
+}
+
+/**
  * The drawn ruler, which only ever grows while a session lasts.
  *
  * Sizing the strip to the content means swapping one car for a longer alternative rescales every

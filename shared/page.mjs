@@ -378,6 +378,20 @@ header.bare .whenplaying{display:none}
 .tlplay.off{display:none}
 /* beats to align to, laid over the tracks the same way the playhead is so neither has to know how
    wide the label columns are */
+/* what is being filmed, over the tracks. The shading falls on what is left out so the stretch you
+   are about to film is the part that looks like itself, and the whole band disappears when nothing
+   has been cut, since a control for a decision nobody has made is noise on every rail */
+.tlcut{position:absolute;top:0;bottom:0;left:var(--tlx,270px);width:var(--tlw,0);pointer-events:none;
+  z-index:3}
+.tlcut .cutout{position:absolute;top:0;bottom:0;background:rgba(5,5,6,.62);border-radius:3px}
+.tlcut i{position:absolute;top:0;bottom:0;width:9px;margin-left:-4.5px;cursor:ew-resize;
+  pointer-events:auto;display:block}
+.tlcut i::after{content:'';position:absolute;top:0;bottom:0;left:4px;width:1.5px;
+  background:var(--accent);opacity:.85}
+.tlcut i:hover::after{opacity:1;width:2.5px;left:3.5px}
+.tlcut.whole .cutout{display:none}
+.tlcut.whole i{opacity:.28}
+.tlcut.whole i:hover{opacity:1}
 .tlmarks{position:absolute;top:0;bottom:0;left:var(--tlx,270px);width:var(--tlw,0);pointer-events:none}
 .tlmark{position:absolute;top:0;bottom:0;width:1px;margin-left:-0.5px;background:var(--faint);
   opacity:.7;pointer-events:auto;cursor:pointer}
@@ -1726,8 +1740,12 @@ async function filmHere(frame, want, say){
      gives somebody time to read the thing the motion was pointing at, and a clip that loops needs
      somewhere to loop from that is not mid gesture */
   const tail=Math.max(0,Math.round((want.tail||0)/1000*want.fps))
+  /* the film starts where the cut starts. Everything downstream still counts frames from zero, so
+     this is the one place the two clocks meet: frame i is at from + i/fps, held at the out point
+     once it gets there */
+  const from=Math.max(0,Math.round(want.from||0))
   const total=Math.max(1,Math.round(want.ms/1000*want.fps))+tail
-  const last=Math.round(want.ms)
+  const last=from+Math.round(want.ms)
   say('Reading what it needs')
   // once for the whole film: refetching a font ninety times is most of the wall clock
   const inlined=await R.inline(doc,{fetchVia:(u)=>fetch('/__wall/asset?u='+encodeURIComponent(u))})
@@ -1737,7 +1755,7 @@ async function filmHere(frame, want, say){
          is between two of them: there is no other await to interrupt */
       if(want.stopped&&want.stopped()) throw new Error('STOPPED')
       yield await R.rasterize(doc,{width:want.w,height:want.h,
-        ms:Math.min(last,Math.round(i/want.fps*1000)),inlined})
+        ms:Math.min(last,from+Math.round(i/want.fps*1000)),inlined})
     }
   }
   // streamed rather than collected: ninety canvases at 1280 by 720 is a third of a gigabyte held
@@ -1835,11 +1853,14 @@ document.getElementById('film').onclick=async()=>{
   const size=SHAPES[shape]||SHAPES.wide
   const fps=Number(document.getElementById('fps').value)||30
   const tail=Number(document.getElementById('tail').value)||0
-  const ms=Math.max(1200, span+400)
+  /* a rail says which stretch of itself is worth watching; anything else is all of it */
+  const cut=railed()?ARR.cutOf(arr):null
+  const from=cut?cut.from:0
+  const ms=cut&&!cut.whole?Math.max(400,cut.to-cut.from):Math.max(1200, span+400)
   try{
     say('Filming')
     const {bytes,total,notes,limits}=await filmHere(frame,
-      {ms,fps,tail,w:size.w,h:size.h,stopped:()=>dropped},say)
+      {ms,from,fps,tail,w:size.w,h:size.h,stopped:()=>dropped},say)
     const url=URL.createObjectURL(new Blob([bytes],{type:'video/mp4'}))
     /* said only when it applies. A film of a component with no canvas and no blend mode in it has
        nothing to warn about, and a standing disclaimer on every one of them teaches you to skip
@@ -2647,6 +2668,7 @@ function paintShots(){
  */
 function timeline(live){
   const total=ruler()
+  const cut=ARR.cutOf(arr)
   const solved=ARR.resolve(arr), at=solved.at, cyclic=solved.cyclic
   const life=arr.cars.map((_,k)=>ARR.lifeOf(arr,k))
   /* what a car follows, by the name of the row rather than by an id nobody chose or can read */
@@ -2737,6 +2759,17 @@ function timeline(live){
           +' title="travels here over '+(m.ms/1000).toFixed(2)+'s. Click to take this leg away">'
           +'</b>').join('')
         +'</span></div>').join('')
+    /* the stretch that gets filmed, drawn over the tracks in the same space the markers use. The
+       shading is on what is left out rather than on what is kept, so what you are about to film is
+       the part that looks normal */
+    + '<div class="tlcut'+(cut.whole?' whole':'')+'" id="tlcut">'
+    + '<b class="cutout" style="left:0;width:'+(cut.from/total*100).toFixed(3)+'%"></b>'
+    + '<b class="cutout" style="left:'+(cut.to/total*100).toFixed(3)+'%;right:0"></b>'
+    + '<i class="cutin" data-cut="from" style="left:'+(cut.from/total*100).toFixed(3)+'%" '
+    + 'title="where the film starts. Drag it to film a stretch rather than the whole thing"></i>'
+    + '<i class="cutend" data-cut="to" style="left:'+(cut.to/total*100).toFixed(3)+'%" '
+    + 'title="where the film ends. Drag it to film a stretch rather than the whole thing"></i>'
+    + '</div>'
     + '<div class="tlmarks" id="tlmarks">'
     + (arr.markers||[]).map(m=>'<b class="tlmark" data-mark="'+m+'" title="a beat to align to, and a'
         +' thing bars snap onto. Click to take it away" style="left:'
@@ -2746,6 +2779,9 @@ function timeline(live){
     + (ARR.viewSpan(arr,0)<total-1
         ? '<button class="tlfit" id="tlfit" title="the ruler only grows while you work, so this brings'
           +' it back to what the composition needs">fit</button>' : '')
+    + (cut.whole?'':'<button class="tlfit" id="tlall" title="film the whole composition again rather'
+        +' than the stretch between the handles">all of it</button>filming '
+        +(cut.from/1000).toFixed(1)+'s to '+(cut.to/1000).toFixed(1)+'s &middot; ')
     + (total/1000).toFixed(1)+'s</span></div></div>'
 }
 /**
@@ -2902,10 +2938,64 @@ function selectRow(i, e){
   }
   shut(); insp.hidden=false
 }
+/* only the band, because a drag that rebuilt the whole strip would take the handle out from under
+   the pointer on the first move */
+function drawCut(){
+  const band=document.getElementById('tlcut'); if(!band||!railed()) return
+  const total=ruler(), cut=ARR.cutOf(arr)
+  band.classList.toggle('whole',cut.whole)
+  const outs=band.querySelectorAll('.cutout')
+  if(outs[0]){ outs[0].style.left='0'; outs[0].style.width=(cut.from/total*100).toFixed(3)+'%' }
+  if(outs[1]){ outs[1].style.left=(cut.to/total*100).toFixed(3)+'%'; outs[1].style.right='0'
+    outs[1].style.width='auto' }
+  const a=band.querySelector('[data-cut="from"]'), b=band.querySelector('[data-cut="to"]')
+  if(a) a.style.left=(cut.from/total*100).toFixed(3)+'%'
+  if(b) b.style.left=(cut.to/total*100).toFixed(3)+'%'
+}
 function wireTimeline(live){
   const total=ruler()
   const fit=document.getElementById('tlfit')
   if(fit) fit.onclick=e=>{ e.stopPropagation(); zoom=0; render() }
+  /**
+   * Dragging where the film starts and stops.
+   *
+   * Against the same ruler and the same snap targets the bars use, so an in point can be put exactly
+   * on the beat a component arrives rather than near it. The arrangement is written once on release,
+   * the way a bar drag does, because rebuilding the strip on every pointermove would take the handle
+   * out from under the cursor.
+   */
+  for (const grab of document.querySelectorAll('[data-cut]')){
+    grab.onpointerdown=e=>{
+      e.preventDefault(); e.stopPropagation()
+      const which=grab.dataset.cut
+      const band=document.getElementById('tlcut')
+      const box=band.getBoundingClientRect()
+      /* the same targets and the same tolerance the bars snap to, so an in point lands exactly on
+         the beat a component arrives rather than four pixels before it. Alt defeats it, as it does
+         everywhere else on this strip */
+      const targets=ARR.edges(arr,[],running?null:Number(scrub.value))
+      const tol=(7/box.width)*total, gridTol=(4/box.width)*total
+      const step=ARR.gridStep(total,box.width)
+      let said=false
+      const move=ev=>{
+        const raw=Math.max(0,Math.min(total,(ev.clientX-box.left)/box.width*total))
+        const got=ev.altKey?{at:raw}:ARR.snapTo(raw,targets,tol,step,gridTol)
+        const now=ARR.cutOf(arr)
+        if(!said){ mark('what the film is of'); said=true }
+        arr=ARR.cutTo(arr,which==='from'?{from:got.at,to:now.to}:{from:now.from,to:got.at})
+        drawCut()
+      }
+      const up=()=>{ removeEventListener('pointermove',move); removeEventListener('pointerup',up)
+        held.clear(); ends.clear(); render() }
+      addEventListener('pointermove',move); addEventListener('pointerup',up)
+    }
+  }
+  /* the way back sits in the foot beside fit rather than on the band. A band that took clicks would
+     have to take them across everything it shades, and what is under there is the rows you are still
+     composing with */
+  const all=document.getElementById('tlall')
+  if(all) all.onclick=e=>{ e.stopPropagation()
+    mark('filming all of it'); arr=ARR.cutTo(arr,null); held.clear(); ends.clear(); render() }
   /* the row keeps everything it had. What changes is one flag the frame is told about, so putting it
      back is the same click and nothing had to be remembered in between */
   for (const eye of document.querySelectorAll('[data-eye]')){

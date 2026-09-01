@@ -1086,6 +1086,31 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
     await room.evaluate(() => { arr = ARR.moved(arr, 1, 800); render() })
     await room.waitForTimeout(600)
 
+    /**
+     * Filming a stretch of a composition rather than all of it.
+     *
+     * A rail can run for a minute, and the thirty seconds worth watching are usually somewhere
+     * inside it. The frame count is the honest reading here: a film of a stretch is shorter, and a
+     * film of the whole thing after taking the cut back is the length it was before.
+     */
+    ok('a rail with nothing cut says so, and offers no way back from a cut nobody made',
+      await room.evaluate(() => ARR.cutOf(arr).whole)
+      && await room.evaluate(() => !document.getElementById('tlall')))
+    const whole = await filmWith(30, 0)
+    /* inside the composition's own length, since a cut past the end is clamped to it: this rail is
+       two cars 800ms apart with 400ms motions, so it runs 1200ms and not a millisecond more */
+    await room.evaluate(() => { arr = ARR.cutTo(arr, { from: 400, to: 1000 }); render() })
+    await room.waitForTimeout(700)
+    ok('a cut shows the stretch on the strip and a way back to all of it',
+      await room.evaluate(() => !document.getElementById('tlcut').classList.contains('whole'))
+      && await room.evaluate(() => !!document.getElementById('tlall')))
+    const part = await filmWith(30, 0)
+    ok('and the film is of the stretch rather than of the whole thing',
+      /^18 frames/.test(part), `${whole} then ${part}`)
+    await room.locator('#tlall').click(); await room.waitForTimeout(700)
+    ok('and taking it back films all of it again',
+      await room.evaluate(() => ARR.cutOf(arr).whole) && await filmWith(30, 0) === whole)
+
     const cut = await filmWith(30, 0)
     ok('a rail films, in the page, with nothing installed', /^72 frames at 30fps/.test(cut), cut)
     const tailed = await filmWith(30, 1600)
