@@ -1093,6 +1093,18 @@ descriptor unset, and a key that includes it matches nothing and strips every fa
 That failure is a fast film in the fallback typeface, so the narrowing only ever narrows inside a
 family that was used at all, and a family whose faces do not line up is carried whole.
 
+The decisions that make a film sit on the button that makes one, and say what they add up to before
+it is pressed. They were in the settings menu next to how many options an ask returns, which is a
+different question asked at a different moment, and neither a tail nor a cut means anything until it
+is read as the seconds it produces. The panel says the whole answer in one line, frames and length
+and size and what it is of, and it moves as the controls do. A film now takes long enough that being
+surprised by its length afterwards is a real cost rather than a small one.
+
+Progress is shown in proportion rather than as a count. "Drawing frame 412 of 1671" is honest and
+unreadable: nobody converts it into a feeling about whether to wait. The Film button fills behind its
+own label, which is the thing already being looked at because it is also the way to stop, and the
+seconds remaining are computed from the frames already drawn rather than guessed at from the machine.
+
 What a film is shaped like is now asked rather than assumed. The frame rate and the length were
 numbers in the script: thirty a second always, and a film that ended the instant the last keyframe
 fired. Sixty is offered because a frame stopped being expensive and a push at thirty judders on a

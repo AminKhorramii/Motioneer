@@ -1065,7 +1065,10 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
      */
     const filmWith = async (fps, tail) => {
       await room.evaluate(() => { span = 2000 })
-      await room.locator('#more').click(); await room.waitForTimeout(200)
+      /* on the film button now rather than in the settings menu, which is where the decisions that
+         make a film belong and where the line saying what one will be lives */
+      await room.evaluate(() => shut()); await room.waitForTimeout(80)
+      await room.locator('#filmset').click(); await room.waitForTimeout(200)
       await room.selectOption('#fps', String(fps))
       await room.selectOption('#tail', String(tail))
       await room.keyboard.press('Escape'); await room.waitForTimeout(150)
@@ -1111,7 +1114,19 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
     ok('and taking it back films all of it again',
       await room.evaluate(() => ARR.cutOf(arr).whole) && await filmWith(30, 0) === whole)
 
+    /* said before it is made, since a minute of rendering is long enough that being surprised by it
+       is a real cost, and a tail and a cut only mean anything as the seconds they produce */
+    await room.evaluate(() => shut()); await room.waitForTimeout(80)
+    await room.locator('#filmset').click(); await room.waitForTimeout(250)
+    await room.selectOption('#tail', '0'); await room.waitForTimeout(150)
+    const promised = await room.evaluate(() => document.getElementById('filmsay').textContent)
+    await room.keyboard.press('Escape')
+    ok('the film says what it will be before it is one', /frames, .*s, \d+ by \d+, of the rail/.test(promised),
+      promised)
+
     const cut = await filmWith(30, 0)
+    ok('and what it promised is what it made', cut.startsWith(promised.split(',')[0]),
+      `${promised} then ${cut}`)
     ok('a rail films, in the page, with nothing installed', /^72 frames at 30fps/.test(cut), cut)
     const tailed = await filmWith(30, 1600)
     ok('and a tail holds the last instant rather than lengthening the motion',
@@ -1122,7 +1137,8 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
     /* the way out of a long one. Filming is the only thing here that can run for a minute, and a
        button that says Film while refusing to do anything is a button that looks broken */
     await room.evaluate(() => { span = 20000 })
-    await room.locator('#more').click(); await room.waitForTimeout(200)
+    await room.evaluate(() => shut()); await room.waitForTimeout(80)
+    await room.locator('#filmset').click(); await room.waitForTimeout(200)
     await room.selectOption('#shape', 'hd'); await room.selectOption('#fps', '60')
     await room.keyboard.press('Escape'); await room.waitForTimeout(150)
     const reels = await room.evaluate(() => takes.length)

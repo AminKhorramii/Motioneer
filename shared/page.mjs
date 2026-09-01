@@ -154,6 +154,15 @@ iframe{width:100%;height:280px;border:0;background:#0b0c0d;display:block}
    read once and skipped after, and this is the line a refusal has to arrive on */
 .saynote{color:var(--faint);font-size:10.5px;line-height:1.45;margin:0}
 .saynote:empty{display:none}
+/* nothing said leaves no room. An empty line still carries its border and its margin, which reads as
+   a panel with something missing from it */
+#filmnote:empty{display:none}
+/* the fill sits behind the label on the button that is also the way out, so the one thing being
+   looked at during a render is the one thing carrying the answer to how much longer */
+.btn.filming{position:relative;overflow:hidden}
+.btn.filming::before{content:'';position:absolute;left:0;top:0;bottom:0;width:var(--done,0%);
+  background:rgba(94,106,210,.30);transition:width 120ms linear;pointer-events:none}
+@media (prefers-reduced-motion:reduce){.btn.filming::before{transition:none}}
 /* the same underline as the card that has nothing but a field in it, so the two ways of saying what
    you want look like one thing said in two places */
 .penrow{display:grid;gap:5px;margin:7px 0 1px}
@@ -586,10 +595,34 @@ header.bare .whenplaying{display:none}
       <input id="scrub" type="range" min="0" max="4200" value="0" step="10">
       <span class="sep"></span>
       <button class="icon" id="inspect" title="Adjust the chosen one">&#9707;</button>
-      <button class="icon" id="more" title="Speed, palette, camera, film shape">&#183;&#183;&#183;</button>
+      <button class="icon" id="more" title="Speed, palette, camera and lens">&#183;&#183;&#183;</button>
+      <button class="icon" id="filmset" title="What the film will be">&#9662;</button>
       <button class="btn" id="film" title="Render what is on screen frame by frame">Film</button>
       <button class="btn" id="save">Export</button>
     </span>
+    <!-- the decisions that make a film, on the button that makes one. They were in the settings menu
+         beside how many options an ask returns, which is a different question asked at a different
+         moment, and the answer to this one is a thing you want to read just before pressing Film -->
+    <div class="menu" id="filmpanel" hidden>
+      <p class="ihead">Film</p>
+      <p class="ifacts" id="filmsay"></p>
+      <label>Shape<select id="shape">
+        <option value="wide" selected>wide 1280</option>
+        <option value="hd">wide 1920</option>
+        <option value="square">square 1080</option>
+        <option value="tall">tall 1080</option></select></label>
+      <!-- both of these used to be numbers in the script. Sixty is worth offering because the frames
+           are cheap now and a push at thirty judders on a big screen; the tail is worth offering
+           because a demo that cuts on the last keyframe gives nobody time to read what it landed on -->
+      <label>Frames<select id="fps">
+        <option value="30" selected>30 a second</option>
+        <option value="60">60 a second</option></select></label>
+      <label>Tail<select id="tail">
+        <option value="0">cut on the end</option>
+        <option value="700" selected>hold briefly</option>
+        <option value="1600">hold longer</option></select></label>
+      <p class="keys" id="filmnote"></p>
+    </div>
     <div class="menu reel" id="reel" hidden>
       <p class="ihead">Film <em id="reeltag"></em></p>
       <video id="reelvid" controls loop muted playsinline></video>
@@ -644,21 +677,6 @@ header.bare .whenplaying{display:none}
            current element's and writes back to it -->
       <div class="camwrap"><span>Shot</span>
         <div class="cams" id="camgrid"></div></div>
-      <label>Shape<select id="shape">
-        <option value="wide" selected>wide 1280</option>
-        <option value="hd">wide 1920</option>
-        <option value="square">square 1080</option>
-        <option value="tall">tall 1080</option></select></label>
-      <!-- both of these used to be numbers in the script. Sixty is worth offering because the frames
-           are cheap now and a push at thirty judders on a big screen; the tail is worth offering
-           because a demo that cuts on the last keyframe gives nobody time to read what it landed on -->
-      <label>Frames<select id="fps">
-        <option value="30" selected>30 a second</option>
-        <option value="60">60 a second</option></select></label>
-      <label>Tail<select id="tail">
-        <option value="0">cut on the end</option>
-        <option value="700" selected>hold briefly</option>
-        <option value="1600">hold longer</option></select></label>
       <label>Lens<select id="depth">
         <option value="0.4">shallow</option><option value="1" selected>as shot</option>
         <option value="1.6">heavy</option></select></label>
@@ -1391,13 +1409,55 @@ const menu=document.getElementById('menu'), moreBtn=document.getElementById('mor
 const insp=document.getElementById('inspector'), inspBtn=document.getElementById('inspect')
 let chosenOpt=null   // the option the inspector is pointed at
 const reel=document.getElementById('reel'), models=document.getElementById('models')
-const PANELS=[menu,insp,reel,models]
+const filmPanel=document.getElementById('filmpanel')
+const PANELS=[menu,insp,reel,models,filmPanel]
 const pop=(panel)=>{ for(const q of PANELS) q.hidden = q!==panel || !q.hidden }
 const shut=()=>{ for(const q of PANELS) q.hidden=true }
 /* the shot grid is redrawn on the way open rather than on every render. It shows whichever element
    is current, and there is a top level render() above the line CAMS is declared on, so a render that
    redrew this would be reading a const before its line and would take the whole page script with it */
 moreBtn.onclick=e=>{ e.stopPropagation(); pop(menu); if(!menu.hidden) drawCamMenu() }
+/**
+ * What the film will be, before it is one.
+ *
+ * Pressing Film and finding out afterwards is the shape of thing this studio keeps taking out: the
+ * length, the size and the number of frames are all known in advance, and a minute of rendering is
+ * long enough that being surprised by it is a real cost. It also makes the three decisions in this
+ * panel legible, since a tail and a cut are only meaningful as the number of seconds they produce.
+ *
+ * Drawn on the way open and whenever one of them changes, not from render: SHAPES is a const
+ * declared below the top level render call, and reading it from there would take the page with it.
+ */
+function filmPlan(){
+  const aim=filmable()
+  const size=SHAPES[document.getElementById('shape').value]||SHAPES.wide
+  const fps=Number(document.getElementById('fps').value)||30
+  const tail=Number(document.getElementById('tail').value)||0
+  const cut=railed()?ARR.cutOf(arr):null
+  const stretch=cut&&!cut.whole
+  const ms=stretch?Math.max(400,cut.to-cut.from):Math.max(1200,span+400)
+  const frames=Math.max(1,Math.round(ms/1000*fps))+Math.round(tail/1000*fps)
+  return { why:aim.why||'', what:aim.what||'', frames, secs:frames/fps,
+    w:size.w, h:size.h, stretch:stretch?cut:null }
+}
+function drawFilmPlan(){
+  const say=document.getElementById('filmsay'), note=document.getElementById('filmnote')
+  if(!say) return
+  const p=filmPlan()
+  if(p.why){ say.textContent=p.why; note.textContent=''; return }
+  say.textContent=p.frames+' frames, '+p.secs.toFixed(1)+'s, '+p.w+' by '+p.h+', of '+p.what
+  /* only when it is not simply all of it, since a line saying nothing was cut appears on every rail
+     that was never cut, which is most of them */
+  note.textContent=p.stretch
+    ? 'From '+(p.stretch.from/1000).toFixed(1)+'s to '+(p.stretch.to/1000).toFixed(1)
+      +'s of the composition, which is what the handles on the strip are set to.'
+    : ''
+}
+document.getElementById('filmset').onclick=e=>{
+  e.stopPropagation(); pop(filmPanel); if(!filmPanel.hidden) drawFilmPlan() }
+for(const k of ['shape','fps','tail']){
+  const box=document.getElementById(k); if(box) box.onchange=drawFilmPlan
+}
 
 /**
  * The model panel.
@@ -1761,7 +1821,7 @@ async function filmHere(frame, want, say){
   // streamed rather than collected: ninety canvases at 1280 by 720 is a third of a gigabyte held
   // for no reason, when the encoder only ever looks at one of them
   const bytes=await M.encode(stream(),{width:want.w,height:want.h,fps:want.fps,
-    onProgress:(done)=>say('Drawing frame '+done+' of '+total)})
+    onProgress:(done)=>say('Drawing frame '+done+' of '+total,done,total)})
   return {bytes,total,notes:(inlined&&inlined.notes)||[],limits:R.limits(doc)}
 }
 /* 1920 is here because it stopped being expensive. A frame used to cost 298ms and four times the
@@ -1834,6 +1894,7 @@ document.getElementById('film').onclick=async()=>{
   const frame=aim.frame
   const btn=document.getElementById('film')
   filming=true; dropped=false; btn.textContent='Stop'
+  btn.classList.add('filming'); btn.style.setProperty('--done','0%')
   btn.title='Stop drawing and keep nothing'
   /* The transport stops for the length of the film. Filming copies this document once per frame,
      and the rAF loop was going on seeking the original in between the copies: holdAt writes what
@@ -1843,9 +1904,24 @@ document.getElementById('film').onclick=async()=>{
      way of pausing. */
   const wasRunning=running
   running=false; face()
-  /* the progress goes to the status line only now, because the button is saying Stop and a label
-     that flickers between a verb and a count is not offering either */
-  const say=(m)=>{ drops.textContent=m }
+  /**
+   * How far along, in proportion rather than as a count.
+   *
+   * "Drawing frame 412 of 1671" is honest and unreadable: nobody converts that to a feeling about
+   * whether to wait. A film was two seconds long when that line was written and can be two minutes
+   * now. The button fills behind its own label, which is the thing already being looked at because
+   * it is also the way to stop, and the seconds left come from the frames already drawn rather than
+   * from a guess about the machine.
+   */
+  const began=Date.now()
+  const say=(m,done,total)=>{
+    if(!done||!total){ drops.textContent=m; btn.style.removeProperty('--done'); return }
+    const part=done/total
+    btn.style.setProperty('--done',(part*100).toFixed(1)+'%')
+    const left=Math.round((Date.now()-began)/Math.max(1,done)*(total-done)/1000)
+    drops.textContent=done+' of '+total+' frames'
+      +(done>8&&left>1?', about '+left+'s left':'')
+  }
   const base=(APP?(chosen&&chosen.label)||'element':(file||'film')).split('/').pop().replace(/[^A-Za-z0-9_-]+/g,'-')
   const n=takes.filter(t=>t.name===base||t.name.startsWith(base+' ')).length
   const name=n?base+' '+(n+1):base
@@ -1891,6 +1967,8 @@ document.getElementById('film').onclick=async()=>{
   }
   filming=false; dropped=false
   running=wasRunning; face()
+  btn.style.removeProperty('--done')
+  btn.classList.remove('filming')
   btn.textContent='Film'; btn.title='Render what is on screen frame by frame'
 }
 document.getElementById('save').onclick=async()=>{
