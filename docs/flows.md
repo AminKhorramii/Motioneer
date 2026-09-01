@@ -847,7 +847,14 @@ seconds that matter are somewhere inside it. Nothing is drawn until something is
 for a decision nobody has made is noise on every rail, and the shading falls on what is left out so
 the part about to be filmed is the part that looks like itself.
 
-The way back sits in the foot beside fit rather than on the band. Double clicking the band was the
+The handles are the fine control and they are the wrong place to discover the feature: they are
+almost invisible until they have been used once, so trimming was something you had to already know
+about. What somebody actually does is scrub to the moment they mean and then look for a way to say
+start here, so that is offered in the film panel where the rest of the film is decided, and the panel
+names the instant it would use rather than making anybody guess where the playhead ended up. The way
+back appears only once there is something to go back from.
+
+The way back on the strip sits in the foot beside fit rather than on the band. Double clicking the band was the
 first answer and it is the wrong one: a band that takes clicks has to take them across everything it
 shades, and what is under there is the rows you are still composing with. The cut is held on the
 arrangement next to the offsets and the markers, so forking a rail carries it, and a rail cut back to

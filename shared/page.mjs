@@ -154,6 +154,8 @@ iframe{width:100%;height:280px;border:0;background:#0b0c0d;display:block}
    read once and skipped after, and this is the line a refusal has to arrive on */
 .saynote{color:var(--faint);font-size:10.5px;line-height:1.45;margin:0}
 .saynote:empty{display:none}
+.cutrow{display:flex;gap:5px;margin:2px 0 0}
+.cutrow button{flex:1}
 /* nothing said leaves no room. An empty line still carries its border and its margin, which reads as
    a panel with something missing from it */
 #filmnote:empty{display:none}
@@ -621,6 +623,20 @@ header.bare .whenplaying{display:none}
         <option value="0">cut on the end</option>
         <option value="700" selected>hold briefly</option>
         <option value="1600">hold longer</option></select></label>
+      <!-- the cut, where the decision is made rather than only as two handles on the strip. Those
+           are nearly invisible until they have been used, which makes trimming a thing you have to
+           already know about; scrubbing to a moment and saying start here is what somebody does -->
+      <div id="filmcut" hidden>
+        <p class="ifacts" id="filmcutsay"></p>
+        <div class="cutrow">
+          <button class="tlfit" id="cutin" title="start the film at the playhead, wherever the
+            scrubber is now">start here</button>
+          <button class="tlfit" id="cutout" title="end the film at the playhead, wherever the
+            scrubber is now">end here</button>
+          <button class="tlfit" id="cutall" title="film the whole composition again rather than the
+            stretch between the handles">all of it</button>
+        </div>
+      </div>
       <p class="keys" id="filmnote"></p>
     </div>
     <div class="menu reel" id="reel" hidden>
@@ -1446,15 +1462,46 @@ function drawFilmPlan(){
   const p=filmPlan()
   if(p.why){ say.textContent=p.why; note.textContent=''; return }
   say.textContent=p.frames+' frames, '+p.secs.toFixed(1)+'s, '+p.w+' by '+p.h+', of '+p.what
-  /* only when it is not simply all of it, since a line saying nothing was cut appears on every rail
-     that was never cut, which is most of them */
-  note.textContent=p.stretch
-    ? 'From '+(p.stretch.from/1000).toFixed(1)+'s to '+(p.stretch.to/1000).toFixed(1)
-      +'s of the composition, which is what the handles on the strip are set to.'
-    : ''
+  note.textContent=''
+  /**
+   * Where the film starts and stops, said as a sentence and set from the playhead.
+   *
+   * The handles on the strip are the fine control and they are nearly invisible until they have been
+   * used, which makes trimming something you have to already know exists. What somebody actually
+   * does is scrub to the moment they mean and then look for a way to say start here, so that is
+   * offered where the rest of the film is decided, and it names the instant it would use.
+   */
+  const box=document.getElementById('filmcut')
+  if(!box) return
+  box.hidden=!railed()
+  if(box.hidden) return
+  const cut=ARR.cutOf(arr)
+  const here=Math.max(0,Math.round(Number(scrub.value)||0))
+  document.getElementById('filmcutsay').textContent=(cut.whole
+    ? 'Filming all of it.'
+    : 'From '+(cut.from/1000).toFixed(1)+'s to '+(cut.to/1000).toFixed(1)+'s of it.')
+    +' The playhead is at '+(here/1000).toFixed(1)+'s.'
+  /* the way back is only there once there is something to go back from */
+  document.getElementById('cutall').hidden=cut.whole
 }
 document.getElementById('filmset').onclick=e=>{
   e.stopPropagation(); pop(filmPanel); if(!filmPanel.hidden) drawFilmPlan() }
+/* the playhead is the anchor for both, because it is the thing already being aimed with: the frame
+   under it is the frame somebody is looking at when they decide the film should begin there */
+function cutAt(which){
+  if(!railed()) return
+  const now=ARR.cutOf(arr)
+  const here=Math.max(0,Math.round(Number(scrub.value)||0))
+  mark('what the film is of')
+  arr=ARR.cutTo(arr,which==='from'?{from:here,to:now.to}:{from:now.from,to:here})
+  held.clear(); ends.clear(); render(); drawFilmPlan()
+}
+document.getElementById('cutin').onclick=e=>{ e.stopPropagation(); cutAt('from') }
+document.getElementById('cutout').onclick=e=>{ e.stopPropagation(); cutAt('to') }
+document.getElementById('cutall').onclick=e=>{ e.stopPropagation()
+  if(!railed()) return
+  mark('filming all of it'); arr=ARR.cutTo(arr,null)
+  held.clear(); ends.clear(); render(); drawFilmPlan() }
 for(const k of ['shape','fps','tail']){
   const box=document.getElementById(k); if(box) box.onchange=drawFilmPlan
 }

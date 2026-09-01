@@ -1134,8 +1134,41 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
     ok('while a click outside it still does',
       await room.evaluate(() => document.getElementById('filmpanel').hidden))
 
+    /**
+     * Setting the cut from the playhead, which is what somebody reaches for.
+     *
+     * The handles on the strip are the fine control and they are almost invisible until they have
+     * been used once, so trimming was a thing you had to already know about. Scrubbing to the moment
+     * you mean and saying start here is the gesture, and it belongs where the rest of the film is
+     * decided rather than only on the strip.
+     */
+    await room.evaluate(() => { running = false; scrub.value = 900; hold(900) })
+    await room.waitForTimeout(250)
+    await room.evaluate(() => shut()); await room.waitForTimeout(80)
+    await room.locator('#filmset').click(); await room.waitForTimeout(250)
+    ok('the film panel says where the playhead is, since that is what start here would use',
+      /playhead is at 0\.9s/.test(await room.evaluate(() =>
+        document.getElementById('filmcutsay').textContent)),
+      await room.evaluate(() => document.getElementById('filmcutsay').textContent))
+    ok('and offers no way back before anything has been cut',
+      await room.evaluate(() => document.getElementById('cutall').hidden))
+    await room.locator('#cutin').click(); await room.waitForTimeout(600)
+    ok('start here begins the film at the playhead',
+      await room.evaluate(() => ARR.cutOf(arr).from) === 900,
+      await room.evaluate(() => JSON.stringify(ARR.cutOf(arr))))
+    await room.evaluate(() => shut()); await room.locator('#filmset').click()
+    await room.waitForTimeout(250)
+    ok('and now there is a way back', await room.evaluate(() =>
+      !document.getElementById('cutall').hidden))
+    await room.locator('#cutall').click(); await room.waitForTimeout(500)
+    ok('which takes the whole thing again', await room.evaluate(() => ARR.cutOf(arr).whole))
+    await room.evaluate(() => shut())
+
     /* said before it is made, since a minute of rendering is long enough that being surprised by it
        is a real cost, and a tail and a cut only mean anything as the seconds they produce */
+    /* the same ruler filmWith films against, or the promise is read against one length and kept
+       against another and the two disagree for a reason that is nothing to do with either */
+    await room.evaluate(() => { span = 2000 })
     await room.evaluate(() => shut()); await room.waitForTimeout(80)
     await room.locator('#filmset').click(); await room.waitForTimeout(250)
     await room.selectOption('#tail', '0'); await room.waitForTimeout(150)
