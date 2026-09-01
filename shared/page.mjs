@@ -1537,10 +1537,12 @@ byId('mforget').onclick=async()=>{
   drawModelForm(true)
 }
 inspBtn.onclick=e=>{ e.stopPropagation(); pop(insp); drawInspector() }
-menu.onclick=e=>e.stopPropagation()
-insp.onclick=e=>e.stopPropagation()
-reel.onclick=e=>e.stopPropagation()
-models.onclick=e=>e.stopPropagation()
+/* Every panel, from the one list that says what a panel is.
+   A click anywhere shuts them, so each one has to stop its own clicks from reaching the document.
+   That was four lines naming four panels, and a fifth panel was added to PANELS and not to them, so
+   the film settings closed the moment you opened the dropdown you had come for. Derived from PANELS
+   instead, because the two lists were the same list written twice and one of them drifted. */
+for(const q of PANELS) q.onclick=e=>e.stopPropagation()
 addEventListener('click',shut)
 addEventListener('keydown',e=>{ if(e.key==='Escape') shut() })
 

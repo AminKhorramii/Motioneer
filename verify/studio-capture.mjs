@@ -1114,6 +1114,26 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
     ok('and taking it back films all of it again',
       await room.evaluate(() => ARR.cutOf(arr).whole) && await filmWith(30, 0) === whole)
 
+    /**
+     * A panel survives being used.
+     *
+     * A click anywhere shuts the panels, so each has to stop its own clicks reaching the document.
+     * That was four lines naming four panels and a fifth was added to the list of panels and not to
+     * them, so the film settings closed the instant you opened the dropdown you had come for.
+     *
+     * Clicked for real rather than through selectOption, which sets the value and fires change
+     * without ever dispatching a click. That is exactly why every check here passed while the panel
+     * was closing under a person's hand.
+     */
+    await room.evaluate(() => shut()); await room.waitForTimeout(80)
+    await room.locator('#filmset').click(); await room.waitForTimeout(200)
+    await room.locator('#filmpanel select#fps').click(); await room.waitForTimeout(250)
+    ok('using a control inside a panel does not shut the panel',
+      await room.evaluate(() => !document.getElementById('filmpanel').hidden))
+    await room.keyboard.press('Escape'); await room.waitForTimeout(150)
+    ok('while a click outside it still does',
+      await room.evaluate(() => document.getElementById('filmpanel').hidden))
+
     /* said before it is made, since a minute of rendering is long enough that being surprised by it
        is a real cost, and a tail and a cut only mean anything as the seconds they produce */
     await room.evaluate(() => shut()); await room.waitForTimeout(80)
