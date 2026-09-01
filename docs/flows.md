@@ -1085,6 +1085,15 @@ dragged forward to it. Stepped rather than recorded: a recording hopes the machi
 produces a different file every run, while setting the clock by hand produces the same film every
 time. Measured on a real option, 48 frames at 1280 by 720 in under a second.
 
+The typefaces are declared once for a rail rather than once for every car in it. A face rule is not
+scoped to a car the way a selector is, and every car carries its own copy of the sheet it was captured
+from, so a rail of thirty picks off one app declared the same three typefaces six hundred and ninety
+times. On a page that costs nothing, because a browser fetches each url once however often it is
+named; in a frame the bytes are embedded at every mention, so it was 28105kb of a 28805kb frame. The
+payload was growing by 962kb a car and is now flat: thirty cars went from 28805kb to 1515kb, a frame
+from 653ms to 104ms, and a minute at sixty frames a second from thirty nine minutes to six. The
+picture is unchanged, checked pixel by pixel across six cars mid cascade.
+
 A film serializes the document once rather than once a frame. Broken down on a real capture at 1280
 by 720, a frame cost 33ms: 5.6ms serializing, 8.9ms in base64, 12.3ms of the browser parsing the
 copy, and the rest drawing. The fonts were 937kb of the 966kb frame, and between two instants of the

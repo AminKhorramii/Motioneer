@@ -36,7 +36,7 @@ import { streamText } from '../shared/providers.mjs'
 import { listenNear, movedFrom } from '../shared/port.mjs'
 import {
   MOTION_SYSTEM, dealMotions, dealErrands, grabJson, safeStyle, unmoved, brittle, janky, scopeOf, retimed,
-  tempo, unstill, leaks, grounded, namespaced, typefaces,
+  tempo, unstill, leaks, grounded, namespaced, typefaces, faceList, unfaced,
   PRESETS, themeOf, themeCss,
 } from '../dist-core/core.js'
 
@@ -1815,7 +1815,10 @@ ${tw ? `<script>${tw}</script><style type="text/tailwindcss">${themeMap}</style>
 /* every car's sheet, not just the first, and each walked into the car it belongs to. Two pages'
    rules in one document are two sites arguing: whichever came last won body and repainted this
    frame, and a .title written for one component restyled the other */
-${parts.map((p) => grounded(p.base, p.tag)).join('\n')}
+/* the typefaces once, ahead of the cars, because a face rule is not scoped to a car the way a
+   selector is and every car was carrying its own copy of the same three fonts */
+${[...new Set(parts.flatMap((p) => faceList(p.base)))].join('\n')}
+${parts.map((p) => grounded(unfaced(p.base), p.tag)).join('\n')}
 ${parts.map((p) => p.css).join('\n')}
 :root{--bg:#08090a;--panel:#0f1011;--raised:#141516;--line:rgba(255,255,255,.07);
   --line2:rgba(255,255,255,.11);--ink:#e6e6e6;--dim:#8a8f98;--faint:#5c6068;--accent:#5e6ad2}
@@ -2112,7 +2115,10 @@ ${tw ? `<style>${themeFor(palette)}</style>` : ''}
 /* every car's sheet, not just the first, and each walked into the car it belongs to. Two pages'
    rules in one document are two sites arguing: whichever came last won body and repainted this
    frame, and a .title written for one component restyled the other */
-${parts.map((p) => grounded(p.base, p.tag)).join('\n')}
+/* the typefaces once, ahead of the cars, because a face rule is not scoped to a car the way a
+   selector is and every car was carrying its own copy of the same three fonts */
+${[...new Set(parts.flatMap((p) => faceList(p.base)))].join('\n')}
+${parts.map((p) => grounded(unfaced(p.base), p.tag)).join('\n')}
 ${parts.map((p) => p.css).join('\n')}
 .car > .in{transform-origin:center center}
 .car.shot{background:#050506;border-radius:8px;overflow:hidden}

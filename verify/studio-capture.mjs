@@ -441,7 +441,10 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
       /* the rules that matched it on the page it came from, page level ones and all, which is what
          every real pick carries and what used to repaint this frame. The letter spacing differs per
          pick so a car wearing its neighbour's sheet is visible rather than merely plausible */
-      base: `:root{--paper:#fff}body{background:#fff;color:#111;letter-spacing:${n}px}`
+      /* the same face on every car, which is what three picks off one app carry: a face rule is not
+         scoped to a car, so without hoisting the frame declares it once per car */
+      base: '@font-face{font-family:"Probe";src:url(https://example.invalid/probe.woff2)}'
+        + `:root{--paper:#fff}body{background:#fff;color:#111;letter-spacing:${n}px}`
         + '*, ::after, ::before{box-sizing:border-box}',
       note: `card ${n} rises`, verb: 'rising,',
     }]).concat([['f', {
@@ -481,6 +484,21 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
     body: JSON.stringify({ ids: ['1', '2', '3'], at: [0, 800, 1600], shots: ['', '', ''], name: 'railleg' }),
   }).then((r) => r.json()).catch((e) => ({ error: String(e) }))
   ok('a rail exports', !!wrote.at && !wrote.error, wrote.at ? `${wrote.kb}kb` : String(wrote.error))
+
+  /**
+   * The typefaces once for the rail rather than once for every car in it.
+   *
+   * A face rule is not scoped to a car the way a selector is, and every car carries its own copy of
+   * the sheet it was captured from. On a page that costs nothing, because a browser fetches each url
+   * once however often it is named. In a frame the bytes are embedded at every mention, so thirty
+   * cars off one app meant the same three typefaces written out six hundred and ninety times: 28105kb
+   * of a 28805kb frame, and 653ms to draw one.
+   */
+  const railed2 = await fetch(`http://localhost:${XPORT}/__wall/railview?ids=1,2,3&at=0,800,1600&shots=,,&palette=`)
+    .then((r) => r.text()).catch(() => '')
+  const facesIn = (railed2.match(/@font-face/g) || []).length
+  ok('a rail of three declares each typeface once rather than once a car', facesIn === 1,
+    `${facesIn} face rules for three cars`)
 
   /* Measured on a real app before this was written: a pick off it carried thirty-nine face rules and
      the preview registered none of them, so every option in the grid was rendered in the fallback. */

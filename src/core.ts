@@ -16,7 +16,7 @@
 
 export { MOTION, MOTION_SYSTEM, dealMotions, dealErrands } from '@/design/motion'
 export {
-  safeStyle, unmoved, brittle, janky, scopeOf, retimed, tempo, unstill, leaks, grounded, namespaced, typefaces,
+  safeStyle, unmoved, brittle, janky, scopeOf, retimed, tempo, unstill, leaks, grounded, namespaced, typefaces, faceList, unfaced,
   type Retime, type Tempo, type Written,
 } from '@/written'
 export { grabJson } from '@/reply'

@@ -376,15 +376,42 @@ function balanced(css: string, from: number): number {
  * same reason they are useless to a snapshot: a face rule styles nothing by itself and can only be
  * reached by a name something else already asked for.
  */
-export function typefaces(css: string): string {
-  if (!css) return ''
+export function faceList(css: string): string[] {
+  if (!css) return []
   const out: string[] = []
   for (let at = css.indexOf('@font-face'); at >= 0; at = css.indexOf('@font-face', at + 1)) {
     const open = css.indexOf('{', at)
     if (open < 0) break
     out.push(css.slice(at, balanced(css, open) + 1))
   }
-  return out.join('\n')
+  return out
+}
+
+export function typefaces(css: string): string {
+  return faceList(css).join('\n')
+}
+
+/**
+ * The same sheet with its face rules taken out, so somebody else can carry them.
+ *
+ * A rail gives every car its own copy of the sheet it was captured with, and a face rule is not
+ * scoped to a car the way a selector is: thirty cars off the same app meant the same three typefaces
+ * declared six hundred and ninety times. That costs nothing on a page, where a browser fetches each
+ * url once however often it is named, and it costs everything in a frame, where the bytes are
+ * embedded at every mention. Measured on thirty real captures: 28105kb of a 28805kb frame was three
+ * fonts written out again and again.
+ */
+export function unfaced(css: string): string {
+  if (!css) return ''
+  let out = ''
+  let at = 0
+  for (let i = css.indexOf('@font-face'); i >= 0; i = css.indexOf('@font-face', at)) {
+    const open = css.indexOf('{', i)
+    if (open < 0) break
+    out += css.slice(at, i)
+    at = balanced(css, open) + 1
+  }
+  return out + css.slice(at)
 }
 
 /**
