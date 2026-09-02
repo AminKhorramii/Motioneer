@@ -877,6 +877,21 @@ is not tidiness. `data-rail` is what a click on the stage maps back to a row, so
 car out would move every index after it: the same conflation that once handed every car its
 neighbour's timing on the way out to an export.
 
+Three operations act on a set of rows rather than on one bar: cascade, spread and reverse. A launch
+film is eight things arriving a beat apart and later leaving in the other order, and composed by hand
+that is eight drags against a ruler, with the tell being that the gaps are never quite equal. Cascade
+puts ninety milliseconds between them in row order, starting where the earliest already is, because a
+gap much wider stops reading as one gesture and starts reading as separate events; it is a starting
+point rather than a verdict, since the bars are still draggable afterwards. Spread divides the span
+they already cover, moving what is between the ends. Reverse hands the same instants out the other
+way up. Each is one operation on the arrangement, so each is one step of undo instead of a run of
+nudges, and each goes through `moved` so a car pinned to another keeps its link and has its gap
+adjusted rather than quietly coming loose.
+
+They appear with the selection and are shown by `paintSel` rather than written into the strip, for
+the reason that function already exists: a selection deliberately does not rebuild the timeline,
+because reloading the rail frame to light up a row would restart every motion on it.
+
 Rows carry a grip and can be dragged into a different order. Order and offset are different
 decisions, so reordering swaps places in the rail and leaves each car's own offset alone: two cars can
 begin together and still need one above the other.

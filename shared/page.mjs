@@ -2819,6 +2819,18 @@ function timeline(live){
     + '<div class="tlrails">'
     + (comparing()? rails.map((t,n)=>'<button class="railtab'+(n===railN?' on':'')+'" data-arr-to="'+n+'">'
         +esc('take '+(n+1))+'</button>').join('') : '')
+    /* always in the markup and shown by paintSel, because a selection deliberately does not rebuild
+       this strip: reloading the rail frame to light up a row would restart every motion on it */
+    + '<button class="railtab beat" id="tlcascade"'+(sel.size>1?'':' hidden')
+      +' title="a tight gap between each of them, in row order, starting where the earliest already'
+      +' is. Ninety milliseconds, because a gap much wider stops reading as one gesture and starts'
+      +' reading as separate events">cascade</button>'
+    + '<button class="railtab beat" id="tlspread"'+(sel.size>1?'':' hidden')
+      +' title="the same span, evenly divided, which is what a row of bars nobody has tidied is'
+      +' missing">spread</button>'
+    + '<button class="railtab beat" id="tlreverse"'+(sel.size>1?'':' hidden')
+      +' title="the same instants handed out the other way up, so a cascade runs back the way it'
+      +' came">reverse</button>'
     + '<button class="railtab" id="tlback" title="back to the cards, to choose a different motion for'
       +' any of these">choosing</button>'
     + (rails.length<3
@@ -2961,6 +2973,9 @@ function paintSel(){
     r.classList.toggle('on', i===lead)
     const bar=r.querySelector('.tlbar'); if(bar) bar.classList.toggle('sel', sel.has(i))
   }
+  /* the three that act on a set appear with the set, here rather than in the markup, for the same
+     reason the rows are painted rather than rebuilt: a selection must not reload the frame */
+  for(const b of document.querySelectorAll('.railtab.beat')) b.hidden = sel.size<2
   /* reached into rather than reloaded, because the frame is showing the same cars at the same
      offsets and rebuilding it to light one up would restart every motion in it */
   try{
@@ -3128,6 +3143,23 @@ function wireTimeline(live){
   /* the way back sits in the foot beside fit rather than on the band. A band that took clicks would
      have to take them across everything it shades, and what is under there is the rows you are still
      composing with */
+  /* the three that act on the taken rows. Each is one operation on the arrangement, so each is one
+     step of undo and none of them has to be assembled from a run of nudges */
+  const beat=(id,how,say)=>{
+    const btn=document.getElementById(id); if(!btn) return
+    btn.onclick=e=>{ e.stopPropagation()
+      const rows=[...sel]
+      if(rows.length<2) return
+      mark(say)
+      arr=how(arr,rows)
+      held.clear(); ends.clear(); render()
+    }
+  }
+  /* ninety, because a gap much wider stops reading as one gesture and starts reading as separate
+     events. It is a starting point rather than a verdict: the bars are still draggable afterwards */
+  beat('tlcascade',(a,rows)=>ARR.staggered(a,rows,90),'cascading them')
+  beat('tlspread',(a,rows)=>ARR.spread(a,rows),'spreading them evenly')
+  beat('tlreverse',(a,rows)=>ARR.reversed(a,rows),'reversing their order')
   const all=document.getElementById('tlall')
   if(all) all.onclick=e=>{ e.stopPropagation()
     mark('filming all of it'); arr=ARR.cutTo(arr,null); held.clear(); ends.clear(); render() }

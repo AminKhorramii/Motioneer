@@ -700,6 +700,35 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
     await room.locator('[data-row="0"]').click(); await room.waitForTimeout(120)
     await room.locator('[data-row="2"]').click({ modifiers: ['Shift'] }); await room.waitForTimeout(120)
     ok('shift click takes the rows between', String(await picked()) === '0,1,2', `${await picked()}`)
+    /**
+     * The three that act on a set, which dragging bars one at a time is not.
+     *
+     * A launch film is eight things arriving a beat apart and later leaving in the other order.
+     * Composed by hand that is eight drags against a ruler, and the tell is that the gaps are never
+     * quite equal. They appear with the selection and are painted in rather than rebuilt, because a
+     * selection must not reload the rail frame and restart every motion on it.
+     */
+    ok('the rhythm controls appear with a set of rows and not before',
+      await room.evaluate(() => !document.getElementById('tlcascade').hidden))
+    await room.evaluate(() => { arr = ARR.moved(ARR.moved(arr, 1, 700), 2, 1500); render(); choose([0, 1, 2]) })
+    await room.waitForTimeout(400)
+    await room.evaluate(() => shut())
+    await room.locator('#tlcascade').click(); await room.waitForTimeout(500)
+    ok('cascade puts a tight gap between them, in row order, from where the earliest was',
+      String(await offs()) === '0,90,180', `${await offs()}`)
+    await room.evaluate(() => shut())
+    await room.locator('#tlreverse').click(); await room.waitForTimeout(500)
+    ok('and reverse hands the same instants out the other way up',
+      String(await offs()) === '180,90,0', `${await offs()}`)
+    await room.evaluate(() => { arr = ARR.moved(arr, 1, 20); render() }); await room.waitForTimeout(300)
+    await room.evaluate(() => shut())
+    await room.locator('#tlspread').click(); await room.waitForTimeout(500)
+    /* they sit at 180, 20 and 0, so the span is 0 to 180 and evenly divided in row order is 0, 90,
+       180: the point being that the middle one moves and the two ends do not */
+    ok('while spread divides the span they already cover evenly, moving what is between the ends',
+      String(await offs()) === '0,90,180', `${await offs()}`)
+    await room.evaluate(() => { arr = ARR.moved(ARR.moved(arr, 1, 800), 2, 1600); render(); choose([0, 1, 2]) })
+    await room.waitForTimeout(400)
     await room.locator('[data-row="1"]').click({ modifiers: ['Meta'] }); await room.waitForTimeout(120)
     ok('and the platform modifier takes one back out rather than putting it back in',
       String(await picked()) === '0,2', `${await picked()}`)

@@ -561,6 +561,58 @@ export function shifted(arr, ids, delta) {
   return out
 }
 
+/**
+ * The three things you do to several bars at once, which dragging them one at a time is not.
+ *
+ * A launch film is fast and dense: eight things arriving a beat apart, then the same eight leaving in
+ * the other order. Composed by hand that is eight drags against a ruler, and the tell that it was
+ * done by hand is that the gaps are never quite equal. These are the operations somebody is actually
+ * performing when they do that, so they are worth having as operations.
+ *
+ * Every one of them goes through moved rather than writing `at` itself, so a car pinned to another
+ * keeps its link and has its gap adjusted instead of quietly coming loose. Rows are taken in the
+ * order they sit in, because that is the order on screen and the only one anybody is thinking in.
+ */
+const inOrder = (arr, picks) => [...new Set(picks)]
+  .filter((i) => arr.cars && arr.cars[i]).sort((a, b) => a - b)
+
+/** each one a fixed gap after the one above it, starting where the earliest of them already was */
+export function staggered(arr, picks, gap) {
+  const rows = inOrder(arr, picks)
+  if (rows.length < 2) return arr
+  const { at } = resolve(arr)
+  const start = Math.min(...rows.map((i) => at[i]))
+  const step = Math.max(0, Math.round(num(gap)))
+  let out = arr
+  rows.forEach((i, k) => { out = moved(out, i, start + k * step) })
+  return out
+}
+
+/** the same span, evenly divided, which is what somebody means by tidy them up */
+export function spread(arr, picks) {
+  const rows = inOrder(arr, picks)
+  /* two are already evenly spread and there is nothing in between to place */
+  if (rows.length < 3) return arr
+  const { at } = resolve(arr)
+  const times = rows.map((i) => at[i])
+  const first = Math.min(...times)
+  const step = (Math.max(...times) - first) / (rows.length - 1)
+  let out = arr
+  rows.forEach((i, k) => { out = moved(out, i, Math.round(first + k * step)) })
+  return out
+}
+
+/** the same instants handed out the other way up, so a cascade runs back the way it came */
+export function reversed(arr, picks) {
+  const rows = inOrder(arr, picks)
+  if (rows.length < 2) return arr
+  const { at } = resolve(arr)
+  const times = rows.map((i) => at[i]).sort((a, b) => a - b)
+  let out = arr
+  rows.forEach((i, k) => { out = moved(out, i, Math.round(times[times.length - 1 - k])) })
+  return out
+}
+
 /** a row moved to a different place in the film, which is not a change to when it starts */
 export function reordered(arr, from, to) {
   const cars = arr.cars.slice()
