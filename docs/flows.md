@@ -1094,6 +1094,19 @@ payload was growing by 962kb a car and is now flat: thirty cars went from 28805k
 from 653ms to 104ms, and a minute at sixty frames a second from thirty nine minutes to six. The
 picture is unchanged, checked pixel by pixel across six cars mid cascade.
 
+The walk happens once for the whole film too. Whether an element animates, what its base delays are,
+which clock it sits on and when it is on stage are all questions about the document rather than about
+the instant, and holdAt was asking every one of them per frame: every element and both its pseudo
+elements, which on thirty components is eighteen hundred computed style reads a frame and six and a
+half million across a minute at sixty. Split in two, a plan that walks and a rule builder that is
+arithmetic over it, a frame of thirty components went from 104ms to 27ms. holdAt still does both and
+behaves exactly as it did; the film path plans once and never touches the document again, because the
+copy each frame goes into was taken already and names its elements by attributes that stay put. They
+come off with the strip rather than frame by frame, which is what its release is for.
+
+Together with the typefaces those two take a rail of thirty components from 653ms a frame to 27, and
+a minute of it at sixty frames a second from thirty nine minutes to a hundred seconds.
+
 A film serializes the document once rather than once a frame. Broken down on a real capture at 1280
 by 720, a frame cost 33ms: 5.6ms serializing, 8.9ms in base64, 12.3ms of the browser parsing the
 copy, and the rest drawing. The fonts were 937kb of the 966kb frame, and between two instants of the

@@ -1871,8 +1871,14 @@ async function filmHere(frame, want, say){
   }
   // streamed rather than collected: ninety canvases at 1280 by 720 is a third of a gigabyte held
   // for no reason, when the encoder only ever looks at one of them
-  const bytes=await M.encode(stream(),{width:want.w,height:want.h,fps:want.fps,
-    onProgress:(done)=>say('Drawing frame '+done+' of '+total,done,total)})
+  let bytes
+  try{
+    bytes=await M.encode(stream(),{width:want.w,height:want.h,fps:want.fps,
+      onProgress:(done)=>say('Drawing frame '+done+' of '+total,done,total)})
+  }finally{
+    // the document goes back the way it was found, however the film ended
+    try{ draw.release() }catch(_){}
+  }
   return {bytes,total,notes:(inlined&&inlined.notes)||[],limits:R.limits(doc)}
 }
 /* 1920 is here because it stopped being expensive. A frame used to cost 298ms and four times the

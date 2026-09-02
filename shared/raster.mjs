@@ -460,13 +460,25 @@ const rewriteCss = (text, base, found) => String(text).replace(URL_IN_CSS, (whol
  * than it sounds: the same document is held at ninety instants in a row, and a hold that leaves a
  * milligram behind each time is jitter that reads as a bad ease.
  */
-export function holdAt(doc, ms) {
-  const at = Math.max(0, Number(ms) || 0)
+/**
+ * Which elements a hold has anything to say about, and what it needs to know about each.
+ *
+ * Everything here is a question about the document rather than about the instant. Whether an element
+ * animates, what its base delays are, which clock it sits on and when it is on stage do not change
+ * between two frames of the same film; only the arithmetic does. Asking them per frame meant walking
+ * every element and calling getComputedStyle on it and both its pseudo elements ninety times over,
+ * which on thirty components is six hundred nodes, eighteen hundred style reads a frame, and six and
+ * a half million across a minute at sixty frames a second.
+ *
+ * The attributes are applied here, because a rule can only name an element that wears one, and a
+ * serialized copy has to carry them. The order the numbers are handed out in is the order the walk
+ * finds them, which is what lets a copy taken once stay valid for every instant afterwards.
+ */
+function planOf(doc) {
   const view = doc.defaultView
-  if (!view) throw new Error('holdAt needs a document that is in a window, because it reads computed styles')
-
   const marked = []
-  const rules = []
+  const moves = []
+  const lives = []
   const retimed = new Set()
   let n = 0
 
@@ -484,10 +496,8 @@ export function holdAt(doc, ms) {
   }
 
   for (const el of doc.querySelectorAll('*')) {
-    const lines = []
-    /* not clamped at zero: a car whose turn has not come is legitimately at a negative instant, and
-       that is what leaves it holding its first frame instead of being dragged forward to it */
-    const local = at - clockOf(el)
+    const found = []
+    const clock = clockOf(el)
     for (const part of PARTS) {
       let style = null
       try {
@@ -497,15 +507,13 @@ export function holdAt(doc, ms) {
       }
       const name = style && style.animationName
       if (!name || name === 'none') continue
-      const shifted = String(style.animationDelay || '0s').split(',')
-        .map((one) => `${millis(one) - local}ms`).join(', ')
-      lines.push(`[${HELD}="${n}"]${part || ''}{animation-delay:${shifted} !important;animation-play-state:paused !important}`)
+      found.push({ part, delays: String(style.animationDelay || '0s').split(',').map(millis), clock })
     }
-    if (!lines.length) continue
+    if (!found.length) continue
     el.setAttribute(HELD, String(n))
     marked.push(el)
     retimed.add(el)
-    rules.push(...lines)
+    for (const one of found) moves.push({ ...one, n })
     n++
   }
 
@@ -516,28 +524,56 @@ export function holdAt(doc, ms) {
    * style as the clock moves. That is invisible to anything that draws the document rather than
    * watching it: a copy carries declarations and not whatever a listener last did, so a filmed rail
    * showed every element from the first frame however carefully its arrival had been placed.
-   * Important, because the copy inherits the inline style the preview left behind.
    */
   for (const el of doc.querySelectorAll(`[${FROM}]`)) {
-    const from = Number(el.getAttribute(FROM)) || 0
     const said = el.getAttribute(UNTIL)
-    const until = said === null || said === '' ? null : Number(said)
-    /**
-     * Said either way, not only when it should be hidden.
-     *
-     * The live preview hides a component by setting a style on it as the clock moves, and filming
-     * holds the frame at zero before it starts, so every component that has not come on yet is
-     * carrying an inline hidden when the first frame is drawn. A rule that only ever adds hidden
-     * cannot take that back, so the whole film showed the one component that happens to start at
-     * zero and nothing else ever arrived. Both halves have to be written, or the copy inherits
-     * whatever the last listener happened to leave behind.
-     */
-    const on = at >= from && (until === null || at < until)
+    lives.push({ n, from: Number(el.getAttribute(FROM)) || 0,
+      until: said === null || said === '' ? null : Number(said) })
     el.setAttribute(HELD, String(n))
     marked.push(el)
-    rules.push(`[${HELD}="${n}"]{visibility:${on ? 'visible' : 'hidden'} !important}`)
     n += 1
   }
+  return { moves, lives, marked, retimed }
+}
+
+/**
+ * The hold sheet for one instant, which is all that changes between two frames of a film.
+ *
+ * Pure arithmetic over the plan: no dom, no computed styles, nothing to undo. That is the whole
+ * point of splitting it out, and it is why a frame can be drawn by splicing this into a copy taken
+ * once rather than by rebuilding the copy.
+ */
+function rulesAt(plan, at) {
+  const out = []
+  for (const m of plan.moves) {
+    /* not clamped at zero: a car whose turn has not come is legitimately at a negative instant, and
+       that is what leaves it holding its first frame instead of being dragged forward to it */
+    const local = at - m.clock
+    const shifted = m.delays.map((d) => `${d - local}ms`).join(', ')
+    out.push(`[${HELD}="${m.n}"]${m.part || ''}{animation-delay:${shifted} !important;animation-play-state:paused !important}`)
+  }
+  /**
+   * Said either way, not only when it should be hidden.
+   *
+   * Filming holds the frame at zero before it starts, so every component that has not come on yet is
+   * carrying an inline hidden when the first frame is drawn. A rule that only ever adds hidden
+   * cannot take that back, so the whole film showed the one component that happens to start at zero.
+   */
+  for (const l of plan.lives) {
+    const on = at >= l.from && (l.until === null || at < l.until)
+    out.push(`[${HELD}="${l.n}"]{visibility:${on ? 'visible' : 'hidden'} !important}`)
+  }
+  return out.join('\n')
+}
+
+export function holdAt(doc, ms) {
+  const at = Math.max(0, Number(ms) || 0)
+  const view = doc.defaultView
+  if (!view) throw new Error('holdAt needs a document that is in a window, because it reads computed styles')
+
+  const plan = planOf(doc)
+  const { marked, retimed } = plan
+  const rules = [rulesAt(plan, at)]
 
   const sheet = doc.createElement('style')
   sheet.setAttribute('data-wall-hold', '')
@@ -860,20 +896,21 @@ export async function filmstrip(doc, { width, height, inlined, scale = 1 } = {})
     + `<foreignObject x="0" y="0" width="${w}" height="${h}">`
   const foot = '</foreignObject></svg>'
 
-  const sheetOf = () => doc.querySelector('[data-wall-hold]')
-  const shape = (() => {
-    const release = holdAt(doc, 0)
-    try {
-      const el = sheetOf()
-      return { text: el ? el.textContent : null, marks: doc.querySelectorAll(`[${HELD}]`).length }
-    } finally { release() }
-  })()
+  /* the walk happens once for the whole film. Everything it learns is a question about the document
+     and not about the instant, so per frame there is nothing left to read: the rules are arithmetic
+     over the plan and the copy they go into was taken already */
+  const plan = planOf(doc)
+  const undo = () => { for (const el of plan.marked) el.removeAttribute(HELD) }
+  const shape = { text: rulesAt(plan, 0), marks: plan.marked.length }
 
   let cut = null
   if (shape.text) {
-    const release = holdAt(doc, 0)
+    const sheet = doc.createElement('style')
+    sheet.setAttribute('data-wall-hold', '')
+    sheet.textContent = shape.text
+    ;(doc.head || doc.documentElement).appendChild(sheet)
     let xml
-    try { xml = await serialize(doc, { inlined, width: w, height: h }) } finally { release() }
+    try { xml = await serialize(doc, { inlined, width: w, height: h }) } finally { sheet.remove() }
     const at = xml.indexOf(shape.text)
     if (at > 0) {
       /* padded so the front half is a whole number of base64 groups. Spaces, and inside the sheet's
@@ -886,20 +923,16 @@ export async function filmstrip(doc, { width, height, inlined, scale = 1 } = {})
     }
   }
 
+  /* the attributes stay on for the life of the strip, because the copy that was taken names elements
+     by them and every frame is that copy with different rules in it */
   const owner = (typeof document !== 'undefined' && document) || doc
-  return async function frame(ms) {
+  async function frame(ms) {
     let uri = null
     if (cut) {
-      const release = holdAt(doc, ms)
-      try {
-        const el = sheetOf()
-        if (el && doc.querySelectorAll(`[${HELD}]`).length === cut.marks) {
-          uri = `data:image/svg+xml;base64,${cut.b64}`
-            + base64(new TextEncoder().encode(el.textContent + cut.back))
-        }
-      } finally { release() }
+      uri = `data:image/svg+xml;base64,${cut.b64}`
+        + base64(new TextEncoder().encode(rulesAt(plan, Math.max(0, Number(ms) || 0)) + cut.back))
     }
-    if (!uri) return rasterize(doc, { width: w, height: h, ms, inlined, scale })
+    if (!uri) { undo(); return rasterize(doc, { width: w, height: h, ms, inlined, scale }) }
     const image = await new Promise((ok, no) => {
       const img = new Image()
       img.onload = () => ok(img)
@@ -912,6 +945,11 @@ export async function filmstrip(doc, { width, height, inlined, scale = 1 } = {})
     canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height)
     return canvas
   }
+  /* the marks are left on for the life of the strip and taken off with it. A hold cleans up after
+     itself frame by frame; this one cannot, because the copy every frame goes into names elements
+     by exactly these attributes */
+  frame.release = undo
+  return frame
 }
 
 /**
