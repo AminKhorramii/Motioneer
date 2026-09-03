@@ -727,8 +727,44 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
        180: the point being that the middle one moves and the two ends do not */
     ok('while spread divides the span they already cover evenly, moving what is between the ends',
       String(await offs()) === '0,90,180', `${await offs()}`)
-    await room.evaluate(() => { arr = ARR.moved(ARR.moved(arr, 1, 800), 2, 1600); render(); choose([0, 1, 2]) })
+    /**
+     * One motion put on the other rows, without asking for it again.
+     *
+     * A film is often the same movement on many things at different times, and every one of those
+     * was its own model call. Nothing has to be generated: the sheet exists. A motion id names a
+     * sheet and the element it was written for together, so what is minted is each target's own
+     * capture wearing the source's sheet, and the check that matters is that each row still draws
+     * its own element rather than three copies of the source's.
+     */
+    await room.evaluate(() => { arr = ARR.moved(ARR.moved(arr, 1, 800), 2, 1600); render(); choose([0, 1, 2], 0) })
     await room.waitForTimeout(400)
+    const sheets = () => room.evaluate(() => arr.cars.map((c) => c.motion.id))
+    const lists = () => room.evaluate(() => arr.cars.map((c) => c.alternatives.length))
+    const wore = await sheets()
+    await room.evaluate(() => shut())
+    await room.locator('#tlsame').click()
+    await room.waitForFunction(() => !document.getElementById('tlsame').disabled, null, { timeout: 60000 })
+    await room.waitForTimeout(500)
+    const nowWear = await sheets()
+    ok('one motion goes onto the other taken rows, as their own new options',
+      nowWear[0] === wore[0] && nowWear[1] !== wore[1] && nowWear[2] !== wore[2],
+      `${wore} then ${nowWear}`)
+    /* the lead is untouched and keeps its one; the two it was put on gain a second, which is the
+       promise the tune panel makes about the original staying */
+    ok('and each it was put on keeps what it had, in its own list, so it can be cycled back to',
+      (await lists()).slice(1).every((n) => n >= 2), `${await lists()}`)
+    /* by the attribute each car's own markup carries, since these three say the same words and
+       reading their text would prove nothing either way */
+    ok('while every row still draws its own element rather than the one it borrowed from',
+      await room.evaluate(() => {
+        const f = document.querySelector('.appwrap iframe')
+        return [1, 2, 3].every((n) => f.contentDocument.querySelectorAll(`[data-m${n}]`).length === 1)
+      }))
+    await room.evaluate(() => { undo(); render() }); await room.waitForTimeout(400)
+    ok('and one undo puts every one of them back',
+      String(await sheets()) === String(wore), `${await sheets()}`)
+    await room.evaluate(() => { choose([0, 1, 2]) })
+    await room.waitForTimeout(300)
     await room.locator('[data-row="1"]').click({ modifiers: ['Meta'] }); await room.waitForTimeout(120)
     ok('and the platform modifier takes one back out rather than putting it back in',
       String(await picked()) === '0,2', `${await picked()}`)

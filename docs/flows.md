@@ -877,6 +877,26 @@ is not tidiness. `data-rail` is what a click on the stage maps back to a row, so
 car out would move every index after it: the same conflation that once handed every car its
 neighbour's timing on the way out to an export.
 
+A fourth puts one motion on the rest of them. A film is often the same movement on many things at
+different times, and every one of those was its own model call: eight elements meant eight asks and
+eight sets of five to choose between, when what somebody wanted to say was that one, on these too.
+Nothing has to be generated for it, because the sheet already exists.
+
+It cannot simply hand a car the source's motion id. An id names a sheet and the element it was
+written for together, so railview would look it up and draw the source's markup twice; what is minted
+instead is each target's own capture wearing the source's sheet. The scope travels with it, which is
+safe because railview already gives every car its own tag and rewrites the sheet into it, so two cars
+sharing a scope was always the ordinary case rather than a collision. Measured on three elements with
+three different motions: after one press all three run the same keyframes, and held at 700ms they sit
+at three different points in it, which is the whole shape of a launch film in one gesture.
+
+The sheet was written against the source's markup, so on an element built differently some of it will
+match nothing. That is worth allowing rather than preventing: it costs a click to find out, the row
+says what it is playing, and what it had is still in its own list to cycle back to. Applying is a
+bulk assignment and not a live link, for the reason the tune panel and the pen already give: every
+edit here is local, and a change that silently moved seven other rows would be coupling with nothing
+on screen to show it.
+
 Three operations act on a set of rows rather than on one bar: cascade, spread and reverse. A launch
 film is eight things arriving a beat apart and later leaving in the other order, and composed by hand
 that is eight drags against a ruler, with the tell being that the gaps are never quite equal. Cascade

@@ -2831,6 +2831,10 @@ function timeline(live){
     + '<button class="railtab beat" id="tlreverse"'+(sel.size>1?'':' hidden')
       +' title="the same instants handed out the other way up, so a cascade runs back the way it'
       +' came">reverse</button>'
+    + '<button class="railtab beat" id="tlsame"'+(sel.size>1?'':' hidden')
+      +' title="give the other taken rows the motion this one plays. A film is often the same'
+      +' movement on many things at different times, and nothing has to be written again for it:'
+      +' the sheet already exists. Each keeps what it had, in its own list">same motion</button>'
     + '<button class="railtab" id="tlback" title="back to the cards, to choose a different motion for'
       +' any of these">choosing</button>'
     + (rails.length<3
@@ -3160,6 +3164,35 @@ function wireTimeline(live){
   beat('tlcascade',(a,rows)=>ARR.staggered(a,rows,90),'cascading them')
   beat('tlspread',(a,rows)=>ARR.spread(a,rows),'spreading them evenly')
   beat('tlreverse',(a,rows)=>ARR.reversed(a,rows),'reversing their order')
+  /* the motion the lead row plays, put on the rest of the set. No model call: the sheet exists and
+     what is minted is each target's own capture wearing it */
+  const same=document.getElementById('tlsame')
+  if(same) same.onclick=async(e)=>{
+    e.stopPropagation()
+    const rows=[...sel].filter(i=>arr.cars[i]&&arr.cars[i].motion)
+    const head=lead!==null&&sel.has(lead)?lead:rows[0]
+    const rest=rows.filter(i=>i!==head)
+    if(head===undefined||!rest.length) return
+    same.classList.add('working'); same.disabled=true
+    try{
+      const r=await post('/__wall/sameas',
+        {from:arr.cars[head].motion.id,to:rest.map(i=>arr.cars[i].motion.id)},120000)
+      const got=(r&&r.kept)||[]
+      if(got.length){
+        mark(nameOf(arr.cars[head].motion)+' on '+got.length+' more')
+        /* offered then swapped, so what each row had stays in its own list and can be cycled back
+           to: the same promise the tune panel makes about the original staying */
+        for(const one of got){
+          const i=rows.find(k=>arr.cars[k].motion.id===one.was)
+          if(i===undefined) continue
+          arr=ARR.offered(arr,i,[one])
+          arr=ARR.swapped(arr,i,arr.cars[i].alternatives.length-1)
+        }
+        held.clear(); ends.clear(); render()
+      } else drops.textContent='Nothing came back to put on them.'
+    }catch(err){ drops.textContent=String(err&&err.message||err) }
+    same.classList.remove('working'); same.disabled=false
+  }
   const all=document.getElementById('tlall')
   if(all) all.onclick=e=>{ e.stopPropagation()
     mark('filming all of it'); arr=ARR.cutTo(arr,null); held.clear(); ends.clear(); render() }

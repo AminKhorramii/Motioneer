@@ -1683,6 +1683,38 @@ async function altered(from, words) {
     seen: { reach: rest.reach, stir: rest.stir, escape: rest.escape, blank: rest.blank } }
 }
 
+/**
+ * One motion put on other elements, without asking for it again.
+ *
+ * A launch film is the same movement on many things at different times: eight cards that all rise,
+ * a beat apart. Today every one of those is its own ask, so eight elements is eight model calls and
+ * eight sets of five to choose between, and the thing somebody wanted was to say "that one, on these
+ * too". Nothing has to be generated for that: the sheet already exists.
+ *
+ * A motion id names a sheet and the element it was written for together, so this cannot simply hand
+ * a car somebody else's id: railview would look it up and draw the source's markup twice. What it
+ * mints instead is the target's own capture wearing the source's sheet. The scope goes across with
+ * it, which is safe because railview already gives every car its own tag and rewrites the sheet into
+ * it, so two cars sharing a scope was always the ordinary case rather than a collision.
+ *
+ * The sheet was written against the source's markup, so on an element built differently some of it
+ * will match nothing. That is worth allowing rather than preventing: it costs a click to find out,
+ * the row says what it is playing, and the alternative it had is still in its list.
+ */
+function sameAs(from, to) {
+  const source = made.get(from)
+  if (!source) return null
+  return (to || []).map((id) => {
+    const target = made.get(id)
+    if (!target || id === from) return null
+    const next = String(nextId++)
+    keep(next, { ...target, id: next, css: source.css, scope: source.scope,
+      note: source.note, verb: source.verb })
+    return { was: id, id: next, verb: source.verb, scope: source.scope, note: source.note,
+      css: source.css, tempo: tempo(source.css) }
+  }).filter(Boolean)
+}
+
 async function options(src, count) {
   // a picked element arrives already rendered and already carrying the rules that matched it, so
   // there is nothing to parse and nothing to guess
@@ -2518,6 +2550,13 @@ const server = createServer(async (req, res) => {
       const got = await altered(from, words)
       console.log(got.id ? `    kept as ${got.id}` : `    dropped: ${got.why}`)
       return json(res, got)
+    }
+    if (url.pathname === '/__wall/sameas' && req.method === 'POST') {
+      const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))
+      const got = sameAs(String(body.from ?? ''), (body.to ?? []).map(String))
+      if (!got) { res.writeHead(404); return res.end('gone') }
+      console.log(`  putting "${made.get(String(body.from)).note}" on ${got.length} more`)
+      return json(res, { kept: got })
     }
     if (url.pathname === '/__wall/export' && req.method === 'POST') {
       const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))
