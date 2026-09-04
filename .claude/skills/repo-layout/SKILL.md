@@ -61,7 +61,7 @@ five in the same change:
    Check each one rather than assuming.
 3. Update every `scripts` entry in `package.json` that names the old path, because those paths
    are the public interface of the repository and a stale one fails only when someone runs it.
-4. Update the map in `docs/architecture.md` and any mention in `docs/development.md`, because a
+4. Update the map in `docs/architecture.md`, because a
    map that lies is worse than no map.
 5. Run `npm run build && node verify/app.mjs`, then run the moved suite itself. A move that is
    not exercised is a move that is not done.

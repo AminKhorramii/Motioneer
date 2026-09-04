@@ -107,5 +107,5 @@ npm run verify:all    the suites that need no network
 npm run verify:studio twenty real sites through the proxy
 ```
 
-`docs/architecture.md` is the module map, `docs/flows.md` is every path through the studio and the
-code that carries it, and `docs/rail.md` is the plan for finishing multi selection.
+`docs/architecture.md` is the module map and `docs/flows.md` is every path through the studio and the
+code that carries it.

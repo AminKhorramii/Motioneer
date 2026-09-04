@@ -4,8 +4,7 @@ Motioneer is a motion studio. You point it at a running site, pick elements off 
 motions for each to compare on one timeline. It used to also make walls of landing pages; that
 half was removed, and anything in git history about sections, worlds, composing or slop belongs
 to it rather than to this. Read `docs/flows.md` for every path through the studio and the code
-that carries it, `docs/architecture.md` for the module map, and `docs/rail.md` for the plan for
-multi selection.
+that carries it, and `docs/architecture.md` for the module map.
 
 ## Where things live
 
