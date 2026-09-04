@@ -338,7 +338,7 @@ if (process.stdin.isTTY) {
   console.log('    npx motioneer                 open the studio on the components it ships with')
   console.log('    npx motioneer localhost:3000     open it on your own app\n')
   console.log('  To give it to an agent instead:\n')
-  console.log('    claude mcp add --scope user motioneer -- npx -y motioneer-mcp\n')
+  console.log('    claude mcp add --scope user motioneer -- npx -y -p motioneer motioneer-mcp\n')
   process.exit(0)
 }
 

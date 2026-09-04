@@ -52,7 +52,7 @@ The same studio, opened for you when you ask:
 > open the motion studio on localhost:3000
 
 ```
-claude mcp add --scope user motioneer -- npx -y motioneer-mcp
+claude mcp add --scope user motioneer -- npx -y -p motioneer motioneer-mcp
 ```
 
 The agent side also has `motion`, which writes a sheet for markup you hand it without opening
