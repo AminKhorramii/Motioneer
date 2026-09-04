@@ -54,7 +54,7 @@ const kinds = DEEP ? KINDS : KINDS.slice(0, 7)
 
 const only = process.argv.slice(2).filter((a) => !a.startsWith('--'))
 const list = only.length ? SITES.filter(([n]) => only.includes(n)) : SITES
-const PORT = Number(process.env.WALL_PORT || 4398)
+const PORT = Number(process.env.MOTIONEER_PORT || 4398)
 
 /* ── the rail's arithmetic, which needs no site and no browser ────────────────────────────────── */
 /**
@@ -425,7 +425,7 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
    * looked wrong in the file; the one decision a rail records had simply been dropped on the way out.
    */
   console.log('\n  what an exported rail plays')
-  const bed = mkdtempSync(join(tmpdir(), 'wall-rail-'))
+  const bed = mkdtempSync(join(tmpdir(), 'motioneer-rail-'))
   const sheet = (n, ms) => `[data-m${n}] > b{opacity:0;animation:rise${n} ${ms}ms ease both}
 [data-m${n}] > b:nth-child(2){animation-delay:120ms}
 @keyframes rise${n}{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
@@ -467,18 +467,18 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
       base: '', note: 'slow rises', verb: 'rising,',
     }]]),
   }))
-  const XPORT = Number(process.env.WALL_RAIL_PORT || 4390)
+  const XPORT = Number(process.env.MOTIONEER_RAIL_PORT || 4390)
   for (const pid of spawnSync('lsof', ['-ti', `tcp:${XPORT}`], { encoding: 'utf8' })
     .stdout.split('\n').filter(Boolean).filter((p) => p !== String(process.pid))) {
     try { process.kill(Number(pid), 'SIGKILL') } catch { /* gone */ }
   }
   const seeded = spawn('node', [resolve('tools/studio.mjs'), resolve('examples/components')],
-    { cwd: bed, env: { ...process.env, WALL_PORT: String(XPORT), WALL_NO_OPEN: '1' }, stdio: 'ignore' })
+    { cwd: bed, env: { ...process.env, MOTIONEER_PORT: String(XPORT), MOTIONEER_NO_OPEN: '1' }, stdio: 'ignore' })
   const shut = () => { try { seeded.kill('SIGKILL') } catch { /* gone */ } }
   process.on('exit', shut)
   await new Promise((r) => setTimeout(r, 3500))
 
-  const wrote = await fetch(`http://localhost:${XPORT}/__wall/export`, {
+  const wrote = await fetch(`http://localhost:${XPORT}/__motioneer/export`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ ids: ['1', '2', '3'], at: [0, 800, 1600], shots: ['', '', ''], name: 'railleg' }),
@@ -494,7 +494,7 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
    * cars off one app meant the same three typefaces written out six hundred and ninety times: 28105kb
    * of a 28805kb frame, and 653ms to draw one.
    */
-  const railed2 = await fetch(`http://localhost:${XPORT}/__wall/railview?ids=1,2,3&at=0,800,1600&shots=,,&palette=`)
+  const railed2 = await fetch(`http://localhost:${XPORT}/__motioneer/railview?ids=1,2,3&at=0,800,1600&shots=,,&palette=`)
     .then((r) => r.text()).catch(() => '')
   const facesIn = (railed2.match(/@font-face/g) || []).length
   ok('a rail of three declares each typeface once rather than once a car', facesIn === 1,
@@ -502,7 +502,7 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
 
   /* Measured on a real app before this was written: a pick off it carried thirty-nine face rules and
      the preview registered none of them, so every option in the grid was rendered in the fallback. */
-  const faced = await fetch(`http://localhost:${XPORT}/__wall/preview/f`).then((r) => r.text())
+  const faced = await fetch(`http://localhost:${XPORT}/__motioneer/preview/f`).then((r) => r.text())
     .catch((e) => String(e))
   ok('a preview keeps the face rules a snapshot cannot carry', faced.includes('@font-face'))
   ok('and still drops the rest of the sheet the snapshot replaces', !faced.includes('background:#fff'))
@@ -515,9 +515,9 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
    * looked right on their own, which is how this family of fault always presents.
    */
   const lens = (t) => (t.match(/animation:dolly\w*\s+(\d+)ms/) || t.match(/animation:dolly\s+(\d+)ms/) || [])[1]
-  const shown = lens(await fetch(`http://localhost:${XPORT}/__wall/preview/L?camera=orbit&depth=1`)
+  const shown = lens(await fetch(`http://localhost:${XPORT}/__motioneer/preview/L?camera=orbit&depth=1`)
     .then((r) => r.text()).catch(() => ''))
-  const filmedAt = lens(await fetch(`http://localhost:${XPORT}/__wall/railview?ids=L&at=0&shots=orbit&palette=`)
+  const filmedAt = lens(await fetch(`http://localhost:${XPORT}/__motioneer/railview?ids=L&at=0&shots=orbit&palette=`)
     .then((r) => r.text()).catch(() => ''))
   ok('the camera in the film runs as long as the camera in the preview', !!shown && shown === filmedAt,
     `${shown}ms shown, ${filmedAt}ms filmed`)
@@ -550,7 +550,7 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
 
     /* the last thing the handoff was dropping. Offsets went first, then the placement, and each time
        the file looked complete: every id present, every sheet correct, one decision quietly gone */
-    const filmed = await fetch(`http://localhost:${XPORT}/__wall/export`, {
+    const filmed = await fetch(`http://localhost:${XPORT}/__motioneer/export`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ ids: ['1', '2'], at: [0, 700], shots: ['push', ''],
@@ -591,11 +591,11 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
      * offsets has all three at the same opacity.
      */
     const rail = await seat.newPage()
-    await rail.goto(`http://localhost:${XPORT}/__wall/railview?ids=1,2,3&at=0,800,1600&shots=,,&palette=`,
+    await rail.goto(`http://localhost:${XPORT}/__motioneer/railview?ids=1,2,3&at=0,800,1600&shots=,,&palette=`,
       { waitUntil: 'load' })
     await rail.waitForTimeout(900)
     const drawnAt = (ms) => rail.evaluate(async (t) => {
-      const R = await import('/__wall/raster.mjs')
+      const R = await import('/__motioneer/raster.mjs')
       const undo = R.holdAt(document, t)
       const seen = [...document.querySelectorAll('.car')]
         .map((c) => Number(getComputedStyle(c.querySelector('b')).opacity))
@@ -626,12 +626,12 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
      * which is the same fault the offsets had and is just as quiet.
      */
     const lived = await seat.newPage()
-    await lived.goto(`http://localhost:${XPORT}/__wall/railview`
+    await lived.goto(`http://localhost:${XPORT}/__motioneer/railview`
       + '?ids=1,2,3&at=0,600,1200&shots=,,&place=,,&life=0_1000,600_,1200_&palette=',
     { waitUntil: 'load' })
     await lived.waitForTimeout(800)
     const onStage = (ms) => lived.evaluate(async (t) => {
-      const R = await import('/__wall/raster.mjs')
+      const R = await import('/__motioneer/raster.mjs')
       const undo = R.holdAt(document, t)
       const v = [...document.querySelectorAll('.car')].map((c) => getComputedStyle(c).visibility)
       if (typeof undo === 'function') undo()
@@ -645,7 +645,7 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
      * back, so every later frame inherited the first one's answer and nothing ever arrived. Both
      * halves have to be written, which is why this holds at zero first and then asks.
      */
-    await lived.evaluate(() => window.postMessage({ wall: 'hold', t: 0, i: 0 }, '*'))
+    await lived.evaluate(() => window.postMessage({ motioneer: 'hold', t: 0, i: 0 }, '*'))
     await lived.waitForTimeout(200)
     ok('a component held out of the picture at zero is put back into it later',
       String(await onStage(1400)) === 'hidden,visible,visible', `${await onStage(1400)}`)
@@ -861,7 +861,7 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
     ok('and the refusal leaves the composition exactly as it was',
       String(await when()) === '300,700,840', `${await when()}`)
 
-    /* two arrangements of the same elements, on one clock, which is the wall applied to time */
+    /* two arrangements of the same elements, on one clock, which is the comparison this studio is for, applied to time */
     await lay(); await room.waitForTimeout(300)
     const shown = () => room.evaluate(() => [...document.querySelectorAll('.grid iframe')]
       .map((f) => decodeURIComponent((f.src.split('at=')[1] || '').split('&')[0])))
@@ -1299,7 +1299,7 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
      */
     let inWords = null
     let refuse = true
-    await room.route('**/__wall/described', async (route) => {
+    await room.route('**/__motioneer/described', async (route) => {
       inWords = JSON.parse(route.request().postData() || '{}').words
       await route.fulfill({ status: 200, contentType: 'application/json',
         body: JSON.stringify(refuse ? { why: 'it never comes back to where it started' }
@@ -1337,7 +1337,7 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
     await room.waitForTimeout(600)
     ok('and one that passes joins the row as another option',
       await room.evaluate(() => opts.length) === 2 && await room.evaluate(() => chosenOpt) === '2')
-    await room.unroute('**/__wall/described')
+    await room.unroute('**/__motioneer/described')
 
     /**
      * Changing one of them, which is a different question from asking for another.
@@ -1349,7 +1349,7 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
      */
     let penWords = null
     let penRefuse = true
-    await room.route('**/__wall/changed', async (route) => {
+    await room.route('**/__motioneer/changed', async (route) => {
       penWords = JSON.parse(route.request().postData() || '{}')
       await route.fulfill({ status: 200, contentType: 'application/json',
         body: JSON.stringify(penRefuse ? { why: 'it never comes back to where it started' }
@@ -1395,7 +1395,7 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
       await room.evaluate(() => opts.filter((o) => o.id === '2').length) === 1)
     ok('and the field closed behind it', await room.evaluate(() =>
       document.querySelectorAll('[data-penfor]').length) === 0)
-    await room.unroute('**/__wall/changed')
+    await room.unroute('**/__motioneer/changed')
 
     /**
      * The shot belongs to the element, not to the room.
@@ -1553,10 +1553,10 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
     const away = await seat.newContext({ viewport: { width: 1200, height: 800 },
       permissions: ['clipboard-read', 'clipboard-write'] })
     const shelf = await away.newPage()
-    await shelf.goto(`http://localhost:${XPORT}/__wall/bookmarklet`, { waitUntil: 'load' })
+    await shelf.goto(`http://localhost:${XPORT}/__motioneer/bookmarklet`, { waitUntil: 'load' })
     const code = decodeURIComponent((await shelf.getAttribute('a.bm', 'href')).replace(/^javascript:/, ''))
     ok('the picker travels whole in the bookmarklet, since a strict site will not fetch it',
-      code.length > 8000 && code.includes('wall-capture'), `${Math.round(code.length / 1024)}kb`)
+      code.length > 8000 && code.includes('motioneer-capture'), `${Math.round(code.length / 1024)}kb`)
 
     const theirs = await away.newPage()
     const sheet = '<!doctype html><html><body style="margin:0;font:16px system-ui">'
@@ -1580,7 +1580,7 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
     }
     ok('a page whose policy allows it hands the capture straight over',
       /2 elements sent/.test(await theirs.evaluate(() => {
-        const t = document.getElementById('wall-said'); return t ? t.textContent : '' })))
+        const t = document.getElementById('motioneer-said'); return t ? t.textContent : '' })))
     await inbox.waitForTimeout(1600)
     ok('and it arrives in the studio with nothing to paste',
       await inbox.evaluate(() => picks.length) === already + 2,
@@ -1606,7 +1606,7 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
     await shut.mouse.click(one.x + 12, one.y + 10); await shut.waitForTimeout(1500)
     ok('and falls back to the clipboard when it cannot',
       /1 element copied/.test(await shut.evaluate(() => {
-        const t = document.getElementById('wall-said'); return t ? t.textContent : '' })))
+        const t = document.getElementById('motioneer-said'); return t ? t.textContent : '' })))
 
     const carried = await inbox.evaluate(() => navigator.clipboard.readText())
     const paste = (text) => inbox.evaluate((t) => {
@@ -1641,8 +1641,8 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
       const sent = []
       const alerts = []
       one.on('dialog', async (d) => { alerts.push(d.message()); await d.dismiss() })
-      await one.route('**/__wall/rail', (r) => { sent.push(['rail', r.request().postDataJSON()]); r.abort() })
-      await one.route('**/__wall/motion', (r) => { sent.push(['motion', r.request().postDataJSON()]); r.abort() })
+      await one.route('**/__motioneer/rail', (r) => { sent.push(['rail', r.request().postDataJSON()]); r.abort() })
+      await one.route('**/__motioneer/motion', (r) => { sent.push(['motion', r.request().postDataJSON()]); r.abort() })
       await one.goto(`http://localhost:${XPORT}`, { waitUntil: 'load' })
       await one.waitForTimeout(1300)
       await one.evaluate(() => { picks = []; arr = null; opts = []; file = null; drawSel(); render() })
@@ -1657,7 +1657,7 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
       const some = [{ html: '<div data-p1><b>x</b></div>', css: '', shot: '', label: 'div.a', w: 240, h: 80, n: 2 },
         { html: '<div data-p2><b>y</b></div>', css: '', shot: '', label: 'div.b', w: 240, h: 80, n: 2 }].slice(0, k)
       const dt = new DataTransfer()
-      dt.setData('text', JSON.stringify({ wall: 'wall-capture', v: 1, picks: some }))
+      dt.setData('text', JSON.stringify({ motioneer: 'motioneer-capture', v: 1, picks: some }))
       document.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }))
     }, n)
 
@@ -1682,7 +1682,7 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
      */
     /* served rather than intercepted, because the studio fetches it from its own side where nothing
        in the browser can stand in the way, which is the entire point of doing it there */
-    const SHEET = Number(process.env.WALL_SHEET_PORT || 4372)
+    const SHEET = Number(process.env.MOTIONEER_SHEET_PORT || 4372)
     const stall = createServer((q, r) => { r.writeHead(200, { 'content-type': 'text/css' })
       r.end('@font-face{font-family:Ghost;src:local("Georgia")}:root{--said:#c0ffee}p{color:red}') })
     await new Promise((r) => stall.listen(SHEET, r))
@@ -1693,7 +1693,7 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
     const hadPicks = await faced.evaluate(() => picks.length)
     await faced.evaluate((where) => {
       const dt = new DataTransfer()
-      dt.setData('text', JSON.stringify({ wall: 'wall-capture', v: 1, picks: [{
+      dt.setData('text', JSON.stringify({ motioneer: 'motioneer-capture', v: 1, picks: [{
         html: '<div data-q><b>x</b></div>', css: '[data-q]{display:block}', shot: '',
         label: 'div.q', w: 200, h: 60, n: 2, opaque: 1, shut: [where] }] }))
       document.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }))
@@ -1766,7 +1766,7 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
       try { process.kill(Number(pid), 'SIGKILL') } catch { /* gone */ }
     }
     const again = spawn('node', [resolve('tools/studio.mjs'), resolve('examples/components')],
-      { cwd: bed, env: { ...process.env, WALL_PORT: String(XPORT), WALL_NO_OPEN: '1' }, stdio: 'ignore' })
+      { cwd: bed, env: { ...process.env, MOTIONEER_PORT: String(XPORT), MOTIONEER_NO_OPEN: '1' }, stdio: 'ignore' })
     process.on('exit', () => { try { again.kill('SIGKILL') } catch { /* gone */ } })
     await room.waitForTimeout(9000)
     const afterBounce = await held()
@@ -1786,7 +1786,7 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
 if (RAIL) process.exit(bad ? 1 : 0)
 
 const studio = spawn('node', ['tools/studio.mjs'],
-  { env: { ...process.env, WALL_PORT: String(PORT), WALL_NO_OPEN: '1' }, stdio: 'ignore' })
+  { env: { ...process.env, MOTIONEER_PORT: String(PORT), MOTIONEER_NO_OPEN: '1' }, stdio: 'ignore' })
 const stop = () => { try { studio.kill() } catch {} }
 process.on('exit', stop); process.on('SIGINT', () => { stop(); process.exit(1) })
 await new Promise((r) => setTimeout(r, 3500))

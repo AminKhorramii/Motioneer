@@ -30,10 +30,10 @@ const SITES = [
 
 const only = process.argv.slice(2).filter((a) => !a.startsWith('--'))
 const list = only.length ? SITES.filter(([n]) => only.includes(n)) : SITES
-const PORT = Number(process.env.WALL_PORT || 4399)
+const PORT = Number(process.env.MOTIONEER_PORT || 4399)
 
 const studio = spawn('node', ['tools/studio.mjs'],
-  { env: { ...process.env, WALL_PORT: String(PORT), WALL_NO_OPEN: '1' }, stdio: 'ignore' })
+  { env: { ...process.env, MOTIONEER_PORT: String(PORT), MOTIONEER_NO_OPEN: '1' }, stdio: 'ignore' })
 const stop = () => { try { studio.kill() } catch {} }
 process.on('exit', stop); process.on('SIGINT', () => { stop(); process.exit(1) })
 await new Promise((r) => setTimeout(r, 3500))

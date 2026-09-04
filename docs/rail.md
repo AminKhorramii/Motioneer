@@ -9,7 +9,7 @@ studio and the least finished, and this is the plan for finishing it.
 each and shows you the first one it judged acceptable, with no way to see or reach the others, and
 nothing in the page offers to swap or re-roll a car.
 
-Wall's whole argument is that choosing beats describing, and comparison is how choosing happens. The
+Motioneer's whole argument is that choosing beats describing, and comparison is how choosing happens. The
 rail is the one place in the product where you cannot choose. Everything below follows from fixing
 that.
 
@@ -61,7 +61,7 @@ shape is a value rather than a global.
 
 ## Phase four, comparing arrangements
 
-The move that has no equivalent anywhere else, and it is Wall's own idea one level up: the wall
+The move that has no equivalent anywhere else, and it is Motioneer's own idea one level up: the wall
 compares pages, this compares compositions.
 
 - Two or three arrangements of the same elements, side by side, held on one clock.

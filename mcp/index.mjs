@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Wall as a tool an agent can call.
+ * Motioneer as a tool an agent can call.
  *
  * The flow it exists for: you ask Claude Code for a landing page, it calls `design`, the
  * desktop opens with your brief already in it, you browse a wall of real pages and pick one,
@@ -120,11 +120,11 @@ const TOOLS = [
  * and finds nothing there, and by then the agent has already said it worked.
  */
 async function studio({ url, dir }) {
-  const port = Number(process.env.WALL_PORT || 4321)
+  const port = Number(process.env.MOTIONEER_PORT || 4321)
   const at = `http://localhost:${port}`
   const answering = async () => {
     try {
-      const r = await fetch(`${at}/__wall/model`, { signal: AbortSignal.timeout(700) })
+      const r = await fetch(`${at}/__motioneer/model`, { signal: AbortSignal.timeout(700) })
       return r.ok
     } catch { return false }
   }
@@ -332,13 +332,13 @@ async function call(name, args, id) {
  * is the difference, and it is the one signal that cannot be faked by the thing that should be here.
  */
 if (process.stdin.isTTY) {
-  console.log(`\n  Wall ${VERSION}, the motion studio.\n`)
+  console.log(`\n  Motioneer ${VERSION}, the motion studio.\n`)
   console.log('  This command is the agent side of it and speaks a protocol rather than English,')
   console.log('  which is why nothing is happening. What you almost certainly want is:\n')
-  console.log('    npx wall                      open the studio on the components it ships with')
-  console.log('    npx wall http://localhost:3000   open it on your own app\n')
+  console.log('    npx motioneer                 open the studio on the components it ships with')
+  console.log('    npx motioneer localhost:3000     open it on your own app\n')
   console.log('  To give it to an agent instead:\n')
-  console.log('    claude mcp add --scope user wall -- npx -y wall-mcp\n')
+  console.log('    claude mcp add --scope user motioneer -- npx -y motioneer-mcp\n')
   process.exit(0)
 }
 
@@ -362,7 +362,7 @@ process.stdin.on('data', async (chunk) => {
         result: {
           protocolVersion: msg.params?.protocolVersion ?? '2024-11-05',
           capabilities: { tools: {} },
-          serverInfo: { name: 'wall', version: VERSION },
+          serverInfo: { name: 'motioneer', version: VERSION },
         },
       })
     } else if (msg.method === 'tools/list') {

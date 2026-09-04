@@ -20,7 +20,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
 const root = path.resolve(import.meta.dirname, '..')
-const PORT = Number(process.env.WALL_PORT || 4471)
+const PORT = Number(process.env.MOTIONEER_PORT || 4471)
 const AWAY = PORT + 1
 
 const problems = []
@@ -366,7 +366,7 @@ try {
     again = snap(doc)
     return {
       same: before === after, moved: before !== during, steady: before === again,
-      left: doc.querySelectorAll('[data-wall-held], style[data-wall-hold]').length,
+      left: doc.querySelectorAll('[data-motioneer-held], style[data-motioneer-hold]').length,
       shows: before.slice(0, 0),
     }
   })

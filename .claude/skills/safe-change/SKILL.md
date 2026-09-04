@@ -1,6 +1,6 @@
 ---
 name: safe-change
-description: The loop for changing Wall when a second agent session may be working in the same tree. Use before editing, before staging anything, when your change overlaps a file that is already dirty, and when writing the commit.
+description: The loop for changing Motioneer when a second agent session may be working in the same tree. Use before editing, before staging anything, when your change overlaps a file that is already dirty, and when writing the commit.
 ---
 
 # Making a change safely
@@ -24,13 +24,13 @@ Editing a file another session is mid way through means whichever of you commits
 both changes, and the diff will not show which line belonged to whom.
 
 ```
-git worktree add ../wall-<topic> master
-cd ../wall-<topic>
+git worktree add ../motioneer-<topic> master
+cd ../motioneer-<topic>
 npm install
 ```
 
 Build and verify inside the worktree, because a suite run in the dirty tree proves nothing about
-the change you are about to push. Remove it when you are done: `git worktree remove ../wall-<topic>`.
+the change you are about to push. Remove it when you are done: `git worktree remove ../motioneer-<topic>`.
 
 ## Staging
 
@@ -66,7 +66,7 @@ One line, a sentence, saying why rather than what. The diff already says what. R
 the model to follow:
 
 ```
-The views hold still so the wall feels fast
+The views hold still so the studio feels fast
 Fifty directions, and the practices written down
 A minute of silence is indistinguishable from a hang, so it beats
 ```

@@ -1,9 +1,9 @@
 {
-  "name": "wall-mcp",
+  "name": "motioneer",
   "description": "A motion studio: point it at a running site, pick elements off it, and compare several motions for them on one timeline.",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/AminKhorramii/Wall.git"
+    "url": "git+https://github.com/AminKhorramii/Motioneer.git"
   },
   "version": "0.2.0",
   "scripts": {
@@ -49,8 +49,8 @@
   },
   "type": "module",
   "bin": {
-    "wall": "tools/studio.mjs",
-    "wall-mcp": "mcp/index.mjs"
+    "motioneer": "tools/studio.mjs",
+    "motioneer-mcp": "mcp/index.mjs"
   },
   "files": [
     "mcp/",
@@ -73,5 +73,5 @@
     "ai",
     "agent"
   ],
-  "homepage": "https://wall.bsct.so"
+  "homepage": "https://motioneer.bsct.so"
 }

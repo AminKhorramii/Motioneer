@@ -1,9 +1,9 @@
 # Development notes
 
-Everything here used to live in the README. It is the long-form record of how Wall is
+Everything here used to live in the README. It is the long-form record of how Motioneer is
 built, verified, and run; the README stays minimal on purpose.
 
-What ships today is the MCP server: an agent calls `design`, Wall opens in the browser, and
+What ships today is the MCP server: an agent calls `design`, Motioneer opens in the browser, and
 the chosen page returns as a spec. The desktop shell is built and verified in this repo but
 is not released yet, so where these notes describe it, read them as how it works rather than
 as how anyone reaches it. The wall below is the same code either way, which is the point of
@@ -80,7 +80,7 @@ rewriting anybody's delays.
 ## How it works
 
 1. **Brief** — product, one line, what it is, audience, three things it does.
-2. **Taste sheet** — pick a preset, or **drop a screenshot of a page you love** and Wall
+2. **Taste sheet** — pick a preset, or **drop a screenshot of a page you love** and Motioneer
    reads the system out of it: background, ink, accents, contrast, and turns them into an
    editable contract (density / scale / radius knobs). Everything is generated against
    this — "more like Linear, less like a template" becomes a spec, not a wish.
@@ -98,7 +98,7 @@ Onboarding runs once and ends by building your page, so the setup produces somet
 instead of only explaining. Two steps: which model writes, and what it writes about. Reopen
 the explanation any time from the help button in the header.
 
-Model keys are optional. Wall builds pages, layouts, and variants on your machine with no
+Model keys are optional. Motioneer builds pages, layouts, and variants on your machine with no
 key at all. A key is used only when you ask a model to write copy, and it stays in this
 app's storage.
 
@@ -117,7 +117,7 @@ reads, and keep every file far from 1k lines.
 
 ## Two builds, one app
 
-`src/host.ts` is the only file that knows where Wall is running. The desktop app answers with
+`src/host.ts` is the only file that knows where Motioneer is running. The desktop app answers with
 Rust commands, because it can write real files and reach a vendor without preflight. The browser
 answers for itself with localStorage, a Blob download, and a direct call to the model. Everything
 above that boundary is the same code, so the web version is the desktop version rather than a
@@ -160,7 +160,7 @@ node tools/shots.mjs   # screenshots into shots/
 ```
 
 What `verify/app.mjs` (headless Chromium) asserts: the house gate first, every built-in world
-on every preset look rendered and failed if Wall's own output trips the slop catalogue ·
+on every preset look rendered and failed if Motioneer's own output trips the slop catalogue ·
 onboarding, intake and the required-field gate · a nine paper wall with distinct headlines ·
 triage: pin survives x, remove, restore · slop chips with reasons on every grid cell · direct
 edits landing in the model · ship writes a self-contained HTML file · zero page errors.
@@ -171,7 +171,7 @@ progressive repaint are all exercised. It asserts that papers appear while the m
 still writing, that the wall never exceeds nine (which is the one-id-per-stream upsert
 holding), and that the eight angles produce eight distinct headlines.
 
-`npm run verify:update` holds the update channel itself. Wall updates by publish, since `npx`
+`npm run verify:update` holds the update channel itself. Motioneer updates by publish, since `npx`
 resolves the latest version on every run, so the suite asserts what that rests on: the package
 answers to the name in the one line, it is publishable, the tarball npm would build carries
 everything the entry points import, the version clients are told is the one in package.json,
@@ -182,7 +182,7 @@ directory can be any age.
 ## Capturing a real run
 
 ```
-WALL_KEY=$(cat ~/.wall-test-key) npm run capture
+MOTIONEER_KEY=$(cat ~/.wall-test-key) npm run capture
 ```
 
 This drives the real app against the real API through a recording proxy, and writes every
@@ -215,7 +215,7 @@ shows `clean` or `N generic` for the paper in the middle, with the reasons on ho
 
 ## Backdrops and images
 
-A landing page needs something behind the words. Wall draws it rather than generating a
+A landing page needs something behind the words. Motioneer draws it rather than generating a
 photograph, for two reasons: a generated hero image is the fastest way to look like every
 other page, and one image embedded as a data URI outweighs the entire document.
 
@@ -266,30 +266,30 @@ For a public deployment there are two ceilings, both off unless set, because an 
 paying with its own key does not need protecting from itself:
 
 ```
-WALL_WALLS_PER_HOUR=5            # per address
-WALL_DAILY_OUTPUT_TOKENS=500000  # whole deployment
+MOTIONEER_WALLS_PER_HOUR=5            # per address
+MOTIONEER_DAILY_OUTPUT_TOKENS=500000  # whole deployment
 ```
 
 The unit is the wall rather than the request, because one click is eight calls. Measured from
 real captures, one wall costs about 14,000 input and 16,000 output tokens and takes around 28
 seconds.
 
-`WALL_MODEL` picks the model. The task here is short JSON copy rather than code, since the
+`MOTIONEER_MODEL` picks the model. The task here is short JSON copy rather than code, since the
 renderer produces the HTML, so a small model may do it as well as a large one at a fraction of
 the cost.
 
-## Wall as a tool your agent can call
+## Motioneer as a tool your agent can call
 
 One line, and nothing else to install:
 
 ```
-claude mcp add --scope user wall -- npx -y wall-mcp
+claude mcp add --scope user motioneer -- npx -y motioneer
 ```
 
-Ask for a landing page. Wall opens, you pick one, and the choice arrives in your project as a
+Ask for a landing page. Motioneer opens, you pick one, and the choice arrives in your project as a
 spec your agent implements.
 
-Where it opens depends on what is there. A desktop build if `WALL_APP` points at one or a
+Where it opens depends on what is there. A desktop build if `MOTIONEER_APP` points at one or a
 clone has built it, and otherwise a local server and whichever browser you already have. The
 browser route is the one a first run takes: no download, no toolchain, and nothing for the
 operating system to refuse to open, which matters because the install is the part of a first
@@ -303,7 +303,7 @@ them per origin, so a server on a different port every run would lose them and a
 From a clone, point it at the file instead:
 
 ```
-claude mcp add --scope user wall -- node /path/to/wall/mcp/index.mjs
+claude mcp add --scope user motioneer -- node /path/to/motioneer/mcp/index.mjs
 ```
 
 Then ask for a landing page. Your agent calls `design` with whatever brief exists, the desktop
@@ -317,7 +317,7 @@ go into `.wall/` beside it.
 
 Three tools:
 
-- `design` opens Wall and waits. A person browsing takes longer than any sensible timeout, so
+- `design` opens Motioneer and waits. A person browsing takes longer than any sensible timeout, so
   if it gives up the answer is still written to disk.
 - `collect` reads a design chosen after `design` stopped waiting.
 - `check` reports the patterns that make a page look generated, with the reason each matters.

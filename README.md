@@ -1,11 +1,11 @@
-# Wall
+# Motioneer
 
 **Motion for components you already have.**
 
-[![npm](https://img.shields.io/npm/v/wall-mcp?logo=npm&color=cb3837)](https://www.npmjs.com/package/wall-mcp)
+[![npm](https://img.shields.io/npm/v/motioneer-mcp?logo=npm&color=cb3837)](https://www.npmjs.com/package/motioneer-mcp)
 [![MCP](https://img.shields.io/badge/MCP-server-111?logo=claude&logoColor=D97757)](https://modelcontextprotocol.io)
-[![Node](https://img.shields.io/node/v/wall-mcp?logo=nodedotjs&logoColor=fff&color=5FA04E)](package.json)
-[![License](https://img.shields.io/npm/l/wall-mcp?color=blue)](LICENSE)
+[![Node](https://img.shields.io/node/v/motioneer-mcp?logo=nodedotjs&logoColor=fff&color=5FA04E)](package.json)
+[![License](https://img.shields.io/npm/l/motioneer-mcp?color=blue)](LICENSE)
 
 Point it at your running app, click an element, and get several motions for it at once, playing
 side by side on one timeline. Keep the one you like as a stylesheet that ships in your product.
@@ -18,7 +18,7 @@ clock*, which is the only way choosing between them is real.
 Nothing to install. If you have [Node](https://nodejs.org) 20 or newer, one line opens it:
 
 ```
-npx -p wall-mcp wall
+npx motioneer
 ```
 
 That opens on the seven components it ships with, so there is something to animate before you have
@@ -26,15 +26,15 @@ pointed it at anything. To open it on your own app instead, give it the address 
 already running on:
 
 ```
-npx -p wall-mcp wall localhost:3000
-npx -p wall-mcp wall ~/app/src/ui --css ~/app/globals.css    a folder, with your stylesheet
+npx motioneer localhost:3000
+npx motioneer ~/app/src/ui --css ~/app/globals.css    a folder, with your stylesheet
 ```
 
-Installed once, it is just `wall`:
+Installed once, it is just `motioneer`:
 
 ```
-npm install -g wall-mcp
-wall localhost:3000
+npm install -g motioneer
+motioneer localhost:3000
 ```
 
 Everything after that happens in the browser tab it opens. Nothing is uploaded: the proxy, the
@@ -52,7 +52,7 @@ The same studio, opened for you when you ask:
 > open the motion studio on localhost:3000
 
 ```
-claude mcp add --scope user wall -- npx -y wall-mcp
+claude mcp add --scope user motioneer -- npx -y motioneer-mcp
 ```
 
 The agent side also has `motion`, which writes a sheet for markup you hand it without opening

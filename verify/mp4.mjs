@@ -312,7 +312,7 @@ if (!has('ffmpeg') || !has('ffprobe')) {
     check(chunks.length === REAL.frames, `ffmpeg gave ${chunks.length} access units for ${REAL.frames} frames`)
     check(chunks.filter((c) => c.type === 'key').length >= 2, `and ${chunks.filter((c) => c.type === 'key').length} of them are keyframes`)
 
-    const dir = mkdtempSync(path.join(tmpdir(), 'wall-mp4-'))
+    const dir = mkdtempSync(path.join(tmpdir(), 'motioneer-mp4-'))
     try {
       const real = mux(chunks, { width: REAL.width, height: REAL.height, fps: REAL.fps, codecDescription: description })
       const at = path.join(dir, 'film.mp4')

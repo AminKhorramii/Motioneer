@@ -1,11 +1,11 @@
 ---
 name: module-boundaries
-description: Decide which file owns a piece of logic in Wall, keep files small, and know which boundaries are load bearing. Use when adding a feature, when logic could plausibly live in two files, when a file grows past a few hundred lines, or when reviewing a change for architecture rather than for bugs.
+description: Decide which file owns a piece of logic in Motioneer, keep files small, and know which boundaries are load bearing. Use when adding a feature, when logic could plausibly live in two files, when a file grows past a few hundred lines, or when reviewing a change for architecture rather than for bugs.
 ---
 
 # Module boundaries
 
-Wall has one rule that decides most questions and three boundaries that decide the rest.
+Motioneer has one rule that decides most questions and three boundaries that decide the rest.
 
 ## The rule: logic lives with the data it reads
 
@@ -39,7 +39,7 @@ catalogue stays current.
 
 Crossing these is not a style question, it costs a fork.
 
-**`src/host.ts`** is the only file that knows where Wall is running. Above it there is one
+**`src/host.ts`** is the only file that knows where Motioneer is running. Above it there is one
 codebase, below it there are answers for state, export, preview, streaming and images per
 shell. If you find yourself asking "am I in Tauri" anywhere else, the answer belongs in
 `host.ts` as a capability the caller asks for by name, because a fourth shell should be a file
@@ -50,7 +50,7 @@ checks have no DOM dependency. Reaching for `document`, `window` or `localStorag
 line breaks the agent tool and the render service at once, so if a function needs the DOM it is
 not core logic and belongs in a component.
 
-**`shared/providers.mjs`** separates Wall from the vendors and, separately, the wire format from
+**`shared/providers.mjs`** separates Motioneer from the vendors and, separately, the wire format from
 the transport. Request shapes and SSE parsing live there once. A shell that needs a different
 fetch hands one in with `setFetch()` rather than carrying its own copy of the request shapes,
 because two copies of a wire format drift and then disagree in production only.
@@ -76,7 +76,7 @@ not at the point it is used, because an unbounded scale produces an unreadable p
 a daring one and a check at the use site will be missed by the next use site.
 
 **Fail one, not eight.** Fan out catches per item, so one bad reply loses one page rather than
-the wall. When you add a parallel path, decide where its failure stops before you write the
+the studio. When you add a parallel path, decide where its failure stops before you write the
 happy path.
 
 ## Prefer deleting complexity to rearranging it

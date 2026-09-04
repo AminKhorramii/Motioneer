@@ -3,7 +3,7 @@
  *
  * The local Claude reports a failure as a frame on stdout and writes its warnings to stderr, and
  * the streaming reader used to look only for content deltas. Every other frame was skipped, so a
- * call that failed came back with no text and no reason, and the reason handed to the wall was
+ * call that failed came back with no text and no reason, and the reason handed to the studio was
  * whatever had landed on stderr. On a real machine that was a warning about claude.ai connectors,
  * while the session had actually stopped on a bad key, so the message named a cause that had
  * nothing to do with it and the person went and looked at connectors.
@@ -18,7 +18,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { runClaude } from '../shared/cli.mjs'
 
-const work = mkdtempSync(join(tmpdir(), 'wall-cli-'))
+const work = mkdtempSync(join(tmpdir(), 'motioneer-cli-'))
 let failed = 0
 const ok = (cond, label, detail = '') => {
   console.log(`${cond ? 'ok  ' : 'FAIL'} ${label}${detail ? `  ${detail}` : ''}`)
@@ -67,23 +67,23 @@ const quiet = await runClaude('sys', 'user', { bin: silent, onDelta: () => {} })
 console.log('a session that said nothing:', JSON.stringify(quiet))
 ok(Boolean(quiet.error), 'a silent failure is still reported as one', quiet.error)
 
-// ——— a session that never answers does not hang the wall ———
+// ——— a session that never answers does not hang the studio ———
 // This was the one failure with nothing covering it. A missing binary, a bad key, a reply that is
 // not JSON and a stream that stops were all handled; a process that simply never closes was not,
-// and it is the worst of them, because the promise never settles and the wall sits at seven of
+// and it is the worst of them, because the promise never settles and the studio sits at seven of
 // eight for as long as the window is open. Measured on the bench three times before it was found,
-// where the number being reported was the harness giving up rather than the wall finishing.
+// where the number being reported was the harness giving up rather than the studio finishing.
 const hangs = fake('hangs', `process.stdin.resume(); setInterval(() => {}, 1000)`)
 // the real ceiling is seven minutes, which is generous because a page written whole thinks for
 // minutes before it writes a character. The suite asserts the mechanism, not the number.
-process.env.WALL_CALL_MS = '2500'
+process.env.MOTIONEER_CALL_MS = '2500'
 const began = Date.now()
 const gaveUp = await runClaude('sys', 'user', { bin: hangs, onDelta: () => {} })
 const waited = Date.now() - began
 console.log('a session that never answers:', JSON.stringify({ ...gaveUp, waitedMs: waited }))
 ok(Boolean(gaveUp.error), 'it comes back at all rather than hanging for ever', gaveUp.error)
 ok(waited < 8000, 'it comes back when told to rather than at its own pace', `${waited}ms`)
-delete process.env.WALL_CALL_MS
+delete process.env.MOTIONEER_CALL_MS
 
 // ——— and a binary that is not there is named as that ———
 const missing = await runClaude('sys', 'user', { bin: join(work, 'not-here'), onDelta: () => {} })

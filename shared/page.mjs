@@ -555,7 +555,7 @@ header.bare .whenplaying{display:none}
     <span id="aimnote" data-state="${AIM ? 'ok' : 'empty'}">${AIM ? ''
       : HAS_FOLDER ? 'or pick a component below' : 'type where your app is running'}</span>
     <!-- an app behind a sign in cannot be proxied, so there is a way to pick without proxying -->
-    <a class="away" href="/__wall/bookmarklet" target="_blank" rel="noopener"
+    <a class="away" href="/__motioneer/bookmarklet" target="_blank" rel="noopener"
       title="for an app that needs an account, where proxying cannot work">or pick behind a sign in</a>
   </div>
   <div class="files" id="files"></div>
@@ -809,7 +809,7 @@ let arr=null      // the arrangement, once each element has been given a motion
  * a model call, so nothing downstream has to ask whether it arrived.
  */
 let ARR=null
-const arriving=import('/__wall/arrange.mjs').then(m=>{ARR=m}).catch(()=>{})
+const arriving=import('/__motioneer/arrange.mjs').then(m=>{ARR=m}).catch(()=>{})
 /* one question, asked in five places before this, each its own chance to answer differently */
 const railed=()=>!!(ARR&&arr&&ARR.live(arr).length)
 /**
@@ -1042,7 +1042,7 @@ function railKey(e){
    straight over, and the only difference is that nobody had to carry it */
 async function takeInbox(){
   try{
-    const got=await fetch('/__wall/inbox').then(r=>r.json())
+    const got=await fetch('/__motioneer/inbox').then(r=>r.json())
     if(got&&Array.isArray(got.picks)&&got.picks.length) tookPicks(got.picks,'picked')
   }catch(_){}
 }
@@ -1063,7 +1063,7 @@ async function mendSheets(pick){
   const got=[]
   for(const href of pick.shut.slice(0,6)){
     try{
-      const css=await fetch('/__wall/asset?u='+encodeURIComponent(href)).then(r=>r.ok?r.text():'')
+      const css=await fetch('/__motioneer/asset?u='+encodeURIComponent(href)).then(r=>r.ok?r.text():'')
       if(!css) continue
       /* the pieces a lifted component actually needs from a page level sheet */
       let keep=''
@@ -1115,7 +1115,7 @@ addEventListener('paste',e=>{
   const said=(e.clipboardData||window.clipboardData); if(!said) return
   let got=null
   try{ got=JSON.parse(said.getData('text')||'') }catch(_){ return }
-  if(!got||got.wall!=='wall-capture'||!Array.isArray(got.picks)||!got.picks.length) return
+  if(!got||got.motioneer!=='motioneer-capture'||!Array.isArray(got.picks)||!got.picks.length) return
   e.preventDefault()
   tookPicks(got.picks,'pasted')
 })
@@ -1125,7 +1125,7 @@ pickBtn.onclick=()=>{
   const want=pickBtn.getAttribute('aria-pressed')!=='true'
   pickBtn.setAttribute('aria-pressed',want)
   const f=document.querySelector('.appwrap iframe')
-  if(f) f.contentWindow.postMessage({wall:want?'pick':'nopick'},'*')
+  if(f) f.contentWindow.postMessage({motioneer:want?'pick':'nopick'},'*')
 }
 /* aiming somewhere new: the frame reloads, the selection is somebody else's page now, and the
    favicon is asked for once the target has actually changed rather than optimistically */
@@ -1135,7 +1135,7 @@ aimform.onsubmit=async e=>{
   const said=urlbox.value.trim(); if(!said) return
   const note=document.getElementById('aimnote')
   note.dataset.state='reaching'; note.textContent='reaching it…'
-  const r=await fetch('/__wall/target',{method:'POST',headers:{'content-type':'application/json'},
+  const r=await fetch('/__motioneer/target',{method:'POST',headers:{'content-type':'application/json'},
     body:JSON.stringify({url:said})}).then(x=>x.json()).catch(e=>({error:String(e)}))
   if(r.error){ note.dataset.state='error'; note.textContent=r.error; return }
   /**
@@ -1157,11 +1157,11 @@ aimform.onsubmit=async e=>{
   drawRail(r.recent||[])
   // nothing to say once it is up: the page is right there and it says it better
   note.dataset.state='ok'; note.textContent=''
-  document.getElementById('fav').src='/__wall/favicon?t='+Date.now()
+  document.getElementById('fav').src='/__motioneer/favicon?t='+Date.now()
   pickBtn.style.display=''
   drawSel(); render()
 }
-if(APP){ document.getElementById('fav').src='/__wall/favicon' } else { pickBtn.style.display='none' }
+if(APP){ document.getElementById('fav').src='/__motioneer/favicon' } else { pickBtn.style.display='none' }
 render()
 /**
  * The rail lists where this has been, and falls back to the components in the repo when it has been
@@ -1174,7 +1174,7 @@ function drawRail(recent){
   const rows=[]
   if(recent.length) rows.push('<p class="railhead">Recent</p>'
     +recent.map(r=>'<button class="site" data-go="'+r.href+'">'
-      +'<img src="/__wall/favicon?host='+encodeURIComponent(r.href)+'" alt="" width="13" height="13">'
+      +'<img src="/__motioneer/favicon?host='+encodeURIComponent(r.href)+'" alt="" width="13" height="13">'
       +'<span><b>'+r.host+'</b>'+(r.path?'<i>'+r.path.slice(0,26)+'</i>':'')+'</span></button>').join(''))
   if(files.length && !recent.length) rows.push('<p class="railhead">In this repo</p>'
     +files.map(f=>'<button class="file" data-f="'+f+'">'+f.split('/').slice(-2).join('/')+'</button>').join(''))
@@ -1188,7 +1188,7 @@ function drawRail(recent){
     opts=[]; verdict=null; arr=null; held.clear(); drops.textContent=''; render()
   })
 }
-Promise.all([fetch('/__wall/list').then(r=>r.json()), fetch('/__wall/recent').then(r=>r.json())])
+Promise.all([fetch('/__motioneer/list').then(r=>r.json()), fetch('/__motioneer/recent').then(r=>r.json())])
   .then(([fs,rs])=>{ files=fs; drawRail(rs) })
 
 /**
@@ -1336,7 +1336,7 @@ function peek(){
   const shot=shotOf()
   const q='?file='+encodeURIComponent(file)+'&palette='+encodeURIComponent(palette.value)
     +(shot?'&camera='+shot+'&depth='+lens:'')
-  grid.innerHTML='<figure class="solo"><iframe data-i="0" src="/__wall/peek'+q+'"></iframe><figcaption>'
+  grid.innerHTML='<figure class="solo"><iframe data-i="0" src="/__motioneer/peek'+q+'"></iframe><figcaption>'
     +'<b>'+file.split('/').pop()+'</b><span class="verb">as written, nothing added yet. '
     +'Press <b>Give it motion</b> for options.</span></figcaption></figure>'
 }
@@ -1378,7 +1378,7 @@ ask.onclick=async()=>{
     grid.innerHTML=WAITER(); runShader()
     drops.textContent=''
     try{
-      const r=await post('/__wall/rail',{picks,palette:palette.value},420000)
+      const r=await post('/__motioneer/rail',{picks,palette:palette.value},420000)
       /* the one place an arrangement is born, and so the one place worth waiting for the module. It
          has already waited minutes on the model, so this costs nothing and every synchronous reader
          below it can stop asking whether the import landed */
@@ -1400,7 +1400,7 @@ ask.onclick=async()=>{
   grid.innerHTML=WAITER(); runShader()
   drops.textContent=''
   try{
-    const r=await post('/__wall/motion',
+    const r=await post('/__motioneer/motion',
       /* a pick if there is one, whatever brought it, and the file only when there is not */
       Object.assign({count:Number(document.getElementById('count').value)},
         picks.length?chosen:{file}), 360000)
@@ -1516,7 +1516,7 @@ for(const k of ['shape','fps','tail']){
 const byId=(id)=>document.getElementById(id)
 let CAT=[], CUR=null
 async function loadModels(){
-  const r=await fetch('/__wall/model').then(r=>r.json()).catch(()=>null)
+  const r=await fetch('/__motioneer/model').then(r=>r.json()).catch(()=>null)
   if(!r) return
   CAT=r.providers||[]; CUR=r.current||null
   byId('mprov').innerHTML=CAT.map(p=>'<option value="'+p.id+'"'
@@ -1556,7 +1556,7 @@ byId('savedbtn').onclick=e=>{
 byId('mprov').onchange=()=>drawModelForm(false)
 byId('msave').onclick=async()=>{
   const b=byId('msave'); b.disabled=true; b.textContent='Saving'
-  const r=await fetch('/__wall/model',{method:'POST',headers:{'content-type':'application/json'},
+  const r=await fetch('/__motioneer/model',{method:'POST',headers:{'content-type':'application/json'},
     body:JSON.stringify(modelForm())}).then(r=>r.json()).catch(e=>({error:String(e.message||e)}))
   b.disabled=false; b.textContent='Use this'
   if(r.error){ byId('mout').textContent=r.error; return }
@@ -1568,7 +1568,7 @@ byId('msave').onclick=async()=>{
 byId('mtest').onclick=async()=>{
   const b=byId('mtest'); b.disabled=true; b.textContent='Testing'
   byId('mout').textContent='Asking it for one word.'
-  const r=await fetch('/__wall/model/check',{method:'POST',headers:{'content-type':'application/json'},
+  const r=await fetch('/__motioneer/model/check',{method:'POST',headers:{'content-type':'application/json'},
     body:JSON.stringify(modelForm())}).then(r=>r.json()).catch(e=>({ok:false,why:String(e.message||e)}))
   b.disabled=false; b.textContent='Test it'
   byId('mout').textContent=r.ok
@@ -1576,7 +1576,7 @@ byId('mtest').onclick=async()=>{
     : 'It did not answer. '+r.why
 }
 byId('mforget').onclick=async()=>{
-  const r=await fetch('/__wall/model',{method:'POST',headers:{'content-type':'application/json'},
+  const r=await fetch('/__motioneer/model',{method:'POST',headers:{'content-type':'application/json'},
     body:JSON.stringify({ ...modelForm(), key:null })}).then(r=>r.json()).catch(e=>({error:String(e.message||e)}))
   if(r.error){ byId('mout').textContent=r.error; return }
   CUR=r.current; byId('mkey').value=''
@@ -1747,7 +1747,7 @@ document.getElementById('tapply').onclick=async()=>{
   const s=subject(); if(!s) return
   const o=s.o, was=document.getElementById('tapply').textContent
   const btn=document.getElementById('tapply'); btn.disabled=true; btn.textContent='Adjusting…'
-  const r = await post('/__wall/tune',{ id:o.id,
+  const r = await post('/__motioneer/tune',{ id:o.id,
     duration:Number(document.getElementById('tdur').value),
     stagger:Number(document.getElementById('tstag').value),
     ease:document.getElementById('tease').value }, 20000).catch(e=>({error:String(e.message||e)}))
@@ -1838,11 +1838,11 @@ async function filmHere(frame, want, say){
      about each is different, so each says its own thing. */
   if(!doc) throw new Error('that frame is from another origin, so this page is not allowed to read '
     +'it. Pick the element and film it here instead.')
-  const [R,M]=await Promise.all([import('/__wall/raster.mjs'),import('/__wall/mp4.mjs')])
+  const [R,M]=await Promise.all([import('/__motioneer/raster.mjs'),import('/__motioneer/mp4.mjs')])
   if(!M.supported()) throw new Error('this browser has no video encoder. Filming needs Chrome or '
     +'Edge 94, Safari 16.4, or Firefox 130.')
   /* the preview drives its own clock and would fight the raster, so it is held first */
-  try{ frame.contentWindow.postMessage({wall:'hold',t:0,i:0},'*') }catch{}
+  try{ frame.contentWindow.postMessage({motioneer:'hold',t:0,i:0},'*') }catch{}
   await new Promise(r=>setTimeout(r,120))
   /* the tail is frames rather than time: the same last instant drawn again, so a film ends on what
      it landed on instead of cutting the moment the last keyframe fires. Holding a still is what
@@ -1857,7 +1857,7 @@ async function filmHere(frame, want, say){
   const last=from+Math.round(want.ms)
   say('Reading what it needs')
   // once for the whole film: refetching a font ninety times is most of the wall clock
-  const inlined=await R.inline(doc,{fetchVia:(u)=>fetch('/__wall/asset?u='+encodeURIComponent(u))})
+  const inlined=await R.inline(doc,{fetchVia:(u)=>fetch('/__motioneer/asset?u='+encodeURIComponent(u))})
   /* the document is serialized once for the whole film rather than once a frame. Between two
      instants only the hold sheet differs, and everything expensive is the same bytes */
   const draw=await R.filmstrip(doc,{width:want.w,height:want.h,inlined})
@@ -1903,7 +1903,7 @@ let takes=[]
  */
 function filmStore(mode){
   return new Promise((ok,no)=>{
-    let r; try{ r=indexedDB.open('wall-films',1) }catch(e){ return no(e) }
+    let r; try{ r=indexedDB.open('motioneer-films',1) }catch(e){ return no(e) }
     r.onupgradeneeded=()=>{ const db=r.result
       if(!db.objectStoreNames.contains('takes')) db.createObjectStore('takes',{keyPath:'at'}) }
     r.onerror=()=>no(r.error)
@@ -2042,7 +2042,7 @@ document.getElementById('save').onclick=async()=>{
   const ids = opts.length ? opts.map(o=>o.id) : rows.map(x=>x.car.motion.id)
   if(!ids.length) return
   const btn=document.getElementById('save'); btn.textContent='Writing…'
-  const r=await fetch('/__wall/export',{method:'POST',headers:{'content-type':'application/json'},
+  const r=await fetch('/__motioneer/export',{method:'POST',headers:{'content-type':'application/json'},
     body:JSON.stringify({ids,palette:palette.value,
       at: rail ? rows.map(x=>Math.round(when[x.i])) : [],
       shots: rail ? rows.map(x=>x.car.shot||'') : [],
@@ -2099,7 +2099,7 @@ function render(){
       + '<div class="chgrid'+(opened?' solo':'')+'">'
       + car.alternatives.map((m,k)=>'<figure class="'
           +(car.motion&&car.motion.id===m.id?'chosen ':'')+(opened===m.id?'up':'')+'">'
-          +'<iframe data-i="'+k+'" src="/__wall/preview/'+m.id+q+'"></iframe>'
+          +'<iframe data-i="'+k+'" src="/__motioneer/preview/'+m.id+q+'"></iframe>'
           +'<figcaption><b title="timing from '+esc(m.verb)+'. '+esc(m.scope)+'">'
           +esc(m.note||'untitled')+'</b>'
           +'<span class="facts">'+factLine(m)+'</span>'
@@ -2176,7 +2176,7 @@ function render(){
        changed, and every other render leaves it loading in peace. */
     const have=grid.querySelector('.appwrap iframe')
     if(have && have.dataset.n===String(aimN)) return
-    grid.innerHTML='<div class="appwrap"><iframe data-n="'+aimN+'" src="/__wall/app?n='+aimN
+    grid.innerHTML='<div class="appwrap"><iframe data-n="'+aimN+'" src="/__motioneer/app?n='+aimN
       +(quietMode?'&quiet=1':'')+'"></iframe></div>'
     watchFrame()
     return }
@@ -2188,7 +2188,7 @@ function render(){
   const q='?palette='+encodeURIComponent(palette.value)
     +(shot?'&camera='+shot+'&depth='+lens:'')
   grid.innerHTML=opts.map((o,i)=>
-    '<figure><iframe data-i="'+i+'" src="/__wall/preview/'+o.id+q+'"></iframe>'+
+    '<figure><iframe data-i="'+i+'" src="/__motioneer/preview/'+o.id+q+'"></iframe>'+
     /* the verb and the scope moved into the title. Both are worth having and neither helps you
        choose between five of these, which is the only thing this card is for */
     '<figcaption><b title="timing from '+esc(o.verb)+'. '+esc(o.scope)+'">'+esc(o.note||'untitled')+'</b>'+
@@ -2267,7 +2267,7 @@ function render(){
       if(!words){ note.textContent='Say what to change, then press enter.'; return }
       box.disabled=true; note.textContent='Changing it'
       try{
-        const r=await post('/__wall/changed',{id,words},360000)
+        const r=await post('/__motioneer/changed',{id,words},360000)
         if(!r||!r.id){
           note.textContent=(r&&r.why)?'Turned down, because '+r.why:'Nothing came back.'
           box.disabled=false; box.focus(); return }
@@ -2299,7 +2299,7 @@ function render(){
     try{
       /* any of them will do as the source: they are all motions of the same element, and what this
          needs from one is the markup and the sheet it was captured with */
-      const r=await post('/__wall/described',{id:opts[0].id,words},360000)
+      const r=await post('/__motioneer/described',{id:opts[0].id,words},360000)
       if(!r||!r.id){
         note.textContent=(r&&r.why)?'Turned down, because '+r.why:'Nothing came back.'
         said.disabled=false; said.focus(); return }
@@ -2330,7 +2330,7 @@ function render(){
     for (const other of document.querySelectorAll('[data-more]')) other.disabled = true
     ask.disabled=true
     try{
-      const r=await post('/__wall/refine',{id:keep.id,count:3},360000)
+      const r=await post('/__motioneer/refine',{id:keep.id,count:3},360000)
       // the one you liked stays on screen, with its variations beside it, so the comparison is real
       opts=[keep].concat(r.kept); held.clear(); ends.clear(); render()
       drops.textContent=r.dropped.length? r.dropped.length+' variation'+(r.dropped.length>1?'s':'')
@@ -2367,7 +2367,7 @@ addEventListener('message',e=>{const d=e.data||{}
    */
   /* data-rail counts the cars that move, and a car index counts every row. They agree until one
      pick fails, which is exactly the conflation the timeline already had and had to be taken out of */
-  if(d.wall==='chose'&&railed()){
+  if(d.motioneer==='chose'&&railed()){
     const x=ARR.live(arr)[Number(d.i)]
     if(x){ anchor=x.i; choose([x.i],x.i); shut(); insp.hidden=false }
     return
@@ -2379,7 +2379,7 @@ addEventListener('message',e=>{const d=e.data||{}
    * being made. The leg ends at the playhead, because the playhead is where you already put the
    * clock to decide this, and starts a little before it, which is the shortest thing worth watching.
    */
-  if(d.wall==='travelled'&&railed()){
+  if(d.motioneer==='travelled'&&railed()){
     const seat=ARR.live(arr)[Number(d.i)]; if(!seat) return
     const base=seat.car.place||{x:0,y:0,w:100}
     const lands=Math.max(120,Math.round(Number(scrub.value)||0))
@@ -2396,7 +2396,7 @@ addEventListener('message',e=>{const d=e.data||{}
    * Alt on the stage background, the way alt on a component sends that component: the same gesture
    * at two levels, because a camera move and a component move turned out to be the same shape.
    */
-  if(d.wall==='panned'&&railed()&&!d.keep){
+  if(d.motioneer==='panned'&&railed()&&!d.keep){
     const lands=Math.max(200,Math.round(Number(scrub.value)||0))
     const ms=Math.min(1200,Math.max(300,lands))
     const now=(arr.camera||[]).reduce((v,m)=>({x:m.x,y:m.y,scale:m.scale}),{x:0,y:0,scale:1})
@@ -2406,7 +2406,7 @@ addEventListener('message',e=>{const d=e.data||{}
     held.clear(); ends.clear(); render(); drawInspector()
     return
   }
-  if(d.wall==='placed'&&railed()){
+  if(d.motioneer==='placed'&&railed()){
     const seat=ARR.live(arr)[Number(d.i)]; if(!seat) return
     const at=seat.i, car=seat.car
     if(!d.done){
@@ -2425,7 +2425,7 @@ addEventListener('message',e=>{const d=e.data||{}
     held.clear(); ends.clear(); render()
     return
   }
-  if(d.wall==='held'){held.set(d.i,d.n)
+  if(d.motioneer==='held'){held.set(d.i,d.n)
     // a motion that runs six seconds cannot be scrubbed to its end on a four second ruler, and the
     // only thing that knows how long it runs is the animation itself
     /* Two minutes rather than twenty seconds.
@@ -2458,20 +2458,20 @@ addEventListener('message',e=>{const d=e.data||{}
    * with nothing on it and its own back end refusing it, which is the difference between an app
    * that cannot run here and an app that simply does not need that request.
    */
-  if(d.wall==='refused'&&d.host){ turnedAway=String(d.host); return }
-  if(d.wall==='armed'||d.wall==='disarmed'){
+  if(d.motioneer==='refused'&&d.host){ turnedAway=String(d.host); return }
+  if(d.motioneer==='armed'||d.motioneer==='disarmed'){
     const pb=document.getElementById('pick')
-    pb.setAttribute('aria-pressed',d.wall==='armed')
+    pb.setAttribute('aria-pressed',d.motioneer==='armed')
     /* the label only: setting textContent here used to replace the icon along with the word.
        And the key is drawn as a key. "Picking, esc to stop" is a sentence you read; a cap sitting
        in the button is a thing you recognise without reading it, which is what you want from a
        state you are only in for a couple of seconds */
     const lbl=pb.querySelector('.lbl')
-    if(d.wall==='armed') lbl.innerHTML='Picking<kbd class="cap">esc</kbd>'
+    if(d.motioneer==='armed') lbl.innerHTML='Picking<kbd class="cap">esc</kbd>'
     else lbl.textContent='Pick'
-    pb.classList.toggle('on',d.wall==='armed')
+    pb.classList.toggle('on',d.motioneer==='armed')
   }
-  if(d.wall==='picked'){
+  if(d.motioneer==='picked'){
     chosen={html:d.html,css:d.css,shot:d.shot,label:d.label,w:d.w,h:d.h,n:d.n,
       cut:d.cut,opaque:d.opaque,weak:d.weak}
     picks.push(chosen)
@@ -2562,7 +2562,7 @@ const slug=(v)=>String(v||'motion').replace(/[^A-Za-z0-9]+/g,'-').replace(/^-|-$
  * motion still plays when whatever produced it is long gone, and the whole shelf is a folder of
  * finished work rather than a list of ids that used to mean something.
  */
-const DB='wall', SHELF='saved'
+const DB='motioneer', SHELF='saved'
 function shelf(){
   if(dbp) return dbp
   dbp=new Promise((ok,no)=>{
@@ -3058,7 +3058,7 @@ async function moreLikeCar(i, from){
   if(pressed) pressed.classList.add('working')
   document.querySelectorAll('[data-more-car]').forEach(b=>{ b.disabled=Number(b.dataset.moreCar)!==i })
   try{
-    const r=await post('/__wall/refine',{id:base.id,count:3},360000)
+    const r=await post('/__motioneer/refine',{id:base.id,count:3},360000)
     mark('varying '+nameOf(base))
     arr=ARR.offered(arr,i,r.kept||[])
     drops.textContent=(r.kept&&r.kept.length? r.kept.length+' more for '+nameOf(base)+'. ':'')
@@ -3175,7 +3175,7 @@ function wireTimeline(live){
     if(head===undefined||!rest.length) return
     same.classList.add('working'); same.disabled=true
     try{
-      const r=await post('/__wall/sameas',
+      const r=await post('/__motioneer/sameas',
         {from:arr.cars[head].motion.id,to:rest.map(i=>arr.cars[i].motion.id)},120000)
       const got=(r&&r.kept)||[]
       if(got.length){
@@ -3334,7 +3334,7 @@ function wireTimeline(live){
         const base=arr.cars[i].motion
         bar.classList.add('working')
         try{
-          const r=await post('/__wall/tune',{ id:base.origin||base.id,
+          const r=await post('/__motioneer/tune',{ id:base.origin||base.id,
             duration:want/was, stagger:1 }, 20000)
           if(r.error){ drops.textContent=r.error.slice(0,140); return render() }
           mark('the length of '+nameOf(base))
@@ -3646,7 +3646,7 @@ function paint(){
 }
 function hold(ms){
   ;[...document.querySelectorAll(DRIVEN)].filter(f=>f.offsetParent!==null).forEach((f,i)=>{
-    try{f.contentWindow.postMessage({wall:'hold',t:ms,i},'*')}catch(_){}
+    try{f.contentWindow.postMessage({motioneer:'hold',t:ms,i},'*')}catch(_){}
   })
   scrub.value=ms; at.textContent=(ms/1000).toFixed(2)
   markPlayhead(ms)
@@ -3688,13 +3688,13 @@ function keepWork(){
   if(keeping) return
   keeping=setTimeout(()=>{
     keeping=null
-    try{ fetch('/__wall/work',{method:'POST',headers:{'content-type':'application/json'},
+    try{ fetch('/__motioneer/work',{method:'POST',headers:{'content-type':'application/json'},
       body:JSON.stringify({picks,arr,rails,railN,zoom,chosenOpt})}).catch(()=>{}) }catch(_){}
   },600)
 }
 async function putBack(){
   try{
-    const was=await fetch('/__wall/work').then(r=>r.json())
+    const was=await fetch('/__motioneer/work').then(r=>r.json())
     if(!was||!was.picks||!was.picks.length) return
     await arriving
     picks=was.picks; chosen=picks[picks.length-1]||null
@@ -3708,7 +3708,7 @@ async function putBack(){
        an empty room somebody has to work out for themselves */
     if(arr&&ARR.live(arr).length){
       const on=ARR.live(arr)
-      const there=await Promise.all(on.map(x=>fetch('/__wall/preview/'+x.car.motion.id)
+      const there=await Promise.all(on.map(x=>fetch('/__motioneer/preview/'+x.car.motion.id)
         .then(r=>r.ok).catch(()=>false)))
       const lost=there.filter(v=>!v).length
       if(lost===on.length){ arr=null; rails=[]
@@ -3723,7 +3723,7 @@ async function putBack(){
 putBack()
 /* a different process answering is the only reliable sign that the code under this page moved */
 try{
-  const watch=new EventSource('/__wall/live')
+  const watch=new EventSource('/__motioneer/live')
   let born=null, caughtAt=0
   watch.onmessage=(e)=>{
     try{
@@ -3748,7 +3748,7 @@ addEventListener('keydown',e=>{
   if(e.key==='Escape'&&opened){ opened=null; held.clear(); ends.clear(); render(); return }
   if(e.key==='Escape'&&document.getElementById('pick').getAttribute('aria-pressed')==='true'){
     const f=document.querySelector('.appwrap iframe')
-    if(f) f.contentWindow.postMessage({wall:'nopick'},'*')
+    if(f) f.contentWindow.postMessage({motioneer:'nopick'},'*')
     return
   }
   if(e.target.tagName==='INPUT'&&e.target.type==='range')return

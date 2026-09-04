@@ -78,9 +78,9 @@ let AIM = null   // the address as typed, for the sidebar to show
  * inside a datacentre begins with the address that hands out credentials. The rules and the reasons
  * are in shared/guard.mjs, since a worker needs the same answers and has no dns to ask with.
  */
-const MODE = process.env.WALL_PUBLIC ? 'public' : 'local'
-const ALLOW = (process.env.WALL_ALLOW || '').split(',').map((h) => h.trim()).filter(Boolean)
-const DENY = (process.env.WALL_DENY || '').split(',').map((h) => h.trim()).filter(Boolean)
+const MODE = process.env.MOTIONEER_PUBLIC ? 'public' : 'local'
+const ALLOW = (process.env.MOTIONEER_ALLOW || '').split(',').map((h) => h.trim()).filter(Boolean)
+const DENY = (process.env.MOTIONEER_DENY || '').split(',').map((h) => h.trim()).filter(Boolean)
 const GUARD = { mode: MODE, allow: ALLOW, deny: DENY }
 
 /** a bare host is http only when it is this machine: everywhere else redirects to https, and the
@@ -116,7 +116,7 @@ const asked = args.find((a, i) => !a.startsWith('--')
 /**
  * A bare address means aim there, the way anybody would expect it to.
  *
- * The one positional argument was always a folder, so `wall localhost:3000` set the components
+ * The one positional argument was always a folder, so `motioneer localhost:3000` set the components
  * directory to a string that is not a directory and opened an empty room saying to type an address
  * into the sidebar. That is the exact thing they had just typed. An address and a path are not
  * ambiguous in practice: a scheme, or a host with a port, or a dotted host, is not a folder anybody
@@ -127,7 +127,7 @@ const looksLikeAddress = (v) => !!v && !existsSync(v)
 const aimed = !TARGET && looksLikeAddress(asked) ? asked : null
 if (aimed) TARGET = aimed
 const ROOT = aimed ? null : (asked ?? (existsSync(SHIPPED) ? SHIPPED : null))
-const PORT = Number(process.env.WALL_PORT || 4321)
+const PORT = Number(process.env.MOTIONEER_PORT || 4321)
 const KIND = /\.(tsx|jsx|vue|svelte|astro|html|htm)$/i
 /**
  * Whether there is anything here that can write.
@@ -222,7 +222,7 @@ const rawSheet = SHEET && existsSync(SHEET) ? readFileSync(SHEET, 'utf8') : ''
  * first makes no network request and the whole thing keeps working on a plane. If the fetch fails the
  * studio says so in the header instead of quietly showing naked text again.
  *
- * The colours come from Wall's own presets by way of themeOf, which already knows how to turn a
+ * The colours come from Motioneer's own presets by way of themeOf, which already knows how to turn a
  * direction into the token set shadcn reads and has already been measured for contrast in both modes.
  * That is a better answer than defaulting to slate: you get to see your component in eight palettes
  * that have passed a readability gate, and the motion is judged against the one you will ship.
@@ -422,12 +422,12 @@ const STAGE = (shot = 'drift', ms = 3200, depth = 1) => {
 const LISTENER = `<script>
 requestAnimationFrame(function(){document.getAnimations().forEach(function(a){
   try{a.pause();a.currentTime=0}catch(_){}})});
-addEventListener('message',function(e){var d=e.data||{};if(d.wall!=='hold')return;
+addEventListener('message',function(e){var d=e.data||{};if(d.motioneer!=='hold')return;
 var a=document.getAnimations(),end=0;
 a.forEach(function(x){try{x.pause();x.currentTime=d.t;
   var t=x.effect&&x.effect.getComputedTiming?x.effect.getComputedTiming().endTime:0;
   if(typeof t==='number'&&isFinite(t)&&t>end)end=t}catch(_){}});
-(e.source||parent).postMessage({wall:'held',n:a.length,i:d.i,end:Math.round(end)},'*');});<\/script>`
+(e.source||parent).postMessage({motioneer:'held',n:a.length,i:d.i,end:Math.round(end)},'*');});<\/script>`
 
 const preview = (o, camera, palette, depth = 1) => {
   /**
@@ -442,7 +442,7 @@ const preview = (o, camera, palette, depth = 1) => {
   const scoped = o.scope ? body.replace(/<(\w+)/, `<$1 ${o.scope}`) : body
   // Tailwind's compiler and the motion sheet both go in head, but the motion sheet is written last so
   // that a keyframe never loses to a utility that happens to set the same property
-  const tw = o.tw ? `<script src="/__wall/tailwind.js"></script>
+  const tw = o.tw ? `<script src="/__motioneer/tailwind.js"></script>
     <style type="text/tailwindcss">${themeMap}</style>` : ''
   const vars = o.tw ? `<style>${themeFor(palette)}</style>` : ''
   /**
@@ -629,20 +629,20 @@ async function proxy(req, res, url, quiet) {
     if (!/rel\s*=\s*["']?[^"'>]*stylesheet/i.test(tag)) return tag
     return tag.replace(/href\s*=\s*["']([^"']+)["']/i, (whole, href) => {
       if (!/^https?:\/\//i.test(href) || href.startsWith(HOST)) return whole
-      return `href="/__wall/asset?u=${encodeURIComponent(href)}"`
+      return `href="/__motioneer/asset?u=${encodeURIComponent(href)}"`
     })
   })
   const at = html.search(/<\/body>/i)
   /* the aimed host is substituted here rather than baked into the constant, which is built once at
      startup when nothing has been aimed at yet and would carry an empty string for the session */
-  const picker = PICKER.replace('__WALL_HOME__',
+  const picker = PICKER.replace('__MOTIONEER_HOME__',
     String(HOST || '').replace(/^https?:\/\//, '').split('/')[0])
   html = at === -1 ? html + picker : html.slice(0, at) + picker + html.slice(at)
   /**
    * Some sites navigate their own frame back to their canonical host.
    *
    * vercel.com and nextjs.org both do it: a script reads location.host, finds it is not theirs, and
-   * sets it, which keeps the path and lands the frame on vercel.com/__wall/app. window.location
+   * sets it, which keeps the path and lands the frame on vercel.com/__motioneer/app. window.location
    * cannot be overridden, so there is no shim that beats it from inside the page.
    *
    * But their javascript is not what any of this needs. The picker wants the rendered dom and the
@@ -692,7 +692,7 @@ var refused={},toldAt=0;
 /* the app's own back end rather than anybody's. A blocked tracker is somebody's ad blocker doing its
    job and says nothing about whether this app can run here; an api on the same registrable domain
    as the site being proxied is the app talking to itself and being told no */
-var HOME="__WALL_HOME__";
+var HOME="__MOTIONEER_HOME__";
 function ours(host){
   var a=String(host).split('.'), b=String(HOME).split('.');
   if(a.length<2||b.length<2)return false;
@@ -710,7 +710,7 @@ function refusing(url){
        before it does anything else and gives up once; its telemetry keeps retrying and would win a
        count while having nothing to do with why the page is empty */
     var first=Object.keys(refused)[0];
-    parent.postMessage({wall:'refused',host:first,n:refused[first]},'*');
+    parent.postMessage({motioneer:'refused',host:first,n:refused[first]},'*');
   }catch(_){}
 }
 var realFetch=window.fetch;
@@ -739,8 +739,8 @@ var on=false,box=null,last=null;
 var framed=false; try{ framed = window.parent !== window }catch(_){ framed = true }
 var mine=[];
 function tell(n,sent){
-  var t=document.getElementById('wall-said');
-  if(!t){ t=document.createElement('div'); t.id='wall-said';
+  var t=document.getElementById('motioneer-said');
+  if(!t){ t=document.createElement('div'); t.id='motioneer-said';
     t.style.cssText='position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:2147483647;'
       +'background:#141516;color:#e6e6e6;border:1px solid rgba(255,255,255,.14);border-radius:8px;'
       +'padding:9px 14px;font:13px ui-sans-serif,system-ui;box-shadow:0 6px 24px rgba(0,0,0,.5);'
@@ -776,11 +776,11 @@ function older(text,then){
  * same as picking in the studio: click, and it is there. Both are kept because which one is possible
  * is the site's decision rather than ours, and finding out is one request.
  */
-var STUDIO="__WALL_STUDIO__";
+var STUDIO="__MOTIONEER_STUDIO__";
 function toStudio(text,then){
   try{
     var r=new XMLHttpRequest();
-    r.open('POST',STUDIO+'/__wall/picked',true);
+    r.open('POST',STUDIO+'/__motioneer/picked',true);
     r.setRequestHeader('content-type','text/plain');
     r.timeout=4000;
     r.onload=function(){ then(r.status>=200&&r.status<300) };
@@ -796,9 +796,9 @@ function deliver(m){
   /* the one just picked when it is handed straight over, since it arrives at once and there is
      nothing to accumulate for; all of them when it goes by clipboard, since one paste should bring
      everything rather than the last thing clicked */
-  toStudio(JSON.stringify({wall:'wall-capture',v:1,picks:[m]}),function(sent){
+  toStudio(JSON.stringify({motioneer:'motioneer-capture',v:1,picks:[m]}),function(sent){
     if(sent){ tell(n,true); return }
-    toClipboard(JSON.stringify({wall:'wall-capture',v:1,picks:mine}),function(won){
+    toClipboard(JSON.stringify({motioneer:'motioneer-capture',v:1,picks:mine}),function(won){
       tell(won?n:0,false) });
   });
 }
@@ -1059,24 +1059,24 @@ function pick(e){if(!on)return;e.preventDefault();e.stopPropagation();
     : thin ? 'too thin to stagger'
     : kids === 0 ? 'nothing inside it to move separately'
     : kids < 3 ? 'only ' + kids + ' part' + (kids === 1 ? '' : 's') : '';
-  deliver({wall:'picked',html:h,css:css,shot:shot,label:label(el),opaque:opaque,shut:shut,weak:weak,
+  deliver({motioneer:'picked',html:h,css:css,shot:shot,label:label(el),opaque:opaque,shut:shut,weak:weak,
     n:el.querySelectorAll('*').length+1,
     cut:h.length<el.outerHTML.length,w:Math.round(r.width),h:Math.round(r.height)})}
 function arm(v){on=v;
   document.documentElement.style.cursor=v?'crosshair':'';
   if(!v&&box)box.style.display='none';
-  if(framed) parent.postMessage({wall:v?'armed':'disarmed'},'*');
+  if(framed) parent.postMessage({motioneer:v?'armed':'disarmed'},'*');
   else if(v) tell(mine.length)}
 addEventListener('mousemove',move,true);addEventListener('click',pick,true);
 /* a framework that acts on mousedown would fire before the click is stopped */
 addEventListener('mousedown',function(e){if(on){e.preventDefault();e.stopPropagation()}},true);
 addEventListener('keydown',function(e){if(on&&e.key==='Escape'){e.preventDefault();arm(false)}},true);
 addEventListener('message',function(e){var d=e.data||{};
-  if(d.wall==='pick')arm(true);
-  if(d.wall==='nopick')arm(false)});
+  if(d.motioneer==='pick')arm(true);
+  if(d.motioneer==='nopick')arm(false)});
 /* on the page itself there is nobody to ask it to start, and being run at all is the asking. Escape
    still disarms, which is how you get the page back without reloading it */
-if(framed) parent.postMessage({wall:'ready'},'*'); else arm(true);
+if(framed) parent.postMessage({motioneer:'ready'},'*'); else arm(true);
 })();<\/script>`
 
 /**
@@ -1334,7 +1334,7 @@ const TERMINAL = /not found on this machine|not authenticated|no such file|api k
 const AUTH = /401|403|api key|authentication|unauthorized/i
 const BUSY = /rate limit|overloaded|429|503|too many requests|temporarily/i
 
-const CALL_MS = Number(process.env.WALL_STUDIO_CALL_MS || 150_000)
+const CALL_MS = Number(process.env.MOTIONEER_STUDIO_CALL_MS || 150_000)
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 /**
@@ -1349,10 +1349,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
  * Eight times faster and, on this payload, better: both failures were unmoved reporting that
  * everything moved at once, which is the fault a longer deliberation is supposed to prevent. The cost
  * compounds, because a gated attempt is asked again with a fresh verb, so a batch where anything
- * fails was paying that minute twice. WALL_STUDIO_THINKING turns it back on for anyone who wants to
+ * fails was paying that minute twice. MOTIONEER_STUDIO_THINKING turns it back on for anyone who wants to
  * measure it again on their own components rather than take this on faith.
  */
-const THINK = process.env.WALL_STUDIO_THINKING ? Number(process.env.WALL_STUDIO_THINKING) : 0
+const THINK = process.env.MOTIONEER_STUDIO_THINKING ? Number(process.env.MOTIONEER_STUDIO_THINKING) : 0
 
 /**
  * A key skips a process, which is a third of every call.
@@ -1400,10 +1400,10 @@ const MODEL_AT = path.join(work, 'model.json')
  * with nothing.
  */
 const fromEnv = () => (CAN_CLI
-  ? { provider: 'claude-cli', model: process.env.WALL_STUDIO_MODEL || '' }
+  ? { provider: 'claude-cli', model: process.env.MOTIONEER_STUDIO_MODEL || '' }
   : (process.env.ANTHROPIC_API_KEY
-    ? { provider: 'anthropic', key: process.env.ANTHROPIC_API_KEY, model: process.env.WALL_STUDIO_MODEL || '' }
-    : { provider: 'claude-cli', model: process.env.WALL_STUDIO_MODEL || '' }))
+    ? { provider: 'anthropic', key: process.env.ANTHROPIC_API_KEY, model: process.env.MOTIONEER_STUDIO_MODEL || '' }
+    : { provider: 'claude-cli', model: process.env.MOTIONEER_STUDIO_MODEL || '' }))
 let MODEL = (() => {
   try { return { ...fromEnv(), ...JSON.parse(readFileSync(MODEL_AT, 'utf8')) } }
   catch { return fromEnv() }
@@ -1817,7 +1817,7 @@ user sees, and the css below is the rules that actually matched it.\n\n${source.
   tried.sort((a, b) => (a.id ? 0 : 1) - (b.id ? 0 : 1) || cost(a) - cost(b))
   if (worth.length) console.log(`    retried ${worth.length}, recovered ${again.filter((t) => t.id).length}`)
   const styled = picked ? 'the rules that matched it in your app'
-    : tw ? 'tailwind and a Wall palette'
+    : tw ? 'tailwind and a Motioneer palette'
       : base ? `${SHEET ? path.basename(SHEET) : 'its own <style>'}`
         : (await getTailwind()).why ? `nothing: ${(await getTailwind()).why}` : 'nothing, and it needs nothing'
   return { kept: tried.filter((t) => t.id), dropped: tried.filter((t) => !t.id), styled }
@@ -1828,7 +1828,7 @@ user sees, and the css below is the rules that actually matched it.\n\n${source.
  *
  * Playing with motion in a studio is only half of it; the other half is showing somebody. A link to
  * localhost is not showing somebody, and a screenshot cannot carry motion, so the artifact is a single
- * html file that opens anywhere with the transport built in. That is Wall's existing promise about
+ * html file that opens anywhere with the transport built in. That is Motioneer's existing promise about
  * shipped pages applied to motion, and it is the thing you attach to a pull request.
  *
  * The options share one document rather than sitting in iframes, which is what makes it one file. They
@@ -2106,7 +2106,7 @@ const railView = (ids, palette, offsets = [], shots = [], places = [], lives = [
   if (!parts.length) return null
   const tw = parts.some((o) => o.tw)
   return `<html class="dark"><head><meta charset="utf-8">
-${tw ? `<script src="/__wall/tailwind.js"></script><style type="text/tailwindcss">${themeMap}</style>` : ''}
+${tw ? `<script src="/__motioneer/tailwind.js"></script><style type="text/tailwindcss">${themeMap}</style>` : ''}
 ${tw ? `<style>${themeFor(palette)}</style>` : ''}
 <style>html,body{margin:0;height:100%;overflow:hidden;background:#0b0c0d;color:#e6e6e6;
   font:13px ui-sans-serif,system-ui}
@@ -2244,7 +2244,7 @@ ${(() => {
          <div class="layer sharp">${inner}</div>
          <div class="layer blur" data-copy></div></div></div></div>`
     : inner
-  /* data-wall-at says which clock this car runs on. The transport holds it at t minus its offset,
+  /* data-motioneer-at says which clock this car runs on. The transport holds it at t minus its offset,
      which is a live animation and is invisible to anything that draws the document instead of
      watching it: filming walked every element and wrote one instant into all of them, so a rail came
      out with every car starting together and the sequencing, the thing being filmed, was gone */
@@ -2252,9 +2252,9 @@ ${(() => {
     ? ` style="left:${p.place.x}%;top:${p.place.y}%;width:${p.place.w}%"` : ''
   return `<div class="car${p.shot ? ' shot' : ''}${p.place ? ' put' : ''}${p.off ? ' off' : ''}${
     p.paper ? ` paper-${p.paper}` : ''}" data-rail="${p.i}"${put}
-    data-wall-at="${Math.round(p.at)}"${p.life
-      ? ` data-wall-from="${Math.round(p.life.from)}"${p.life.until === null ? '' : ` data-wall-until="${Math.round(p.life.until)}"`}`
-      : ` data-wall-from="${Math.round(p.at)}"`}>
+    data-motioneer-at="${Math.round(p.at)}"${p.life
+      ? ` data-motioneer-from="${Math.round(p.life.from)}"${p.life.until === null ? '' : ` data-motioneer-until="${Math.round(p.life.until)}"`}`
+      : ` data-motioneer-from="${Math.round(p.at)}"`}>
     ${body}<i class="grab" data-grab="${p.i}"></i><i class="wide" data-wide="${p.i}"></i></div>`
 }).join('')}</div>
 <script>
@@ -2282,7 +2282,7 @@ function pct(e, box){
            y:Math.max(0,Math.min(100,(e.clientY-box.top)/box.height*100)) }
 }
 function tell(i, at, done){
-  parent.postMessage({wall:'placed', i:i, x:at.x, y:at.y, w:at.w, done:!!done}, '*')
+  parent.postMessage({motioneer:'placed', i:i, x:at.x, y:at.y, w:at.w, done:!!done}, '*')
 }
 for (var handle of document.querySelectorAll('[data-grab]')){
   handle.addEventListener('pointerdown', function(e){
@@ -2306,12 +2306,12 @@ for (var handle of document.querySelectorAll('[data-grab]')){
       /* a press that never moved is a click, and a click on a component means that component. The
          stage had no selection at all, so you dragged whatever you happened to grab and the row it
          belonged to was somewhere else entirely */
-      if(!moved){ parent.postMessage({wall:'chose', i:i}, '*'); return }
+      if(!moved){ parent.postMessage({motioneer:'chose', i:i}, '*'); return }
       var p=pct(ev, box)
       /* alt says this is a journey rather than a placement: the component travels to here by the
          instant the clock is at, instead of simply being here from the start */
       if(ev.altKey){
-        parent.postMessage({wall:'travelled', i:i,
+        parent.postMessage({motioneer:'travelled', i:i,
           x:Math.max(0,p.x-hold.x), y:Math.max(0,p.y-hold.y)}, '*')
         return
       }
@@ -2338,7 +2338,7 @@ if(floor) floor.addEventListener('pointerdown', function(e){
     window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up)
     if(!moved) return
     var now=pct(ev, box)
-    parent.postMessage({wall:'panned', x:now.x-was.x, y:now.y-was.y, keep:!ev.altKey}, '*')
+    parent.postMessage({motioneer:'panned', x:now.x-was.x, y:now.y-was.y, keep:!ev.altKey}, '*')
   }
   window.addEventListener('pointermove',move); window.addEventListener('pointerup',up)
 })
@@ -2393,7 +2393,7 @@ function alive(t){
     car.style.visibility=on?'':'hidden'
   }
 }
-addEventListener('message',function(e){var d=e.data||{};if(d.wall!=='hold')return
+addEventListener('message',function(e){var d=e.data||{};if(d.motioneer!=='hold')return
   alive(d.t)
   var a=document.getAnimations(),end=0
   a.forEach(function(x){try{
@@ -2402,7 +2402,7 @@ addEventListener('message',function(e){var d=e.data||{};if(d.wall!=='hold')retur
     var t=x.effect&&x.effect.getComputedTiming?x.effect.getComputedTiming().endTime:0
     if(typeof t==='number'&&isFinite(t)&&t+off>end)end=t+off
   }catch(_){}})
-  ;(e.source||parent).postMessage({wall:'held',n:a.length,i:d.i,end:Math.round(end)},'*')})
+  ;(e.source||parent).postMessage({motioneer:'held',n:a.length,i:d.i,end:Math.round(end)},'*')})
 <\/script></body></html>`
 }
 
@@ -2496,9 +2496,9 @@ const server = createServer(async (req, res) => {
     if (url.pathname === '/' && !(HOST && url.searchParams.has('__wall'))) {
       res.writeHead(200, { 'content-type': 'text/html' }); return res.end(PAGE())
     }
-    if (url.pathname === '/__wall/list') return json(res, HAS_FOLDER ? list() : [])
-    if (url.pathname === '/__wall/recent') return json(res, recent)
-    if (url.pathname === '/__wall/tailwind.js') {
+    if (url.pathname === '/__motioneer/list') return json(res, HAS_FOLDER ? list() : [])
+    if (url.pathname === '/__motioneer/recent') return json(res, recent)
+    if (url.pathname === '/__motioneer/tailwind.js') {
       const t = await getTailwind()
       if (!t.js) { res.writeHead(503); return res.end(`// ${t.why}`) }
       res.writeHead(200, { 'content-type': 'text/javascript', 'cache-control': 'max-age=86400' })
@@ -2512,7 +2512,7 @@ const server = createServer(async (req, res) => {
      * loses the tree gives you a preview of nothing, and you want to know that before you spend
      * thirty seconds and four model calls animating it.
      */
-    if (url.pathname === '/__wall/peek') {
+    if (url.pathname === '/__motioneer/peek') {
       const want = path.resolve(url.searchParams.get('file') ?? '')
       const under = HAS_FOLDER ? path.resolve(ROOT) : '\u0000'
       if (!want.startsWith(under) || !KIND.test(want) || !existsSync(want)) {
@@ -2526,14 +2526,14 @@ const server = createServer(async (req, res) => {
         url.searchParams.get('camera'), url.searchParams.get('palette'),
         Number(url.searchParams.get('depth')) || 1))
     }
-    if (url.pathname.startsWith('/__wall/preview/')) {
+    if (url.pathname.startsWith('/__motioneer/preview/')) {
       const o = made.get(url.pathname.split('/')[3])
       if (!o) { res.writeHead(404); return res.end('gone') }
       res.writeHead(200, { 'content-type': 'text/html' })
       return res.end(preview(o, url.searchParams.get('camera'), url.searchParams.get('palette'),
         Number(url.searchParams.get('depth')) || 1))
     }
-    if (url.pathname === '/__wall/motion' && req.method === 'POST') {
+    if (url.pathname === '/__motioneer/motion' && req.method === 'POST') {
       const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))
       const src = body.html ? { html: body.html, css: body.css ?? '', shot: body.shot ?? '',
         label: body.label ?? 'element', w: Number(body.w) || 0 }
@@ -2543,7 +2543,7 @@ const server = createServer(async (req, res) => {
       console.log(`    ${got.kept.length} kept, ${got.dropped.length} dropped`)
       return json(res, got)
     }
-    if (url.pathname === '/__wall/refine' && req.method === 'POST') {
+    if (url.pathname === '/__motioneer/refine' && req.method === 'POST') {
       const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))
       const base = made.get(body.id)
       if (!base) { res.writeHead(404); return res.end('gone') }
@@ -2552,7 +2552,7 @@ const server = createServer(async (req, res) => {
       console.log(`    ${got.kept.length} kept, ${got.dropped.length} dropped`)
       return json(res, got)
     }
-    if (url.pathname === '/__wall/described' && req.method === 'POST') {
+    if (url.pathname === '/__motioneer/described' && req.method === 'POST') {
       const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))
       const from = made.get(body.id)
       if (!from) { res.writeHead(404); return res.end('gone') }
@@ -2565,7 +2565,7 @@ const server = createServer(async (req, res) => {
       console.log(got.id ? `    kept as ${got.id}` : `    dropped: ${got.why}`)
       return json(res, got)
     }
-    if (url.pathname === '/__wall/changed' && req.method === 'POST') {
+    if (url.pathname === '/__motioneer/changed' && req.method === 'POST') {
       const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))
       const from = made.get(body.id)
       if (!from) { res.writeHead(404); return res.end('gone') }
@@ -2576,14 +2576,14 @@ const server = createServer(async (req, res) => {
       console.log(got.id ? `    kept as ${got.id}` : `    dropped: ${got.why}`)
       return json(res, got)
     }
-    if (url.pathname === '/__wall/sameas' && req.method === 'POST') {
+    if (url.pathname === '/__motioneer/sameas' && req.method === 'POST') {
       const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))
       const got = sameAs(String(body.from ?? ''), (body.to ?? []).map(String))
       if (!got) { res.writeHead(404); return res.end('gone') }
       console.log(`  putting "${made.get(String(body.from)).note}" on ${got.length} more`)
       return json(res, { kept: got })
     }
-    if (url.pathname === '/__wall/export' && req.method === 'POST') {
+    if (url.pathname === '/__motioneer/export' && req.method === 'POST') {
       const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))
       const html = await exportable(body.ids ?? [], body.palette, body.at ?? [], body.shots ?? [], body.place ?? [])
       if (!html) { res.writeHead(404); return res.end('nothing to export') }
@@ -2593,7 +2593,7 @@ const server = createServer(async (req, res) => {
       console.log(`    exported ${at} (${Math.round(html.length / 1024)}kb)`)
       return json(res, { at, kb: Math.round(html.length / 1024) })
     }
-    if (url.pathname === '/__wall/rail' && req.method === 'POST') {
+    if (url.pathname === '/__motioneer/rail' && req.method === 'POST') {
       const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))
       const picks = (body.picks ?? []).slice(0, 8)
       console.log(`  rail of ${picks.length}: ${picks.map((p) => p.label).join(', ').slice(0, 90)}`)
@@ -2602,7 +2602,7 @@ const server = createServer(async (req, res) => {
       for (const c of cars.filter((c) => !c.id)) console.log(`      ${c.label}: ${String(c.why).slice(0, 120)}`)
       return json(res, { cars })
     }
-    if (url.pathname === '/__wall/railview') {
+    if (url.pathname === '/__motioneer/railview') {
       const ids = (url.searchParams.get('ids') ?? '').split(',').filter(Boolean)
       const at = (url.searchParams.get('at') ?? '').split(',').map(Number).filter((n) => !Number.isNaN(n))
       const shots = (url.searchParams.get('shots') ?? '').split(',')
@@ -2624,7 +2624,7 @@ const server = createServer(async (req, res) => {
      * thing you liked, so this rewrites the times in place and hands back a new option beside the
      * original. The original stays, because an adjustment you cannot undo is not an adjustment.
      */
-    if (url.pathname === '/__wall/tune' && req.method === 'POST') {
+    if (url.pathname === '/__motioneer/tune' && req.method === 'POST') {
       const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))
       const base = made.get(body.id)
       if (!base) { res.writeHead(404); return res.end('gone') }
@@ -2655,8 +2655,8 @@ const server = createServer(async (req, res) => {
      * thousand lines through the escaping that has already cost this file six bugs, and would make
      * every page load carry an encoder almost nobody presses.
      */
-    if (url.pathname === '/__wall/raster.mjs' || url.pathname === '/__wall/mp4.mjs'
-      || url.pathname === '/__wall/arrange.mjs') {
+    if (url.pathname === '/__motioneer/raster.mjs' || url.pathname === '/__motioneer/mp4.mjs'
+      || url.pathname === '/__motioneer/arrange.mjs') {
       /* next to this file rather than next to wherever it was started from. Resolving against the
          working directory meant these only existed when the studio was run from the repository root,
          which is what npm run studio does and so nobody met it; started anywhere else, and the agent
@@ -2681,7 +2681,7 @@ const server = createServer(async (req, res) => {
      * holding in variables is only there until it reloads, and it has to reload, because a tab
      * running the code from before the edit is a tab that disagrees with the studio serving it.
      */
-    if (url.pathname === '/__wall/work') {
+    if (url.pathname === '/__motioneer/work') {
       if (req.method === 'POST') {
         const body = await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) })
         try { bench = JSON.parse(body) } catch { bench = null }
@@ -2705,13 +2705,13 @@ const server = createServer(async (req, res) => {
      * strict enough to need this sends connect-src self and script-src self, and localhost is
      * neither. Seventeen kilobytes of bookmark is inelegant and it is the only shape that works.
      */
-    if (url.pathname === '/__wall/bookmarklet') {
+    if (url.pathname === '/__motioneer/bookmarklet') {
       // the paste key is one of two things and saying the wrong one is worse than saying neither
       const MAC = /mac/i.test(String(req.headers['user-agent'] ?? ''))
       const inner = PICKER.replace(/^<script>/, '').replace(/<\/script>$/, '')
-        .replace(/<\\\/script>/g, '</script>').replace('__WALL_HOME__', '')
+        .replace(/<\\\/script>/g, '</script>').replace('__MOTIONEER_HOME__', '')
         /* the studio's own address, known here because this is the studio serving it */
-        .replace('__WALL_STUDIO__', `http://localhost:${PORT}`)
+        .replace('__MOTIONEER_STUDIO__', `http://localhost:${PORT}`)
       const href = `javascript:${encodeURIComponent(inner)}`
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
       return res.end(`<!doctype html><html><head><meta charset="utf-8"><title>Pick anywhere</title>
@@ -2728,7 +2728,7 @@ code{background:#141516;border:1px solid rgba(255,255,255,.11);border-radius:4px
 <p>An app that signs in against its own api on another host cannot be proxied: here that api is a
 different site, so it refuses the call and the app never gets past its loading screen. Pick on the
 real page instead, in the browser you are already signed into.</p>
-<a class="bm" href="${href}">Pick for Wall</a>
+<a class="bm" href="${href}">Pick for Motioneer</a>
 <ol>
 <li>Drag that button to your bookmarks bar. It holds the picker rather than an address.</li>
 <li>Open your app and sign in as usual.</li>
@@ -2749,7 +2749,7 @@ anywhere on the studio. Nothing is installed and nothing leaves this machine.</p
      * in advance. It holds what arrives until the page asks, which it does the moment it is told
      * something is waiting.
      */
-    if (url.pathname === '/__wall/picked') {
+    if (url.pathname === '/__motioneer/picked') {
       if (req.method === 'OPTIONS') {
         res.writeHead(204, { 'access-control-allow-origin': '*',
           'access-control-allow-methods': 'POST, OPTIONS',
@@ -2772,11 +2772,11 @@ anywhere on the studio. Nothing is installed and nothing leaves this machine.</p
       }
       res.writeHead(405, { 'access-control-allow-origin': '*' }); return res.end('')
     }
-    if (url.pathname === '/__wall/inbox') {
+    if (url.pathname === '/__motioneer/inbox') {
       const had = inbox
       return json(res, { picks: had || [] })
     }
-    if (url.pathname === '/__wall/live') {
+    if (url.pathname === '/__motioneer/live') {
       res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache',
         connection: 'keep-alive' })
       res.write(`data: ${JSON.stringify({ boot: BOOT })}\n\n`)
@@ -2785,10 +2785,10 @@ anywhere on the studio. Nothing is installed and nothing leaves this machine.</p
       req.on('close', () => { clearInterval(beat); streams.delete(res) })
       return
     }
-    if (url.pathname === '/__wall/model' && req.method === 'GET') {
+    if (url.pathname === '/__motioneer/model' && req.method === 'GET') {
       return json(res, { providers: PROVIDERS, current: publicly(MODEL), canCli: CAN_CLI })
     }
-    if (url.pathname === '/__wall/model' && req.method === 'POST') {
+    if (url.pathname === '/__motioneer/model' && req.method === 'POST') {
       const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))
       const next = {
         provider: String(body.provider || MODEL.provider),
@@ -2814,7 +2814,7 @@ anywhere on the studio. Nothing is installed and nothing leaves this machine.</p
       console.log(`  writing with ${resolve(MODEL).label}${MODEL.model ? `, ${MODEL.model}` : ''}`)
       return json(res, { current: publicly(MODEL) })
     }
-    if (url.pathname === '/__wall/model/check' && req.method === 'POST') {
+    if (url.pathname === '/__motioneer/model/check' && req.method === 'POST') {
       const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))
       // tested as typed rather than as saved, so a wrong key is caught before it is kept
       const trying = body.provider
@@ -2822,7 +2822,7 @@ anywhere on the studio. Nothing is installed and nothing leaves this machine.</p
         : MODEL
       return json(res, await checkProvider(trying, { callMs: 30_000, env: CLEAN_ENV }))
     }
-    if (url.pathname === '/__wall/save' && req.method === 'POST') {
+    if (url.pathname === '/__motioneer/save' && req.method === 'POST') {
       const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))
       const o = made.get(body.id)
       if (!o) { res.writeHead(404); return res.end('gone') }
@@ -2833,7 +2833,7 @@ anywhere on the studio. Nothing is installed and nothing leaves this machine.</p
       console.log(`    saved ${at}`)
       return json(res, { at })
     }
-    if (url.pathname === '/__wall/app') {
+    if (url.pathname === '/__motioneer/app') {
       if (!HOST) { res.writeHead(404); return res.end('nothing aimed at yet: type an address') }
       /**
        * The entry page follows its redirects here rather than in the browser.
@@ -2854,9 +2854,9 @@ anywhere on the studio. Nothing is installed and nothing leaves this machine.</p
       /**
        * Handed on to the path the app thinks it is at, rather than served here.
        *
-       * This served the entry page's content while the frame's address stayed /__wall/app, which is
+       * This served the entry page's content while the frame's address stayed /__motioneer/app, which is
        * invisible to anything rendered on a server and fatal to anything routed in the browser: an
-       * application reads location.pathname, finds /__wall/app among its routes, and renders the one
+       * application reads location.pathname, finds /__motioneer/app among its routes, and renders the one
        * it keeps for addresses that do not exist. Measured on a real app, its own not found page at
        * a hundred and nineteen nodes where the page itself is a hundred and thirty seven.
        *
@@ -2871,7 +2871,7 @@ anywhere on the studio. Nothing is installed and nothing leaves this machine.</p
       res.writeHead(302, { location: going.pathname + going.search, 'cache-control': 'no-store' })
       return res.end('')
     }
-    if (url.pathname === '/__wall/target' && req.method === 'POST') {
+    if (url.pathname === '/__motioneer/target' && req.method === 'POST') {
       const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))
       try {
         /**
@@ -2904,7 +2904,7 @@ anywhere on the studio. Nothing is installed and nothing leaves this machine.</p
      * with no icon gets nothing rather than a placeholder that pretends.
      */
     /** a stylesheet from somewhere else, served from here so the page can read its own rules */
-    if (url.pathname === '/__wall/asset') {
+    if (url.pathname === '/__motioneer/asset') {
       const want = url.searchParams.get('u') ?? ''
       const may = await allowed(want, GUARD)
       if (!may.ok) { res.writeHead(400); return res.end(may.why) }
@@ -2916,7 +2916,7 @@ anywhere on the studio. Nothing is installed and nothing leaves this machine.</p
         return res.end(body)
       } catch (e) { res.writeHead(502); return res.end('') }
     }
-    if (url.pathname === '/__wall/favicon') {
+    if (url.pathname === '/__motioneer/favicon') {
       const from = url.searchParams.get('host') || HOST
       if (!from) { res.writeHead(404); return res.end('') }
       if (!(await allowed(from, GUARD)).ok) { res.writeHead(404); return res.end('') }
@@ -3026,7 +3026,7 @@ else if (HAS_FOLDER) {
 } else console.log('  type where your app is running in the sidebar, or give a folder of components')
 console.log(TARGET ? '  picked elements bring their own css, so nothing is guessed'
   : rawSheet ? `  styled with ${SHEET}`
-    : '  no --css given: utility classes are compiled here and coloured from a Wall palette')
+    : '  no --css given: utility classes are compiled here and coloured from a Motioneer palette')
 /* named from the config rather than from a key that no longer exists. This line read `KEY ?` for
    several commits after the variable behind it was removed, and threw every boot into the catch all
    handler, which is exactly the kind of thing you never see by reading the first two lines */
@@ -3041,7 +3041,7 @@ if (resumed) {
     + `${resumed.aim ? `, still aimed at ${new URL(resumed.aim).host}` : ''}`)
 }
 // a restart every time a file is saved must not open a tab every time a file is saved
-if (!process.env.WALL_NO_OPEN && !resumed) {
+if (!process.env.MOTIONEER_NO_OPEN && !resumed) {
   const [cmd, a] = process.platform === 'darwin' ? ['open', [where]]
     : process.platform === 'win32' ? ['cmd', ['/c', 'start', '', where]]
       : ['xdg-open', [where]]

@@ -1,6 +1,6 @@
 # The module map
 
-Wall is a motion studio. One room, served by one node program, with the parts that have to agree
+Motioneer is a motion studio. One room, served by one node program, with the parts that have to agree
 with each other kept outside it.
 
 ```
@@ -26,7 +26,7 @@ src/                   what the studio imports through a built bundle, because n
   core.ts              the barrel, exporting exactly what runs outside a browser
 
 mcp/
-  index.mjs            Wall as a tool an agent calls: studio opens the room, motion skips it
+  index.mjs            Motioneer as a tool an agent calls: studio opens the room, motion skips it
 
 verify/                the suites, read as a set
   studio-sites.mjs     twenty real sites through the proxy, picked one at a time

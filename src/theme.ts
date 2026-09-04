@@ -1,7 +1,7 @@
 /**
  * A direction, said in the token names the rest of the world already uses.
  *
- * Wall has always described a look in its own vocabulary: bg, ink, dim, accent, accent2, surface,
+ * Motioneer has always described a look in its own vocabulary: bg, ink, dim, accent, accent2, surface,
  * line. That is the right vocabulary for a page this app renders and the wrong one for anybody
  * else, because the app somebody is actually building has a --primary and a --muted-foreground and
  * a --ring, and a set of colours that does not name those is a swatch strip rather than a theme.

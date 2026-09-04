@@ -1,6 +1,6 @@
 ---
 name: repo-layout
-description: Decide where a new file belongs in Wall and keep the repository root readable. Use before creating any file outside src/, when about to add a root level script, when a suite or tool needs a home, or when asked to tidy or reorganize the tree.
+description: Decide where a new file belongs in Motioneer and keep the repository root readable. Use before creating any file outside src/, when about to add a root level script, when a suite or tool needs a home, or when asked to tidy or reorganize the tree.
 ---
 
 # Where a file goes

@@ -1,11 +1,11 @@
 ---
 name: verify-suite
-description: How Wall proves itself, and how to add a check without adding a suite. Use when writing or changing a verification script, when a bug needs a regression check, when deciding which suite owns a path, or when choosing what to run before pushing.
+description: How Motioneer proves itself, and how to add a check without adding a suite. Use when writing or changing a verification script, when a bug needs a regression check, when deciding which suite owns a path, or when choosing what to run before pushing.
 ---
 
 # Verifying
 
-Wall has no unit test framework and does not want one. Every suite drives the built app the way
+Motioneer has no unit test framework and does not want one. Every suite drives the built app the way
 a visitor drives it, because what is proved against a harness is proved for the harness.
 
 ## One way in
@@ -41,7 +41,7 @@ The npm script names are unchanged and remain the way to run these: `npm run ver
 `verify:stream`, `verify:hard`, and so on, with `verify:all` running every one.
 
 `verify/app.mjs` runs the house gate first: every built in world on every preset look, rendered and
-failed if Wall's own output trips the slop catalogue. The house obeys its own detector, because
+failed if Motioneer's own output trips the slop catalogue. The house obeys its own detector, because
 a detector its author exempts himself from is decoration.
 
 ## Extend a suite before adding one
@@ -64,7 +64,7 @@ step in the suite that owns the nearest path.
   function was called.
 - Fail fast and loudly. A suite that waits without saying what it is waiting for is
   indistinguishable from a hang, so every wait carries a deadline and prints what it wanted.
-- Assert the negative where it is cheap: the wall never exceeds nine, the console has no errors,
+- Assert the negative where it is cheap: the grid never exceeds nine, the console has no errors,
   the key never appears in what the server sends.
 
 ## Fixtures
@@ -73,7 +73,7 @@ step in the suite that owns the nearest path.
 recorded pace, because a replay that dumps everything at once would prove nothing about whether
 papers visibly fill in.
 
-Re-record with `WALL_KEY=$(cat ~/.wall-test-key) npm run capture`, which drives the real app
+Re-record with `MOTIONEER_KEY=$(cat ~/.motioneer-test-key) npm run capture`, which drives the real app
 against the real API through a recording proxy. With no fixtures present the fake upstream falls
 back to a synthetic stream, so the suite still runs on a fresh clone and a missing fixture never
 reads as a broken repository.

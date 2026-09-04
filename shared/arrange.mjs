@@ -656,7 +656,7 @@ export function urlOf(arr, palette) {
   const on = live(arr)
   if (!on.length) return null
   const q = (k, v) => `${k}=${encodeURIComponent(v)}`
-  return `/__wall/railview?${[
+  return `/__motioneer/railview?${[
     q('ids', on.map((x) => x.car.motion.id).join(',')),
     q('at', on.map((x) => Math.round(at[x.i])).join(',')),
     q('shots', on.map((x) => x.car.shot || '').join(',')),

@@ -1,7 +1,7 @@
 /**
  * The model a Claude Code user already has.
  *
- * Someone who reached Wall through their agent has a working Claude session on the machine
+ * Someone who reached Motioneer through their agent has a working Claude session on the machine
  * already, and asking them for an API key to use a second one is a step that buys nothing. This
  * runs the local CLI headlessly instead, so the first run has nothing to configure and nothing
  * to sign up for.
@@ -45,7 +45,7 @@ export function hasClaude(bin = 'claude') {
 
 /** good enough to write with, and named here so a deployment can say otherwise */
 export const CLI_MODEL = () =>
-  (typeof process !== 'undefined' ? process.env?.WALL_CLI_MODEL : '') || 'sonnet'
+  (typeof process !== 'undefined' ? process.env?.MOTIONEER_CLI_MODEL : '') || 'sonnet'
 
 /**
  * The model that designs the worlds, which need not be the one that writes the words.
@@ -56,7 +56,7 @@ export const CLI_MODEL = () =>
  * greenhouse, so this defaults to leaving it alone and exists to be tried.
  */
 export const DESIGN_MODEL = () =>
-  (typeof process !== 'undefined' ? process.env?.WALL_DESIGN_MODEL : '') || CLI_MODEL()
+  (typeof process !== 'undefined' ? process.env?.MOTIONEER_DESIGN_MODEL : '') || CLI_MODEL()
 
 /**
  * The model that reads a brief into fields.
@@ -73,7 +73,7 @@ export const DESIGN_MODEL = () =>
  * one liner every time, and the saving is taken by not thinking about it: see runClaude.
  */
 export const INTAKE_MODEL = () =>
-  (typeof process !== 'undefined' ? process.env?.WALL_INTAKE_MODEL : '') || CLI_MODEL()
+  (typeof process !== 'undefined' ? process.env?.MOTIONEER_INTAKE_MODEL : '') || CLI_MODEL()
 
 /**
  * How many of these may run at once.
@@ -95,7 +95,7 @@ export const INTAKE_MODEL = () =>
  * a wall one wave instead of two.
  */
 const MAX_AT_ONCE = Number(
-  (typeof process !== 'undefined' ? process.env?.WALL_MAX_CALLS : '') || 8,
+  (typeof process !== 'undefined' ? process.env?.MOTIONEER_MAX_CALLS : '') || 8,
 )
 let running = 0
 const waiting = []
@@ -137,16 +137,16 @@ export async function runClaude(system, user, { model = CLI_MODEL(), bin = 'clau
    *
    * A caller that passes a number is describing the job rather than tuning the app: reading a
    * brief into five fields has nothing to weigh up, and measured on the same brief, thinking
-   * about it anyway cost 14.8 seconds against 5.6. WALL_THINKING and WALL_FAST are the dials for
+   * about it anyway cost 14.8 seconds against 5.6. MOTIONEER_THINKING and MOTIONEER_FAST are the dials for
    * everything that did not say, so a job that knows what it is wins over them.
    */
   const budget =
     thinking !== undefined
       ? String(thinking)
-      : process.env.WALL_FAST
+      : process.env.MOTIONEER_FAST
         ? '0'
-        : process.env.WALL_THINKING
-          ? String(process.env.WALL_THINKING)
+        : process.env.MOTIONEER_THINKING
+          ? String(process.env.MOTIONEER_THINKING)
           : null
   await take()
   return new Promise((resolve) => {
@@ -182,10 +182,10 @@ export async function runClaude(system, user, { model = CLI_MODEL(), bin = 'clau
         // So it is offered rather than taken. Turning it on is for the iteration loop, where
         // waiting three minutes to see whether a prompt change landed is its own kind of expensive.
         // Thinking is a dial and was wired as a switch. The two measurements above are its ends,
-        // and nothing in between had been tried: WALL_THINKING sets the budget directly, so a
+        // and nothing in between had been tried: MOTIONEER_THINKING sets the budget directly, so a
         // run can buy back most of the speed without giving up the whole of the design. Unset
         // leaves the model's own budget alone, which is what every measurement above was taken
-        // with, and WALL_FAST still means none at all.
+        // with, and MOTIONEER_FAST still means none at all.
         /**
          * The environment, which a caller may need to change.
          *
@@ -214,7 +214,7 @@ export async function runClaude(system, user, { model = CLI_MODEL(), bin = 'clau
     // a caller that knows its own job may set a tighter one: a studio option is somebody waiting at
     // a screen, where four minutes of silence is indistinguishable from a broken button, while a page
     // written whole is worth waiting out
-    const ceiling = Number(callMs || process.env.WALL_CALL_MS || 420_000)
+    const ceiling = Number(callMs || process.env.MOTIONEER_CALL_MS || 420_000)
     const bell = setTimeout(() => {
       child.kill('SIGKILL')
       done({ error: `the session did not answer within ${Math.round(ceiling / 1000)}s` })

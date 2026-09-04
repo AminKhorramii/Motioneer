@@ -1,5 +1,5 @@
 /**
- * Wall as a tool an agent calls, driven the way an agent drives it.
+ * Motioneer as a tool an agent calls, driven the way an agent drives it.
  *
  * Spoken over stdio as real JSON-RPC rather than by importing the handlers, because most of what can
  * go wrong here is in the protocol rather than in the work: a tool that does not appear in the list
@@ -28,7 +28,7 @@ const ok = (how, cond, detail = '') => {
   if (!cond) bad++
 }
 
-const PORT = Number(process.env.WALL_PORT || 4396)
+const PORT = Number(process.env.MOTIONEER_PORT || 4396)
 /**
  * Everything holding the port, except this process.
  *
@@ -49,7 +49,7 @@ freePort(PORT)
 
 const mcp = spawn('node', ['mcp/index.mjs'], {
   stdio: ['pipe', 'pipe', 'pipe'],
-  env: { ...process.env, WALL_PORT: String(PORT), WALL_NO_OPEN: '1' },
+  env: { ...process.env, MOTIONEER_PORT: String(PORT), MOTIONEER_NO_OPEN: '1' },
 })
 const waiting = new Map()
 let buf = ''
@@ -115,7 +115,7 @@ console.log('\n  opening the studio')
 const first = await callTool('studio', {})
 ok('it opens', !first.isError && /open/i.test(first.text), first.text.slice(0, 64))
 ok('and names the address', first.text.includes(String(PORT)))
-const answering = await fetch(`http://localhost:${PORT}/__wall/model`)
+const answering = await fetch(`http://localhost:${PORT}/__motioneer/model`)
   .then((r) => r.ok).catch(() => false)
 ok('and something is really serving there', answering)
 
@@ -135,7 +135,7 @@ ok('a second call does not open a second studio', /already open/i.test(second.te
 console.log('\n  what the package offers a person')
 const pkg = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8'))
 ok('there is a command that opens the studio, not only one that talks to agents',
-  !!pkg.bin && !!pkg.bin.wall, Object.keys(pkg.bin || {}).join(' and '))
+  !!pkg.bin && !!pkg.bin.motioneer, Object.keys(pkg.bin || {}).join(' and '))
 for (const [name, at] of Object.entries(pkg.bin || {})) {
   const head = readFileSync(path.join(ROOT, at), 'utf8').slice(0, 20)
   ok(`${name} can be run as a command, since a bin without a shebang is not one`,
@@ -147,33 +147,33 @@ ok('the components it opens on are published with it, so a first run has somethi
 /**
  * A bare address means aim there.
  *
- * The one positional argument was always a folder, so `wall localhost:3000` set the components
+ * The one positional argument was always a folder, so `motioneer localhost:3000` set the components
  * directory to a string that is not one and opened an empty room advising you to type an address
  * into the sidebar, which is precisely what had just been typed.
  */
 const said = (args, port) => new Promise((done) => {
   const child = spawn(process.execPath, [path.join(ROOT, 'tools', 'studio.mjs'), ...args],
-    { cwd: away0, env: { ...process.env, WALL_PORT: String(port), WALL_NO_OPEN: '1' },
+    { cwd: away0, env: { ...process.env, MOTIONEER_PORT: String(port), MOTIONEER_NO_OPEN: '1' },
       stdio: ['ignore', 'pipe', 'pipe'] })
   let out = ''
   child.stdout.on('data', (d) => { out += d })
   setTimeout(() => { try { child.kill('SIGKILL') } catch { /* gone */ } done(out) }, 3200)
 })
-const away0 = mkdtempSync(path.join(tmpdir(), 'wall-args-'))
+const away0 = mkdtempSync(path.join(tmpdir(), 'motioneer-args-'))
 ok('a bare address is aimed at rather than looked for as a folder',
   /proxying localhost:3000/.test(await said(['localhost:3000'], PORT + 5)))
 ok('while a folder that is there is still a folder',
   /components under/.test(await said([path.join(ROOT, 'examples', 'components')], PORT + 6)))
 
 /* started somewhere that is not this repo and given no folder, which is every npm install of it */
-const away = mkdtempSync(path.join(tmpdir(), 'wall-away-'))
+const away = mkdtempSync(path.join(tmpdir(), 'motioneer-away-'))
 const PORT2 = PORT + 3
 for (const pid of spawnSync('lsof', ['-ti', `tcp:${PORT2}`], { encoding: 'utf8' })
   .stdout.split('\n').filter(Boolean).filter((v) => v !== mine)) {
   try { process.kill(Number(pid), 'SIGKILL') } catch { /* gone */ }
 }
 const loose = spawn(process.execPath, [path.join(ROOT, 'tools', 'studio.mjs')],
-  { cwd: away, env: { ...process.env, WALL_PORT: String(PORT2), WALL_NO_OPEN: '1' }, stdio: 'ignore' })
+  { cwd: away, env: { ...process.env, MOTIONEER_PORT: String(PORT2), MOTIONEER_NO_OPEN: '1' }, stdio: 'ignore' })
 await new Promise((r) => setTimeout(r, 3500))
 const loose200 = await fetch(`http://localhost:${PORT2}/`).then((r) => r.ok).catch(() => false)
 ok('and it opens from a directory that is not this repo, rather than throwing on a folder that is not there',

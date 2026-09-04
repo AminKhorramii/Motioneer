@@ -1,6 +1,6 @@
 # Flows
 
-Every path through Wall, from first run to a shipped file, with the code that carries it.
+Every path through Motioneer, from first run to a shipped file, with the code that carries it.
 Written so someone who has never opened the app can follow what happens and where to change it.
 
 The one act is compare and choose. Every flow below exists to serve that, so anything that
@@ -122,11 +122,11 @@ worlds, backdrops, editing and export never need a model at all.
 tokens, and around 28 seconds.
 
 **The speed knob is which model designs.** Thinking is priced in seconds and the design calls do
-most of it, so `WALL_DESIGN_MODEL=haiku` is the one setting that moves the whole wall: measured
+most of it, so `MOTIONEER_DESIGN_MODEL=haiku` is the one setting that moves the whole wall: measured
 on the same brief, haiku reached the first world in 10.7s against sonnet's 23.3 and finished all
 eight in 45s against 74. Both returned eight valid worlds, and sonnet reached for the more
-particular object, so this is offered rather than taken. `WALL_THINKING` sets the budget directly
-for anything in between, and `WALL_FAST` turns it off entirely, which is for the iteration loop
+particular object, so this is offered rather than taken. `MOTIONEER_THINKING` sets the budget directly
+for anything in between, and `MOTIONEER_FAST` turns it off entirely, which is for the iteration loop
 rather than for a wall you mean to keep.
 
 ---
@@ -364,7 +364,7 @@ deciding which cells to cull.
 
 ## 6. Images and backdrops
 
-A landing page needs something behind the words. Wall draws it rather than generating a
+A landing page needs something behind the words. Motioneer draws it rather than generating a
 photograph, for two reasons: a generated hero image is the fastest way to look like every other
 page, and one image embedded as a data URI outweighs the entire document.
 
@@ -378,7 +378,7 @@ host boundary as everything else. `illustrate()` returns a data URL that is stor
 content, so it still ships as one file. The prompt rules out text hardest of all, because words
 baked into an image cannot be edited on the paper and are usually wrong.
 
-**The image pipeline.** A generated image is the one thing in a Wall page measured in megabytes,
+**The image pipeline.** A generated image is the one thing in a Motioneer page measured in megabytes,
 so it is the one thing worth compressing. Before the data URL reaches page content it goes
 through `crates/wall-image`: decode, fit the long edge to 1400 because a page renders at 1280
 wide and a figure is never all of it, flatten transparency onto the page background rather than
@@ -417,7 +417,7 @@ No accounts, no hosting of ours, no lock-in. The file is yours and it opens on i
 
 ## 7b. Handing back to the agent
 
-The flow Wall exists for. You ask Claude Code for a landing page, it calls `design`, a wall opens
+The flow Motioneer exists for. You ask Claude Code for a landing page, it calls `design`, a wall opens
 with your brief already in it, you pick one, and the choice comes back as a spec your agent
 implements in your own codebase. Choosing happens where choosing is easy and building happens
 where the code lives. `mcp/index.mjs` is the whole of it, in three tools: `design`, `collect`
@@ -443,7 +443,7 @@ sequenceDiagram
 **Returning without a choice is the normal answer, not an error.** `design` used to hold the call
 for fifteen minutes, which is longer than any MCP client waits, so the usual outcome of a working
 wall was a tool error, and an agent that reads an error tries again, which replaces the wall you
-are halfway through reading. It now waits `WALL_WAIT_MS`, 25 seconds by default, in case the
+are halfway through reading. It now waits `MOTIONEER_WAIT_MS`, 25 seconds by default, in case the
 choice is instant, and otherwise answers that the wall is open and that `collect` is the pickup.
 The tool descriptions teach that two step, because they are the only place an agent can learn it.
 
@@ -474,7 +474,7 @@ nothing polls for the memory: it is read at the start of the next wall, not at t
 
 **The server outlives the call and then stops on its own.** It holds API keys, so leaving it
 running until logout is not acceptable, and killing it when `design` returns would close the
-window mid-choice. So `WALL_IDLE_MS` is set to ten minutes by the spawner: any request resets the
+window mid-choice. So `MOTIONEER_IDLE_MS` is set to ten minutes by the spawner: any request resets the
 clock, an open tab beats every twenty seconds by asking `/api/config`, and silence for that long
 means the tab is gone and there is nobody left to serve. Unset means run forever, so `npm run
 serve` and any deployment are untouched.
@@ -541,7 +541,7 @@ stored anywhere else. Deleting the file entirely starts you over.
 
 ## 8. One app, three shells
 
-`src/host.ts` is the only file that knows where Wall is running. Everything above it is the same
+`src/host.ts` is the only file that knows where Motioneer is running. Everything above it is the same
 code, so the web version is the desktop version rather than a reduced copy.
 
 | Shell | State | Export | Model calls | Keys |
@@ -581,12 +581,12 @@ a key it does not need. Two ceilings exist for public deployments, both off unle
 an instance paying with its own key does not need protecting from itself:
 
 ```
-WALL_WALLS_PER_HOUR=5             # per address
-WALL_DAILY_OUTPUT_TOKENS=500000   # whole deployment
-WALL_IDLE_MS=600000               # stop after this much silence, unset means never
+MOTIONEER_WALLS_PER_HOUR=5             # per address
+MOTIONEER_DAILY_OUTPUT_TOKENS=500000   # whole deployment
+MOTIONEER_IDLE_MS=600000               # stop after this much silence, unset means never
 ```
 
-The unit is the wall rather than the request, because one click is eight calls. `WALL_IDLE_MS` is
+The unit is the wall rather than the request, because one click is eight calls. `MOTIONEER_IDLE_MS` is
 for the copy an agent starts, which nothing else is in a position to end; a deployment leaves it
 unset and runs until it is stopped.
 
@@ -807,7 +807,7 @@ transport filters that when sizing the scrubber, and dragging it end to end play
 move. Every move is finite now and the ruler sizes itself to whichever runs longer.
 
 Flat on is the one that was missing, and it was missing for years of shots. Every move here is built
-out of a rotation, so every film Wall could make was of software seen at an angle. That is the right
+out of a rotation, so every film Motioneer could make was of software seen at an angle. That is the right
 look for a component on a landing page and the wrong one for a demo of a tool: type on a plane turned
 eleven degrees is type somebody leans in to read, and a film of a pipeline board whose column
 headings are illegible is not a demo of anything. It is also the only shot whose plate fits the frame
@@ -1113,7 +1113,7 @@ its own offset, which is an operation on live animations, and filming does not w
 copies one: a copy carries declarations and not clocks, so `holdAt` writes the instant into each
 element's own `animation-delay`. It wrote one instant into all of them, so a filmed rail came out with
 every car starting together, the same loss the export had and for the same underlying reason. A
-document with more than one clock in it now says so in the markup, `data-wall-at` on each car, and
+document with more than one clock in it now says so in the markup, `data-motioneer-at` on each car, and
 `holdAt` reads the nearest one rather than assuming there is only the document's. A car whose turn has
 not come sits at a negative instant, which is what leaves it holding its first frame instead of being
 dragged forward to it. Stepped rather than recorded: a recording hopes the machine keeps up and
@@ -1247,7 +1247,7 @@ wherever it was started: that default was a relative path, so installed into som
 run there it went looking for a folder of that name under their app and threw on the way up. The
 examples are published with it, because a first run with an empty sidebar is a worse first run than
 one with seven things to animate. A bare address is aimed at rather than looked for as a directory,
-since `wall localhost:3000` opening an empty room that advises typing an address into the sidebar is
+since `motioneer localhost:3000` opening an empty room that advises typing an address into the sidebar is
 the tool ignoring what was just typed. And the agent command, run by a person, now says what it is
 and what they probably wanted instead: a terminal on stdin is the one signal that cannot be faked by
 the thing that should be there.
@@ -1319,7 +1319,7 @@ npm run verify:all     # all of them
 ```
 
 `npm run verify` is the house gate and runs `verify/layout.mjs` inside itself, which renders
-every built in world on every look at three widths and fails if Wall's own output trips its own
+every built in world on every look at three widths and fails if Motioneer's own output trips its own
 slop catalogue. There is no separate command for it, because a geometry check nobody runs is a
 geometry check nobody has. It also opens no browser for its first three sections: the house gate,
 the escaping check, and the two node level checks on the taste log, one feeding it a hostile file
@@ -1351,7 +1351,7 @@ the suite rather than shipping.
 ### Capturing a real run
 
 ```
-WALL_KEY=$(cat ~/.wall-test-key) npm run capture
+MOTIONEER_KEY=$(cat ~/.wall-test-key) npm run capture
 ```
 
 This drives the real app against the real API through a recording proxy and writes every byte of

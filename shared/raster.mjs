@@ -111,7 +111,7 @@ const XHTML = 'http://www.w3.org/1999/xhtml'
 const SVGNS = 'http://www.w3.org/2000/svg'
 
 /** the attribute a held element wears, so a pseudo element can be named by a rule */
-const HELD = 'data-wall-held'
+const HELD = 'data-motioneer-held'
 /**
  * An element saying that its subtree runs on a clock offset from the document's.
  *
@@ -122,7 +122,7 @@ const HELD = 'data-wall-held'
  * document with several clocks in it has to say so in the markup, or a film of a rail draws every
  * car at the same instant and the sequencing, which is the whole thing being filmed, is gone.
  */
-const OFFSET = 'data-wall-at'
+const OFFSET = 'data-motioneer-at'
 /**
  * An element saying when it is on the stage at all, which is not the same as when it moves.
  *
@@ -131,8 +131,8 @@ const OFFSET = 'data-wall-at'
  * last did, so without this a filmed rail showed every element from its first frame however
  * carefully its arrival had been placed.
  */
-const FROM = 'data-wall-from'
-const UNTIL = 'data-wall-until'
+const FROM = 'data-motioneer-from'
+const UNTIL = 'data-motioneer-until'
 
 /** an element, and the two children css can give it that no inline style can reach */
 const PARTS = [null, '::before', '::after']
@@ -576,7 +576,7 @@ export function holdAt(doc, ms) {
   const rules = [rulesAt(plan, at)]
 
   const sheet = doc.createElement('style')
-  sheet.setAttribute('data-wall-hold', '')
+  sheet.setAttribute('data-motioneer-hold', '')
   sheet.textContent = rules.join('\n')
   ;(doc.head || doc.documentElement).appendChild(sheet)
 
@@ -740,7 +740,7 @@ export async function serialize(doc, { inlined, width, height } = {}) {
 
   if (inlined?.css) {
     const carried = doc.createElement('style')
-    carried.setAttribute('data-wall-inlined', '')
+    carried.setAttribute('data-motioneer-inlined', '')
     carried.textContent = inlined.css
     ;(root.querySelector('head') || root).insertBefore(carried, (root.querySelector('head') || root).firstChild)
   }
@@ -906,7 +906,7 @@ export async function filmstrip(doc, { width, height, inlined, scale = 1 } = {})
   let cut = null
   if (shape.text) {
     const sheet = doc.createElement('style')
-    sheet.setAttribute('data-wall-hold', '')
+    sheet.setAttribute('data-motioneer-hold', '')
     sheet.textContent = shape.text
     ;(doc.head || doc.documentElement).appendChild(sheet)
     let xml

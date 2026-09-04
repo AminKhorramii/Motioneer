@@ -8,7 +8,7 @@
  *  path can be exercised without a key. Unset in normal use. */
 /** The model is configurable because this task is short JSON copy, not code, so a small model
  *  may do it as well as a large one at a fraction of the cost. */
-const model = (fallback) => env('WALL_MODEL') || fallback
+const model = (fallback) => env('MOTIONEER_MODEL') || fallback
 
 const env = (name) =>
   globalThis[name] ?? (typeof process !== 'undefined' ? process.env?.[name] : '') ?? ''
@@ -30,14 +30,14 @@ export const setFetch = (fn) => {
   doFetch = typeof fn === 'function' ? fn : (...args) => globalThis.fetch(...args)
 }
 
-const base = () => env('WALL_API_BASE')
+const base = () => env('MOTIONEER_API_BASE')
 
 /**
  * Every serious open weight model speaks the OpenAI shape: same request, same SSE frames, same
  * delta field. So there is no vendor table here, only a base URL and a model name. Pointing
- * WALL_OPENAI_BASE at GLM, DeepSeek, Qwen, Kimi, MiniMax or a gateway is the whole integration.
+ * MOTIONEER_OPENAI_BASE at GLM, DeepSeek, Qwen, Kimi, MiniMax or a gateway is the whole integration.
  */
-const openaiBase = () => base() || env('WALL_OPENAI_BASE') || 'https://api.openai.com'
+const openaiBase = () => base() || env('MOTIONEER_OPENAI_BASE') || 'https://api.openai.com'
 
 export const REQUESTS = {
   openai: (system, user, key, opts = {}) => ({
@@ -146,7 +146,7 @@ export async function streamText(provider, system, user, key, onDelta, opts = {}
  */
 export const IMAGE_REQUESTS = {
   gemini: (prompt, key, opts = {}) => ({
-    url: `${base() || 'https://generativelanguage.googleapis.com'}/v1beta/models/${opts.model || env('WALL_IMAGE_MODEL') || 'gemini-2.5-flash-image'}:generateContent?key=${encodeURIComponent(key)}`,
+    url: `${base() || 'https://generativelanguage.googleapis.com'}/v1beta/models/${opts.model || env('MOTIONEER_IMAGE_MODEL') || 'gemini-2.5-flash-image'}:generateContent?key=${encodeURIComponent(key)}`,
     headers: { 'content-type': 'application/json' },
     body: { contents: [{ parts: [{ text: prompt }] }] },
     pick: (j) => {

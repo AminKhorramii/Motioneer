@@ -1,6 +1,6 @@
-# Working on Wall
+# Working on Motioneer
 
-Wall is a motion studio. You point it at a running site, pick elements off it, and get several
+Motioneer is a motion studio. You point it at a running site, pick elements off it, and get several
 motions for each to compare on one timeline. It used to also make walls of landing pages; that
 half was removed, and anything in git history about sections, worlds, composing or slop belongs
 to it rather than to this. Read `docs/flows.md` for every path through the studio and the code
@@ -36,7 +36,7 @@ multi selection.
   the tail was the errands that are supposed to be slow, so those are reported and not enforced.
   A gate tuned by taste is how a field guide gets rejected for the italics its subject requires.
 - The house obeys its own detector: `verify/app.mjs` renders every built-in world on every look
-  and fails if Wall's own output trips the slop catalogue. Those pages wear placeholder copy on
+  and fails if Motioneer's own output trips the slop catalogue. Those pages wear placeholder copy on
   purpose, so the gate judges the design half, and the copy half of the defaults is asserted
   separately: each placeholder has a tell of its own and the suite fails if one stops firing,
   because a stand-in the writing call leaves alone is one that ships.

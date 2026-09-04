@@ -3,7 +3,7 @@
  *
  * The studio is a node program and the MCP server is another, and neither can import TypeScript. So
  * this is the one module vite builds for them, and it exports exactly what they call and nothing
- * else. It used to re-export the whole of Wall, which meant a node tool asking for one gate pulled
+ * else. It used to re-export the whole of Motioneer, which meant a node tool asking for one gate pulled
  * in a page renderer, a composer, an image pipeline and a wasm binding it would never call.
  *
  * The three kinds of thing here, and why each is outside the studio rather than inside it:
