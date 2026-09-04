@@ -25,9 +25,6 @@ body{margin:0;height:100vh;display:grid;grid-template-columns:250px 1fr;backgrou
 aside{border-right:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;min-height:0}
 .head{padding:11px 11px 12px;border-bottom:1px solid var(--line);display:grid;gap:7px}
 .head span{color:var(--faint);font-size:11px;word-break:break-all;padding:0 3px;line-height:1.5}
-.away{color:var(--faint);font-size:10.5px;padding:0 3px;text-decoration:none;line-height:1.5;
-  border-bottom:1px solid transparent}
-.away:hover{color:var(--dim);border-bottom-color:var(--line2)}
 /* an app being refused by its own api is not an error in the address, so it is said in the colour
    of a warning rather than a failure: the aim worked and the app will not run here */
 #aimnote[data-state=refused]{color:#c2925f}
@@ -550,13 +547,11 @@ header.bare .whenplaying{display:none}
       <input id="url" spellcheck="false" placeholder="localhost:3000" value="${AIM ?? ''}">
       <button class="enter" id="go" title="Aim the studio here" type="submit">&#9166;</button>
     </form>
-    <!-- data-state, not the words: two verifications used to grep this sentence to decide whether
-         a site had loaded, which made a line of copy load bearing and unchangeable -->
-    <span id="aimnote" data-state="${AIM ? 'ok' : 'empty'}">${AIM ? ''
-      : HAS_FOLDER ? 'or pick a component below' : 'type where your app is running'}</span>
-    <!-- an app behind a sign in cannot be proxied, so there is a way to pick without proxying -->
-    <a class="away" href="/__motioneer/bookmarklet" target="_blank" rel="noopener"
-      title="for an app that needs an account, where proxying cannot work">or pick behind a sign in</a>
+    <!-- Empty until it has something to report. It said what to do next, under a field whose own
+         placeholder already says it, and the components are listed directly below it in any case.
+         The element stays because it is where reaching and refused are said, and because two
+         verifications read its data-state: the words were load bearing once and are not again. -->
+    <span id="aimnote" data-state="${AIM ? 'ok' : 'empty'}"></span>
   </div>
   <div class="files" id="files"></div>
   <div id="sel"></div>
