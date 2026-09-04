@@ -323,6 +323,25 @@ async function call(name, args, id) {
     + `${TOOLS.map((t) => t.name).join(' and ')}.`)
 }
 
+/**
+ * A person who ran this by hand, told what it is instead of left waiting.
+ *
+ * An agent starts this with pipes and speaks JSON-RPC into them. Somebody who read the package name
+ * and typed it into a terminal gets neither: no output, no prompt, and no exit, which is what a
+ * hung program looks like and is the worst possible first contact with a tool. A terminal on stdin
+ * is the difference, and it is the one signal that cannot be faked by the thing that should be here.
+ */
+if (process.stdin.isTTY) {
+  console.log(`\n  Wall ${VERSION}, the motion studio.\n`)
+  console.log('  This command is the agent side of it and speaks a protocol rather than English,')
+  console.log('  which is why nothing is happening. What you almost certainly want is:\n')
+  console.log('    npx wall                      open the studio on the components it ships with')
+  console.log('    npx wall http://localhost:3000   open it on your own app\n')
+  console.log('  To give it to an agent instead:\n')
+  console.log('    claude mcp add --scope user wall -- npx -y wall-mcp\n')
+  process.exit(0)
+}
+
 let buffer = ''
 process.stdin.on('data', async (chunk) => {
   buffer += chunk

@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * The studio: point it at components you already have and play with their motion.
  *
@@ -27,6 +28,7 @@ import { randomUUID } from 'node:crypto'
 import { readFileSync, writeFileSync, existsSync, statSync, readdirSync, mkdirSync, rmSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { hasClaude } from '../shared/cli.mjs'
 import { isLocal, allowed } from '../shared/guard.mjs'
 import { page } from '../shared/page.mjs'
@@ -42,7 +44,7 @@ import {
 
 const args = process.argv.slice(2)
 const appAt = args.indexOf('--app')
-const TARGET = appAt > -1 ? String(args[appAt + 1] ?? '').replace(/\/$/, '') : null
+let TARGET = appAt > -1 ? String(args[appAt + 1] ?? '').replace(/\/$/, '') : null
 /**
  * An origin and a page, kept apart.
  *
@@ -98,10 +100,33 @@ function aimAt(raw) {
 if (TARGET) aimAt(TARGET)
 const cssAt = args.indexOf('--css')
 const SHEET = cssAt > -1 ? args[cssAt + 1] : null
-// with no folder given it opens on the components in this repo, so `npm run studio` is a thing you
-// can run on a clean checkout and immediately have something to animate
-const ROOT = args.find((a, i) => !a.startsWith('--')
-  && !(cssAt > -1 && i === cssAt + 1) && !(appAt > -1 && i === appAt + 1)) ?? 'examples/components'
+/**
+ * With no folder given, the components in this repo, and nothing at all when there is no repo.
+ *
+ * This read `examples/components` relative to wherever it was started, which is right for a clean
+ * checkout and wrong everywhere else: installed from npm and run in somebody's own project it went
+ * looking for a folder of that name under their app, did not find one, and threw on the way up. The
+ * examples are not published either, so the honest default off npm is no folder, which the room
+ * already knows how to be: an address bar and nothing in the sidebar.
+ */
+const HERE = path.dirname(fileURLToPath(import.meta.url))
+const SHIPPED = path.resolve(HERE, '..', 'examples', 'components')
+const asked = args.find((a, i) => !a.startsWith('--')
+  && !(cssAt > -1 && i === cssAt + 1) && !(appAt > -1 && i === appAt + 1))
+/**
+ * A bare address means aim there, the way anybody would expect it to.
+ *
+ * The one positional argument was always a folder, so `wall localhost:3000` set the components
+ * directory to a string that is not a directory and opened an empty room saying to type an address
+ * into the sidebar. That is the exact thing they had just typed. An address and a path are not
+ * ambiguous in practice: a scheme, or a host with a port, or a dotted host, is not a folder anybody
+ * has, and a folder that does exist wins anyway because it is checked first.
+ */
+const looksLikeAddress = (v) => !!v && !existsSync(v)
+  && (/^https?:\/\//i.test(v) || /^[\w.-]+:\d+(\/|$)/.test(v) || /^[\w-]+(\.[\w-]+)+(\/|$)/.test(v))
+const aimed = !TARGET && looksLikeAddress(asked) ? asked : null
+if (aimed) TARGET = aimed
+const ROOT = aimed ? null : (asked ?? (existsSync(SHIPPED) ? SHIPPED : null))
 const PORT = Number(process.env.WALL_PORT || 4321)
 const KIND = /\.(tsx|jsx|vue|svelte|astro|html|htm)$/i
 /**
@@ -119,7 +144,7 @@ const CAN_WRITE = CAN_CLI || !!process.env.ANTHROPIC_API_KEY || existsSync('.stu
 const work = '.studio'
 mkdirSync(work, { recursive: true })
 
-const HAS_FOLDER = existsSync(ROOT)
+const HAS_FOLDER = !!ROOT && existsSync(ROOT)
 
 /* ── reading a component out of a file, the same way animate.mjs does ─────────────────────────── */
 const matching = (s, open) => {
@@ -2489,7 +2514,7 @@ const server = createServer(async (req, res) => {
      */
     if (url.pathname === '/__wall/peek') {
       const want = path.resolve(url.searchParams.get('file') ?? '')
-      const under = path.resolve(ROOT)
+      const under = HAS_FOLDER ? path.resolve(ROOT) : '\u0000'
       if (!want.startsWith(under) || !KIND.test(want) || !existsSync(want)) {
         res.writeHead(403); return res.end('not a component under the folder this studio was opened on')
       }
@@ -2995,10 +3020,10 @@ console.log(`\n  motion studio  ${where}`)
 const moved = movedFrom(live, PORT)
 if (moved) console.log(moved)
 if (TARGET) console.log(`  proxying ${TARGET}\n  its dom is readable here, so its elements can be picked`)
-else {
+else if (HAS_FOLDER) {
   const files = list().length
   console.log(`  ${files} component${files === 1 ? '' : 's'} under ${path.resolve(ROOT)}`)
-}
+} else console.log('  type where your app is running in the sidebar, or give a folder of components')
 console.log(TARGET ? '  picked elements bring their own css, so nothing is guessed'
   : rawSheet ? `  styled with ${SHEET}`
     : '  no --css given: utility classes are compiled here and coloured from a Wall palette')

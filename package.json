@@ -49,6 +49,7 @@
   },
   "type": "module",
   "bin": {
+    "wall": "tools/studio.mjs",
     "wall-mcp": "mcp/index.mjs"
   },
   "files": [
@@ -56,7 +57,8 @@
     "shared/",
     "tools/",
     "dist-core/",
-    "README.md"
+    "README.md",
+    "examples/"
   ],
   "engines": {
     "node": ">=20"

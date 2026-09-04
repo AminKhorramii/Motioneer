@@ -13,9 +13,41 @@ side by side on one timeline. Keep the one you like as a stylesheet that ships i
 Generating one animation is solved. What nobody gives you is *many at once, live, on the same
 clock*, which is the only way choosing between them is real.
 
-## Two ways in
+## Open it
 
-Ask your agent, which opens it for you:
+Nothing to install. If you have [Node](https://nodejs.org) 20 or newer, one line opens it:
+
+```
+npx -p wall-mcp wall
+```
+
+That opens on the seven components it ships with, so there is something to animate before you have
+pointed it at anything. To open it on your own app instead, give it the address your dev server is
+already running on:
+
+```
+npx -p wall-mcp wall localhost:3000
+npx -p wall-mcp wall ~/app/src/ui --css ~/app/globals.css    a folder, with your stylesheet
+```
+
+Installed once, it is just `wall`:
+
+```
+npm install -g wall-mcp
+wall localhost:3000
+```
+
+Everything after that happens in the browser tab it opens. Nothing is uploaded: the proxy, the
+picker and the film all run on your machine.
+
+**One thing it needs.** Every motion is written by a model, so it wants either
+[Claude Code](https://claude.com/claude-code) on your PATH or an api key, and it says which is
+missing on the way up. Settings in the studio takes a key for Anthropic, OpenAI or anything speaking
+their shapes, and remembers it.
+
+### Or give it to your agent
+
+The same studio, opened for you when you ask:
 
 > open the motion studio on localhost:3000
 
@@ -23,13 +55,8 @@ Ask your agent, which opens it for you:
 claude mcp add --scope user wall -- npx -y wall-mcp
 ```
 
-Or bring it up yourself:
-
-```
-npm run studio                                     the components in examples/
-npm run studio -- --app http://localhost:3000      your dev server
-npm run studio -- ~/app/src/ui --css ~/app/globals.css
-```
+The agent side also has `motion`, which writes a sheet for markup you hand it without opening
+anything. Choosing between several at once is the part that wants eyes, so that stays in the room.
 
 With no arguments, **type an address into the sidebar**: `localhost:3000`, `stripe.com`, anything
 reachable. The five most recent stay in the rail with their favicons.

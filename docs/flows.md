@@ -1234,6 +1234,24 @@ install it produced no film at all, and a path that is not installed is not more
 that is. What the browser path cannot draw is specific and short, so `limits()` looks for those five
 things in the document being filmed and says so on the film where they are present.
 
+### Getting in
+
+There are two doors and only one of them was open. The package exposed a single command, the agent
+side, which speaks JSON-RPC on stdio: run by a person it printed nothing, exited never, and looked
+exactly like a program that had hung. Meanwhile every instruction for opening the studio by hand was
+`npm run studio`, which needs a checkout, so somebody who installed it from npm could not reach the
+room at all. The studio shipped in the package the whole time with no command to start it.
+
+It has one now, and the folder it opens on is resolved against the package rather than against
+wherever it was started: that default was a relative path, so installed into somebody's project and
+run there it went looking for a folder of that name under their app and threw on the way up. The
+examples are published with it, because a first run with an empty sidebar is a worse first run than
+one with seven things to animate. A bare address is aimed at rather than looked for as a directory,
+since `wall localhost:3000` opening an empty room that advises typing an address into the sidebar is
+the tool ignoring what was just typed. And the agent command, run by a person, now says what it is
+and what they probably wanted instead: a terminal on stdin is the one signal that cannot be faked by
+the thing that should be there.
+
 ### Proving it
 
 ```

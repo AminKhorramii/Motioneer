@@ -15,6 +15,12 @@
  */
 
 import { spawn, spawnSync } from 'node:child_process'
+import { mkdtempSync, readFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
 let bad = 0
 const ok = (how, cond, detail = '') => {
@@ -116,6 +122,63 @@ ok('and something is really serving there', answering)
 const second = await callTool('studio', {})
 ok('a second call does not open a second studio', /already open/i.test(second.text),
   second.text.slice(0, 56))
+
+/**
+ * What the published package actually gives somebody, which is not the same as what the repo does.
+ *
+ * Every instruction for opening the studio by hand was `npm run studio`, which needs a checkout, and
+ * the only command the package exposed spoke JSON-RPC on stdio: run by a person it printed nothing
+ * and never exited. Meanwhile the studio defaulted to a folder path relative to wherever it was
+ * started, so installed into somebody's project and run there it threw on the way up. Both are
+ * failures of the front door rather than of anything the tool does once it is open.
+ */
+console.log('\n  what the package offers a person')
+const pkg = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8'))
+ok('there is a command that opens the studio, not only one that talks to agents',
+  !!pkg.bin && !!pkg.bin.wall, Object.keys(pkg.bin || {}).join(' and '))
+for (const [name, at] of Object.entries(pkg.bin || {})) {
+  const head = readFileSync(path.join(ROOT, at), 'utf8').slice(0, 20)
+  ok(`${name} can be run as a command, since a bin without a shebang is not one`,
+    head.startsWith('#!'), head.split('\n')[0])
+}
+ok('the components it opens on are published with it, so a first run has something in it',
+  (pkg.files || []).includes('examples/'), (pkg.files || []).join(' '))
+
+/**
+ * A bare address means aim there.
+ *
+ * The one positional argument was always a folder, so `wall localhost:3000` set the components
+ * directory to a string that is not one and opened an empty room advising you to type an address
+ * into the sidebar, which is precisely what had just been typed.
+ */
+const said = (args, port) => new Promise((done) => {
+  const child = spawn(process.execPath, [path.join(ROOT, 'tools', 'studio.mjs'), ...args],
+    { cwd: away0, env: { ...process.env, WALL_PORT: String(port), WALL_NO_OPEN: '1' },
+      stdio: ['ignore', 'pipe', 'pipe'] })
+  let out = ''
+  child.stdout.on('data', (d) => { out += d })
+  setTimeout(() => { try { child.kill('SIGKILL') } catch { /* gone */ } done(out) }, 3200)
+})
+const away0 = mkdtempSync(path.join(tmpdir(), 'wall-args-'))
+ok('a bare address is aimed at rather than looked for as a folder',
+  /proxying localhost:3000/.test(await said(['localhost:3000'], PORT + 5)))
+ok('while a folder that is there is still a folder',
+  /components under/.test(await said([path.join(ROOT, 'examples', 'components')], PORT + 6)))
+
+/* started somewhere that is not this repo and given no folder, which is every npm install of it */
+const away = mkdtempSync(path.join(tmpdir(), 'wall-away-'))
+const PORT2 = PORT + 3
+for (const pid of spawnSync('lsof', ['-ti', `tcp:${PORT2}`], { encoding: 'utf8' })
+  .stdout.split('\n').filter(Boolean).filter((v) => v !== mine)) {
+  try { process.kill(Number(pid), 'SIGKILL') } catch { /* gone */ }
+}
+const loose = spawn(process.execPath, [path.join(ROOT, 'tools', 'studio.mjs')],
+  { cwd: away, env: { ...process.env, WALL_PORT: String(PORT2), WALL_NO_OPEN: '1' }, stdio: 'ignore' })
+await new Promise((r) => setTimeout(r, 3500))
+const loose200 = await fetch(`http://localhost:${PORT2}/`).then((r) => r.ok).catch(() => false)
+ok('and it opens from a directory that is not this repo, rather than throwing on a folder that is not there',
+  loose200)
+try { loose.kill('SIGKILL') } catch { /* gone */ }
 
 stop()
 console.log(bad ? `\n  ${bad} failed\n` : '\n  errors: none\n')
