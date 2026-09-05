@@ -65,12 +65,18 @@
   },
   "license": "MIT",
   "keywords": [
+    "motion",
+    "animation",
+    "css",
+    "keyframes",
+    "css-animation",
+    "ui",
+    "components",
+    "motion-design",
+    "devtools",
     "mcp",
     "claude",
     "claude-code",
-    "landing-page",
-    "design",
-    "ai",
     "agent"
   ],
   "homepage": "https://motioneer.bsct.so"
