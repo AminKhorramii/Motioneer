@@ -113,7 +113,8 @@ async function suggest(url, key) {
 export async function streamText(provider, system, user, key, onDelta, opts = {}) {
   const req = (REQUESTS[provider] ?? REQUESTS.anthropic)(system, user, key, opts)
   try {
-    const res = await doFetch(req.url, { method: 'POST', headers: req.headers, body: JSON.stringify(req.body) })
+    const res = await doFetch(req.url, { method: 'POST',
+    signal: opts.signal, headers: req.headers, body: JSON.stringify(req.body) })
     if (!res.ok) {
       const why = (await res.text()).slice(0, 160)
       return { error: `${provider} ${res.status}: ${why}${res.status === 404 ? await suggest(req.url, key) : ''}` }

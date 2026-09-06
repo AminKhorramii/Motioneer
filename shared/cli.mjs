@@ -130,7 +130,7 @@ function give() {
  * ours to show, but the fact of it is, so it goes to a separate callback that never touches the
  * reply.
  */
-export async function runClaude(system, user, { model = CLI_MODEL(), bin = 'claude', onDelta, onThink, thinking, callMs, env } = {}) {
+export async function runClaude(system, user, { model = CLI_MODEL(), bin = 'claude', onDelta, onThink, thinking, callMs, env, signal } = {}) {
   const streaming = typeof onDelta === 'function'
   /**
    * How much this call may think, in tokens, or null to leave the model's own budget alone.
@@ -149,6 +149,7 @@ export async function runClaude(system, user, { model = CLI_MODEL(), bin = 'clau
           ? String(process.env.MOTIONEER_THINKING)
           : null
   await take()
+  if (signal?.aborted) { give(); return { error: 'Cancelled' } }
   return new Promise((resolve) => {
     const child = spawn(
       bin,
@@ -225,9 +226,13 @@ export async function runClaude(system, user, { model = CLI_MODEL(), bin = 'clau
       if (ended) return
       ended = true
       clearTimeout(bell)
+      signal?.removeEventListener('abort', abort)
       give()
       resolve(result)
     }
+    const abort = () => { child.kill('SIGKILL'); done({ error: 'Cancelled' }) }
+    signal?.addEventListener('abort', abort, { once: true })
+    if (signal?.aborted) abort()
     let out = ''
     let err = ''
     let text = ''

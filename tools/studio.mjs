@@ -22,6 +22,7 @@
  * and the camera is the stage out of shot.mjs. What is new is only the room they are used in.
  */
 
+import { editorRoutes } from './editor/routes.mjs'
 import { createServer } from 'node:http'
 import net from 'node:net'
 import { randomUUID } from 'node:crypto'
@@ -39,7 +40,7 @@ import { listenNear, movedFrom } from '../shared/port.mjs'
 import {
   MOTION_SYSTEM, dealMotions, dealErrands, grabJson, safeStyle, unmoved, brittle, janky, scopeOf, retimed,
   tempo, unstill, leaks, grounded, namespaced, typefaces, faceList, unfaced,
-  PRESETS, themeOf, themeCss,
+  PRESETS, themeOf, themeCss, motionBrief, motionDirection, judgeMotion,
 } from '../dist-core/core.js'
 
 const args = process.argv.slice(2)
@@ -990,6 +991,7 @@ function snapshot(el,cap){
   for(var i=0;i<n;i++){
     var st=inked(from[i])
     if(st)to[i].setAttribute('style',st)
+    if(to[i].tagName==='IMG'){to[i].setAttribute('src',from[i].currentSrc||from[i].src);to[i].removeAttribute('srcset')}
     /* an input keeps what is typed in a property rather than in the markup, so a clone of a filled
        field comes back empty unless the value is written down */
     if(to[i].tagName==='INPUT'&&from[i].value!==undefined)to[i].setAttribute('value',from[i].value)
@@ -1059,7 +1061,7 @@ function pick(e){if(!on)return;e.preventDefault();e.stopPropagation();
     : thin ? 'too thin to stagger'
     : kids === 0 ? 'nothing inside it to move separately'
     : kids < 3 ? 'only ' + kids + ' part' + (kids === 1 ? '' : 's') : '';
-  deliver({motioneer:'picked',html:h,css:css,shot:shot,label:label(el),opaque:opaque,shut:shut,weak:weak,
+  deliver({motioneer:'picked',name:el.getAttribute('aria-label')||(el.querySelector('h1,h2,h3')||{}).textContent||label(el),html:h,css:css,shot:shot,label:label(el),opaque:opaque,shut:shut,weak:weak,
     n:el.querySelectorAll('*').length+1,
     cut:h.length<el.outerHTML.length,w:Math.round(r.width),h:Math.round(r.height)})}
 function arm(v){on=v;
@@ -1073,7 +1075,10 @@ addEventListener('mousedown',function(e){if(on){e.preventDefault();e.stopPropaga
 addEventListener('keydown',function(e){if(on&&e.key==='Escape'){e.preventDefault();arm(false)}},true);
 addEventListener('message',function(e){var d=e.data||{};
   if(d.motioneer==='pick')arm(true);
-  if(d.motioneer==='nopick')arm(false)});
+  if(d.motioneer==='nopick')arm(false);
+  if(d.motioneer==='pick-parent'&&last&&last.parentElement){last=last.parentElement;move({target:last})}
+  if(d.motioneer==='pick-child'&&last&&last.firstElementChild){last=last.firstElementChild;move({target:last})}
+  if(d.motioneer==='pick-current'&&last){arm(true);pick({target:last,preventDefault:function(){},stopPropagation:function(){}})}});
 /* on the page itself there is nobody to ask it to start, and being run at all is the asking. Escape
    still disarms, which is how you get the page back without reloading it */
 if(framed) parent.postMessage({motioneer:'ready'},'*'); else arm(true);
@@ -1438,11 +1443,12 @@ const remember = (href) => {
 }
 let refused = false   // said once, however many calls discover it at the same moment
 
-async function askModel(brief, tries = 4) {
+async function askModel(brief, tries = 4, signal) {
   let last = 'no usable reply came back'
   for (let n = 0; n < tries; n++) {
+    if (signal?.aborted) return { why: 'Cancelled', terminal: true }
     let reply = await askProvider(MOTION_SYSTEM, brief, MODEL,
-      { callMs: CALL_MS, thinking: THINK, env: CLEAN_ENV, maxTokens: 4000 })
+      { callMs: CALL_MS, thinking: THINK, env: CLEAN_ENV, maxTokens: 4000, signal })
       .catch((e) => ({ error: String(e && e.message ? e.message : e).slice(0, 160) }))
 
     if (reply && reply.error) {
@@ -1496,30 +1502,7 @@ async function askModel(brief, tries = 4) {
 
 /** the gates, in one place, so refine and options cannot drift apart on what they accept */
 function judge(raw, fallbackScope, parts = true) {
-  const clean = safeStyle(raw.css)
-  if (!clean) return { why: 'the reply carried no css that is allowed in a sheet' }
-  const scope = scopeOf(clean, raw.scope ?? fallbackScope)
-  /**
-   * Keyframe names are renamed before anything judges the sheet, because the name is private to it
-   * and only has to be unique. There is one flat namespace for @keyframes across every stylesheet on
-   * a page, so a sheet defining `rise` replaces whatever the host application already called `rise`,
-   * and the thing that breaks is somewhere else entirely. Measured over 18 real options, none used a
-   * name plain enough to be obvious about it, which is exactly why it would not be found by reading.
-   */
-  const css = namespaced(clean, scope)
-  /**
-   * unstill is enforced and the tempo is not, which is a distinction the measurements made rather than
-   * a preference. Across 23 real options every single one already wrapped itself in a reduced-motion
-   * query, so requiring it costs nothing and catches the day the model forgets. The stated timings are
-   * a different matter: only 70 to 74 percent land inside them, and the long tail is the errands that
-   * are supposed to be slow, since a motion whose job is to keep something alive has no business
-   * finishing in 400ms. Enforcing those numbers would reject a third of the good work for failing to
-   * be an entrance. So they are reported on the card and left to a person.
-   */
-  const faults = [...unmoved({ html: '', css, note: '' }, { parts }), ...brittle(css), ...janky(css),
-    ...unstill(css), ...leaks(css, scope)]
-  if (faults.length) return { why: faults[0] }
-  return { css, scope, note: String(raw.note ?? '').slice(0, 90) }
+  return judgeMotion(raw, fallbackScope, parts)
 }
 
 /**
@@ -2479,9 +2462,44 @@ function scriptsParse() {
   return ''
 }
 
+const editor = editorRoutes({
+  work,
+  config: () => ({ source: AIM, files: HAS_FOLDER ? list() : [], canWrite: CAN_WRITE }),
+  legacy: async () => { try { const was = JSON.parse(readFileSync(SESSION_AT, 'utf8')); return { bench: was.bench, motions: was.made || [] } } catch { return { motions: [] } } },
+  source: async (file) => {
+    const want = path.resolve(file || ''), root = path.resolve(ROOT)
+    if (!HAS_FOLDER || !want.startsWith(root + path.sep) || !KIND.test(want)) throw new Error('Choose a component from this studio’s folder.')
+    const read = markupOf(want), base = rawSheet ? relevant(rawSheet, read.markup) : read.own
+    const tw = wantsTailwind(read.markup, base) && !!(await getTailwind()).js
+    return preview({ markup: read.markup, base, css: '', scope: '', tw }).replace('</body>', PICKER + '</body>')
+  },
+  generate: async ({ subject, brief: rawBrief, treatment, previous }, signal) => {
+    if (!subject || typeof subject.html !== 'string' || !subject.html.trim()) throw new Error('Pick a component before generating motion.')
+    const brief = motionBrief(rawBrief), direction = motionDirection(brief, treatment)
+    const about = `The captured component:\n${subject.html.slice(0, 14000)}\nIts CSS:\n${String(subject.css || '').slice(0, 6000)}\n${direction}`
+      + (previous ? `\nRefine this existing motion, preserving its idea unless the direction requests otherwise:\n${String(previous.css).slice(0, 10000)}` : '')
+    let why = ''
+    for (let i = 0; i < 2; i++) {
+      const got = await askModel(about + (why ? `\nThe last attempt failed: ${why}. Correct that.` : ''), 2, signal)
+      if (signal.aborted) throw new Error('Cancelled')
+      if (!got.raw) throw new Error(got.why)
+      const judged = judgeMotion(got.raw, previous?.scope, false)
+      if (!judged.css) { why = judged.why; continue }
+      const rest = await drifts({ markup: subject.html, base: subject.css, css: judged.css, scope: judged.scope, wide: subject.w })
+      const faults = brief.purpose === 'idle' ? (rest.running === 0 ? ['No visible animation was found.'] : []) : resting(rest)
+      if (faults.length) { why = faults[0]; continue }
+      return { id: randomUUID(), subjectId: subject.id, ...judged, treatment, brief, duration: tempo(judged.css).span || brief.duration, parentId: previous?.id,
+        seen: { blank: rest.blank || 0, escape: rest.escape || 0, stir: rest.stir || 0 }, checked: !rest.skipped }
+    }
+    throw new Error(why || 'No usable motion came back. Try a more specific direction.')
+  },
+})
+
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x')
   try {
+    if (await editor(req, res, url)) return
+    if (url.pathname === '/__motioneer/legacy') { res.writeHead(200, { 'content-type': 'text/html' }); return res.end(PAGE()) }
     /**
      * The root belongs to the studio, except when the frame is the one asking for it.
      *
@@ -2494,7 +2512,7 @@ const server = createServer(async (req, res) => {
      * is asking, and sec-fetch-dest is right until something does not send it.
      */
     if (url.pathname === '/' && !(HOST && url.searchParams.has('__wall'))) {
-      res.writeHead(200, { 'content-type': 'text/html' }); return res.end(PAGE())
+      res.writeHead(302, { location: '/__motioneer/editor/' }); return res.end()
     }
     if (url.pathname === '/__motioneer/list') return json(res, HAS_FOLDER ? list() : [])
     if (url.pathname === '/__motioneer/recent') return json(res, recent)

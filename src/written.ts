@@ -518,3 +518,13 @@ export function scopeOf(css: string, declared?: unknown): string {
 }
 
 
+
+/** Every entry point judges the same sheet; purpose decides whether a stagger is appropriate. */
+export function judgeMotion(raw: { css?: unknown; scope?: string; note?: unknown }, fallbackScope?: string, parts = false) {
+  const clean = safeStyle(raw.css)
+  if (!clean) return { why: 'The reply carried no usable motion CSS.' }
+  const scope = scopeOf(clean, raw.scope ?? fallbackScope), css = namespaced(clean, scope)
+  const faults = [...unmoved({html:'',css,note:''},{parts}), ...brittle(css), ...janky(css), ...unstill(css), ...leaks(css,scope)]
+  if (faults.length) return { why: faults[0] }
+  return { css, scope, note: String(raw.note ?? '').slice(0, 150) }
+}

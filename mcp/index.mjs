@@ -98,6 +98,10 @@ const TOOLS = [
           type: 'string',
           description: 'Its stylesheet, if you have it. Optional, and it makes the timing fit better.',
         },
+        purpose: { type: 'string', enum: ['entrance', 'emphasis', 'idle', 'interaction'], description: 'What this motion is for. Entrance by default.' },
+        intensity: { type: 'string', enum: ['range', 'subtle', 'expressive', 'bold'], description: 'Treatment intensity. Range compares three treatments.' },
+        duration: { type: 'number', description: 'Target duration in milliseconds, between 200 and 10000.' },
+        direction: { type: 'string', description: 'Specific creative direction for the motion.' },
         options: {
           type: 'number',
           description: 'How many different motions to write. Three by default, six at most.',
@@ -176,7 +180,8 @@ async function motion(args) {
   const want = Math.max(1, Math.min(6, Number(args?.options) || 3))
   const core = await import(pathToFileURL(path.join(ROOT, 'dist-core', 'core.js')).href)
   const { runClaude } = await import(pathToFileURL(path.join(ROOT, 'shared', 'cli.mjs')).href)
-  const motions = core.dealMotions(want)
+  const brief = core.motionBrief(args)
+  const motions = Array.from({ length: want }, (_, i) => brief.intensity === 'range' ? ['subtle','expressive','bold'][i % 3] : brief.intensity)
   // the markup is what the selectors have to name, so it goes over whole rather than summarised
   const seen = html.slice(0, 6000)
   const styles = args?.css ? `\n\nIts stylesheet, for the timing to fit:\n${String(args.css).slice(0, 4000)}` : ''
@@ -220,8 +225,7 @@ async function motion(args) {
   }
 
   const tried = await Promise.all(motions.map(async (m) => {
-    const brief = `The component:\n${seen}${styles}\n\nMove it by ${m} Take the timing from that `
-      + `object: it is how the thing behaves, and it is why this one will not move like the others.`
+    const prompt = `The component:\n${seen}${styles}\n\n${core.motionDirection(brief, m)}`
     /**
      * One retry, because a dropped reply is not an opinion about the component.
      *
@@ -230,18 +234,16 @@ async function motion(args) {
      * verdict where there was only a hiccup. The second attempt is allowed to think, since the
      * first was probably running under the fast dial, and thinking is the thing that was skipped.
      */
-    let reply = await runClaude(core.MOTION_SYSTEM, brief).catch(() => null)
+    let reply = await runClaude(core.MOTION_SYSTEM, prompt).catch(() => null)
     let raw = reply ? core.grabJson(typeof reply === 'string' ? reply : reply.text ?? '') : null
     if (!raw) {
-      reply = await runClaude(core.MOTION_SYSTEM, brief, { thinking: undefined }).catch(() => null)
+      reply = await runClaude(core.MOTION_SYSTEM, prompt, { thinking: undefined }).catch(() => null)
       raw = reply ? core.grabJson(typeof reply === 'string' ? reply : reply.text ?? '') : null
     }
-    const css = raw ? core.safeStyle(raw.css) : ''
-    if (!css) return null
-    // does it move the parts, and will its selectors still match after somebody edits the markup
-    const faults = [...core.unmoved({ html: '', css, note: '' }), ...core.brittle(css)]
-    const scope = core.scopeOf(css, raw.scope)
-    return { m, css, scope, note: String(raw.note ?? '').slice(0, 90), faults }
+    const judged = raw ? core.judgeMotion(raw, undefined, false) : { why: 'No usable CSS came back.' }
+    if (!judged.css) return { m, css: '', scope: '', note: '', faults: [judged.why] }
+    return { m, css: judged.css, scope: judged.scope, note: judged.note, faults: [] }
+
   }))
 
   /**

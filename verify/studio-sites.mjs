@@ -46,7 +46,7 @@ for (const [name, addr] of list) {
   const page = await ctx.newPage()
   const row = { name, addr, aimed: '', frame: false, nodes: 0, readable: 0, opaque: 0, picked: '', note: '' }
   try {
-    await page.goto(`http://localhost:${PORT}`, { waitUntil: 'load' })
+    await page.goto(`http://localhost:${PORT}/__motioneer/legacy`, { waitUntil: 'load' })
     await page.fill('#url', addr)
     await page.click('#go')
     // "reaching it" is the in flight state and must not be mistaken for an answer
@@ -61,7 +61,7 @@ for (const [name, addr] of list) {
     await page.waitForTimeout(9000)
 
     // the frame must still be served by us: a redirect that escaped is the failure this catches
-    const fr = page.frames().find((f) => f.url().includes(`localhost:${PORT}`) && !f.url().endsWith(`${PORT}/`))
+    const fr = page.frames().find((f) => f.url().includes(`localhost:${PORT}`) && !f.url().endsWith(`${PORT}/`) && !f.url().includes('/__motioneer/legacy'))
     row.frame = !!fr
     if (!fr) {
       const stray = page.frames().map((f) => f.url()).find((u) => !u.includes(`localhost:${PORT}`) && u !== 'about:blank')

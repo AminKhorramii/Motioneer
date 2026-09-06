@@ -171,6 +171,7 @@ export async function write(system, user, config = {}, opts = {}) {
     return runClaude(system, user, {
       model: at.model || undefined,
       onDelta: opts.onDelta,
+      signal: opts.signal,
       callMs: opts.callMs,
       thinking: opts.thinking,
       env: opts.env,
@@ -181,6 +182,7 @@ export async function write(system, user, config = {}, opts = {}) {
     model: at.model,
     base: at.base,
     maxTokens: opts.maxTokens ?? 4000,
+    signal: opts.signal,
   })
 }
 

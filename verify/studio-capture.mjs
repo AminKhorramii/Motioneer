@@ -683,7 +683,7 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
     const room = await seat.newPage()
     const said = []
     room.on('pageerror', (e) => said.push(String(e)))
-    await room.goto(`http://localhost:${XPORT}`, { waitUntil: 'load' })
+    await room.goto(`http://localhost:${XPORT}/__motioneer/legacy`, { waitUntil: 'load' })
     await room.waitForTimeout(1200)
     const lay = async () => room.evaluate(async () => {
       await arriving
@@ -1571,7 +1571,7 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
       await theirs.evaluate(() => document.documentElement.style.cursor) === 'crosshair')
 
     const inbox = await away.newPage()
-    await inbox.goto(`http://localhost:${XPORT}`, { waitUntil: 'load' })
+    await inbox.goto(`http://localhost:${XPORT}/__motioneer/legacy`, { waitUntil: 'load' })
     await inbox.waitForTimeout(1400)
     const already = await inbox.evaluate(() => picks.length)
     for (const id of ['#a', '#b']) {
@@ -1643,7 +1643,7 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
       one.on('dialog', async (d) => { alerts.push(d.message()); await d.dismiss() })
       await one.route('**/__motioneer/rail', (r) => { sent.push(['rail', r.request().postDataJSON()]); r.abort() })
       await one.route('**/__motioneer/motion', (r) => { sent.push(['motion', r.request().postDataJSON()]); r.abort() })
-      await one.goto(`http://localhost:${XPORT}`, { waitUntil: 'load' })
+      await one.goto(`http://localhost:${XPORT}/__motioneer/legacy`, { waitUntil: 'load' })
       await one.waitForTimeout(1300)
       await one.evaluate(() => { picks = []; arr = null; opts = []; file = null; drawSel(); render() })
       await how(one)
@@ -1688,7 +1688,7 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
     await new Promise((r) => stall.listen(SHEET, r))
     const mending = await seat.newContext({ viewport: { width: 1100, height: 760 } })
     const faced = await mending.newPage()
-    await faced.goto(`http://localhost:${XPORT}`, { waitUntil: 'load' })
+    await faced.goto(`http://localhost:${XPORT}/__motioneer/legacy`, { waitUntil: 'load' })
     await faced.waitForTimeout(1200)
     const hadPicks = await faced.evaluate(() => picks.length)
     await faced.evaluate((where) => {
@@ -1798,7 +1798,7 @@ for (const [site, addr] of list) {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } })
   const page = await ctx.newPage()
   try {
-    await page.goto(`http://localhost:${PORT}`, { waitUntil: 'load' })
+    await page.goto(`http://localhost:${PORT}/__motioneer/legacy`, { waitUntil: 'load' })
     await page.fill('#url', addr)
     await page.click('#go')
     await page.waitForFunction(() => document.getElementById('aimnote').dataset.state !== 'reaching',
@@ -1808,7 +1808,7 @@ for (const [site, addr] of list) {
       await ctx.close(); continue
     }
     await page.waitForTimeout(12000)
-    const fr = page.frames().find((f) => f.url().includes(`localhost:${PORT}`) && !f.url().endsWith(`${PORT}/`))
+    const fr = page.frames().find((f) => f.url().includes(`localhost:${PORT}`) && !f.url().endsWith(`${PORT}/`) && !f.url().includes('/__motioneer/legacy'))
     if (!fr) { rows.push({ site, kind: '(site)', note: 'frame left the proxy' }); await ctx.close(); continue }
     const box = await page.locator('.appwrap iframe').boundingBox()
     await page.click('#pick'); await page.waitForTimeout(400)

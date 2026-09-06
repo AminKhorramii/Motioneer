@@ -7,7 +7,7 @@
   },
   "version": "0.2.0",
   "scripts": {
-    "build": "tsc -b && npx vite build --ssr src/core.ts --outDir dist-core",
+    "build": "tsc -b && vite build --ssr src/core.ts --outDir dist-core && vite build --config tools/editor/vite.config.mjs",
     "mcp": "node mcp/index.mjs",
     "prepublishOnly": "npm run build",
     "studio": "node --watch tools/studio.mjs",
@@ -58,7 +58,8 @@
     "tools/",
     "dist-core/",
     "README.md",
-    "examples/"
+    "examples/",
+    "dist-editor/"
   ],
   "engines": {
     "node": ">=20"

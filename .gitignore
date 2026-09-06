@@ -15,3 +15,5 @@ dist-core/
 .studio/
 
 wall-mcp-*.tgz
+
+dist-editor/

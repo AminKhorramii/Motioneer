@@ -1,8 +1,13 @@
 {
   "compilerOptions": {
     "target": "es2023",
-    "lib": ["ES2023", "DOM"],
-    "types": ["node"],
+    "lib": [
+      "ES2023",
+      "DOM"
+    ],
+    "types": [
+      "node"
+    ],
     "module": "preserve",
     "moduleResolution": "bundler",
     "skipLibCheck": true,
@@ -14,7 +19,14 @@
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
-    "paths": { "@/*": ["./src/*"] }
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ]
+    },
+    "jsx": "react-jsx"
   },
-  "include": ["src"]
+  "include": [
+    "src"
+  ]
 }

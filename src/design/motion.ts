@@ -148,3 +148,16 @@ Respond with the JSON object alone, because the reply is parsed directly.`
  * to change nothing else: a repair that redesigns is a second opinion, and the wall already has
  * eight of those.
  */
+/** A purpose stays fixed across alternatives; intensity changes its treatment, not its job. */
+export type MotionBrief = { purpose?: string; intensity?: string; duration?: number; direction?: string }
+export function motionBrief(raw: MotionBrief = {}) {
+  return { purpose: ['entrance','emphasis','idle','interaction'].includes(raw.purpose || '') ? raw.purpose! : 'entrance',
+    intensity: ['subtle','expressive','bold'].includes(raw.intensity || '') ? raw.intensity! : 'range',
+    duration: Math.max(200, Math.min(10000, Number(raw.duration) || 1000)), direction: String(raw.direction || '').trim().slice(0,800) }
+}
+export function motionDirection(raw: MotionBrief = {}, treatment = 'expressive') {
+  const brief = motionBrief(raw)
+  const purpose: Record<string,string> = { entrance: 'Reveal the component in its reading order. Establish the main content first, then its supporting details. Finish at its original resting appearance.', emphasis: 'Direct attention to one meaningful detail while the surrounding UI remains still and readable. Return to its resting appearance.', idle: 'Create a quiet seamless ambient cycle. Keep all information visible throughout; do not repeatedly introduce the component.', interaction: 'Acknowledge a single press or change with clear, brief feedback on the relevant control. Leave unrelated content still and return to rest.' }
+  const intensity: Record<string,string> = { subtle: 'Use small distances and restrained timing. Prefer precision and legibility over spectacle.', expressive: 'Use a clear lead and follow rhythm with controlled overshoot where the component supports it.', bold: 'Use a distinctive staged reveal or directional gesture. Be confident, but do not sacrifice readability or animate every part at once.' }
+  return `Purpose: ${purpose[brief.purpose]}\nTreatment: ${treatment}. ${intensity[treatment] || intensity.expressive}\nTarget duration: ${brief.duration}ms. Read the actual component structure before choosing what moves; do not invent parts. ${brief.direction ? `User direction, which takes priority over the default treatment: ${brief.direction}` : ''}\nPreserve its layout, colors, typography and content. ${brief.purpose === 'entrance' ? 'Stagger only when multiple meaningful parts exist.' : 'One moving part is sufficient for this purpose; never add a stagger just to satisfy a rule.'}`
+}
