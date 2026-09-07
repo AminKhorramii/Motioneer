@@ -29,7 +29,7 @@ mcp/
   index.mjs            Motioneer as a tool an agent calls: studio opens the room, motion skips it
 
 site/
-  index.html           the landing page: one file, no requests, its demo drawn in css
+  index.html           the landing page: one hero over a shader, in one file that loads nothing
 
 verify/                the suites, read as a set
   studio-sites.mjs     twenty real sites through the proxy, picked one at a time

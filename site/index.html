@@ -10,168 +10,82 @@
 <meta property="og:description" content="Pick elements off your running product and compare motions for them on one timeline.">
 <meta property="og:type" content="website">
 <style>
-/* One file, no requests: the fonts are the system's, the icons are inline, the demo is css.
-   A landing page that loads nothing cannot flash unstyled, cannot be tracked, and works from a
-   file:// url, which is how it gets reviewed. */
+/* One hero over one shader, in one file that loads nothing. The fonts are the system's, the
+   icons are inline, and the background is a fragment shader written here rather than a package,
+   so the page cannot flash unstyled, cannot be tracked, and opens from a file:// url. */
 :root{
-  --ink:#ecebf0;--dim:#a9a8b3;--faint:#6f6e7a;--bg:#09090b;--panel:#111014;--raised:#1a191f;--line:#26252d;
-  --accent:#c9557d;--accent-ink:#e8b3c8;--accent-soft:#2c1721;--paper:#f6f5f8;--paper-ink:#1c1b22;--paper-dim:#6b6a78;
-  --measure:64ch;--radius:12px;
+  --ink:#ecebf0;--dim:#b3b2bd;--faint:#7c7b87;--bg:#09090b;--panel:#111014cc;--raised:#1a191f;--line:#26252d;
+  --accent:#c9557d;--accent-ink:#e8b3c8;
   font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   font-size:16px;line-height:1.55;color:var(--ink);background:var(--bg);font-synthesis:none;-webkit-text-size-adjust:100%
 }
 *{box-sizing:border-box}
-body{margin:0;min-height:100dvh}
+body{margin:0;min-height:100dvh;display:flex;flex-direction:column;overflow-x:hidden}
 a{color:var(--accent-ink);text-decoration-thickness:1px;text-underline-offset:3px}
 a:hover{color:#fff}
 :focus-visible{outline:2px solid var(--accent-ink);outline-offset:3px;border-radius:4px}
-h1,h2,h3,p{margin:0}
-h1{font-size:clamp(2.2rem,5.5vw,4rem);line-height:1.02;letter-spacing:-.035em;font-weight:650;text-wrap:balance}
-h2{font-size:clamp(1.5rem,3vw,2.1rem);line-height:1.12;letter-spacing:-.025em;font-weight:620;text-wrap:balance}
-h3{font-size:1.05rem;font-weight:620;letter-spacing:-.01em}
-p{color:var(--dim);max-width:var(--measure);text-wrap:pretty}
-code,kbd,.cmd{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.92em}
+h1,p{margin:0}
+code,.cmd{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.92em}
 .skip{position:absolute;left:12px;top:-40px;padding:8px 12px;background:var(--accent);color:#fff;border-radius:6px;z-index:10}
 .skip:focus{top:12px}
 .wrap{width:min(1120px,100% - 2*clamp(16px,4vw,40px));margin-inline:auto}
-section{padding:clamp(56px,9vw,120px) 0}
-section+section{border-top:1px solid var(--line)}
-.eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:.8rem;color:var(--accent-ink);margin-bottom:14px}
-.eyebrow::before{content:"";width:18px;height:1px;background:var(--accent)}
-.lede{font-size:1.15rem;margin-top:18px}
 
-/* header */
-.top{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
-.top .wrap{display:flex;align-items:center;gap:20px;height:60px}
+/* the sky sits behind everything; when there is no webgl the gradient underneath is the picture */
+#sky{position:fixed;inset:0;width:100%;height:100%;z-index:0;display:block;
+  background:radial-gradient(ellipse 70% 60% at 68% 40%,#2c1721 0%,#150d13 45%,var(--bg) 100%)}
+.scrim{position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:linear-gradient(90deg,#09090bb3 0%,#09090b66 40%,#09090b00 65%),linear-gradient(0deg,#09090b99 0%,#09090b00 25%)}
+header,main,footer{position:relative;z-index:1}
+
+header .wrap{display:flex;align-items:center;gap:20px;height:64px}
 .brand{display:flex;align-items:center;gap:10px;color:var(--ink);text-decoration:none;font-weight:650;letter-spacing:-.02em}
 .mark{width:28px;height:28px;border-radius:8px;background:var(--accent);color:#fff;font:italic 700 22px/28px Georgia,"Times New Roman",serif;display:grid;place-items:center}
-nav{display:flex;gap:4px;margin-left:auto}
-nav a{color:var(--dim);text-decoration:none;padding:8px 12px;border-radius:8px;font-size:.92rem}
-nav a:hover{background:var(--raised);color:var(--ink)}
+nav{margin-left:auto;display:flex;gap:4px}
 .btn{display:inline-flex;align-items:center;gap:8px;min-height:42px;padding:0 18px;border-radius:10px;border:0;background:var(--accent);color:#fff;font:inherit;font-weight:600;cursor:pointer;text-decoration:none;white-space:nowrap;transition:background .15s,transform .15s}
 .btn:hover{background:#d86a90;color:#fff}
 .btn:active{transform:translateY(1px)}
-.btn.quiet{background:var(--raised);color:var(--ink)}
+.btn.quiet{background:#1a191fb3;color:var(--ink);backdrop-filter:blur(8px)}
 .btn.quiet:hover{background:#25242b}
 .btn svg{width:16px;height:16px}
 
-/* hero */
-.hero{padding-top:clamp(48px,8vw,96px)}
-.hero .wrap{display:grid;gap:clamp(32px,5vw,72px);grid-template-columns:minmax(0,5fr) minmax(0,6fr);align-items:center}
-.cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:28px;align-items:center}
-.cmd{display:inline-flex;align-items:center;gap:10px;min-height:42px;padding:0 6px 0 14px;border-radius:10px;background:var(--panel);border:1px solid var(--line);color:var(--ink)}
+main{flex:1;display:grid;align-items:center;padding:clamp(40px,6vw,80px) 0}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:.8rem;color:var(--accent-ink);margin-bottom:16px}
+.eyebrow::before{content:"";width:18px;height:1px;background:var(--accent)}
+h1{font-size:clamp(2.4rem,6.4vw,5rem);line-height:1;letter-spacing:-.04em;font-weight:650;text-wrap:balance;max-width:14ch}
+.lede{font-size:clamp(1.05rem,1.5vw,1.25rem);margin-top:22px;max-width:52ch;color:var(--dim);text-wrap:pretty}
+.cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:32px;align-items:center}
+.cmd{display:inline-flex;align-items:center;gap:10px;min-height:44px;padding:0 6px 0 14px;border-radius:10px;background:var(--panel);border:1px solid var(--line);color:var(--ink);backdrop-filter:blur(8px)}
 .cmd span{color:var(--faint)}
 .cmd button{display:grid;place-items:center;width:32px;height:32px;border:0;border-radius:7px;background:transparent;color:var(--dim);cursor:pointer}
 .cmd button:hover{background:var(--raised);color:var(--ink)}
 .cmd svg{width:15px;height:15px}
-.small{font-size:.86rem;color:var(--faint);margin-top:14px}
+.small{font-size:.86rem;color:var(--faint);margin-top:16px;max-width:52ch}
+.facts{display:flex;flex-wrap:wrap;gap:8px 28px;margin:44px 0 0;padding:0;list-style:none;font-size:.9rem;color:var(--dim)}
+.facts li{display:flex;align-items:center;gap:8px}
+.facts svg{width:15px;height:15px;color:var(--accent-ink)}
 
-/* the demo: one captured card, three treatments, looping on a four second bar so each
-   one has time to be read after it lands */
-.demo{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px;box-shadow:0 30px 80px #0007}
-.demo-bar{display:flex;align-items:center;gap:8px;padding:2px 4px 12px;font-size:.8rem;color:var(--faint)}
-.demo-bar b{color:var(--dim);font-weight:500}
-.demo-bar button{margin-left:auto;display:inline-flex;align-items:center;gap:6px;border:0;background:var(--raised);color:var(--dim);font:inherit;font-size:.8rem;padding:6px 10px;border-radius:7px;cursor:pointer}
-.demo-bar button:hover{color:var(--ink)}
-.demo-bar svg{width:13px;height:13px}
-.takes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
-.take{position:relative;background:var(--paper);border-radius:10px;aspect-ratio:4/3.4;overflow:hidden;display:grid;place-items:center;padding:12%}
-.take.kept{box-shadow:0 0 0 1.5px var(--accent)}
-.take .tag{position:absolute;left:8px;top:8px;font-size:.68rem;padding:3px 8px;border-radius:99px;background:#101013d9;color:var(--accent-ink);text-transform:capitalize}
-.take .time{position:absolute;right:8px;top:8px;font-size:.68rem;padding:3px 8px;border-radius:99px;background:#101013d9;color:#e4e4ea}
-.card{width:100%;color:var(--paper-ink);display:grid;gap:6px}
-.card b{font-size:clamp(.7rem,1.3vw,.95rem);line-height:1.2;letter-spacing:-.01em}
-.card i{display:block;height:5px;border-radius:3px;background:#d9d8e2;width:80%}
-.card i+i{width:55%}
-.card u{display:inline-block;margin-top:5px;padding:5px 9px;border-radius:5px;background:#5c63d3;color:#fff;font-size:.6rem;text-decoration:none;font-weight:600;justify-self:start}
-.card>*{animation:var(--anim,none) 4s var(--ease,ease-out) infinite both;animation-delay:calc(var(--i,0) * var(--gap,0ms))}
-.take.subtle{--anim:subtle;--gap:0ms}
-.take.expressive{--anim:expressive;--gap:70ms;--ease:cubic-bezier(.2,.9,.3,1.2)}
-.take.bold{--anim:bold;--gap:110ms;--ease:cubic-bezier(.7,0,.2,1)}
-.card>:nth-child(1){--i:0}.card>:nth-child(2){--i:1}.card>:nth-child(3){--i:2}.card>:nth-child(4){--i:3}
-/* the motion is the first 900ms of every 4s; the remaining time is rest, because a loop that
-   never rests never lets you judge the landing */
-@keyframes subtle{0%{opacity:0;transform:translateY(6px)}14%{opacity:1;transform:none}100%{opacity:1;transform:none}}
-@keyframes expressive{0%{opacity:0;transform:translateY(14px)}18%{opacity:1;transform:none}100%{opacity:1;transform:none}}
-@keyframes bold{0%{opacity:0;transform:translateX(-22px) scale(.96)}20%{opacity:1;transform:none}100%{opacity:1;transform:none}}
-.demo.paused .card>*{animation-play-state:paused}
-.demo-timeline{margin-top:12px;height:34px;border-radius:8px;background:var(--raised);position:relative;overflow:hidden}
-.demo-timeline i{position:absolute;top:8px;height:18px;border-radius:4px;background:#492432;color:#dfa8c0;font-size:.66rem;line-height:18px;padding:0 8px;font-style:normal;white-space:nowrap}
-.demo-timeline i.t{background:#354a57;color:#c7e0ef}
-.demo-timeline b{position:absolute;top:0;bottom:0;width:1.5px;background:var(--accent-ink);animation:sweep 4s linear infinite}
-@keyframes sweep{from{left:0}to{left:100%}}
-.demo.paused .demo-timeline b{animation-play-state:paused}
-
-/* steps */
-.steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(16px,2.5vw,32px);margin-top:40px}
-.step{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:22px;display:grid;gap:12px;align-content:start}
-.step .n{width:28px;height:28px;border-radius:8px;background:var(--accent-soft);color:var(--accent-ink);display:grid;place-items:center;font-size:.85rem;font-weight:600}
-.step p{font-size:.95rem}
-.fig{height:120px;border-radius:8px;background:var(--paper);position:relative;overflow:hidden;margin-top:4px}
-.fig .row{position:absolute;left:14px;right:14px;height:9px;border-radius:5px;background:#dcdbe5}
-.fig .box{position:absolute;left:14px;right:14px;top:44px;height:56px;border-radius:7px;background:#fff;border:1px solid #e3e2ea}
-.fig .box.hot{outline:2px solid var(--accent);outline-offset:2px}
-.fig .cursor{position:absolute;right:26px;top:70px;width:18px;height:18px}
-.fig .three{position:absolute;inset:14px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.fig .three i{border-radius:6px;background:#fff;border:1px solid #e3e2ea}
-.fig .three i:nth-child(2){border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
-.fig .url{position:absolute;left:14px;right:14px;top:14px;height:22px;border-radius:6px;background:#fff;border:1px solid #e3e2ea;font-size:.7rem;line-height:20px;padding:0 8px;color:var(--paper-dim)}
-
-/* two column feature rows */
-.split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:clamp(28px,5vw,72px);align-items:center}
-.split.flip>:first-child{order:2}
-.list{list-style:none;padding:0;margin:24px 0 0;display:grid;gap:14px}
-.list li{display:grid;grid-template-columns:22px 1fr;gap:12px;color:var(--dim);font-size:.98rem}
-.list li b{color:var(--ink);font-weight:600}
-.list svg{width:20px;height:20px;color:var(--accent-ink);margin-top:2px}
-.film{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px;display:grid;gap:10px}
-.screen{aspect-ratio:16/9;border-radius:10px;background:radial-gradient(ellipse at center,#17171c,#0a0a0d 80%);display:grid;place-items:center;position:relative;overflow:hidden}
-.screen .card{width:52%;background:var(--paper);padding:16px;border-radius:10px;box-shadow:0 20px 50px #0006}
-.screen .title{position:absolute;left:8%;bottom:12%;color:#fff;font-weight:650;font-size:clamp(.9rem,2vw,1.4rem);letter-spacing:-.02em}
-.tracks{display:grid;gap:4px}
-.track{display:grid;grid-template-columns:78px 1fr;gap:8px;align-items:center;font-size:.72rem;color:var(--dim)}
-.track span{position:relative;height:18px;background:var(--raised);border-radius:4px}
-.track i{position:absolute;top:0;bottom:0;border-radius:4px;background:#492432}
-.track i.t{background:#354a57}.track i.a{background:#28463c}
-pre{margin:0;padding:18px 20px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:auto;color:var(--ink);font-size:.86rem;line-height:1.6}
-pre .c{color:var(--faint)}
-pre .k{color:var(--accent-ink)}
-
-/* closing */
-.close{text-align:center}
-.close p{margin-inline:auto}
-footer{border-top:1px solid var(--line);padding:32px 0;font-size:.86rem;color:var(--faint)}
-footer .wrap{display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;align-items:center}
+footer{padding:24px 0;font-size:.84rem;color:var(--faint)}
+footer .wrap{display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between}
 footer a{color:var(--dim)}
 
-@media (max-width:860px){
-  .hero .wrap,.split{grid-template-columns:1fr}
-  .split.flip>:first-child{order:0}
-  .steps{grid-template-columns:1fr}
-  nav a:not(.btn){display:none}
-}
-@media (max-width:520px){
-  .takes{grid-template-columns:1fr 1fr}
-  .take.bold{display:none}
-  .demo-bar b{display:none}
+@media (max-width:600px){
+  .scrim{background:linear-gradient(0deg,#09090be6 0%,#09090b99 60%,#09090b33 100%)}
+  .cmd{width:100%;justify-content:space-between}
 }
 @media (prefers-reduced-motion:reduce){
-  .card>*,.demo-timeline b{animation:none}
-  .demo-bar button{display:none}
   .btn,.btn:active{transition:none;transform:none}
 }
 </style>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
-<header class="top">
+<canvas id="sky" aria-hidden="true"></canvas>
+<div class="scrim" aria-hidden="true"></div>
+
+<header>
   <div class="wrap">
     <a class="brand" href="#"><span class="mark" aria-hidden="true">m</span>motioneer</a>
-    <nav aria-label="Sections">
-      <a href="#how">How it works</a>
-      <a href="#film">Film</a>
-      <a href="#judged">What gets judged</a>
-      <a href="#agents">Agents</a>
+    <nav aria-label="Links">
       <a class="btn quiet" href="https://github.com/AminKhorramii/Motioneer">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6"/></svg>
         GitHub
@@ -181,149 +95,26 @@ footer a{color:var(--dim)}
 </header>
 
 <main id="main">
-<section class="hero">
   <div class="wrap">
-    <div>
-      <span class="eyebrow">A motion studio for your own product</span>
-      <h1>Your interface, in motion. Three ways at once.</h1>
-      <p class="lede">Point Motioneer at a running site, pick an element straight off the page, and get three motions for it side by side. Keep the one that feels right, then cut what you kept into a film.</p>
-      <div class="cta">
-        <span class="cmd" id="cmd"><span>$</span>npx motioneer localhost:3000
-          <button type="button" aria-label="Copy the command" title="Copy the command" data-copy="npx motioneer localhost:3000">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 9h11v11H9zM5 15V4h11"/></svg>
-          </button>
-        </span>
-        <a class="btn" href="#how">See how it works</a>
-      </div>
-      <p class="small">Node 20 or newer. Nothing leaves your machine except the prompt to the model you chose.</p>
-    </div>
-    <div class="demo" id="demo" aria-label="Three motions for one captured card, compared on one timeline">
-      <div class="demo-bar"><b>Pricing card</b> <span>captured from localhost:3000</span>
-        <button type="button" id="replay"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/></svg>Replay</button>
-      </div>
-      <div class="takes">
-        <div class="take subtle"><span class="tag">subtle</span><span class="time">0.5s</span><div class="card"><b>Everything your team ships</b><i></i><i></i><u>Get started</u></div></div>
-        <div class="take expressive kept"><span class="tag">expressive</span><span class="time">0.8s</span><div class="card"><b>Everything your team ships</b><i></i><i></i><u>Get started</u></div></div>
-        <div class="take bold"><span class="tag">bold</span><span class="time">1.1s</span><div class="card"><b>Everything your team ships</b><i></i><i></i><u>Get started</u></div></div>
-      </div>
-      <div class="demo-timeline" aria-hidden="true"><i class="t" style="left:2%;width:22%">Opening</i><i style="left:26%;width:40%">Pricing card</i><i class="t" style="left:70%;width:28%">Closing</i><b></b></div>
-    </div>
-  </div>
-</section>
-
-<section id="how">
-  <div class="wrap">
-    <span class="eyebrow">How it works</span>
-    <h2>Real components, not mockups of them.</h2>
-    <p class="lede">A motion designed on a drawing of your button never quite fits the button. Motioneer works on the thing itself, with its own markup and its own stylesheet.</p>
-    <div class="steps">
-      <div class="step">
-        <span class="n">1</span>
-        <h3>Point it at what is running</h3>
-        <p>Give it the address of your dev server or a deployed site. It proxies the page so the picker can read the document, and a bookmarklet covers pages that need you signed in.</p>
-        <div class="fig" aria-hidden="true"><div class="url">localhost:3000</div><div class="row" style="top:50px;width:60%"></div><div class="row" style="top:68px;width:80%"></div><div class="row" style="top:86px;width:45%"></div></div>
-      </div>
-      <div class="step">
-        <span class="n">2</span>
-        <h3>Pick an element off the page</h3>
-        <p>Hover, widen to the parent or narrow to a child, then capture. The capture keeps the styles that matter to that element and freezes its images, so what you animate is what you ship.</p>
-        <div class="fig" aria-hidden="true"><div class="row" style="top:14px;width:50%"></div><div class="row" style="top:30px;width:30%"></div><div class="box hot"></div><svg class="cursor" viewBox="0 0 24 24" fill="#1c1b22" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"><path d="M5 3l7 17 2.5-6.5L21 11z"/></svg></div>
-      </div>
-      <div class="step">
-        <span class="n">3</span>
-        <h3>Compare three treatments</h3>
-        <p>Say what the motion is for: an entrance, an emphasis, an idle, or a response to a press. You get a subtle, an expressive and a bold reading of it, all on one clock, so the differences are visible rather than remembered.</p>
-        <div class="fig" aria-hidden="true"><div class="three"><i></i><i></i><i></i></div></div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section id="film">
-  <div class="wrap split">
-    <div>
-      <span class="eyebrow">Film</span>
-      <h2>From the motions you kept to a film you can send.</h2>
-      <p class="lede">A product demo is a minute of components arriving a beat apart. The film editor sequences what you kept on one timeline, with titles, sound and a camera move, and renders an MP4 on your machine.</p>
-      <ul class="list">
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span><b>A first cut in one click.</b> Opening, feature highlights, and a moment to land, all yours to edit.</span></li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span><b>Linked starts.</b> A clip can begin when another ends, so reordering one does not mean retiming all of them.</span></li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span><b>Preview equals export.</b> Frames are rendered from the same composition the editor shows, and the suite compares them pixel by pixel.</span></li>
-      </ul>
-    </div>
-    <div class="film" aria-hidden="true">
-      <div class="screen"><div class="card"><b>Everything your team ships</b><i></i><i></i><u>Get started</u></div><span class="title">Meet your next great idea</span></div>
-      <div class="tracks">
-        <div class="track">Opening<span><i class="t" style="left:0;width:24%"></i></span></div>
-        <div class="track">Pricing card<span><i style="left:22%;width:46%"></i></span></div>
-        <div class="track">Chart<span><i style="left:50%;width:30%"></i></span></div>
-        <div class="track">Narration<span><i class="a" style="left:0;width:100%"></i></span></div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section id="judged">
-  <div class="wrap split flip">
-    <div>
-      <span class="eyebrow">What gets judged</span>
-      <h2>Every motion passes the gates before you see it.</h2>
-      <p class="lede">A model writes the css. The studio reads it back and refuses what would break in your product, so the three you compare are three that would ship.</p>
-      <ul class="list">
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/></svg><span><b>Only transform and opacity move.</b> Animating layout drops frames, so a sheet that animates width or margin is sent back.</span></li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 11h14v10H5zM8 11V7a4 4 0 0 1 8 0v4"/></svg><span><b>Scoped to the element.</b> Keyframe names are namespaced, because a sheet defining <code>rise</code> would replace whatever your app already called <code>rise</code>.</span></li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/></svg><span><b>Reduced motion respected.</b> Every motion is wrapped in the media query, since a person who asked for less should get less.</span></li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v16H4zM4 9h4M4 15h4M16 9h4M16 15h4M8 4v16M16 4v16"/></svg><span><b>Checked in a real browser.</b> The element is rendered with the motion applied and watched for blank frames, escapes from its box, and content that never settles.</span></li>
-      </ul>
-    </div>
-    <pre aria-label="A motion the gates accepted"><code><span class="c">/* expressive, 0.8s, entrance */</span>
-<span class="k">@media</span> (prefers-reduced-motion: no-preference) {
-  [data-mn-pricing] &gt; * {
-    animation: mn-pricing-arrive 720ms cubic-bezier(.2,.9,.3,1.1) both;
-  }
-  [data-mn-pricing] &gt; :nth-child(2) { animation-delay: 70ms }
-  [data-mn-pricing] &gt; :nth-child(3) { animation-delay: 140ms }
-  <span class="k">@keyframes</span> mn-pricing-arrive {
-    from { opacity: 0; transform: translateY(14px) }
-    to   { opacity: 1; transform: none }
-  }
-}</code></pre>
-  </div>
-</section>
-
-<section id="agents">
-  <div class="wrap split">
-    <div>
-      <span class="eyebrow">Agents</span>
-      <h2>Your coding agent can ask for motion too.</h2>
-      <p class="lede">Motioneer ships a Model Context Protocol server. An agent working in your codebase can hand it a component and get back css that already passed the gates, or open the studio for you when a decision needs eyes.</p>
-      <ul class="list">
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span><b>Same gates, same taste.</b> The server calls the functions the studio calls, so an agent cannot get a motion the studio would have refused.</span></li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span><b>Bring your own model.</b> The Claude command line, or any provider with an API key. Keys stay in a file on your machine.</span></li>
-      </ul>
-    </div>
-    <pre aria-label="Adding the server to Claude Code"><code><span class="c"># once, for every project</span>
-claude mcp add --scope user motioneer -- npx -y -p motioneer motioneer-mcp
-
-<span class="c"># then, in a conversation</span>
-<span class="k">&gt;</span> give the pricing card an entrance, subtle, about half a second</code></pre>
-  </div>
-</section>
-
-<section class="close">
-  <div class="wrap">
-    <h2>Open your product and pick something worth showing.</h2>
-    <p class="lede">One command, no account, and everything it makes stays in your project folder.</p>
-    <div class="cta" style="justify-content:center">
+    <span class="eyebrow">A motion studio for your own product</span>
+    <h1>Your interface, in motion. Three ways at once.</h1>
+    <p class="lede">Point Motioneer at a running site, pick an element straight off the page, and get three motions for it side by side. Keep the one that feels right, then cut what you kept into a film.</p>
+    <div class="cta">
       <span class="cmd"><span>$</span>npx motioneer localhost:3000
         <button type="button" aria-label="Copy the command" title="Copy the command" data-copy="npx motioneer localhost:3000">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 9h11v11H9zM5 15V4h11"/></svg>
         </button>
       </span>
-      <a class="btn quiet" href="https://github.com/AminKhorramii/Motioneer">Read the source</a>
+      <a class="btn" href="https://github.com/AminKhorramii/Motioneer#readme">Read how it works</a>
     </div>
+    <p class="small">Node 20 or newer. Nothing leaves your machine except the prompt to the model you chose.</p>
+    <ul class="facts">
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Only transform and opacity move</li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Reduced motion respected</li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Checked in a real browser</li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Rendered to MP4 on your machine</li>
+    </ul>
   </div>
-</section>
 </main>
 
 <footer>
@@ -333,45 +124,140 @@ claude mcp add --scope user motioneer -- npx -y -p motioneer motioneer-mcp
   </div>
 </footer>
 
+<script id="frag" type="x-shader/x-fragment">
+precision highp float;
+uniform vec2 u_res;
+uniform float u_time;
+uniform vec2 u_aim;
+uniform float u_dpr;
+
+/* value noise folded into itself three times, the oldest trick in graphics: two fields
+   crossing at different rates, then a third sampled through them, which is what stops the
+   picture from reading as a grid of sine waves. The studio's waiting state is the same idea
+   drawn in characters, so this is the page wearing the same signature. */
+float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+float noise(vec2 p){
+  vec2 i = floor(p), f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  float a = hash(i), b = hash(i + vec2(1.0, 0.0)), c = hash(i + vec2(0.0, 1.0)), d = hash(i + vec2(1.0, 1.0));
+  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+float fbm(vec2 p){
+  float v = 0.0, a = 0.5;
+  mat2 rot = mat2(0.8, 0.6, -0.6, 0.8);
+  for (int i = 0; i < 5; i++) { v += a * noise(p); p = rot * p * 2.0 + 7.3; a *= 0.5; }
+  return v;
+}
+void main(){
+  vec2 uv = (gl_FragCoord.xy - 0.5 * u_res) / u_res.y;
+  float t = u_time * 0.05;
+  vec2 p = uv * 1.35 + vec2(0.35, 0.0);
+  /* the pointer leans the field a little, so the page answers the hand without chasing it */
+  p += (u_aim - 0.5) * 0.18;
+  vec2 q = vec2(fbm(p + t), fbm(p + vec2(5.2, 1.3) - t * 0.8));
+  vec2 r = vec2(fbm(p + 3.4 * q + vec2(1.7, 9.2) + 0.15 * t), fbm(p + 3.4 * q + vec2(8.3, 2.8) - 0.12 * t));
+  float f = fbm(p + 3.0 * r);
+
+  vec3 ink = vec3(0.035, 0.035, 0.045);
+  vec3 plum = vec3(0.2, 0.08, 0.15);
+  vec3 rose = vec3(0.79, 0.33, 0.49);
+  vec3 glow = vec3(0.91, 0.70, 0.78);
+  vec3 col = mix(ink, plum, smoothstep(0.25, 0.85, f));
+  col = mix(col, rose, smoothstep(0.45, 0.95, length(q)) * 0.62);
+  col = mix(col, glow, smoothstep(0.72, 1.0, f) * 0.32);
+
+  /* the crests are lit as a lattice of dots, one every fourteen css pixels, because a field
+     where every pixel is half on reads as a grey rectangle rather than as something moving */
+  vec2 cell = fract(gl_FragCoord.xy / (14.0 * u_dpr)) - 0.5;
+  float dot = smoothstep(0.17, 0.07, length(cell));
+  float crest = pow(smoothstep(0.3, 0.9, f), 1.8);
+  col += dot * crest * glow * 0.9;
+
+  /* soft edge, since the corner of the screen is not part of the picture */
+  float v = 1.0 - smoothstep(0.35, 1.25, length(uv * vec2(0.75, 1.0)));
+  col *= mix(0.45, 1.0, v);
+  /* a breath of grain so the gradients do not band */
+  col += (hash(gl_FragCoord.xy + fract(u_time)) - 0.5) * 0.018;
+  gl_FragColor = vec4(col, 1.0);
+}
+</script>
 <script>
-/* Two behaviours, both optional: copying the command and replaying the demo. The page reads
-   the same without them, which is why neither is required for anything above to render. */
+/* The shader is optional. Without webgl, or with reduced motion, the gradient under the canvas
+   and one still frame are the whole picture. Copying the command is the only other behaviour. */
 (function () {
   var live = document.createElement('span');
   live.setAttribute('role', 'status');
   live.className = 'skip';
-  live.style.top = '-40px';
   document.body.appendChild(live);
   var timer = 0;
   function say(text) {
-    live.textContent = text;
-    live.style.top = '12px';
+    live.textContent = text; live.style.top = '12px';
     clearTimeout(timer);
-    timer = setTimeout(function () { live.style.top = '-40px'; live.textContent = ''; }, 1800);
+    timer = setTimeout(function () { live.style.top = ''; live.textContent = ''; }, 1800);
   }
   document.querySelectorAll('[data-copy]').forEach(function (button) {
     button.addEventListener('click', function () {
       var text = button.getAttribute('data-copy');
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text).then(function () { say('Copied'); }, function () { say('Select the command and copy it'); });
-      } else {
-        say('Select the command and copy it');
-      }
+      } else { say('Select the command and copy it'); }
     });
   });
-  var demo = document.getElementById('demo');
-  var replay = document.getElementById('replay');
-  if (demo && replay) {
-    replay.addEventListener('click', function () {
-      /* Restart every animation from zero by detaching and reattaching the class that owns them:
-         removing the animation and reading a layout property forces a fresh start. */
-      demo.querySelectorAll('.card > *, .demo-timeline b').forEach(function (node) {
-        node.style.animation = 'none';
-        void node.offsetWidth;
-        node.style.animation = '';
-      });
-    });
+})();
+(function () {
+  var canvas = document.getElementById('sky');
+  var still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var gl = canvas.getContext('webgl', { antialias: false, alpha: false, powerPreference: 'low-power' });
+  if (!gl) { canvas.remove(); return; }
+  function shader(type, src) {
+    var s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { throw new Error(gl.getShaderInfoLog(s)); }
+    return s;
   }
+  var program;
+  try {
+    program = gl.createProgram();
+    gl.attachShader(program, shader(gl.VERTEX_SHADER, 'attribute vec2 a;void main(){gl_Position=vec4(a,0.,1.);}'));
+    gl.attachShader(program, shader(gl.FRAGMENT_SHADER, document.getElementById('frag').textContent));
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) { throw new Error(gl.getProgramInfoLog(program)); }
+  } catch (e) { canvas.remove(); return; }
+  gl.useProgram(program);
+  var buffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+  var a = gl.getAttribLocation(program, 'a');
+  gl.enableVertexAttribArray(a);
+  gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
+  var uRes = gl.getUniformLocation(program, 'u_res'), uTime = gl.getUniformLocation(program, 'u_time'),
+      uAim = gl.getUniformLocation(program, 'u_aim'), uDpr = gl.getUniformLocation(program, 'u_dpr');
+  /* capped at 1.5 device pixels: the picture is soft on purpose and a 3x canvas costs the battery
+     for nothing anybody can see */
+  var dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+  var aim = [0.5, 0.5], want = [0.5, 0.5];
+  function size() {
+    var w = Math.floor(canvas.clientWidth * dpr), h = Math.floor(canvas.clientHeight * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; gl.viewport(0, 0, w, h); }
+  }
+  var start = performance.now(), frame = 0, running = false;
+  function draw(now) {
+    size();
+    aim[0] += (want[0] - aim[0]) * 0.04; aim[1] += (want[1] - aim[1]) * 0.04;
+    gl.uniform2f(uRes, canvas.width, canvas.height);
+    gl.uniform1f(uTime, (now - start) / 1000);
+    gl.uniform2f(uAim, aim[0], aim[1]);
+    gl.uniform1f(uDpr, dpr);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    if (running) frame = requestAnimationFrame(draw);
+  }
+  function play() { if (still || running) return; running = true; frame = requestAnimationFrame(draw); }
+  function pause() { running = false; cancelAnimationFrame(frame); }
+  window.addEventListener('pointermove', function (e) { want = [e.clientX / innerWidth, 1 - e.clientY / innerHeight]; }, { passive: true });
+  window.addEventListener('resize', function () { if (!running) draw(performance.now()); });
+  document.addEventListener('visibilitychange', function () { document.hidden ? pause() : play(); });
+  draw(performance.now());
+  play();
+
 })();
 </script>
 </body>
