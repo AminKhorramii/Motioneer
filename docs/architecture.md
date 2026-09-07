@@ -28,6 +28,9 @@ src/                   what the studio imports through a built bundle, because n
 mcp/
   index.mjs            Motioneer as a tool an agent calls: studio opens the room, motion skips it
 
+site/
+  index.html           the landing page: one file, no requests, its demo drawn in css
+
 verify/                the suites, read as a set
   studio-sites.mjs     twenty real sites through the proxy, picked one at a time
   studio-capture.mjs   what survives being picked, by site and by kind of element
