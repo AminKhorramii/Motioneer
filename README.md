@@ -2,10 +2,10 @@
 
 **Motion for components you already have.**
 
-[![npm](https://img.shields.io/npm/v/motioneer-mcp?logo=npm&color=cb3837)](https://www.npmjs.com/package/motioneer-mcp)
+[![npm](https://img.shields.io/npm/v/motioneer?logo=npm&color=cb3837)](https://www.npmjs.com/package/motioneer)
 [![MCP](https://img.shields.io/badge/MCP-server-111?logo=claude&logoColor=D97757)](https://modelcontextprotocol.io)
-[![Node](https://img.shields.io/node/v/motioneer-mcp?logo=nodedotjs&logoColor=fff&color=5FA04E)](package.json)
-[![License](https://img.shields.io/npm/l/motioneer-mcp?color=blue)](LICENSE)
+[![Node](https://img.shields.io/node/v/motioneer?logo=nodedotjs&logoColor=fff&color=5FA04E)](package.json)
+[![License](https://img.shields.io/npm/l/motioneer?color=blue)](LICENSE)
 
 Point it at your running app, click an element, and get several motions for it at once, playing
 side by side on one timeline. Keep the one you like as a stylesheet that ships in your product.

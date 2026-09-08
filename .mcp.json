@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "motioneer": {
+      "command": "node",
+      "args": ["mcp/index.mjs"]
+    }
+  }
+}

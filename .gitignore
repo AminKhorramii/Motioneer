@@ -8,12 +8,12 @@ dist-core/
 .env
 .env.*
 *.local
-.wall-test-key
+.motioneer-test-key
 
 # what the studio writes while it runs: the tailwind cache, the recent addresses, the chosen
 # service, and the session it puts back when it restarts under you
 .studio/
 
-wall-mcp-*.tgz
+motioneer-*.tgz
 
 dist-editor/

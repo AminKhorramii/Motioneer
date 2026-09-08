@@ -752,7 +752,7 @@ the suite rather than shipping.
 ### Capturing a real run
 
 ```
-MOTIONEER_KEY=$(cat ~/.wall-test-key) npm run capture
+MOTIONEER_KEY=$(cat ~/.motioneer-test-key) npm run capture
 ```
 
 This drives the real app against the real API through a recording proxy and writes every byte of

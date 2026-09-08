@@ -2,17 +2,15 @@
 /**
  * Motioneer as a tool an agent can call.
  *
- * The flow it exists for: you ask Claude Code for a landing page, it calls `design`, the
- * desktop opens with your brief already in it, you browse a wall of real pages and pick one,
- * and the choice comes back as a spec your agent implements in your actual codebase. The point
- * is that choosing happens where choosing is easy, and building happens where the code lives.
+ * Three tools, one flow each. `studio` opens the room on a running site or a folder so the person
+ * can pick elements and compare motions for them by hand. `motion` takes markup the agent already
+ * has and hands back stylesheets that passed the gates, for when nobody needs to look first.
+ * `film` runs the whole thing headless, from a url to a rendered mp4, choosing what to film with
+ * the model and leaving the studio open afterwards for the edit.
  *
- * The handoff is files in a directory rather than a return value, because a person browsing
- * takes longer than any sensible tool timeout. So `design` opens the wall, waits a few seconds
- * in case the choice is instant, and otherwise answers that the wall is open. That is not a
- * failure and is not reported as one: it is what happens almost every time, and an agent told
- * it failed will try again and throw away the wall the person is reading. `collect` is the
- * pickup, and the files stay on disk for it however long choosing takes.
+ * Opening the studio returns as soon as it answers, because a person choosing takes longer than
+ * any sensible tool timeout, and an agent told that failed will open a second one. Filming waits,
+ * because a file is what was asked for and there is nothing to hand back until it exists.
  *
  * JSON-RPC over stdio, spoken directly, so this stays dependency free like the rest.
  */
