@@ -53,7 +53,17 @@ const INSTRUCTIONS = `Motioneer makes motion for a person's own product. Choose 
 - film: they want a video, a demo, a reel, or say "motion video". One call does everything and returns an MP4 path. Always pass dir as the absolute path of their project so the file lands beside their work. "Fast" or "quick" means look "subtle" and about 12 seconds; "demo" or "showcase" means look "expressive" and about 20.
 - studio: they want to pick elements and compare motions by hand, or say "studio". It returns as soon as the room is open; do not wait or retry, tell them where it is.
 - motion: they want CSS for markup they already have, with nothing to look at first.
+- inspect: they want to see or choose what gets filmed first, or ask what is on a page. Follow it with film and pick.
 - open: after a film, or whenever they ask to see the editor or a file.
+
+How people say it, and what to call:
+- "make me a video of my site", "demo reel of localhost:3000", "motion film of linear.app": film with the url and dir.
+- "film the pricing cards", "just the hero": film with pick set to those words. If you are not sure what is on the page, inspect first and offer the list.
+- "what could you film on this page": inspect, then relay the list in plain words and ask which they want.
+- "open the studio on my app", "let me pick": studio with the url.
+- "animate this component", with markup pasted: motion.
+
+When a tool fails its message starts with "Cannot" and ends with "Next:". Relay the reason and the next step as given, and do not invent a different cause. Retry only when the next step says to.
 
 While film runs it can take a minute or two: it opens the site, captures, writes motions, cuts and renders. Say that once, then wait for the result rather than polling or calling it again.
 
@@ -153,6 +163,25 @@ const TOOLS = [
         seconds: { type: 'number', description: 'How long the film should be. About 20 by default.' },
         look: { type: 'string', enum: ['subtle', 'expressive', 'bold'], description: 'The single treatment written for each element. Subtle by default, which reads as fast and calm.' },
         count: { type: 'number', description: 'How many elements to film, 1 to 5. Three by default.' },
+        pick: { type: 'string', description: 'What the person wants filmed, in their own words, like "the pricing cards and the hero". The model matches it against what is on the page. Leave it out to let the model choose the best three.' },
+      },
+      required: ['url'],
+    },
+  },
+  {
+    name: 'inspect',
+    description:
+      'Look at a running site the way film would and list what on it is worth filming: each element '
+      + 'with its role, where it sits, its size, whether it carries an image, and its text. Use it '
+      + 'when the person wants to choose or discuss what gets filmed before spending a minute on a '
+      + 'render, or asks what Motioneer can see on a page. It opens the site in the studio and reads '
+      + 'it in a headless browser, so it takes a few seconds and needs the renderer like film does. '
+      + 'Follow it with film, passing pick in the person\'s words.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'The running site or dev server to look at.' },
+        dir: { type: 'string', description: 'Absolute project path, so a studio opened for this lands on their project.' },
       },
       required: ['url'],
     },
@@ -270,7 +299,23 @@ async function open({ target, path: file }) {
   return `Opened ${what} at ${where}.`
 }
 
-async function film({ url, dir, seconds, look, count }) {
+/**
+ * Read a page the way film would, and say what is on it, so the agent can talk about it and the
+ * person can point at what they want filmed before a minute of rendering is spent.
+ */
+async function inspect({ url, dir }) {
+  if (!url) throw new Error('Cannot inspect: inspect needs a url. Next: pass the running site or dev server.')
+  const at = STUDIO_AT()
+  if (!(await spawnStudio({ url, dir, at }))) throw new Error(`Cannot inspect: no studio would open at ${at}. Next: run \`npm run studio\` and ask again.`)
+  const { inspectSite, describe } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'autofilm.mjs')).href)
+  const seen = await inspectSite({ at, url })
+  const lines = seen.candidates.map(describe)
+  return `${seen.title || seen.source} has ${seen.candidates.length} things worth filming:\n${lines.join('\n')}\n\n`
+    + `To film some of them, call film with the same url and pick set to what the person wants in their words, `
+    + `for example "the pricing cards and the hero"; the model matches pick against this list. Without pick it chooses the best three.`
+}
+
+async function film({ url, dir, seconds, look, count, pick }) {
   if (!url) throw new Error('film needs a url, a running site or dev server like http://localhost:3000.')
   const at = STUDIO_AT()
   const up = await spawnStudio({ url, dir, at })
@@ -289,33 +334,15 @@ async function film({ url, dir, seconds, look, count }) {
   }
 
   const { autofilm } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'autofilm.mjs')).href)
-  const core = await import(pathToFileURL(path.join(ROOT, 'dist-core', 'core.js')).href)
-  const { runClaude } = await import(pathToFileURL(path.join(ROOT, 'shared', 'cli.mjs')).href)
   const max = Math.max(1, Math.min(5, Number(count) || 3))
-
-  /** The model names which of the real, on-page elements are worth filming; a heuristic covers the day it cannot. */
-  const choose = async (cands) => {
-    const list = cands.map((c) => `${c.i}: <${c.tag}> ${c.w}x${c.h} "${c.text}"`).join('\n')
-    const prompt = `These are the elements on a landing page, each with an index, tag, size and text:\n${list}\n\n`
-      + `Choose the ${max} that would make the best short motion film of this product: prefer the hero `
-      + `headline, a primary button or a feature card, and one strong image. Avoid tiny or repeated `
-      + `elements. Reply with only a JSON array of the chosen indices, most important first, like [3,7,1].`
-    const reply = await runClaude('You choose which elements to film. Reply with a JSON array of indices only.', prompt).catch(() => null)
-    const raw = reply ? core.grabJson(typeof reply === 'string' ? reply : reply.text ?? '') : null
-    const chosen = Array.isArray(raw) ? raw : Array.isArray(raw?.indices) ? raw.indices : null
-    if (chosen && chosen.length) return chosen.map(Number).filter((n) => Number.isInteger(n))
-    // prominence: near the top, largest area, headings and cards ahead of bare images
-    return [...cands].sort((a, b) => (b.w * b.h) / (b.top + 400) - (a.w * a.h) / (a.top + 400)).slice(0, max).map((c) => c.i)
-  }
-
   const steps = []
-  const result = await autofilm({ at, url, choose, seconds: Number(seconds) || 20, look: look || 'subtle', max, onStep: (m) => steps.push(m) })
+  const result = await autofilm({ at, url, pick: String(pick || '').slice(0, 300), seconds: Number(seconds) || 20, look: look || 'subtle', max, onStep: (m) => steps.push(m) })
   const buf = Buffer.from(await (await fetch(result.url)).arrayBuffer())
   const outDir = dir && path.isAbsolute(dir) ? dir : process.cwd()
   const file = path.join(outDir, `motioneer-film-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.mp4`)
   await writeFile(file, buf)
-  return `Filmed ${result.captured} element${result.captured === 1 ? '' : 's'} from ${url} into a ${Math.round(result.seconds)} second film, `
-    + `saved to ${file} (${(buf.length / 1e6).toFixed(1)} MB). The studio is still open at ${at}. What it did: ${steps.join(' ')}\n\n`
+  return `Filmed ${result.captured} element${result.captured === 1 ? '' : 's'} from ${url}${result.product ? `, "${result.product}",` : ''} into a ${Math.round(result.seconds)} second film`
+    + `${result.opening ? ` titled "${result.opening}"` : ''}, saved to ${file} (${(buf.length / 1e6).toFixed(1)} MB). The studio is still open at ${at}. What it did: ${steps.join(' ')}\n\n`
     + `Now offer the person these three choices, as options if you can: open the editor, open the video, or continue chatting. `
     + `For the first two call open with target "editor" or target "video" and path "${file}", then stop so they can look.`
 }
@@ -473,6 +500,7 @@ async function call(name, args, id) {
   if (name === 'studio') return ok(id, await studio(args ?? {}))
   if (name === 'motion') return ok(id, await motion(args ?? {}))
   if (name === 'film') return ok(id, await film(args ?? {}))
+  if (name === 'inspect') return ok(id, await inspect(args ?? {}))
   if (name === 'open') return ok(id, await open(args ?? {}))
   /**
    * A name nobody serves is answered rather than ignored.

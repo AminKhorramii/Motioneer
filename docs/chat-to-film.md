@@ -24,7 +24,8 @@ are what it does inside, and what an agent can still drive one at a time when it
 
 | Step | How an agent does it |
 | --- | --- |
-| The whole thing | `film` MCP tool with `{ url, seconds?, look?, count? }` returns an MP4 path |
+| Look first | `inspect` MCP tool with `{ url }` lists what is worth filming, by role and section |
+| The whole thing | `film` MCP tool with `{ url, pick?, seconds?, look?, count? }` returns an MP4 path |
 | Open a site | `POST /__motioneer/target` with `{ "url": "…" }`, or the `studio` tool |
 | Capture an element | the `film` tool does it headless; by hand it is the picker or the bookmarklet |
 | Write three motions | `POST /__motioneer/generate` with the captured subject, a brief and a treatment |
@@ -68,10 +69,21 @@ matches the preview.
 
 The `film` tool drives the real editor in a headless browser rather than reimplementing any of
 it, so capture, the gates, the first cut and the render are the same code a person uses by hand.
-The one judgement it makes on its own is what to film: it tags the visible elements of the page,
-hands that list to the model, and films whichever the model names. Every selector it clicks is
-one it wrote onto the page, so a chosen element always resolves. It needs the local renderer,
-which it installs on first use, because it needs the renderer to make the file at all.
+It needs the local renderer, which it installs on first use, because it needs the renderer to make
+the file at all.
+
+What it adds is judgement, and all of it comes from one model call through the studio's `ask`
+route, so it works with whichever provider the person configured. It tags the visible elements of
+the page, describes each by role, section, size, image and text, and asks the model for a plan:
+which elements to film, what the product is in a few words, an opening and a closing title taken
+from the page rather than imagined, and one sentence of direction per element such as "the price
+lands last". The titles go on the first cut's title tracks, the direction goes into each motion's
+brief, and every selector it clicks is one it wrote onto the page, so a chosen element always
+resolves. When the person said what they want, `pick` carries their words and outranks the
+defaults. When the model cannot be asked, prominence chooses and the film says so.
+
+`inspect` reads a page the same way without filming it, and returns the list, so an agent can say
+what it sees and ask which to film before a minute of rendering is spent.
 
 ```
 > I want a fast motion video from linear.app
@@ -97,8 +109,13 @@ choices, as selectable options where the client can draw them.
 The first two call the `open` tool with `{ target: "editor" }` or `{ target: "video", path }`, which
 launches the system opener and returns at once. `folder` opens the directory the file sits in. The
 same instructions tell the agent which tool to reach for from what a person says: "fast" means a
-subtle look and about twelve seconds, "demo" means expressive and about twenty, and "studio" means
-open the room and hand it over rather than wait.
+subtle look and about twelve seconds, "demo" means expressive and about twenty, "the pricing cards"
+means `film` with `pick`, "what could you film" means `inspect`, and "studio" means open the room
+and hand it over rather than wait.
+
+Failures follow one shape so the agent relays rather than guesses: the message starts with
+"Cannot", names the reason, and ends with "Next:" and the one thing to do. The instructions tell
+the agent to repeat that next step as given and to retry only when it says to.
 
 ## What still needs a person
 
@@ -106,10 +123,9 @@ open the room and hand it over rather than wait.
 against its own api on another host cannot be proxied. For those the bookmarklet still picks from
 the browser the person is already signed into, and the `film` tool cannot reach them.
 
-**Model choice across providers.** The `film` tool asks the model which elements to film through
-the Claude command line, the shipped default. With an api provider configured instead, it falls
-back to a prominence heuristic rather than a model choice, which is worth closing by routing the
-question through the studio's configured provider.
+**A page with nothing the heuristics recognise.** Candidates come from headings, buttons, cards,
+heroes and images by tag and class. A page built entirely from anonymous divs offers the model
+nothing to choose from, and `inspect` will say so; the studio's picker still works there by hand.
 
 ## Where the code is
 
@@ -119,6 +135,9 @@ question through the studio's configured provider.
 - `mcp/index.mjs` is the server an agent talks to; its `film` tool makes the whole video, its
   `studio` tool opens the room, its `motion` tool writes a stylesheet for markup you have, and
   its `open` tool acts on the choices a finished film offers. Its instructions carry the etiquette.
-- `tools/editor/autofilm.mjs` is the headless driver the `film` tool runs, and `verify/film.mjs`
-  proves it from a url to an MP4 with a fake site and model.
+- `tools/editor/autofilm.mjs` is the headless driver behind `film` and `inspect`, and holds the plan
+  prompt; `verify/film.mjs` proves it from a url to an MP4 with a fake site and model, including
+  that the plan's titles and direction land.
+- `tools/studio.mjs` also serves `/__motioneer/ask`, the one route that puts a question to the
+  configured model, so judgement works with any provider.
 - `src/editor/project.ts` is the project document, and the only schema an agent needs.

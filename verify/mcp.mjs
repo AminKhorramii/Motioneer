@@ -89,12 +89,16 @@ ok('it answers initialize', !!hello.result, JSON.stringify(hello.result?.serverI
 ok('and names itself with a version', /\d+\.\d+/.test(hello.result?.serverInfo?.version ?? ''))
 ok('and hands the agent its etiquette, including how a film ends',
   /open the editor/i.test(hello.result?.instructions ?? '') && /continue chatting/i.test(hello.result?.instructions ?? ''))
+ok('and how to read a failure, so it relays the next step rather than guessing',
+  /starts with "Cannot"/.test(hello.result?.instructions ?? '') && /do not invent/.test(hello.result?.instructions ?? ''))
+ok('and when to look before filming',
+  /inspect/.test(hello.result?.instructions ?? '') && /pick/.test(hello.result?.instructions ?? ''))
 
 console.log('\n  what it offers')
 const list = await rpc('tools/list', {})
 const tools = list.result?.tools ?? []
 const names = tools.map((t) => t.name).sort()
-ok('four tools, film, motion, open and studio', names.join(',') === 'film,motion,open,studio', names.join(','))
+ok('five tools, film, inspect, motion, open and studio', names.join(',') === 'film,inspect,motion,open,studio', names.join(','))
 ok('every one has a description an agent can act on',
   tools.every((t) => (t.description ?? '').length > 80))
 ok('every one has an object schema', tools.every((t) => t.inputSchema?.type === 'object'))
@@ -106,6 +110,11 @@ ok('film requires the url, since a video of nowhere is not a call',
   (tools.find((t) => t.name === 'film')?.inputSchema?.required ?? []).includes('url'))
 ok('open requires a target, since it has to know what to open',
   (tools.find((t) => t.name === 'open')?.inputSchema?.required ?? []).includes('target'))
+ok('inspect requires the url, and film accepts pick in the person\'s words',
+  (tools.find((t) => t.name === 'inspect')?.inputSchema?.required ?? []).includes('url')
+  && !!tools.find((t) => t.name === 'film')?.inputSchema?.properties?.pick)
+const noUrl = await callTool('inspect', {})
+ok('inspect without a url says what it cannot do and what to do next', noUrl.isError && /^Cannot/.test(noUrl.text) && /Next:/.test(noUrl.text), noUrl.text.slice(0, 70))
 
 /* ── refusals come back as content, not as transport faults ──────────────────────────────────── */
 console.log('\n  when it is asked for something it cannot do')

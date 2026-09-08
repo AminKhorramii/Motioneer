@@ -24,9 +24,17 @@ const port = Number(process.env.MOTIONEER_PORT || 4397), at = `http://localhost:
 const temp = await mkdtemp(path.join(tmpdir(), 'motioneer-film-'))
 await mkdir(path.join(temp, '.studio'), { recursive: true })
 
+const prompts = []
 const model = createServer(async (req, res) => {
   let body = ''; for await (const b of req) body += b
   const prompt = JSON.parse(body).messages.at(-1).content
+  prompts.push(prompt)
+  if (/"opening"/.test(prompt)) {
+    // the plan: the second and first candidates, words taken from the page, a direction for each
+    const plan = { indices: [1, 0], product: 'a board for shipping teams', opening: 'Ship it with confidence', closing: 'Get started today', directions: { '1': 'the heading lands, then the button settles last', '0': 'the headline rises as one line' } }
+    res.writeHead(200, { 'content-type': 'text/event-stream' })
+    return res.end('data: ' + JSON.stringify({ choices: [{ delta: { content: JSON.stringify(plan) } }] }) + '\n\ndata: [DONE]\n\n')
+  }
   const kind = /Treatment: bold/.test(prompt) ? 'bold' : /Treatment: subtle/.test(prompt) ? 'subtle' : 'expressive'
   const css = '@media (prefers-reduced-motion: no-preference){[data-mn] > *{animation:rise 900ms ease-out both}'
     + '[data-mn] > :nth-child(2){animation-delay:80ms}@keyframes rise{from{transform:translateY(14px);opacity:0}to{transform:none;opacity:1}}}'
@@ -64,10 +72,18 @@ try {
   const steps = []
   const before = await (await fetch(`${at}/__motioneer/editor-config`)).json()
   assert.equal(before.source, null, 'the studio should start aimed at nothing, so the aim is what is being proved')
-  const result = await autofilm({ at, url: siteAt, seconds: 8, look: 'subtle', max: 2,
-    choose: async (cands) => { assert.ok(cands.length >= 3, 'the page should offer several candidates'); return cands.slice(0, 2).map((c) => c.i) },
-    onStep: (m) => steps.push(m) })
+  const result = await autofilm({ at, url: siteAt, seconds: 8, look: 'subtle', max: 2, pick: 'the card and the headline', onStep: (m) => steps.push(m) })
   assert.equal(result.captured, 2, 'both chosen elements should be captured')
+  assert.ok(result.byModel, 'the plan should have come from the model through the studio, not the fallback')
+  assert.equal(result.opening, 'Ship it with confidence', 'the opening title should be the model\'s words')
+  const planPrompt = prompts.find((p) => /"opening"/.test(p))
+  assert.ok(planPrompt && /the card and the headline/.test(planPrompt), 'the person\'s pick should reach the model')
+  assert.ok(planPrompt && /heading in hero/.test(planPrompt), 'candidates should be described by role and section')
+  assert.ok(prompts.some((p) => /settles last|rises as one line/.test(p)), 'the model\'s direction should reach the motion prompt')
+  const saved = await (await fetch(`${at}/__motioneer/projects/${result.projectId}`)).json()
+  const titles = saved.tracks.filter((t) => t.kind === 'title').map((t) => t.text)
+  assert.deepEqual(titles, ['Ship it with confidence', 'Get started today'], 'both title tracks should carry the model\'s words')
+  console.log('ok: the model planned it: chose by the person\'s pick, wrote the titles, and directed each motion')
   const buf = Buffer.from(await (await fetch(result.url)).arrayBuffer())
   assert.ok(buf.length > 20000, `the film should be a real mp4, got ${buf.length} bytes`)
   assert.equal(buf.slice(4, 8).toString(), 'ftyp', 'the file should start with an mp4 box')

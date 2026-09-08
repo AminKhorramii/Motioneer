@@ -2806,6 +2806,33 @@ anywhere on the studio. Nothing is installed and nothing leaves this machine.</p
     if (url.pathname === '/__motioneer/model' && req.method === 'GET') {
       return json(res, { providers: PROVIDERS, current: publicly(MODEL), canCli: CAN_CLI })
     }
+    /**
+     * Ask the configured model a question that is not a motion.
+     *
+     * The film tool needs the model for judgement rather than css: which elements to film, what
+     * the product is, what the titles should say, how each motion should behave. Routing that
+     * through here means it works with whichever provider the person chose, instead of only the
+     * claude command, and it reuses the same key handling and fallback the motion calls get.
+     * Local only, small, and json when asked, so a reply that is prose comes back as an error
+     * rather than as something the caller has to parse.
+     */
+    if (url.pathname === '/__motioneer/ask' && req.method === 'POST') {
+      const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d; if (b.length > 60_000) req.destroy() }); req.on('end', () => ok(b || '{}')) }))
+      const system = String(body.system || 'Answer plainly.').slice(0, 4000), prompt = String(body.prompt || '').slice(0, 40_000)
+      if (!prompt.trim()) return json(res, { error: 'ask needs a prompt' }, 400)
+      let last = 'no reply'
+      for (let n = 0; n < 2; n++) {
+        const reply = await askProvider(system, prompt, MODEL, { callMs: CALL_MS, thinking: THINK, env: CLEAN_ENV, maxTokens: 2000 })
+          .catch((e) => ({ error: String(e && e.message ? e.message : e).slice(0, 200) }))
+        if (reply && reply.error) { last = reply.error; continue }
+        const text = typeof reply === 'string' ? reply : (reply && reply.text) || ''
+        if (!body.json) return json(res, { text })
+        const raw = grabJson(text)
+        if (raw) return json(res, { json: raw })
+        last = 'the reply was not json'
+      }
+      return json(res, { error: last }, 502)
+    }
     if (url.pathname === '/__motioneer/model' && req.method === 'POST') {
       const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d }); req.on('end', () => ok(b)) }))
       const next = {
