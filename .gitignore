@@ -17,3 +17,6 @@ dist-core/
 motioneer-*.tgz
 
 dist-editor/
+
+# films the film tool saves beside the work; a render is output, not source
+motioneer-film-*.mp4
