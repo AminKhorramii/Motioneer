@@ -18,10 +18,15 @@ npx motioneer localhost:3000
 Everything below talks to that port. The prefix `/__motioneer/` keeps the studio's own routes
 apart from the proxied site's.
 
-| Step | How an agent does it now |
+The whole loop is now one MCP tool. `film` takes a url and returns the path to a rendered MP4,
+choosing what to film with the model and cutting and rendering with no clicks. The steps below
+are what it does inside, and what an agent can still drive one at a time when it wants control.
+
+| Step | How an agent does it |
 | --- | --- |
-| Open a site | `POST /__motioneer/target` with `{ "url": "…" }`, or start the studio on it |
-| Capture an element | needs a browser and a hand: the picker in the editor, or the bookmarklet on a signed in page |
+| The whole thing | `film` MCP tool with `{ url, seconds?, look?, count? }` returns an MP4 path |
+| Open a site | `POST /__motioneer/target` with `{ "url": "…" }`, or the `studio` tool |
+| Capture an element | the `film` tool does it headless; by hand it is the picker or the bookmarklet |
 | Write three motions | `POST /__motioneer/generate` with the captured subject, a brief and a treatment |
 | Keep one | edit the project: set `saved` on the motion, `PUT /__motioneer/projects/:id` |
 | Cut a film | edit the project's `tracks`, or press "Create first cut" in the editor |
@@ -59,40 +64,44 @@ state on `GET`. A render draws every frame of the saved revision in a real brows
 them locally, which is why it takes about a minute for fifteen seconds of film and why the film
 matches the preview.
 
-## The two gaps
+## How the film tool closes the loop
 
-**Capture has no route.** Picking reads the live page through a browser, freezes its images and
-fonts, and trims the stylesheet to what the element uses. The MCP `motion` tool takes markup a
-person already has, and the studio's picker takes a click, but nothing takes a selector and a
-url. That is the step that would let an agent go from "the pricing card on my site" to a subject
-without anyone touching a mouse. Playwright is already a dependency, and the picker's capture
-code already runs inside the proxied page, so the route is a matter of driving the same code from
-a headless browser: open the proxy, find the selector, run the capture, return the subject.
-
-**The film has no words.** A first cut places the kept motions a beat apart with an opening and
-a closing title, but the titles are placeholders. An agent that knows what the product does can
-write them, and the project document accepts any text on a title track, so this is a prompt away
-rather than a feature away.
-
-## What an agent conversation looks like once both close
+The `film` tool drives the real editor in a headless browser rather than reimplementing any of
+it, so capture, the gates, the first cut and the render are the same code a person uses by hand.
+The one judgement it makes on its own is what to film: it tags the visible elements of the page,
+hands that list to the model, and films whichever the model names. Every selector it clicks is
+one it wrote onto the page, so a chosen element always resolves. It needs the local renderer,
+which it installs on first use, because it needs the renderer to make the file at all.
 
 ```
-> make a short film of the pricing page on localhost:3000
+> I want a fast motion video from linear.app
 
-Opening localhost:3000. Capturing the pricing card, the plan toggle and the footer.
-Writing three motions for each and keeping the expressive ones.
-Cutting fifteen seconds: opening title, the three cards a beat apart, a closing line.
-Rendering. The film is at ./motioneer/pricing.mp4, and the editor is open if you want to change it.
+Opening linear.app and reading its elements. Filming the hero headline, a feature card and an image.
+Writing a subtle motion for each and keeping them. Cutting sixteen seconds with an opening and a closing title.
+Rendering. The film is at ./motioneer-film-2026-09-08-10-45-02.mp4, and the studio is open if you want to change it.
 ```
 
-Every sentence in that reply maps to a route above. The studio stays open at the end on purpose,
-because a film nobody can adjust is a film that gets re-rendered from scratch for every note.
+The studio stays open at the end on purpose, because a film nobody can adjust is a film that gets
+re-rendered from scratch for every note.
+
+## What still needs a person
+
+**A signed in page.** Capture reads the live page through the proxy, and an app that authenticates
+against its own api on another host cannot be proxied. For those the bookmarklet still picks from
+the browser the person is already signed into, and the `film` tool cannot reach them.
+
+**Model choice across providers.** The `film` tool asks the model which elements to film through
+the Claude command line, the shipped default. With an api provider configured instead, it falls
+back to a prominence heuristic rather than a model choice, which is worth closing by routing the
+question through the studio's configured provider.
 
 ## Where the code is
 
 - `tools/editor/routes.mjs` serves every route in the table and nothing else.
 - `tools/editor/render.mjs` owns the renderer, its install and its jobs.
 - `tools/studio.mjs` owns the proxy, the picker, `target` and `generate`.
-- `mcp/index.mjs` is the server an agent talks to; its `studio` tool opens the room and its
-  `motion` tool writes a stylesheet for markup you already have.
+- `mcp/index.mjs` is the server an agent talks to; its `film` tool makes the whole video, its
+  `studio` tool opens the room, and its `motion` tool writes a stylesheet for markup you have.
+- `tools/editor/autofilm.mjs` is the headless driver the `film` tool runs, and `verify/film.mjs`
+  proves it from a url to an MP4 with a fake site and model.
 - `src/editor/project.ts` is the project document, and the only schema an agent needs.

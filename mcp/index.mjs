@@ -18,7 +18,7 @@
  */
 
 import { spawn } from 'node:child_process'
-import { readFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import path from 'node:path'
 
@@ -110,6 +110,30 @@ const TOOLS = [
       required: ['html'],
     },
   },
+  {
+    name: 'film',
+    description:
+      'Make a short motion film of a running site with no clicks, and return the path to an MP4. '
+      + 'Use this when somebody wants a video, a demo reel or a motion film of a site or dev server '
+      + 'and is happy to let the tool choose what to film and edit it afterwards. It opens the site, '
+      + 'reads its elements, picks a few worth filming, writes one motion for each through the same '
+      + 'gates the studio uses, cuts them into a titled sequence and renders it locally. It needs the '
+      + 'local renderer, which it installs on first use, so the first run on a machine takes an extra '
+      + 'minute. It leaves the studio open so the person can change the cut. Prefer the studio tool '
+      + 'when they would rather pick and compare by hand, and the motion tool when they want CSS for '
+      + 'markup they already have rather than a video.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'The running site or dev server to film, like http://localhost:3000.' },
+        dir: { type: 'string', description: 'Absolute project path. The MP4 is saved here; pass it so the file lands where the person is working.' },
+        seconds: { type: 'number', description: 'How long the film should be. About 20 by default.' },
+        look: { type: 'string', enum: ['subtle', 'expressive', 'bold'], description: 'The single treatment written for each element. Subtle by default, which reads as fast and calm.' },
+        count: { type: 'number', description: 'How many elements to film, 1 to 5. Three by default.' },
+      },
+      required: ['url'],
+    },
+  },
 ]
 
 /**
@@ -123,20 +147,15 @@ const TOOLS = [
  * failed to start looks exactly like one that started, right up until the person opens the address
  * and finds nothing there, and by then the agent has already said it worked.
  */
-async function studio({ url, dir }) {
-  const port = Number(process.env.MOTIONEER_PORT || 4321)
-  const at = `http://localhost:${port}`
-  const answering = async () => {
-    try {
-      const r = await fetch(`${at}/__motioneer/model`, { signal: AbortSignal.timeout(700) })
-      return r.ok
-    } catch { return false }
-  }
-  if (await answering()) {
-    return `A motion studio is already open at ${at}. Tell them to use that one rather than `
-      + 'opening another, and if they want it pointed somewhere else there is an address bar in '
-      + 'the top left of it.'
-  }
+const STUDIO_AT = () => `http://localhost:${Number(process.env.MOTIONEER_PORT || 4321)}`
+const answering = async (at) => {
+  try { return (await fetch(`${at}/__motioneer/model`, { signal: AbortSignal.timeout(700) })).ok }
+  catch { return false }
+}
+
+/** Start a studio aimed at url/dir and wait until it actually answers. Returns whether it is up. */
+async function spawnStudio({ url, dir, at }) {
+  if (await answering(at)) return true
   const args = [path.join(ROOT, 'tools', 'studio.mjs')]
   if (url) args.push('--app', String(url))
   else if (dir) args.push(String(dir))
@@ -147,18 +166,92 @@ async function studio({ url, dir }) {
     child.on('error', () => done(false))
     child.on('spawn', () => { child.unref(); done(true) })
   })
-  if (!started) return 'The studio could not be started from here. `npm run studio` in the project will do it.'
+  if (!started) return false
   for (let n = 0; n < 40; n++) {
-    if (await answering()) {
-      return `The motion studio is open at ${at}.${url ? ` It is aimed at ${url}.` : ''} Tell them `
-        + 'to pick one or more elements and press Give it motion, and that several motions come '
-        + 'back to compare on one timeline. Choosing takes minutes, so do not wait on it: they can '
-        + 'save what they like from the studio itself.'
-    }
+    if (await answering(at)) return true
     await new Promise((r) => setTimeout(r, 250))
   }
-  return `The studio was started but has not answered at ${at} within ten seconds. Ask them to `
-    + 'check the terminal, or run `npm run studio` themselves.'
+  return false
+}
+
+async function studio({ url, dir }) {
+  const at = STUDIO_AT()
+  if (await answering(at)) {
+    return `A motion studio is already open at ${at}. Tell them to use that one rather than `
+      + 'opening another, and if they want it pointed somewhere else there is an address bar in '
+      + 'the top left of it.'
+  }
+  const up = await spawnStudio({ url, dir, at })
+  if (!up) {
+    return `The studio was started but has not answered at ${at} within ten seconds, or could not `
+      + 'be started at all. Ask them to run `npm run studio` themselves.'
+  }
+  return `The motion studio is open at ${at}.${url ? ` It is aimed at ${url}.` : ''} Tell them `
+    + 'to pick one or more elements and press Give it motion, and that several motions come '
+    + 'back to compare on one timeline. Choosing takes minutes, so do not wait on it: they can '
+    + 'save what they like from the studio itself.'
+}
+
+/**
+ * The whole loop, from a running site to a rendered film, with nobody clicking.
+ *
+ * It reuses the room the person would use by hand: the studio proxies the site, the editor runs
+ * headless against it and captures, generates and cuts through the same code and the same gates,
+ * and the renderer draws the frames. The one judgement this tool makes on its own is what to film,
+ * and it makes it by handing the model the elements already on the page and filming whichever it
+ * names, so a choice can never point at something that is not there.
+ *
+ * Rendering needs the local renderer, which it also needs to make the file at all, so this asks for
+ * it to be installed rather than pretending a film happened. The studio is left open, because the
+ * first thing anybody wants after seeing a first cut is to change one thing about it.
+ */
+async function film({ url, dir, seconds, look, count }) {
+  if (!url) throw new Error('film needs a url, a running site or dev server like http://localhost:3000.')
+  const at = STUDIO_AT()
+  const up = await spawnStudio({ url, dir, at })
+  if (!up) throw new Error(`Could not open a studio at ${at}. Run \`npm run studio\` and try again.`)
+
+  // the renderer is required to make the file; install it and wait rather than reporting a film that did not render
+  let ready = await (await fetch(`${at}/__motioneer/renderer`)).json()
+  if (ready.state !== 'ready') {
+    await fetch(`${at}/__motioneer/renderer`, { method: 'POST' })
+    for (let n = 0; n < 240 && ready.state !== 'ready'; n++) {
+      await new Promise((r) => setTimeout(r, 2500))
+      ready = await (await fetch(`${at}/__motioneer/renderer`)).json()
+      if (ready.state === 'error') throw new Error(`The renderer could not be set up: ${ready.message}`)
+    }
+    if (ready.state !== 'ready') throw new Error('The renderer is still installing. Give it a minute and ask again.')
+  }
+
+  const { autofilm } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'autofilm.mjs')).href)
+  const core = await import(pathToFileURL(path.join(ROOT, 'dist-core', 'core.js')).href)
+  const { runClaude } = await import(pathToFileURL(path.join(ROOT, 'shared', 'cli.mjs')).href)
+  const max = Math.max(1, Math.min(5, Number(count) || 3))
+
+  /** The model names which of the real, on-page elements are worth filming; a heuristic covers the day it cannot. */
+  const choose = async (cands) => {
+    const list = cands.map((c) => `${c.i}: <${c.tag}> ${c.w}x${c.h} "${c.text}"`).join('\n')
+    const prompt = `These are the elements on a landing page, each with an index, tag, size and text:\n${list}\n\n`
+      + `Choose the ${max} that would make the best short motion film of this product: prefer the hero `
+      + `headline, a primary button or a feature card, and one strong image. Avoid tiny or repeated `
+      + `elements. Reply with only a JSON array of the chosen indices, most important first, like [3,7,1].`
+    const reply = await runClaude('You choose which elements to film. Reply with a JSON array of indices only.', prompt).catch(() => null)
+    const raw = reply ? core.grabJson(typeof reply === 'string' ? reply : reply.text ?? '') : null
+    const chosen = Array.isArray(raw) ? raw : Array.isArray(raw?.indices) ? raw.indices : null
+    if (chosen && chosen.length) return chosen.map(Number).filter((n) => Number.isInteger(n))
+    // prominence: near the top, largest area, headings and cards ahead of bare images
+    return [...cands].sort((a, b) => (b.w * b.h) / (b.top + 400) - (a.w * a.h) / (a.top + 400)).slice(0, max).map((c) => c.i)
+  }
+
+  const steps = []
+  const result = await autofilm({ at, choose, seconds: Number(seconds) || 20, look: look || 'subtle', max, onStep: (m) => steps.push(m) })
+  const buf = Buffer.from(await (await fetch(result.url)).arrayBuffer())
+  const outDir = dir && path.isAbsolute(dir) ? dir : process.cwd()
+  const file = path.join(outDir, `motioneer-film-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.mp4`)
+  await writeFile(file, buf)
+  return `Filmed ${result.captured} element${result.captured === 1 ? '' : 's'} from ${url} into a ${Math.round(result.seconds)} second film, `
+    + `saved to ${file} (${(buf.length / 1e6).toFixed(1)} MB). The studio is still open at ${at} if they want to change the cut, `
+    + `swap a motion, or add a title. What it did: ${steps.join(' ')}`
 }
 
 /**
@@ -313,6 +406,7 @@ async function motion(args) {
 async function call(name, args, id) {
   if (name === 'studio') return ok(id, await studio(args ?? {}))
   if (name === 'motion') return ok(id, await motion(args ?? {}))
+  if (name === 'film') return ok(id, await film(args ?? {}))
   /**
    * A name nobody serves is answered rather than ignored.
    *

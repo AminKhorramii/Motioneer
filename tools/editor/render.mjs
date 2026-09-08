@@ -8,6 +8,15 @@ import { pathToFileURL } from 'node:url'
 import { randomUUID } from 'node:crypto'
 import { compositionDocument } from '../../dist-core/core.js'
 const VERSIONS = { playwright: '1.62.1', 'ffmpeg-static': '5.2.0' }
+/** The one place that knows where the renderer's browser lives, so the autofilm driver borrows it rather than adding a second copy of playwright. Returns null when the renderer is not installed yet. */
+export async function loadChromium() {
+  const mod = path.join(CACHE, 'node_modules/playwright/index.mjs')
+  if (!existsSync(mod)) return null
+  process.env.PLAYWRIGHT_BROWSERS_PATH = path.join(CACHE, 'browsers')
+  const { chromium } = await import(pathToFileURL(mod).href)
+  if (!existsSync(chromium.executablePath())) return null
+  return chromium
+}
 const CACHE = process.env.MOTIONEER_RENDER_CACHE || path.join(homedir(), '.cache', 'motioneer', 'renderer-1')
 function command(bin,args,{signal,env}={}) {
   return new Promise((resolve,reject) => { const child=spawn(bin,args,{env:{...process.env,...env},signal,stdio:['ignore','pipe','pipe']});let output='';

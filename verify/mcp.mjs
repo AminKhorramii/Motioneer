@@ -92,7 +92,7 @@ console.log('\n  what it offers')
 const list = await rpc('tools/list', {})
 const tools = list.result?.tools ?? []
 const names = tools.map((t) => t.name).sort()
-ok('two tools, studio and motion', names.join(',') === 'motion,studio', names.join(','))
+ok('three tools, film, motion and studio', names.join(',') === 'film,motion,studio', names.join(','))
 ok('every one has a description an agent can act on',
   tools.every((t) => (t.description ?? '').length > 80))
 ok('every one has an object schema', tools.every((t) => t.inputSchema?.type === 'object'))
@@ -100,6 +100,8 @@ ok('motion requires the markup, since it cannot be guessed',
   (tools.find((t) => t.name === 'motion')?.inputSchema?.required ?? []).includes('html'))
 ok('studio requires nothing, because opening it is the whole call',
   (tools.find((t) => t.name === 'studio')?.inputSchema?.required ?? []).length === 0)
+ok('film requires the url, since a video of nowhere is not a call',
+  (tools.find((t) => t.name === 'film')?.inputSchema?.required ?? []).includes('url'))
 
 /* ── refusals come back as content, not as transport faults ──────────────────────────────────── */
 console.log('\n  when it is asked for something it cannot do')
