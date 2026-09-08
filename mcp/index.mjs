@@ -40,6 +40,31 @@ const send = (msg) => process.stdout.write(JSON.stringify(msg) + '\n')
 const ok = (id, text) => send({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text }] } })
 const fail = (id, text) => send({ jsonrpc: '2.0', id, result: { isError: true, content: [{ type: 'text', text }] } })
 
+
+/**
+ * What the agent is told at connect time, which is where a server's etiquette lives.
+ *
+ * Tool descriptions say what each tool does; this says how to behave around them: which one to
+ * reach for from what a person says, what to tell them while a film renders, and how a job ends.
+ * The ending is deliberate. A file path in a wall of text is a dead end, so every finished film
+ * closes with three choices the person can act on, and the open tool is what acts on them.
+ */
+const INSTRUCTIONS = `Motioneer makes motion for a person's own product. Choose by what they want to hold at the end:
+- film: they want a video, a demo, a reel, or say "motion video". One call does everything and returns an MP4 path. Always pass dir as the absolute path of their project so the file lands beside their work. "Fast" or "quick" means look "subtle" and about 12 seconds; "demo" or "showcase" means look "expressive" and about 20.
+- studio: they want to pick elements and compare motions by hand, or say "studio". It returns as soon as the room is open; do not wait or retry, tell them where it is.
+- motion: they want CSS for markup they already have, with nothing to look at first.
+- open: after a film, or whenever they ask to see the editor or a file.
+
+While film runs it can take a minute or two: it opens the site, captures, writes motions, cuts and renders. Say that once, then wait for the result rather than polling or calling it again.
+
+When film returns, relay what it filmed and where the file is in one or two sentences, then offer exactly these three choices, as selectable options if you can present options, otherwise as a short list:
+1. Open the editor, to change the cut, swap a motion or add a title.
+2. Open the video.
+3. Continue chatting.
+Call open with target "editor" or "video" for the first two, then stop and let them look. For the third, ask what they would like next.
+
+A site that needs a sign in cannot be proxied; if capture finds nothing, say so and point them to the bookmarklet in the studio rather than retrying.`
+
 const TOOLS = [
   {
     name: 'studio',
@@ -132,6 +157,22 @@ const TOOLS = [
       required: ['url'],
     },
   },
+  {
+    name: 'open',
+    description:
+      'Open something Motioneer made, on the person\'s machine: the editor in their browser, a '
+      + 'rendered video in their player, or the folder a file sits in. Use it after film when they '
+      + 'choose to open the editor or the video, or whenever they ask to see one. It launches the '
+      + 'system opener and returns at once.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        target: { type: 'string', enum: ['editor', 'video', 'folder'], description: 'What to open. editor is the studio in the browser; video and folder need path.' },
+        path: { type: 'string', description: 'Absolute path of the video, for video and folder.' },
+      },
+      required: ['target'],
+    },
+  },
 ]
 
 /**
@@ -203,6 +244,32 @@ async function studio({ url, dir }) {
  * it to be installed rather than pretending a film happened. The studio is left open, because the
  * first thing anybody wants after seeing a first cut is to change one thing about it.
  */
+/**
+ * Open the editor, a video, or its folder with whatever the system uses, and say what was opened.
+ *
+ * Detached and unreferenced so the server never waits on a browser or a player. MOTIONEER_NO_OPEN
+ * reports instead of launching, the same switch the studio honours, so suites can drive this path
+ * without windows appearing on the machine that runs them.
+ */
+async function open({ target, path: file }) {
+  const at = STUDIO_AT()
+  let what, where
+  if (target === 'editor') {
+    if (!(await answering(at))) throw new Error(`No studio is open at ${at}. Run film or studio first.`)
+    what = 'the editor'; where = `${at}/__motioneer/editor/`
+  } else if (target === 'video' || target === 'folder') {
+    if (!file || !path.isAbsolute(String(file))) throw new Error(`open ${target} needs the absolute path of the video.`)
+    const there = await readFile(file).then(() => true, () => false)
+    if (!there) throw new Error(`There is no file at ${file}.`)
+    what = target === 'video' ? 'the video' : 'its folder'; where = target === 'video' ? String(file) : path.dirname(String(file))
+  } else throw new Error('open needs a target of editor, video or folder.')
+  if (process.env.MOTIONEER_NO_OPEN) return `Would open ${what} at ${where}.`
+  const cmd = process.platform === 'darwin' ? ['open', [where]] : process.platform === 'win32' ? ['cmd', ['/c', 'start', '', where]] : ['xdg-open', [where]]
+  const child = spawn(cmd[0], cmd[1], { stdio: 'ignore', detached: true })
+  child.on('error', () => {}); child.unref()
+  return `Opened ${what} at ${where}.`
+}
+
 async function film({ url, dir, seconds, look, count }) {
   if (!url) throw new Error('film needs a url, a running site or dev server like http://localhost:3000.')
   const at = STUDIO_AT()
@@ -248,8 +315,9 @@ async function film({ url, dir, seconds, look, count }) {
   const file = path.join(outDir, `motioneer-film-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.mp4`)
   await writeFile(file, buf)
   return `Filmed ${result.captured} element${result.captured === 1 ? '' : 's'} from ${url} into a ${Math.round(result.seconds)} second film, `
-    + `saved to ${file} (${(buf.length / 1e6).toFixed(1)} MB). The studio is still open at ${at} if they want to change the cut, `
-    + `swap a motion, or add a title. What it did: ${steps.join(' ')}`
+    + `saved to ${file} (${(buf.length / 1e6).toFixed(1)} MB). The studio is still open at ${at}. What it did: ${steps.join(' ')}\n\n`
+    + `Now offer the person these three choices, as options if you can: open the editor, open the video, or continue chatting. `
+    + `For the first two call open with target "editor" or target "video" and path "${file}", then stop so they can look.`
 }
 
 /**
@@ -405,6 +473,7 @@ async function call(name, args, id) {
   if (name === 'studio') return ok(id, await studio(args ?? {}))
   if (name === 'motion') return ok(id, await motion(args ?? {}))
   if (name === 'film') return ok(id, await film(args ?? {}))
+  if (name === 'open') return ok(id, await open(args ?? {}))
   /**
    * A name nobody serves is answered rather than ignored.
    *
@@ -457,6 +526,7 @@ process.stdin.on('data', async (chunk) => {
           protocolVersion: msg.params?.protocolVersion ?? '2024-11-05',
           capabilities: { tools: {} },
           serverInfo: { name: 'motioneer', version: VERSION },
+          instructions: INSTRUCTIONS,
         },
       })
     } else if (msg.method === 'tools/list') {

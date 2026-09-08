@@ -87,12 +87,14 @@ const hello = await rpc('initialize', {
 })
 ok('it answers initialize', !!hello.result, JSON.stringify(hello.result?.serverInfo ?? {}))
 ok('and names itself with a version', /\d+\.\d+/.test(hello.result?.serverInfo?.version ?? ''))
+ok('and hands the agent its etiquette, including how a film ends',
+  /open the editor/i.test(hello.result?.instructions ?? '') && /continue chatting/i.test(hello.result?.instructions ?? ''))
 
 console.log('\n  what it offers')
 const list = await rpc('tools/list', {})
 const tools = list.result?.tools ?? []
 const names = tools.map((t) => t.name).sort()
-ok('three tools, film, motion and studio', names.join(',') === 'film,motion,studio', names.join(','))
+ok('four tools, film, motion, open and studio', names.join(',') === 'film,motion,open,studio', names.join(','))
 ok('every one has a description an agent can act on',
   tools.every((t) => (t.description ?? '').length > 80))
 ok('every one has an object schema', tools.every((t) => t.inputSchema?.type === 'object'))
@@ -102,12 +104,18 @@ ok('studio requires nothing, because opening it is the whole call',
   (tools.find((t) => t.name === 'studio')?.inputSchema?.required ?? []).length === 0)
 ok('film requires the url, since a video of nowhere is not a call',
   (tools.find((t) => t.name === 'film')?.inputSchema?.required ?? []).includes('url'))
+ok('open requires a target, since it has to know what to open',
+  (tools.find((t) => t.name === 'open')?.inputSchema?.required ?? []).includes('target'))
 
 /* ── refusals come back as content, not as transport faults ──────────────────────────────────── */
 console.log('\n  when it is asked for something it cannot do')
 const nothing = await callTool('motion', { html: '   ' })
 ok('empty markup is refused', nothing.isError, nothing.text.slice(0, 60))
 ok('and the refusal says what was missing', /markup/i.test(nothing.text))
+const nowhere = await callTool('open', { target: 'video', path: '/nowhere/at/all.mp4' })
+ok('open refuses a file that is not there rather than launching anything', nowhere.isError && /no file/i.test(nowhere.text), nowhere.text.slice(0, 60))
+const badTarget = await callTool('open', { target: 'desk' })
+ok('and a target it does not know', badTarget.isError, badTarget.text.slice(0, 60))
 const unknown = await rpc('tools/call', { name: 'nosuchtool', arguments: {} })
 ok('an unknown tool is an error rather than a crash',
   !!unknown.result?.isError || !!unknown.error)
@@ -124,6 +132,18 @@ ok('and something is really serving there', answering)
 const second = await callTool('studio', {})
 ok('a second call does not open a second studio', /already open/i.test(second.text),
   second.text.slice(0, 56))
+
+/* ── open, which is how a finished film's three choices get acted on ─────────────────────────── */
+console.log('\n  opening what was made')
+const editor = await callTool('open', { target: 'editor' })
+ok('the editor opens at the studio that is running', !editor.isError && editor.text.includes(`${PORT}/__motioneer/editor`), editor.text.slice(0, 70))
+const clip = path.join(mkdtempSync(path.join(tmpdir(), 'motioneer-open-')), 'film.mp4')
+import('node:fs').then((fs) => fs.writeFileSync(clip, 'x'))
+await new Promise((r) => setTimeout(r, 50))
+const video = await callTool('open', { target: 'video', path: clip })
+ok('a video that exists is opened by path', !video.isError && video.text.includes(clip), video.text.slice(0, 70))
+const folder = await callTool('open', { target: 'folder', path: clip })
+ok('and its folder is the directory, not the file', !folder.isError && folder.text.includes(path.dirname(clip)) && !folder.text.endsWith('film.mp4.'), folder.text.slice(0, 70))
 
 /**
  * What the published package actually gives somebody, which is not the same as what the repo does.

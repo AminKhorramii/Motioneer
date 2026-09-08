@@ -84,6 +84,22 @@ Rendering. The film is at ./motioneer-film-2026-09-08-10-45-02.mp4, and the stud
 The studio stays open at the end on purpose, because a film nobody can adjust is a film that gets
 re-rendered from scratch for every note.
 
+## How a job ends
+
+A file path in a wall of text is a dead end, so the server tells the agent at connect time, through
+its MCP instructions, how every film closes: relay what was filmed and where it is, then offer three
+choices, as selectable options where the client can draw them.
+
+1. Open the editor, to change the cut, swap a motion or add a title.
+2. Open the video.
+3. Continue chatting.
+
+The first two call the `open` tool with `{ target: "editor" }` or `{ target: "video", path }`, which
+launches the system opener and returns at once. `folder` opens the directory the file sits in. The
+same instructions tell the agent which tool to reach for from what a person says: "fast" means a
+subtle look and about twelve seconds, "demo" means expressive and about twenty, and "studio" means
+open the room and hand it over rather than wait.
+
 ## What still needs a person
 
 **A signed in page.** Capture reads the live page through the proxy, and an app that authenticates
@@ -101,7 +117,8 @@ question through the studio's configured provider.
 - `tools/editor/render.mjs` owns the renderer, its install and its jobs.
 - `tools/studio.mjs` owns the proxy, the picker, `target` and `generate`.
 - `mcp/index.mjs` is the server an agent talks to; its `film` tool makes the whole video, its
-  `studio` tool opens the room, and its `motion` tool writes a stylesheet for markup you have.
+  `studio` tool opens the room, its `motion` tool writes a stylesheet for markup you have, and
+  its `open` tool acts on the choices a finished film offers. Its instructions carry the etiquette.
 - `tools/editor/autofilm.mjs` is the headless driver the `film` tool runs, and `verify/film.mjs`
   proves it from a url to an MP4 with a fake site and model.
 - `src/editor/project.ts` is the project document, and the only schema an agent needs.

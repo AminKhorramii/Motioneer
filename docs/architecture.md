@@ -26,7 +26,7 @@ src/                   what the studio imports through a built bundle, because n
   core.ts              the barrel, exporting exactly what runs outside a browser
 
 mcp/
-  index.mjs            Motioneer as a tool an agent calls: film makes the video, studio opens the room, motion skips it
+  index.mjs            Motioneer as a tool an agent calls: film makes the video, studio opens the room, motion skips it, open shows what was made
 
 site/
   index.html           the landing page: one hero over a shader, in one file that loads nothing
