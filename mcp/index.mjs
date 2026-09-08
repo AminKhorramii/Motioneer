@@ -309,7 +309,7 @@ async function film({ url, dir, seconds, look, count }) {
   }
 
   const steps = []
-  const result = await autofilm({ at, choose, seconds: Number(seconds) || 20, look: look || 'subtle', max, onStep: (m) => steps.push(m) })
+  const result = await autofilm({ at, url, choose, seconds: Number(seconds) || 20, look: look || 'subtle', max, onStep: (m) => steps.push(m) })
   const buf = Buffer.from(await (await fetch(result.url)).arrayBuffer())
   const outDir = dir && path.isAbsolute(dir) ? dir : process.cwd()
   const file = path.join(outDir, `motioneer-film-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.mp4`)

@@ -51,7 +51,8 @@ await new Promise((r) => site.listen(0, '127.0.0.1', r))
 const siteAt = `http://127.0.0.1:${site.address().port}`
 
 await writeFile(path.join(temp, '.studio/model.json'), JSON.stringify({ provider: 'openai', base: modelAt + '/v1', model: 'fixture', key: 'fixture', chosen: true }))
-const studio = spawn(process.execPath, [path.join(root, 'tools', 'studio.mjs'), '--app', siteAt],
+// started on nothing on purpose: a studio left open on a folder is the state that once made a film time out
+const studio = spawn(process.execPath, [path.join(root, 'tools', 'studio.mjs')],
   { cwd: temp, env: { ...process.env, MOTIONEER_PORT: String(port), MOTIONEER_NO_OPEN: '1' }, stdio: ['ignore', 'pipe', 'pipe'] })
 let log = ''; studio.stdout.on('data', (b) => log += b); studio.stderr.on('data', (b) => log += b)
 
@@ -61,7 +62,9 @@ try {
   for (let i = 0; i < 120; i++) { const s = await (await fetch(`${at}/__motioneer/renderer`)).json(); if (s.state === 'ready') break; assert.notEqual(s.state, 'error', s.message); await new Promise((r) => setTimeout(r, 2000)) }
 
   const steps = []
-  const result = await autofilm({ at, seconds: 8, look: 'subtle', max: 2,
+  const before = await (await fetch(`${at}/__motioneer/editor-config`)).json()
+  assert.equal(before.source, null, 'the studio should start aimed at nothing, so the aim is what is being proved')
+  const result = await autofilm({ at, url: siteAt, seconds: 8, look: 'subtle', max: 2,
     choose: async (cands) => { assert.ok(cands.length >= 3, 'the page should offer several candidates'); return cands.slice(0, 2).map((c) => c.i) },
     onStep: (m) => steps.push(m) })
   assert.equal(result.captured, 2, 'both chosen elements should be captured')

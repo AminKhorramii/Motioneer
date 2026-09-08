@@ -67,9 +67,21 @@ async function capture(page, frame, cand) {
  * @param max       cap on how many elements to capture
  * @param onStep    (message) => void  progress, surfaced to the agent's caller
  */
-export async function autofilm({ at, choose, seconds = 20, look = 'subtle', max = 3, onStep = () => {} }) {
+export async function autofilm({ at, url, choose, seconds = 20, look = 'subtle', max = 3, onStep = () => {} }) {
   const chromium = await loadChromium()
   if (!chromium) throw new Error('The renderer is not installed. Open the studio once and set up the local renderer, then try again.')
+  /**
+   * Aim first, every time. A studio that is already up may be pointed at another site or at a
+   * folder, and reusing it as found is how a film of linear.app timed out waiting for a frame that
+   * was never going to show anything: the room was open, but on nothing. Aiming is cheap and idempotent.
+   */
+  if (url) {
+    const aimed = await fetch(`${at}/__motioneer/target`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url }) })
+      .then((r) => r.json()).catch((e) => ({ error: e.message }))
+    if (aimed.error) throw new Error(`The studio could not open ${url}: ${aimed.error}`)
+  }
+  const config = await fetch(`${at}/__motioneer/editor-config`).then((r) => r.json()).catch(() => ({}))
+  if (!config.source) throw new Error('The studio is not aimed at a site, so there is nothing to film. Pass a url.')
   // channel:'chromium' to use the full build the renderer installed, since it omits the headless shell
   const browser = await chromium.launch({ channel: 'chromium' })
   try {
@@ -77,7 +89,8 @@ export async function autofilm({ at, choose, seconds = 20, look = 'subtle', max 
     onStep('Opening the editor on the site.')
     await page.goto(at, { waitUntil: 'domcontentloaded' })
     const frame = page.frameLocator('iframe[title="Source page"]')
-    await frame.locator('body').waitFor({ timeout: 45000 })
+    try { await frame.locator('body').waitFor({ timeout: 45000 }) }
+    catch { throw new Error(`${config.source} did not render inside the studio in 45 seconds. Either it is slow to load, or it refuses to be proxied, which is what a site that signs in against its own api does; the bookmarklet in the studio picks from your own browser instead.`) }
     await page.waitForTimeout(4000)
 
     const cands = await candidates(frame)
