@@ -28,6 +28,7 @@ const paths: Record<string, string> = {
   'arrow-up': 'M12 19V5M5 12l7-7 7 7',
   'arrow-down': 'M12 5v14M5 12l7 7 7-7',
   'arrow-right': 'M5 12h14M12 5l7 7-7 7',
+  'arrow-left': 'M19 12H5M12 5l-7 7 7 7',
   crosshair: 'M12 3v4M12 17v4M3 12h4M17 12h4M12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12z',
   'skip-back': 'M18 5v14L8 12zM5 5v14',
   'skip-forward': 'M6 5v14l10-7zM19 5v14',
