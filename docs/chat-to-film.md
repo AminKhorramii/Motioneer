@@ -123,6 +123,32 @@ shot, not from reasoning about pages in the abstract, and each has a check in th
   part visible and moving from the first frame, and the proof counts shots still empty a third of
   a second in.
 
+## What forty landing pages taught
+
+The same loop over forty sites, `tools/film-lab.mjs` with a file of addresses, found the classes a
+single page never shows. Each is fixed in the driver and most are pinned in `verify/film.mjs`:
+
+- A page that hydrates on the client is scanned only once its text or images have arrived, and
+  one that throws the frame back to its own origin is loaded again with scripts refused.
+- Gates are lifted. slack.com hides everything under display none until a script confirms, and
+  nextjs.org keeps every section below its hero under a hidden attribute; when most headings sit
+  under hidden containers those containers are shown, and the page reads as thirty things, not three.
+- A row of equal blocks that each carry a heading is a row of cards whatever their class, and a
+  large link with an image is a card, not a button. anthropic.com's release banners were columns.
+- A capture that renders empty is left out before a motion is written for it, and a kept motion is
+  played once through the composition and looked at a third of the way in; one that starts empty is
+  refined once with the fault named, the proof's own rule.
+- A motion the studio refused is an answer, not a wait. The driver used to wait five minutes on the
+  pending card of every refused element, which read as a hang. The refusal now goes into the next
+  brief, since the same element asked again blind fails the same gate.
+- A capture on a heavy page takes seconds, so the pointer fallback fires only after a long wait,
+  and each element keeps the index of the subject that arrived for it. mongodb.com captures run a
+  megabyte each with their stylesheet and fonts, so the studio's body limit is against a runaway only.
+- A block page answers 200 and reads as a page of headings. replit.com's was filmed and verified
+  before the title was checked; a title that says blocked is refused as a bot check.
+- Bot checks that answer 403 or a challenge cannot be passed by a proxy: canva, lovable and
+  perplexity say so in one line and point at the bookmarklet.
+
 ## Scenes
 
 The plan speaks in scenes, not only in elements: an ordered list of shots, each with one or two
