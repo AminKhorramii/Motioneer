@@ -459,7 +459,14 @@ export async function autofilm({ at, url, pick = '', direction = '', plan = plan
     const captured = [], subjectAt = []
     for (const n of chosen.indices) {
       onStep(`Capturing ${name(cands.find((c) => c.i === n))}.`)
-      const at_ = await capture(page, frame, n, cands.find((c) => c.i === n)); if (at_ >= 0) { captured.push(n); subjectAt.push(at_); fate.set(n, 'captured') } else onStep('That one could not be captured, skipping it.')
+      const at_ = await capture(page, frame, n, cands.find((c) => c.i === n))
+      if (at_ >= 0) {
+        captured.push(n); subjectAt.push(at_); fate.set(n, 'captured')
+        // named after what it is rather than its tag, so a shot list and the editor's rail say "the image in the hero", not "div"
+        await page.locator('.subject-item').nth(at_).click().catch(() => {})
+        const field = page.getByLabel('Element name', { exact: true })
+        if (await field.count()) await field.fill(name(cands.find((c) => c.i === n)).slice(0, 60)).catch(() => {})
+      } else onStep('That one could not be captured, skipping it.')
       await label(page, 'Source').click().catch(() => {})
     }
     if (!captured.length) throw new Error(`Cannot film ${source}: none of the chosen elements could be captured. Next: ask for different elements with pick, or open the studio and pick by hand.`)

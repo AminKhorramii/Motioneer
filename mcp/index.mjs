@@ -16,7 +16,7 @@
  */
 
 import { spawn } from 'node:child_process'
-import { readFile, writeFile } from 'node:fs/promises'
+import { readFile, writeFile, stat } from 'node:fs/promises'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import path from 'node:path'
 
@@ -382,6 +382,7 @@ async function film({ url, dir, seconds, look, count, pick, pace, direction }) {
   const max = Math.max(1, Math.min(12, Number(count) || (wantPace === 'fast' ? 8 : wantPace === 'brisk' ? 5 : 3)))
   const result = await autofilm({ at, url, pick: String(pick || '').slice(0, 600), direction: String(direction || '').slice(0, 1400), seconds: wantSeconds, look: look || (wantPace === 'calm' ? 'subtle' : 'expressive'), pace: wantPace, max, onStep: (m) => steps.push(m) })
   const file = await keepFile(result, dir)
+  const buf = { length: (await stat(file)).size }
   const { proofLine } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'proof.mjs')).href)
   const verified = proofLine(result.proof)
   const structured = shape(result, file, wantPace)
