@@ -110,6 +110,10 @@ ok('film requires the url, since a video of nowhere is not a call',
   (tools.find((t) => t.name === 'film')?.inputSchema?.required ?? []).includes('url'))
 ok('open requires a target, since it has to know what to open',
   (tools.find((t) => t.name === 'open')?.inputSchema?.required ?? []).includes('target'))
+ok('film accepts a pace, since fast is a cut and not a look',
+  JSON.stringify(tools.find((t) => t.name === 'film')?.inputSchema?.properties?.pace?.enum ?? []) === '["calm","brisk","fast"]')
+ok('and the etiquette maps fast to the fast pace and asks for the measured line to be repeated',
+  /pace "fast"/.test(hello.result?.instructions ?? '') && /Verified/.test(hello.result?.instructions ?? ''))
 ok('inspect requires the url, and film accepts pick in the person\'s words',
   (tools.find((t) => t.name === 'inspect')?.inputSchema?.required ?? []).includes('url')
   && !!tools.find((t) => t.name === 'film')?.inputSchema?.properties?.pick)

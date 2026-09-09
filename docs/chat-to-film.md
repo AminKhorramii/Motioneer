@@ -25,7 +25,7 @@ are what it does inside, and what an agent can still drive one at a time when it
 | Step | How an agent does it |
 | --- | --- |
 | Look first | `inspect` MCP tool with `{ url }` lists what is worth filming, by role and section |
-| The whole thing | `film` MCP tool with `{ url, pick?, seconds?, look?, count? }` returns an MP4 path |
+| The whole thing | `film` MCP tool with `{ url, pace?, pick?, seconds?, look?, count? }` returns an MP4 path and a measured verdict |
 | Open a site | `POST /__motioneer/target` with `{ "url": "…" }`, or the `studio` tool |
 | Capture an element | the `film` tool does it headless; by hand it is the picker or the bookmarklet |
 | Write three motions | `POST /__motioneer/generate` with the captured subject, a brief and a treatment |
@@ -85,6 +85,30 @@ defaults. When the model cannot be asked, prominence chooses and the film says s
 `inspect` reads a page the same way without filming it, and returns the list, so an agent can say
 what it sees and ask which to film before a minute of rendering is spent.
 
+## Pace, and the proof
+
+"A fast video" is a fast cut, not a quiet motion. `pace` is what shapes it, and it lives in the
+one cut function the editor's button also calls, so the two never disagree:
+
+| Pace | Titles | Shots | What it is for |
+| --- | --- | --- | --- |
+| calm | 3 seconds | one per kept motion, spread across the film | the editor's button, an elegant piece |
+| brisk | 2 seconds | about 2.4 seconds each, filling the length | a demo, the default |
+| fast | 1.2 seconds | about 1.3 seconds each, filling the length | "fast", "quick", "lots of cuts" |
+
+When there are fewer kept motions than shots, the elements come round again with the frame
+nudged and tightened a little, so a repeat reads as a new shot and not a freeze. A fast film also
+asks each motion to be over in under half a second, so it lands before the next cut.
+
+Every film is then measured off its rendered frames rather than trusted. `tools/editor/proof.mjs`
+decodes the file at four frames a second, counts the cuts as sharp changes between neighbours,
+times the shots between them, and checks that nothing is blank. The verdict compares that to the
+pace requested and the reply carries it: "Verified from the frames: 12 cuts in 12 seconds, shots
+of 0.9s on average, nothing blank", or "Checked the frames: only 3 cuts in 12 seconds, fast asks
+for at least 6". The agent is told to repeat that line, and to say plainly when a film came out
+slower than asked rather than call it fast because it was meant to be. The same check guards the
+suite, so a change that makes fast films slow fails before it ships.
+
 ```
 > I want a fast motion video from linear.app
 
@@ -108,10 +132,10 @@ choices, as selectable options where the client can draw them.
 
 The first two call the `open` tool with `{ target: "editor" }` or `{ target: "video", path }`, which
 launches the system opener and returns at once. `folder` opens the directory the file sits in. The
-same instructions tell the agent which tool to reach for from what a person says: "fast" means a
-subtle look and about twelve seconds, "demo" means expressive and about twenty, "the pricing cards"
-means `film` with `pick`, "what could you film" means `inspect`, and "studio" means open the room
-and hand it over rather than wait.
+same instructions tell the agent which tool to reach for from what a person says: "fast" means
+pace fast and about twelve seconds, "demo" means brisk and about twenty, "calm" means a subtle
+look, "the pricing cards" means `film` with `pick`, "what could you film" means `inspect`, and
+"studio" means open the room and hand it over rather than wait.
 
 Failures follow one shape so the agent relays rather than guesses: the message starts with
 "Cannot", names the reason, and ends with "Next:" and the one thing to do. The instructions tell
@@ -130,7 +154,10 @@ nothing to choose from, and `inspect` will say so; the studio's picker still wor
 ## Where the code is
 
 - `tools/editor/routes.mjs` serves every route in the table and nothing else.
-- `tools/editor/render.mjs` owns the renderer, its install and its jobs.
+- `tools/editor/render.mjs` owns the renderer, its install and its jobs, and lends its browser and
+  ffmpeg to the driver and the proof.
+- `tools/editor/proof.mjs` measures a rendered film off its frames: cuts, shot length, blank frames.
+- `src/editor/project.ts` holds `firstCut`, where pace lives, used by the editor's button and the film tool alike.
 - `tools/studio.mjs` owns the proxy, the picker, `target` and `generate`.
 - `mcp/index.mjs` is the server an agent talks to; its `film` tool makes the whole video, its
   `studio` tool opens the room, its `motion` tool writes a stylesheet for markup you have, and

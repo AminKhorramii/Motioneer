@@ -28,6 +28,10 @@ src/                   what the studio imports through a built bundle, because n
 mcp/
   index.mjs            Motioneer as a tool an agent calls: inspect reads a page, film makes the video, studio opens the room, motion skips it, open shows what was made
 
+tools/editor/
+  autofilm.mjs         the headless driver behind film and inspect, and the plan it asks the model for
+  proof.mjs            a rendered film measured off its frames: cuts, shot length, blank frames
+
 site/
   index.html           the landing page: one hero over a shader, in one file that loads nothing
 

@@ -10,6 +10,7 @@
  * verify/editor.mjs drives, so this stays in step with the room a person uses.
  */
 import { loadChromium } from './render.mjs'
+import { firstCut } from '../../dist-core/core.js'
 
 const label = (page, name) => page.getByRole('button', { name, exact: true })
 
@@ -33,7 +34,7 @@ async function candidates(frame) {
       const r = el.getBoundingClientRect(), top = Math.round(r.top + window.scrollY), page = document.documentElement.scrollHeight, style = getComputedStyle(el)
       el.setAttribute('data-mn-cand', String(i))
       const image = !!el.querySelector('img,picture,video,svg') || /url\(/.test(style.backgroundImage) || el.tagName === 'IMG'
-      const section = top < 120 ? 'nav' : top < 900 ? 'hero' : top > page - 700 ? 'footer' : 'body'
+      const section = top < 90 ? 'nav' : top < 900 ? 'hero' : top > page - 700 ? 'footer' : 'body'
       const cls = (el.className && typeof el.className === 'string' ? el.className : '').toLowerCase()
       const role = el.tagName === 'IMG' ? 'image' : /^h[1-3]$/i.test(el.tagName) ? 'heading' : /button/i.test(el.tagName) || /cta|button/.test(cls) ? 'button' : /card/.test(cls) ? 'card' : /hero/.test(cls) ? 'hero' : el.tagName.toLowerCase()
       out.push({ el, i, tag: el.tagName.toLowerCase(), role, section, image, w: Math.round(r.width), h: Math.round(r.height), top,
@@ -72,8 +73,21 @@ async function aim(at, url) {
   if (!config.source) throw new Error('Cannot film: the studio is not aimed at a site. Next: pass a url.')
   return config.source
 }
-async function openPage(browser, at, source) {
+/**
+ * Every film gets a project of its own. The editor opens whichever project it last had, and a
+ * film that lands in the person's own project adds elements to it and replaces its cut with
+ * the film's, which is how a fast film once came out portrait: it had inherited somebody's
+ * settings. A fresh project is created first and the editor is told to open that one.
+ */
+async function freshProject(at, name) {
+  const made = await fetch(`${at}/__motioneer/projects`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name }) })
+    .then((r) => r.json()).catch((e) => ({ error: e.message }))
+  if (!made || !made.id) throw new Error(`Cannot film: a project could not be created${made && made.error ? `: ${made.error}` : ''}. Next: try again.`)
+  return made.id
+}
+async function openPage(browser, at, source, projectId) {
   const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } })
+  if (projectId) await page.addInitScript((id) => { try { localStorage.setItem('motioneer-project', id) } catch {} }, projectId)
   await page.goto(at, { waitUntil: 'domcontentloaded' })
   const frame = page.frameLocator('iframe[title="Source page"]')
   try { await frame.locator('body').waitFor({ timeout: 45000 }) }
@@ -146,7 +160,7 @@ async function capture(page, frame, cand) {
  * @param max       cap on how many elements to capture
  * @param onStep    (message) => void  progress, surfaced to the agent's caller
  */
-export async function autofilm({ at, url, pick = '', plan = planFilm, seconds = 20, look = 'subtle', max = 3, onStep = () => {} }) {
+export async function autofilm({ at, url, pick = '', plan = planFilm, seconds = 20, look = 'subtle', pace = 'brisk', max = 3, onStep = () => {} }) {
   const chromium = await loadChromium()
   if (!chromium) throw new Error('Cannot film: the renderer is not installed. Next: open the studio once and set up the local renderer, then ask again.')
   // aim first, every time: a studio already up may be on another site or a folder, and reusing it
@@ -156,7 +170,8 @@ export async function autofilm({ at, url, pick = '', plan = planFilm, seconds = 
   const browser = await chromium.launch({ channel: 'chromium' })
   try {
     onStep('Opening the editor on the site.')
-    const { page, frame, title } = await openPage(browser, at, source)
+    const projectId = await freshProject(at, `Film of ${source.replace(/^https?:\/\//, '').replace(/\/$/, '')}`)
+    const { page, frame, title } = await openPage(browser, at, source, projectId)
     const cands = await candidates(frame)
     if (!cands.length) throw new Error(`Cannot film ${source}: nothing on the page looked worth filming. It may still be loading or need a sign in. Next: try once more; if it needs a sign in, pick from your own browser with the bookmarklet in the studio.`)
     onStep(`Found ${cands.length} things on ${title || source}. Asking the model what to film and what to say.`)
@@ -176,8 +191,9 @@ export async function autofilm({ at, url, pick = '', plan = planFilm, seconds = 
       await page.locator('.subject-item').nth(k).click()
       const treat = page.getByLabel('Treatments', { exact: true })
       if (await treat.count()) await treat.selectOption(look).catch(() => {})
+      // a fast cut wants a motion that is over before the next shot; a calm one can take its time
       const dur = page.getByLabel('Target duration (s)', { exact: true })
-      if (await dur.count()) { await dur.fill('0.6') }
+      if (await dur.count()) { await dur.fill(pace === 'fast' ? '0.45' : pace === 'brisk' ? '0.6' : '0.8') }
       const direction = page.getByLabel('Creative direction', { exact: true })
       if (await direction.count()) await direction.fill(String(chosen.directions[String(captured[k])] || '').slice(0, 300))
       onStep(`Writing a ${look} motion for element ${k + 1} of ${captured.length}.`)
@@ -186,37 +202,26 @@ export async function autofilm({ at, url, pick = '', plan = planFilm, seconds = 
       if (await label(page, 'Keep motion').count()) await label(page, 'Keep motion').first().click()
     }
 
-    onStep('Cutting the first cut.')
-    await label(page, 'Film').click()
-    // set the length before cutting, so the first cut spaces the picks across it; done in the editor
-    // rather than over http, so there is no race with the editor's own autosave and its revisions
-    const ms = Math.max(6000, Math.round(seconds * 1000))
-    const lengthField = page.getByLabel('Film length (s)', { exact: true })
-    if (await lengthField.count()) { await lengthField.fill(String(Math.round(ms / 1000))) }
-    const cut = label(page, 'Create first cut')
-    await cut.waitFor()
-    if (await cut.isEnabled()) await cut.click()
-
-    const id = await page.evaluate(() => localStorage.getItem('motioneer-project'))
-    if (!id) throw new Error('The film was assembled but its project could not be found to render.')
-    // wait for the editor to persist the cut: a render fired before the save lands draws an empty film
+    // the cut is assembled with the same function the editor's button calls, over http rather than
+    // by clicking, so pace, length and the model's words all pass through one place. it waits for
+    // the editor to have saved every kept motion first, since the cut is made from what is saved.
+    onStep(`Cutting it ${pace}.`)
+    const id = projectId
     let project
     for (let n = 0; n < 60; n++) {
       project = await (await fetch(`${at}/__motioneer/projects/${id}`)).json()
-      if (project.tracks?.some((t) => t.kind === 'component') && project.tracks.some((t) => t.kind === 'title')) break
+      if ((project.motions || []).filter((m) => m.saved).length >= captured.length) break
       await new Promise((r) => setTimeout(r, 300))
     }
-    const components = (project.tracks || []).filter((t) => t.kind === 'component').length
-    if (!components) throw new Error('Cannot render: the first cut did not land, so the film had no component to show. Next: try again; if it repeats, open the studio and press Create first cut by hand.')
-    // the model's words on the title tracks, put on the saved project once the cut has landed; the
-    // revision is the one just read, and the editor has nothing left to save, so this cannot race it
-    if (chosen.opening || chosen.closing) {
-      const titles = project.tracks.filter((t) => t.kind === 'title')
-      if (titles[0] && chosen.opening) titles[0].text = chosen.opening
-      if (titles[titles.length - 1] && chosen.closing && titles.length > 1) titles[titles.length - 1].text = chosen.closing
-      await fetch(`${at}/__motioneer/projects/${id}`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(project) }).catch(() => {})
-      onStep(`Titled it "${chosen.opening || ''}"${chosen.closing ? ` and "${chosen.closing}"` : ''}.`)
-    }
+    await new Promise((r) => setTimeout(r, 900))
+    project = await (await fetch(`${at}/__motioneer/projects/${id}`)).json()
+    const cut = firstCut(project, { pace, seconds, opening: chosen.opening, closing: chosen.closing })
+    const components = cut.tracks.filter((t) => t.kind === 'component').length
+    if (!components) throw new Error('Cannot cut: no kept motion was saved, so there was nothing to place. Next: try again; if it repeats, open the studio and keep a motion by hand.')
+    const put = await fetch(`${at}/__motioneer/projects/${id}`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(cut) }).then((r) => r.json()).catch((e) => ({ error: e.message }))
+    if (put.error) throw new Error(`Cannot cut: ${put.error} Next: try again.`)
+    const ms = cut.settings.duration
+    onStep(`${components} shots${chosen.opening ? `, titled "${chosen.opening}"` : ''}${chosen.closing ? ` and "${chosen.closing}"` : ''}.`)
 
     onStep('Rendering. This runs a real browser for every frame and takes about a minute for a short film.')
     const start = await (await fetch(`${at}/__motioneer/projects/${id}/renders`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).json()

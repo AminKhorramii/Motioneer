@@ -16,9 +16,26 @@ import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { autofilm } from '../tools/editor/autofilm.mjs'
 import { loadChromium } from '../tools/editor/render.mjs'
+import { proveFilm } from '../tools/editor/proof.mjs'
+import { firstCut, createProject } from '../dist-core/core.js'
 
 const root = path.dirname(fileURLToPath(new URL('.', import.meta.url)))
 if (!(await loadChromium())) { console.log('skip: the local renderer is not installed, so the film path cannot be exercised here'); process.exit(0) }
+
+// the cut's rhythm, before any browser: fast means many short shots and short titles
+{
+  const p = createProject('pace'); p.subjects = [{ id: 'a', name: 'A', html: '<b>a</b>', css: '', w: 100, h: 50, warnings: [] }, { id: 'b', name: 'B', html: '<b>b</b>', css: '', w: 100, h: 50, warnings: [] }]
+  p.motions = [{ id: 'ma', subjectId: 'a', css: '', scope: 'x', note: '', brief: p.brief, treatment: 'subtle', duration: 500, saved: true }, { id: 'mb', subjectId: 'b', css: '', scope: 'x', note: '', brief: p.brief, treatment: 'subtle', duration: 500, saved: true }]
+  const calm = firstCut(p), fast = firstCut(p, { pace: 'fast', seconds: 12, opening: 'Hello', closing: 'Bye' })
+  const shotsOf = (c) => c.tracks.filter((t) => t.kind === 'component')
+  assert.equal(shotsOf(calm).length, 2, 'calm places each kept motion once')
+  assert.ok(shotsOf(fast).length >= 7, `fast fills 12 seconds with short shots, got ${shotsOf(fast).length}`)
+  assert.ok(shotsOf(fast).every((t) => t.duration <= 1800), 'every fast shot is under 1.8 seconds')
+  assert.equal(fast.tracks[0].text, 'Hello'); assert.equal(fast.tracks.at(-1).text, 'Bye')
+  assert.ok(fast.tracks[0].duration <= 1200 && fast.settings.duration === 12000, 'fast titles are short and the length is what was asked')
+  assert.notDeepEqual([shotsOf(fast)[0].x, shotsOf(fast)[0].width], [shotsOf(fast)[2].x, shotsOf(fast)[2].width], 'a repeated element is framed differently so it cuts rather than freezes')
+  console.log('ok: the cut is paced: calm places each motion once, fast fills the length with short shots and short titles')
+}
 
 const port = Number(process.env.MOTIONEER_PORT || 4397), at = `http://localhost:${port}`
 const temp = await mkdtemp(path.join(tmpdir(), 'motioneer-film-'))
@@ -31,7 +48,8 @@ const model = createServer(async (req, res) => {
   prompts.push(prompt)
   if (/"opening"/.test(prompt)) {
     // the plan: the second and first candidates, words taken from the page, a direction for each
-    const plan = { indices: [1, 0], product: 'a board for shipping teams', opening: 'Ship it with confidence', closing: 'Get started today', directions: { '1': 'the heading lands, then the button settles last', '0': 'the headline rises as one line' } }
+    // the card and the block, which is what a real page offers: things with area, not thin lines of text
+    const plan = { indices: [1, 2], product: 'a board for shipping teams', opening: 'Ship it with confidence', closing: 'Get started today', directions: { '1': 'the heading lands, then the button settles last', '2': 'the block rises as one piece' } }
     res.writeHead(200, { 'content-type': 'text/event-stream' })
     return res.end('data: ' + JSON.stringify({ choices: [{ delta: { content: JSON.stringify(plan) } }] }) + '\n\ndata: [DONE]\n\n')
   }
@@ -48,11 +66,11 @@ const site = createServer((req, res) => {
   res.writeHead(200, { 'content-type': 'text/html' })
   res.end(`<!doctype html><html><body style="margin:0;padding:40px;background:#eef1f6;font:16px system-ui;color:#1a2233">
     <h1 style="font-size:44px;margin:0 0 24px">Ship it with confidence</h1>
-    <article style="width:520px;padding:28px;background:#fff;border-radius:16px;box-shadow:0 20px 60px #0002;margin-bottom:24px">
+    <article class="card" style="width:520px;padding:28px;background:#fff;border-radius:16px;box-shadow:0 20px 60px #0002;margin-bottom:24px">
       <h2 style="margin:0 0 10px">Everything in one place</h2><p style="color:#5b6472">Your team's work, on one board.</p>
       <button style="margin-top:12px;background:#4f56d6;color:#fff;border:0;padding:12px 22px;border-radius:10px">Get started</button>
     </article>
-    <div style="width:520px;height:220px;border-radius:16px;background:linear-gradient(135deg,#6b73e6,#c98bb0)"></div>
+    <div class="hero-image" style="width:520px;height:220px;border-radius:16px;background:linear-gradient(135deg,#6b73e6,#c98bb0)"></div>
   </body></html>`)
 })
 await new Promise((r) => site.listen(0, '127.0.0.1', r))
@@ -72,17 +90,18 @@ try {
   const steps = []
   const before = await (await fetch(`${at}/__motioneer/editor-config`)).json()
   assert.equal(before.source, null, 'the studio should start aimed at nothing, so the aim is what is being proved')
-  const result = await autofilm({ at, url: siteAt, seconds: 8, look: 'subtle', max: 2, pick: 'the card and the headline', onStep: (m) => steps.push(m) })
+  const result = await autofilm({ at, url: siteAt, seconds: 12, look: 'subtle', pace: 'fast', max: 2, pick: 'the card and the headline', onStep: (m) => steps.push(m) })
   assert.equal(result.captured, 2, 'both chosen elements should be captured')
   assert.ok(result.byModel, 'the plan should have come from the model through the studio, not the fallback')
   assert.equal(result.opening, 'Ship it with confidence', 'the opening title should be the model\'s words')
   const planPrompt = prompts.find((p) => /"opening"/.test(p))
   assert.ok(planPrompt && /the card and the headline/.test(planPrompt), 'the person\'s pick should reach the model')
-  assert.ok(planPrompt && /heading in hero/.test(planPrompt), 'candidates should be described by role and section')
-  assert.ok(prompts.some((p) => /settles last|rises as one line/.test(p)), 'the model\'s direction should reach the motion prompt')
+  assert.ok(planPrompt && /card in (hero|body|nav)/.test(planPrompt), 'candidates should be described by role and section')
+  assert.ok(prompts.some((p) => /settles last|rises as one piece/.test(p)), 'the model\'s direction should reach the motion prompt')
   const saved = await (await fetch(`${at}/__motioneer/projects/${result.projectId}`)).json()
   const titles = saved.tracks.filter((t) => t.kind === 'title').map((t) => t.text)
   assert.deepEqual(titles, ['Ship it with confidence', 'Get started today'], 'both title tracks should carry the model\'s words')
+  assert.ok(saved.tracks.filter((t) => t.kind === 'component').length >= 7, 'a fast cut should carry many shots, not one per element')
   console.log('ok: the model planned it: chose by the person\'s pick, wrote the titles, and directed each motion')
   const buf = Buffer.from(await (await fetch(result.url)).arrayBuffer())
   assert.ok(buf.length > 20000, `the film should be a real mp4, got ${buf.length} bytes`)
@@ -105,6 +124,13 @@ try {
   assert.ok(lit(a) > 0.002, `the opening title should be on screen, only ${(lit(a) * 100).toFixed(2)}% of it was lit`)
   assert.ok(lit(b) > 0.002, `a component should be on screen mid-film, only ${(lit(b) * 100).toFixed(2)}% of it was lit`)
   console.log(`ok: the film is not blank (opening ${(lit(a) * 100).toFixed(1)}% lit, middle ${(lit(b) * 100).toFixed(1)}% lit)`)
+  // the verifier, on the real file: a fast film must measure as fast off its own frames
+  const proof = await proveFilm({ file: mp4, pace: 'fast', seconds: 12 })
+  assert.ok(proof.ok, `the proof should pass for a fast film: ${proof.notes.join('; ')}`)
+  assert.ok(proof.cuts >= 6, `a fast 12 second film should show at least 6 cuts, measured ${proof.cuts}`)
+  const calmVerdict = await proveFilm({ file: mp4, pace: 'calm', seconds: 12 })
+  assert.ok(calmVerdict.ok, 'the same film passes a calm verdict, which asks less')
+  console.log(`ok: measured off the frames: ${proof.cuts} cuts, shots ${(proof.avgShotMs / 1000).toFixed(1)}s on average, ${Math.round(proof.blank * 100)}% blank`)
   console.log('ok: it reported each step:', steps.length, 'steps')
   console.log('film verification passed')
 } catch (e) {

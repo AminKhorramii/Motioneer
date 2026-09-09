@@ -50,7 +50,7 @@ const fail = (id, text) => send({ jsonrpc: '2.0', id, result: { isError: true, c
  * closes with three choices the person can act on, and the open tool is what acts on them.
  */
 const INSTRUCTIONS = `Motioneer makes motion for a person's own product. Choose by what they want to hold at the end:
-- film: they want a video, a demo, a reel, or say "motion video". One call does everything and returns an MP4 path. Always pass dir as the absolute path of their project so the file lands beside their work. "Fast" or "quick" means look "subtle" and about 12 seconds; "demo" or "showcase" means look "expressive" and about 20.
+- film: they want a video, a demo, a reel, or say "motion video". One call does everything and returns an MP4 path. Always pass dir as the absolute path of their project so the file lands beside their work. Pace is the cut: "fast", "quick", "punchy" or "lots of cuts" means pace "fast", which is many one second shots, about 12 seconds; "demo" or "showcase" means pace "brisk" and about 20; "calm", "slow" or "elegant" means pace "calm" with look "subtle". Fast and brisk films use look "expressive" unless they ask otherwise.
 - studio: they want to pick elements and compare motions by hand, or say "studio". It returns as soon as the room is open; do not wait or retry, tell them where it is.
 - motion: they want CSS for markup they already have, with nothing to look at first.
 - inspect: they want to see or choose what gets filmed first, or ask what is on a page. Follow it with film and pick.
@@ -67,7 +67,7 @@ When a tool fails its message starts with "Cannot" and ends with "Next:". Relay 
 
 While film runs it can take a minute or two: it opens the site, captures, writes motions, cuts and renders. Say that once, then wait for the result rather than polling or calling it again.
 
-When film returns, relay what it filmed and where the file is in one or two sentences, then offer exactly these three choices, as selectable options if you can present options, otherwise as a short list:
+When film returns it includes a line measured from the rendered frames, "Verified" or "Checked": how many cuts, how long the shots are, whether anything is blank. Repeat that line, it is the proof the film is what they asked for. If it says the film came out slower than asked, say so plainly and offer to film again with count 6 rather than claiming it is fast. Then relay what it filmed and where the file is in one or two sentences, and offer exactly these three choices, as selectable options if you can present options, otherwise as a short list:
 1. Open the editor, to change the cut, swap a motion or add a title.
 2. Open the video.
 3. Continue chatting.
@@ -162,7 +162,8 @@ const TOOLS = [
         dir: { type: 'string', description: 'Absolute project path. The MP4 is saved here; pass it so the file lands where the person is working.' },
         seconds: { type: 'number', description: 'How long the film should be. About 20 by default.' },
         look: { type: 'string', enum: ['subtle', 'expressive', 'bold'], description: 'The single treatment written for each element. Subtle by default, which reads as fast and calm.' },
-        count: { type: 'number', description: 'How many elements to film, 1 to 5. Three by default.' },
+        count: { type: 'number', description: 'How many elements to film, 1 to 5. Three by default; fast films repeat them across more shots.' },
+        pace: { type: 'string', enum: ['calm', 'brisk', 'fast'], description: 'How it is cut. fast is many short shots of about a second with short titles, brisk is a demo rhythm, calm is a few long shots. Brisk by default.' },
         pick: { type: 'string', description: 'What the person wants filmed, in their own words, like "the pricing cards and the hero". The model matches it against what is on the page. Leave it out to let the model choose the best three.' },
       },
       required: ['url'],
@@ -315,7 +316,7 @@ async function inspect({ url, dir }) {
     + `for example "the pricing cards and the hero"; the model matches pick against this list. Without pick it chooses the best three.`
 }
 
-async function film({ url, dir, seconds, look, count, pick }) {
+async function film({ url, dir, seconds, look, count, pick, pace }) {
   if (!url) throw new Error('film needs a url, a running site or dev server like http://localhost:3000.')
   const at = STUDIO_AT()
   const up = await spawnStudio({ url, dir, at })
@@ -336,13 +337,19 @@ async function film({ url, dir, seconds, look, count, pick }) {
   const { autofilm } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'autofilm.mjs')).href)
   const max = Math.max(1, Math.min(5, Number(count) || 3))
   const steps = []
-  const result = await autofilm({ at, url, pick: String(pick || '').slice(0, 300), seconds: Number(seconds) || 20, look: look || 'subtle', max, onStep: (m) => steps.push(m) })
+  const wantPace = ['calm', 'brisk', 'fast'].includes(pace) ? pace : 'brisk'
+  const wantSeconds = Number(seconds) || (wantPace === 'fast' ? 12 : 20)
+  const result = await autofilm({ at, url, pick: String(pick || '').slice(0, 300), seconds: wantSeconds, look: look || (wantPace === 'calm' ? 'subtle' : 'expressive'), pace: wantPace, max, onStep: (m) => steps.push(m) })
   const buf = Buffer.from(await (await fetch(result.url)).arrayBuffer())
   const outDir = dir && path.isAbsolute(dir) ? dir : process.cwd()
   const file = path.join(outDir, `motioneer-film-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.mp4`)
   await writeFile(file, buf)
-  return `Filmed ${result.captured} element${result.captured === 1 ? '' : 's'} from ${url}${result.product ? `, "${result.product}",` : ''} into a ${Math.round(result.seconds)} second film`
-    + `${result.opening ? ` titled "${result.opening}"` : ''}, saved to ${file} (${(buf.length / 1e6).toFixed(1)} MB). The studio is still open at ${at}. What it did: ${steps.join(' ')}\n\n`
+  // measured off the frames, so the reply reports what was made rather than what was meant
+  const { proveFilm, proofLine } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'proof.mjs')).href)
+  const proof = await proveFilm({ file, pace: wantPace, seconds: wantSeconds }).catch((e) => ({ ok: false, notes: [`it could not be measured: ${e.message}`] }))
+  const verified = proofLine(proof)
+  return `Filmed ${result.captured} element${result.captured === 1 ? '' : 's'} from ${url}${result.product ? `, "${result.product}",` : ''} into a ${Math.round(result.seconds)} second ${wantPace} film`
+    + `${result.opening ? ` titled "${result.opening}"` : ''}, saved to ${file} (${(buf.length / 1e6).toFixed(1)} MB). ${verified} The studio is still open at ${at}. What it did: ${steps.join(' ')}\n\n`
     + `Now offer the person these three choices, as options if you can: open the editor, open the video, or continue chatting. `
     + `For the first two call open with target "editor" or target "video" and path "${file}", then stop so they can look.`
 }

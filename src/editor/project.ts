@@ -16,15 +16,36 @@ export function createProject(name = 'Untitled film'): Project {
 export function newTrack(kind: Track['kind'], name: string, at = 0): Track {
   return { id: uid(), kind, name, color: '#f4f4f5', fontSize: 64, start: at, duration: 5000, entrance: 0, x: 15, y: 20, width: 70, height: 60, hidden: false, locked: false, moves: [], volume: 0.7, sourceStart: 0, fadeIn: 200, fadeOut: 400 }
 }
-export function firstCut(p: Project): Project {
+export type Pace = 'calm' | 'brisk' | 'fast'
+export type CutOptions = { pace?: Pace; seconds?: number; opening?: string; closing?: string }
+/**
+ * The first cut, paced. Calm spreads the kept motions across the film with long titles, the way
+ * a person expects when they press the button. Brisk and fast are what "a demo" and "a fast video"
+ * mean: shorter titles, shorter shots, and more of them. When there are fewer kept motions than
+ * shots, the elements come round again with the frame nudged, so a repeat reads as a new shot and
+ * not as a freeze. Everything about the rhythm lives here so the editor and the film tool agree.
+ */
+export function firstCut(p: Project, opts: CutOptions = {}): Project {
   const chosen = p.subjects.map(s => ({ s, m: [...p.motions].reverse().find(m => m.subjectId === s.id && m.saved) })).filter(x => x.m)
   if (!chosen.length) return p
-  const span = Math.min(120000, Math.max(15000, 6000 + chosen.length * 6000))
-  const opening = { ...newTrack('title', 'Opening'), text: 'Meet your next great idea', x: 10, y: 35, width: 80, height: 25, duration: 3000, fontSize: 76 }
-  const end = { ...newTrack('title', 'Closing', span - 3000), text: 'See it in action', x: 10, y: 35, width: 80, height: 25, duration: 3000, fontSize: 76 }
-  const step = (span - 6000) / chosen.length
-  const tracks: Track[] = [opening, ...chosen.map(({ s, m }, i) => ({ ...newTrack('component', s.name, 3000 + i * step), duration: step, subjectId: s.id, motionId: m!.id, width: 76, x: 12, y: 16, height: 68 })), end]
-  return { ...p, tracks, camera: [{ at: 3000, duration: span - 6000, x: 0, y: 0, scale: 1.04, ease: 'ease-in-out' }], settings: { ...p.settings, duration: span, from: 0, to: span } }
+  const pace: Pace = opts.pace ?? 'calm'
+  const title = pace === 'fast' ? 1200 : pace === 'brisk' ? 2000 : 3000
+  const shot = pace === 'fast' ? 1300 : pace === 'brisk' ? 2400 : 0
+  const asked = opts.seconds ? Math.min(120000, Math.max(6000, Math.round(opts.seconds * 1000))) : 0
+  const span = asked || (shot ? Math.min(120000, Math.max(10000, 2 * title + Math.max(6, chosen.length * 2) * shot)) : Math.min(120000, Math.max(15000, 6000 + chosen.length * 6000)))
+  const body = span - 2 * title
+  const shots = shot ? Math.max(chosen.length, Math.round(body / shot)) : chosen.length
+  const step = body / shots
+  const opening = { ...newTrack('title', 'Opening'), text: opts.opening || 'Meet your next great idea', x: 10, y: 35, width: 80, height: 25, duration: title, fontSize: 76 }
+  const end = { ...newTrack('title', 'Closing', span - title), text: opts.closing || 'See it in action', x: 10, y: 35, width: 80, height: 25, duration: title, fontSize: 76 }
+  const cuts: Track[] = Array.from({ length: shots }, (_, i) => {
+    const { s, m } = chosen[i % chosen.length], round = Math.floor(i / chosen.length)
+    // a repeat is framed a little differently, alternating sides and a touch tighter, so it cuts rather than freezes
+    const nudge = round % 2 ? 4 : 0, tighten = Math.min(8, round * 2)
+    return { ...newTrack('component', s.name, title + i * step), duration: step, subjectId: s.id, motionId: m!.id, width: 76 - tighten, x: 12 + nudge + tighten / 2, y: 16 + tighten / 2, height: 68 - tighten }
+  })
+  const camera = pace === 'calm' ? [{ at: title, duration: body, x: 0, y: 0, scale: 1.04, ease: 'ease-in-out' }] : [{ at: title, duration: body, x: 0, y: 0, scale: 1.06, ease: 'linear' }]
+  return { ...p, tracks: [opening, ...cuts, end], camera, settings: { ...p.settings, duration: span, from: 0, to: span } }
 }
 /** Reject malformed documents at the disk boundary instead of poisoning future sessions. */
 export function validateProject(raw: unknown): Project {

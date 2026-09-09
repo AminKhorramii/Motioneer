@@ -9,6 +9,12 @@ import { randomUUID } from 'node:crypto'
 import { compositionDocument } from '../../dist-core/core.js'
 const VERSIONS = { playwright: '1.62.1', 'ffmpeg-static': '5.2.0' }
 /** The one place that knows where the renderer's browser lives, so the autofilm driver borrows it rather than adding a second copy of playwright. Returns null when the renderer is not installed yet. */
+export async function loadFfmpeg() {
+  const ff = path.join(CACHE, 'node_modules/ffmpeg-static/index.js')
+  if (!existsSync(ff)) return null
+  const { default: ffmpeg } = await import(pathToFileURL(ff).href)
+  return ffmpeg && existsSync(ffmpeg) ? ffmpeg : null
+}
 export async function loadChromium() {
   const mod = path.join(CACHE, 'node_modules/playwright/index.mjs')
   if (!existsSync(mod)) return null
