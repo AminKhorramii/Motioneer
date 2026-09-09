@@ -432,7 +432,8 @@ process.stdout.write(JSON.stringify(resolve({ cars: [
 @media (prefers-reduced-motion:reduce){[data-m${n}] > b{animation:none;opacity:1}}`
   mkdirSync(join(bed, '.studio'), { recursive: true })
   writeFileSync(join(bed, '.studio', 'session.json'), JSON.stringify({
-    at: Date.now(), aim: null, nextId: 9,
+    // the port too, since a studio only resumes a session written on its own port
+    at: Date.now(), port: Number(process.env.MOTIONEER_RAIL_PORT || 4390), aim: null, nextId: 9,
     made: [1, 2, 3].map((n) => [String(n), {
       file: `card${n}.tsx`, markup: `<div data-m${n}><b>one</b><b>two</b></div>`, base: '', shot: '',
       css: sheet(n, 300 + n * 100), scope: `data-m${n}`, tw: false, wide: 320,
