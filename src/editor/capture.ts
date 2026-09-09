@@ -14,7 +14,14 @@ export async function freezeCapture(html:string,css:string,source:string) {
   const loaded=new Promise<void>(resolve=>{frame.onload=()=>resolve()});frame.srcdoc=`<!doctype html><html><head><style>${css.replace(/<\/style/gi,'')}</style></head><body>${html}</body></html>`;document.body.append(frame)
   try {
     await loaded;const doc=frame.contentDocument!;await doc.fonts.ready
-    const frozen=await inline(doc,{fetchVia:(url:string)=>fetch('/__motioneer/asset?u='+encodeURIComponent(url))}),map=new Map<string,string>([...frozen.fonts,...frozen.images])
+    /**
+     * A url already on this origin is the proxy's own, a font or an image the site served through it,
+     * and it is fetched as it stands. Sent back through the asset route it names localhost, which the
+     * guard refuses, and every proxied webfont was lost that way: stripe's headings then rendered in a
+     * wider fallback face and were cut mid-word at the edge of the box they had been measured in.
+     */
+    const fetchVia=(url:string)=>url.startsWith(location.origin)?fetch(url):fetch('/__motioneer/asset?u='+encodeURIComponent(url))
+    const frozen=await inline(doc,{fetchVia}),map=new Map<string,string>([...frozen.fonts,...frozen.images])
     for(const [url,data] of map){html=html.split(url).join(data);css=css.split(url).join(data)}
     return {html,css:css+'\n'+(frozen.css||''),warnings:(frozen.notes||[]) as string[]}
   }finally{frame.remove()}

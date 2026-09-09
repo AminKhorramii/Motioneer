@@ -10,7 +10,8 @@
  * verify/editor.mjs drives, so this stays in step with the room a person uses.
  */
 import { loadChromium } from './render.mjs'
-import { firstCut } from '../../dist-core/core.js'
+import { lit } from './proof.mjs'
+import { firstCut, createProject, compositionDocument } from '../../dist-core/core.js'
 
 const label = (page, name) => page.getByRole('button', { name, exact: true })
 
@@ -18,10 +19,31 @@ const label = (page, name) => page.getByRole('button', { name, exact: true })
 async function candidates(frame) {
   return frame.locator('body').evaluate((body) => {
     const out = []
+    /**
+     * A veiled page: slack.com holds all 41 of its headings at opacity zero for a reveal script
+     * that never runs under the proxy, and shows fifteen characters. When almost nothing is
+     * visible but headings are there, hidden elements count as candidates; the composition lifts
+     * the hiding when it draws them, and their text is read from the markup rather than the screen.
+     */
+    /**
+     * A gated page: slack.com keeps its whole content under an ancestor with display none until a
+     * script confirms, and shows a no-script link. When almost nothing is visible and headings sit
+     * under hidden containers, the topmost such container of each is shown, since a page that would
+     * otherwise yield nothing is better read than left empty.
+     */
+    if ((body.innerText || '').trim().length < 200) {
+      // every hidden ancestor, not only the outermost: slack nests one gate inside another
+      const gates = new Set()
+      for (const h of body.querySelectorAll('h1,h2,h3')) for (let a = h.parentElement; a && a !== body; a = a.parentElement) if (getComputedStyle(a).display === 'none') gates.add(a)
+      if (gates.size && [...body.querySelectorAll('h1,h2,h3')].length >= 3) for (const g of gates) { g.style.setProperty('display', 'block', 'important'); g.removeAttribute('hidden'); g.style.setProperty('visibility', 'visible', 'important'); g.style.setProperty('opacity', '1', 'important') }
+    }
+    const hiddenHeads = [...body.querySelectorAll('h1,h2,h3')].filter((h) => { const cs = getComputedStyle(h); return cs.opacity === '0' || cs.visibility === 'hidden' }).length
+    const veiled = (body.innerText || '').trim().length < 200 && hiddenHeads >= 3
     const worth = (el) => {
       const r = el.getBoundingClientRect(), style = getComputedStyle(el)
       if (r.width < 90 || r.height < 24 || r.width > 1300 || r.height > 900) return false
-      if (style.visibility === 'hidden' || style.display === 'none' || Number(style.opacity) < 0.2) return false
+      if (style.display === 'none') return false
+      if (!veiled && (style.visibility === 'hidden' || Number(style.opacity) < 0.2)) return false
       if (r.top + window.scrollY > 7000 || r.bottom + window.scrollY < 0) return false
       // decoration is not a shot: a blurred glow behind a hero filmed as a grey cloud on linear.app,
       // and a placeholder image a few pixels wide is not the picture it stands in for
@@ -40,7 +62,8 @@ async function candidates(frame) {
      */
     // a painted background counts as something to see: a gradient block with no text is a shot, an empty transparent box is not
     const backed = (el) => { const cs = getComputedStyle(el); return (cs.backgroundColor && cs.backgroundColor !== 'transparent' && !/rgba\(\d+, \d+, \d+, 0\)/.test(cs.backgroundColor)) || cs.backgroundImage !== 'none' }
-    const visible = (el) => (el.innerText || '').trim().length > 0 || !!el.querySelector('img,picture,video,svg,canvas') || el.tagName === 'IMG' || backed(el)
+    const words = (el) => ((veiled ? el.textContent : el.innerText) || '').replace(/\s+/g, ' ').trim()
+    const visible = (el) => words(el).length > 0 || !!el.querySelector('img,picture,video,svg,canvas') || el.tagName === 'IMG' || backed(el)
     const area = (el) => { const r = el.getBoundingClientRect(); return r.width * r.height }
     const visualRoot = (el) => {
       if (!visible(el)) { const p = el.parentElement; return p && p !== body && getComputedStyle(el).position === 'absolute' && visible(p) ? p : null }
@@ -72,7 +95,7 @@ async function candidates(frame) {
       out.push({ el, i, tag: el.tagName.toLowerCase(), role, section, image, painted: !image && backed(el), src: media ? (media.currentSrc || media.src || '') : '', w: Math.round(r.width), h: Math.round(r.height), top,
         // innerText, not textContent: a section with its own <style> tag reads back as a
         // keyframes block, and the model then plans a film about css instead of the product
-        text: (el.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 80) })
+        text: words(el).slice(0, 80) })
       i++
     }
     /**
@@ -315,6 +338,37 @@ export async function autofilm({ at, url, pick = '', direction = '', plan = plan
     if (!captured.length) throw new Error(`Cannot film ${source}: none of the chosen elements could be captured. Next: ask for different elements with pick, or open the studio and pick by hand.`)
 
     /**
+     * Each capture is drawn once through the film's own composition before a motion is written for
+     * it, and one that comes up empty is left out. On webflow.com two of eight captures rendered as
+     * white frames, images that never resolved, and cost two model calls and two blank shots. The
+     * check is the proof's own content measure on a small screenshot, against the frame's ground.
+     */
+    const emptyOnes = new Set()
+    {
+      const saved = await (await fetch(`${at}/__motioneer/projects/${projectId}`)).json()
+      const probe = await browser.newPage({ viewport: { width: 320, height: 180 } })
+      try {
+        for (let k = 0; k < captured.length; k++) {
+          const sub = saved.subjects[k]
+          if (!sub) continue
+          const one = createProject('probe'); one.settings.width = 320; one.settings.height = 180; one.settings.background = colours.background; one.subjects = [sub]
+          one.tracks = [{ ...firstCut({ ...one, motions: [{ id: 'm', subjectId: sub.id, css: '', scope: 'x', note: '', brief: one.brief, treatment: 'subtle', duration: 1, saved: true }] }).tracks[1], x: 5, y: 5, width: 90, height: 90, start: 0, duration: 5000 }]
+          await probe.setContent(compositionDocument(one), { waitUntil: 'load' }).catch(() => {})
+          await probe.waitForTimeout(700)
+          const shot = await probe.screenshot({ type: 'png' }).catch(() => null)
+          if (!shot) continue
+          const share = await probe.evaluate(async (b64) => {
+            const img = new Image(); img.src = 'data:image/png;base64,' + b64; await img.decode()
+            const c = document.createElement('canvas'); c.width = 320; c.height = 180; const g = c.getContext('2d'); g.drawImage(img, 0, 0)
+            return Array.from(g.getImageData(0, 0, 320, 180).data).filter((_, i) => i % 4 !== 3)
+          }, shot.toString('base64')).catch(() => null)
+          if (share && lit(Uint8Array.from(share)) < 0.003) emptyOnes.add(k)
+        }
+      } finally { await probe.close() }
+      if (emptyOnes.size) onStep(`Left out ${emptyOnes.size} element${emptyOnes.size === 1 ? '' : 's'} that rendered empty.`)
+    }
+
+    /**
      * One treatment per element, all written at once. Each subject is briefed and its motion
      * started before the next is touched, so eight elements cost one model round rather than
      * eight in a row; then each is waited for and kept. The motion should fill most of its shot:
@@ -326,6 +380,7 @@ export async function autofilm({ at, url, pick = '', direction = '', plan = plan
     // root invisible for 850ms of a 1200ms shot and revealed it in the last third, which is a blank shot
     const paceNote = pace === 'calm' ? '' : ' Use the whole duration for the arrival, with the parts staggered across it, rather than an easing that is finished in the first third. Every part is visible and already moving from the very first frame; never hold the root or any part invisible, and keep every delay under 150ms. The last part should still be settling at seventy percent of the duration, so spread the stagger across it and use an ease that is not over in its first third.'
     for (let k = 0; k < captured.length; k++) {
+      if (emptyOnes.has(k)) continue
       await page.locator('.subject-item').nth(k).click()
       const treat = page.getByLabel('Treatments', { exact: true })
       if (await treat.count()) await treat.selectOption(look).catch(() => {})
@@ -341,6 +396,7 @@ export async function autofilm({ at, url, pick = '', direction = '', plan = plan
     onStep(`Writing ${captured.length} ${look} motions at once.`)
     let kept = 0
     for (let k = 0; k < captured.length; k++) {
+      if (emptyOnes.has(k)) continue
       await page.locator('.subject-item').nth(k).click()
       try { await page.locator('.motion-card:not(.pending)').first().waitFor({ timeout: 300000 }) } catch { onStep(`Element ${k + 1} got no motion in time, leaving it out.`); continue }
       if (await label(page, 'Keep motion').count()) { await label(page, 'Keep motion').first().click(); kept++ }
@@ -361,10 +417,13 @@ export async function autofilm({ at, url, pick = '', direction = '', plan = plan
     await new Promise((r) => setTimeout(r, 900))
     project = await (await fetch(`${at}/__motioneer/projects/${id}`)).json()
     // scenes name candidates; the project's subjects sit in capture order, so a captured index maps to its subject
-    const subjectOf = new Map(captured.map((cand, k) => [cand, project.subjects[k]?.id]).filter(([, id]) => id))
+    const subjectOf = new Map(captured.map((cand, k) => [cand, emptyOnes.has(k) ? null : project.subjects[k]?.id]).filter(([, id]) => id))
     // a button or a label is never a shot on its own, whatever the plan said: asked twice in the prompt, the model still filmed a lone button
     const minor = new Set(cands.filter((c) => c.role === 'button' || c.role === 'label').map((c) => c.i))
     const scenes = (chosen.scenes || []).map((sc) => ({ ids: sc.elements.filter((n) => !(sc.elements.length === 1 && minor.has(n))).map((n) => subjectOf.get(n)).filter(Boolean), layout: sc.layout, hold: sc.hold })).filter((sc) => sc.ids.length)
+    // every captured element earns a shot before any comes round again: a plan of five scenes for eight captures once left three unused while the hero played twice
+    const placed = new Set(scenes.flatMap((sc) => sc.ids))
+    for (const [cand, id] of subjectOf) if (!placed.has(id) && !minor.has(cand)) scenes.push({ ids: [id], layout: 'full', hold: 'normal' })
     const cut = firstCut(project, { pace, seconds, opening: chosen.opening, closing: chosen.closing, background: colours.background, scenes })
     const components = cut.tracks.filter((t) => t.kind === 'component').length
     const shotsMade = new Set(cut.tracks.filter((t) => t.kind === 'component').map((t) => t.start)).size

@@ -35,7 +35,7 @@ async function frames(ffmpeg, file) {
  * same way a film on a dark site counts its light one. Brightness alone called a white stage
  * "lit" everywhere and a dark headline on it nothing at all.
  */
-const lit = (f) => {
+export const lit = (f) => {
   const seen = new Map()
   for (let i = 0; i < f.length; i += 3) { const k = ((f[i] >> 4) << 8) | ((f[i + 1] >> 4) << 4) | (f[i + 2] >> 4); seen.set(k, (seen.get(k) || 0) + 1) }
   let ground = 0, most = -1

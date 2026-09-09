@@ -66,6 +66,17 @@ export function compositionRuntime(initial: Project, assetRoot: string) {
      * every line. The measured size is the border box, so that is what the root is told it is.
      */
     if (root) { root.style.boxSizing = 'border-box'; root.style.width = subject.w + 'px'; root.style.maxWidth = 'none' }
+    /**
+     * A captured element is meant to be seen. Pages reveal their content from a script, and slack.com
+     * and webflow.com carry every heading at opacity zero until that script runs, which under the
+     * proxy it never does; the picker inlines that zero, and the shot is blank. Zero opacity and
+     * hidden visibility in an inlined style are a waiting state, not a design, so they are lifted
+     * here on the root and everything inside it. Display none is left alone: that is a choice.
+     */
+    parsed.body.querySelectorAll<HTMLElement>('[style]').forEach(el => {
+      if (el.style.opacity === '0') el.style.opacity = '1'
+      if (el.style.visibility === 'hidden') el.style.visibility = 'visible'
+    })
     frame.height = String(Math.round(subject.h * 1.17))
     const styles = (subject.css + '\n' + (motion?.css || '')).replace(/<\/style/gi, '<\\/style')
     let done!: () => void
