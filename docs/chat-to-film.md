@@ -100,6 +100,29 @@ a fast fifteen second film of eight elements takes about a minute from the reque
 `inspect` reads a page the same way without filming it, and returns the list, so an agent can say
 what it sees and ask which to film before a minute of rendering is spent.
 
+## What real landing pages taught
+
+Every one of these came from filming linear.app, notion.so and framer.com and looking at every
+shot, not from reasoning about pages in the abstract, and each has a check in the suite:
+
+- Decoration is not a shot. Linear's hero glow is a real PNG that is itself a soft blob, so no
+  style rule can flag it. A picture has edges: measured on a 48 by 27 downscale the glow scored
+  3.3 and every real screenshot 12 to 28, so an image under 6 is left out. The pixels are read
+  through the studio's asset proxy from the editor page, since inside the proxied frame a
+  cross-origin image taints the canvas and cannot be read at all.
+- A captured root is sized border-box at its measured width. The picker inlines the content-box
+  width, so a heading measured 1030 wide came back as 1030 plus 32 of padding a side and lost the
+  end of every line to its own frame. It also gets a sixth more room below, because a site's
+  webfont is often unreadable across origins and the fallback face runs taller.
+- Exact duplicates fold whatever their size. Framer carries the same screenshot twice in its
+  markup, and filmed it as two of eight elements.
+- A one-line h3 is a label, and a label or a button is never a shot on its own. Asked in the
+  prompt, the model still filmed a lone button, so the rule is enforced when scenes are mapped.
+- A motion that hides its root before revealing it makes a blank shot. Asked for a slow arrival,
+  the model once held the root invisible for 850ms of a 1200ms shot. The brief now asks for every
+  part visible and moving from the first frame, and the proof counts shots still empty a third of
+  a second in.
+
 ## Scenes
 
 The plan speaks in scenes, not only in elements: an ordered list of shots, each with one or two

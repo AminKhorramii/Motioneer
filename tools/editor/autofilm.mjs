@@ -23,9 +23,13 @@ async function candidates(frame) {
       if (r.width < 90 || r.height < 24 || r.width > 1300 || r.height > 900) return false
       if (style.visibility === 'hidden' || style.display === 'none' || Number(style.opacity) < 0.2) return false
       if (r.top + window.scrollY > 7000 || r.bottom + window.scrollY < 0) return false
+      // decoration is not a shot: a blurred glow behind a hero filmed as a grey cloud on linear.app,
+      // and a placeholder image a few pixels wide is not the picture it stands in for
+      if (/blur\(/.test(style.filter) || el.getAttribute('aria-hidden') === 'true') return false
+      if (el.tagName === 'IMG' && el.naturalWidth > 0 && el.naturalWidth < 64) return false
       return true
     }
-    const wanted = 'h1,h2,h3,button,a[role=button],[class*=card],[class*=Card],[class*=hero],[class*=Hero],figure,img,[class*=cta],[class*=CTA]'
+    const wanted = 'h1,h2,h3,button,a[role=button],[class*=card],[class*=Card],[class*=hero],[class*=Hero],figure,img,video,[class*=cta],[class*=CTA]'
     /**
      * What a pick resolves to, which is not always the element that matched. Measured on
      * notion.so, five of eight picks rendered blank: two were stretched links, an anchor with
@@ -58,11 +62,13 @@ async function candidates(frame) {
       if (out.some((o) => o.el.contains(el) || el.contains(o.el))) continue
       const r = el.getBoundingClientRect(), top = Math.round(r.top + window.scrollY), page = document.documentElement.scrollHeight, style = getComputedStyle(el)
       el.setAttribute('data-mn-cand', String(i))
-      const image = !!el.querySelector('img,picture,video,svg') || /url\(/.test(style.backgroundImage) || el.tagName === 'IMG'
+      const image = !!el.querySelector('img,picture,video,svg') || /url\(/.test(style.backgroundImage) || el.tagName === 'IMG' || el.tagName === 'VIDEO'
       const section = top < 90 ? 'nav' : top < 900 ? 'hero' : top > page - 700 ? 'footer' : 'body'
       const cls = (el.className && typeof el.className === 'string' ? el.className : '').toLowerCase()
-      const role = el.tagName === 'IMG' ? 'image' : /^h[1-3]$/i.test(el.tagName) ? 'heading' : /button/i.test(el.tagName) || /cta|button/.test(cls) ? 'button' : /card/.test(cls) ? 'card' : /hero/.test(cls) ? 'hero' : el.tagName.toLowerCase()
-      out.push({ el, i, tag: el.tagName.toLowerCase(), role, section, image, painted: !image && backed(el), w: Math.round(r.width), h: Math.round(r.height), top,
+      // a one-line h3 under 32px is a label, not a heading: alone in a frame it is a stray word
+      const role = el.tagName === 'IMG' || el.tagName === 'VIDEO' ? 'image' : /^h[1-3]$/i.test(el.tagName) ? (el.tagName === 'H3' && r.height < 32 ? 'label' : 'heading') : /button/i.test(el.tagName) || /cta|button/.test(cls) ? 'button' : /card/.test(cls) ? 'card' : /hero/.test(cls) ? 'hero' : el.tagName.toLowerCase()
+      const media = el.tagName === 'IMG' || el.tagName === 'VIDEO' ? el : el.querySelector('img,video')
+      out.push({ el, i, tag: el.tagName.toLowerCase(), role, section, image, painted: !image && backed(el), src: media ? (media.currentSrc || media.src || '') : '', w: Math.round(r.width), h: Math.round(r.height), top,
         // innerText, not textContent: a section with its own <style> tag reads back as a
         // keyframes block, and the model then plans a film about css instead of the product
         text: (el.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 80) })
@@ -75,8 +81,11 @@ async function candidates(frame) {
      */
     const kept = []
     for (const c of out) {
-      // only small look-alikes fold: a row of sidebar buttons is one thing, three feature cards are three shots
-      const twin = c.w * c.h < 20000 && kept.find((k) => k.role === c.role && k.section === c.section && Math.abs(k.w - c.w) <= 4 && Math.abs(k.h - c.h) <= 4 && k.image === c.image)
+      // an exact duplicate folds whatever its size: a carousel or a responsive layout carries the
+      // same screenshot twice, and framer.com filmed the same picture as two of eight elements
+      const same = kept.find((k) => Math.abs(k.w - c.w) <= 2 && Math.abs(k.h - c.h) <= 2 && ((c.src && k.src === c.src) || (c.text && k.text === c.text)))
+      // only small look-alikes fold otherwise: a row of sidebar buttons is one thing, three feature cards are three shots
+      const twin = same || (c.w * c.h < 20000 && kept.find((k) => k.role === c.role && k.section === c.section && Math.abs(k.w - c.w) <= 4 && Math.abs(k.h - c.h) <= 4 && k.image === c.image))
       if (twin) twin.alike = (twin.alike || 0) + 1; else kept.push(c)
     }
     return kept.map(({ el, ...rest }) => rest)
@@ -139,14 +148,46 @@ async function openPage(browser, at, source, projectId) {
   }).catch(() => ({ background: '#101319', color: null }))
   return { page, frame, title: title.trim(), colours }
 }
+/**
+ * Is an image a picture or decoration? Linear's hero glow is a real PNG that is itself a soft
+ * blob, so no style rule catches it, and filmed it was a grey cloud for two shots. A picture has
+ * edges; a glow has almost none. Measured on a 48 by 27 downscale, the mean difference between
+ * neighbouring pixels was 3.3 for the glow and 12 to 28 for every real screenshot and photo, so
+ * anything under 6 is decoration. Read through the studio's asset proxy from the editor page,
+ * because inside the proxied frame a cross-origin image taints the canvas and cannot be read at
+ * all; an image that will not decode is let through, since not knowing is not a verdict.
+ */
+async function dropDecoration(page, cands, onStep) {
+  const srcs = cands.filter((c) => c.src && (c.role === 'image' || !c.text)).map((c) => c.src)
+  if (!srcs.length) return cands
+  const edges = await page.evaluate(async (list) => {
+    const out = {}
+    for (const src of list) {
+      try {
+        const url = src.startsWith('data:') ? src : '/__motioneer/asset?u=' + encodeURIComponent(src)
+        const bmp = await createImageBitmap(await (await fetch(url)).blob())
+        const c = document.createElement('canvas'); c.width = 48; c.height = 27
+        const g = c.getContext('2d'); g.drawImage(bmp, 0, 0, 48, 27)
+        const d = g.getImageData(0, 0, 48, 27).data
+        let sum = 0, n = 0
+        for (let y = 0; y < 27; y++) for (let x = 1; x < 48; x++) { const a = (y * 48 + x) * 4, b = a - 4; sum += Math.abs(d[a] - d[b]) + Math.abs(d[a + 1] - d[b + 1]) + Math.abs(d[a + 2] - d[b + 2]); n++ }
+        out[src] = sum / n / 3
+      } catch { out[src] = null }
+    }
+    return out
+  }, srcs).catch(() => ({}))
+  const kept = cands.filter((c) => !(c.src && typeof edges[c.src] === 'number' && edges[c.src] < 6))
+  if (kept.length < cands.length) onStep(`Left out ${cands.length - kept.length} decorative image${cands.length - kept.length === 1 ? '' : 's'} with no detail in it.`)
+  return kept
+}
 export async function inspectSite({ at, url }) {
   const chromium = await loadChromium()
   if (!chromium) throw new Error('Cannot inspect: the renderer is not installed. Next: open the studio once and set up the local renderer.')
   const source = await aim(at, url)
   const browser = await chromium.launch({ channel: 'chromium' })
   try {
-    const { frame, title, colours } = await openPage(browser, at, source)
-    const cands = await candidates(frame)
+    const { page, frame, title, colours } = await openPage(browser, at, source)
+    const cands = await dropDecoration(page, await candidates(frame), () => {})
     return { source, title, colours, candidates: cands }
   } finally { await browser.close() }
 }
@@ -167,7 +208,7 @@ export async function planFilm({ at, title, source, cands, pick, max, pace = 'br
       : `Choose up to ${max} elements that make the best short film of this product: prefer a hero heading, a primary button or feature card, and one strong image; avoid nav, footer, and repeats. `)
     + `Then write the film's words from the page itself, not from imagination: "product" is what this product is in under ten words; "opening" is a title of two to five words that names the product or its promise; "closing" is a title of two to five words that invites the next step. `
     + `For each chosen element write "direction", one sentence on how it should arrive that names its parts, like "the price lands last" or "the headline settles before the subline".\n`
-    + `Then cut it into "scenes", an ordered list of shots. Each scene has "elements", one or two chosen indices; "layout", one of full, detail, pair, stack; and "hold", one of long, normal, short. Use pair for two cards or images side by side, stack for a heading above the visual it introduces on the page, detail for one screenshot or image pushed in close, full otherwise. Hold the hero long and small details short. `
+    + `Then cut it into "scenes", an ordered list of shots. Each scene has "elements", one or two chosen indices; "layout", one of full, detail, pair, stack; and "hold", one of long, normal, short. Use pair for two cards or images side by side, stack for a heading or label above the visual it introduces on the page, detail for one screenshot or image pushed in close, full otherwise. A label, a one-line h3, is never a scene on its own; use it only as the top of a stack, or leave it out. A button is never a scene on its own either: pair it with the card or heading it belongs to, or leave it out. Hold the hero long and small details short. `
     + (many ? `Aim for ${Math.min(max, cands.length)} to ${Math.min(max + 3, cands.length + 2)} scenes; an element may appear in two scenes if the second is a different layout.\n` : `One or two scenes per element.\n`)
     + `Reply exactly: {"indices":[...],"product":"...","opening":"...","closing":"...","directions":{"<index>":"..."},"scenes":[{"elements":[i,j],"layout":"pair","hold":"normal"}]}`
   const r = await fetch(`${at}/__motioneer/ask`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ system, prompt, json: true }) })
@@ -235,7 +276,7 @@ export async function autofilm({ at, url, pick = '', direction = '', plan = plan
     onStep('Opening the editor on the site.')
     const projectId = await freshProject(at, `Film of ${source.replace(/^https?:\/\//, '').replace(/\/$/, '')}`)
     const { page, frame, title, colours } = await openPage(browser, at, source, projectId)
-    const cands = await candidates(frame)
+    const cands = await dropDecoration(page, await candidates(frame), onStep)
     if (!cands.length) throw new Error(`Cannot film ${source}: nothing on the page looked worth filming. It may still be loading or need a sign in. Next: try once more; if it needs a sign in, pick from your own browser with the bookmarklet in the studio.`)
     onStep(`Found ${cands.length} things on ${title || source}. Asking the model what to film and what to say.`)
     const chosen = await plan({ at, title, source, cands, pick, max, pace, direction })
@@ -257,13 +298,15 @@ export async function autofilm({ at, url, pick = '', direction = '', plan = plan
      * 135ms and the element then sat still for over a second, which reads as a pop. So a fast
      * shot of 1.3s gets a 0.9s motion, a brisk one 1.2s, and the direction asks for all of it.
      */
-    const paceNote = pace === 'calm' ? '' : ' Use the whole duration for the arrival, with the parts staggered across it, rather than an easing that is finished in the first third.'
+    // the whole duration, but from the first frame: asked for a slow arrival, a model once held the
+    // root invisible for 850ms of a 1200ms shot and revealed it in the last third, which is a blank shot
+    const paceNote = pace === 'calm' ? '' : ' Use the whole duration for the arrival, with the parts staggered across it, rather than an easing that is finished in the first third. Every part is visible and already moving from the very first frame; never hold the root or any part invisible, and keep every delay under 150ms. The last part should still be settling at seventy percent of the duration, so spread the stagger across it and use an ease that is not over in its first third.'
     for (let k = 0; k < captured.length; k++) {
       await page.locator('.subject-item').nth(k).click()
       const treat = page.getByLabel('Treatments', { exact: true })
       if (await treat.count()) await treat.selectOption(look).catch(() => {})
       const dur = page.getByLabel('Target duration (s)', { exact: true })
-      if (await dur.count()) { await dur.fill(pace === 'fast' ? '0.9' : pace === 'brisk' ? '1.2' : '1.0') }
+      if (await dur.count()) { await dur.fill(pace === 'fast' ? '1.0' : pace === 'brisk' ? '1.2' : '1.0') }
       const directionField = page.getByLabel('Creative direction', { exact: true })
       // the element's own direction first, then the film's, so a detailed brief reaches every motion rather than only the plan
       const filmNote = direction ? ` The film's direction: ${direction}` : ''
@@ -295,7 +338,9 @@ export async function autofilm({ at, url, pick = '', direction = '', plan = plan
     project = await (await fetch(`${at}/__motioneer/projects/${id}`)).json()
     // scenes name candidates; the project's subjects sit in capture order, so a captured index maps to its subject
     const subjectOf = new Map(captured.map((cand, k) => [cand, project.subjects[k]?.id]).filter(([, id]) => id))
-    const scenes = (chosen.scenes || []).map((sc) => ({ ids: sc.elements.map((n) => subjectOf.get(n)).filter(Boolean), layout: sc.layout, hold: sc.hold })).filter((sc) => sc.ids.length)
+    // a button or a label is never a shot on its own, whatever the plan said: asked twice in the prompt, the model still filmed a lone button
+    const minor = new Set(cands.filter((c) => c.role === 'button' || c.role === 'label').map((c) => c.i))
+    const scenes = (chosen.scenes || []).map((sc) => ({ ids: sc.elements.filter((n) => !(sc.elements.length === 1 && minor.has(n))).map((n) => subjectOf.get(n)).filter(Boolean), layout: sc.layout, hold: sc.hold })).filter((sc) => sc.ids.length)
     const cut = firstCut(project, { pace, seconds, opening: chosen.opening, closing: chosen.closing, background: colours.background, scenes })
     const components = cut.tracks.filter((t) => t.kind === 'component').length
     const shotsMade = new Set(cut.tracks.filter((t) => t.kind === 'component').map((t) => t.start)).size

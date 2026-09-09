@@ -40,7 +40,9 @@ if (!(await loadChromium())) { console.log('skip: the local renderer is not inst
   assert.ok(shotsOf(fast).every((t) => t.moves.length === 1 && t.moves[0].duration === t.duration), 'every fast shot keeps moving across its whole length')
   assert.ok(shotsOf(calm).every((t) => t.moves.length === 0), 'a calm shot holds still, the way the editor\'s button always did')
   {
-    const scened = firstCut(p, { pace: 'fast', seconds: 12, scenes: [{ ids: ['a'], layout: 'full', hold: 'long' }, { ids: ['a', 'b'], layout: 'pair' }, { ids: ['b', 'a'], layout: 'stack', hold: 'short' }, { ids: ['b'], layout: 'detail' }] })
+    // sized like real elements, since the cut refuses to blow a tiny one up into a blur
+    const real = { ...p, subjects: p.subjects.map((x) => ({ ...x, w: 900, h: 500 })) }
+    const scened = firstCut(real, { pace: 'fast', seconds: 12, scenes: [{ ids: ['a'], layout: 'full', hold: 'long' }, { ids: ['a', 'b'], layout: 'pair' }, { ids: ['b', 'a'], layout: 'stack', hold: 'short' }, { ids: ['b'], layout: 'detail' }] })
     const comps = shotsOf(scened), starts = [...new Set(comps.map((t) => t.start))]
     assert.ok(comps.length > starts.length, 'a pair or a stack puts two elements in one shot')
     const pair = comps.filter((t) => t.start === starts[1])
@@ -215,6 +217,7 @@ try {
   assert.ok(proof.ok, `the proof should pass for a fast film: ${proof.notes.join('; ')}`)
   assert.ok(proof.cuts >= 6, `a fast 12 second film should show at least 6 cuts, measured ${proof.cuts}`)
   assert.ok(proof.arriveMs >= 200, `elements should visibly arrive rather than pop, measured ${proof.arriveMs}ms`)
+  assert.equal(proof.lateShots, 0, 'no shot should still be empty a third of a second in')
   const calmVerdict = await proveFilm({ file: mp4, pace: 'calm', seconds: 12, cuts: result.cutTimes })
   assert.ok(calmVerdict.ok, 'the same film passes a calm verdict, which asks less')
   console.log(`ok: measured off the frames: ${proof.cuts} cuts, shots ${(proof.avgShotMs / 1000).toFixed(1)}s on average, elements arriving over ${proof.arriveMs}ms, ${Math.round(proof.blank * 100)}% blank`)

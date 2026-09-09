@@ -39,7 +39,7 @@ export function compositionRuntime(initial: Project, assetRoot: string) {
     signatures.set(t.id, key)
     holder.replaceChildren()
     const frame = document.createElement('iframe'); frame.title = subject.name; frame.style.cssText = 'border:0;position:absolute;left:0;top:0;transform-origin:top left;pointer-events:none;'
-    frame.width = String(subject.w); frame.height = String(subject.h)
+    frame.width = String(subject.w)
     const parsed = new DOMParser().parseFromString(subject.html, 'text/html')
     parsed.querySelectorAll('script,iframe,object,embed,base,meta,link').forEach(el => el.remove())
     parsed.querySelectorAll('*').forEach(el => { for (const attr of [...el.attributes]) if (/^on/i.test(attr.name) || /^(javascript|vbscript):/i.test(attr.value.trim())) el.removeAttribute(attr.name) })
@@ -52,6 +52,21 @@ export function compositionRuntime(initial: Project, assetRoot: string) {
      */
     const root = parsed.body.firstElementChild as HTMLElement | null
     if (root) root.style.margin = '0'
+    /**
+     * A little room below. A site's webfont is often unreadable across origins, and the fallback
+     * face runs taller, so a heading measured at 83px on the page needs more here and lost its
+     * descenders to the frame's edge. The root may grow, and the frame is a sixth taller than the
+     * box it was measured in, with the same width, so the scale the track computes still holds.
+     */
+    if (root) { root.style.height = 'auto'; root.style.minHeight = subject.h + 'px' }
+    /**
+     * Border-box at the measured width. The picker inlines the computed width, which for a
+     * content-box element excludes its padding, so a heading measured 1030 wide came back as
+     * width 1030 plus 32 of padding a side, overflowed its 1030 frame by 64, and lost the end of
+     * every line. The measured size is the border box, so that is what the root is told it is.
+     */
+    if (root) { root.style.boxSizing = 'border-box'; root.style.width = subject.w + 'px'; root.style.maxWidth = 'none' }
+    frame.height = String(Math.round(subject.h * 1.17))
     const styles = (subject.css + '\n' + (motion?.css || '')).replace(/<\/style/gi, '<\\/style')
     let done!: () => void
     const wait = new Promise<void>(resolve => { done = resolve }); pending.add(wait)
