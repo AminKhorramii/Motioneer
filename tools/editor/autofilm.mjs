@@ -22,13 +22,37 @@ async function candidates(frame) {
       const r = el.getBoundingClientRect(), style = getComputedStyle(el)
       if (r.width < 90 || r.height < 24 || r.width > 1300 || r.height > 900) return false
       if (style.visibility === 'hidden' || style.display === 'none' || Number(style.opacity) < 0.2) return false
-      if (r.top > 2600 || r.bottom < 0) return false
+      if (r.top + window.scrollY > 7000 || r.bottom + window.scrollY < 0) return false
       return true
     }
     const wanted = 'h1,h2,h3,button,a[role=button],[class*=card],[class*=Card],[class*=hero],[class*=Hero],figure,img,[class*=cta],[class*=CTA]'
+    /**
+     * What a pick resolves to, which is not always the element that matched. Measured on
+     * notion.so, five of eight picks rendered blank: two were stretched links, an anchor with
+     * position absolute and inset zero laid over a card as its click target, holding one
+     * non-breaking space; one was a card's content box whose white text only reads on the dark
+     * background of its parent. An overlay stands for what it covers, and a content box takes
+     * the container that carries its look, when that container is not much bigger than itself.
+     */
+    const visible = (el) => (el.innerText || '').trim().length > 0 || !!el.querySelector('img,picture,video,svg,canvas') || /url\(/.test(getComputedStyle(el).backgroundImage) || el.tagName === 'IMG'
+    const backed = (el) => { const cs = getComputedStyle(el); return (cs.backgroundColor && cs.backgroundColor !== 'transparent' && !/rgba\(\d+, \d+, \d+, 0\)/.test(cs.backgroundColor)) || /url\(/.test(cs.backgroundImage) }
+    const area = (el) => { const r = el.getBoundingClientRect(); return r.width * r.height }
+    const visualRoot = (el) => {
+      if (!visible(el)) { const p = el.parentElement; return p && p !== body && getComputedStyle(el).position === 'absolute' && visible(p) ? p : null }
+      let cur = el
+      for (let n = 0; n < 3; n++) {
+        if (backed(cur) || /^(h[1-3]|img|figure|button)$/i.test(cur.tagName)) return cur
+        const p = cur.parentElement
+        if (!p || p === body || area(p) > area(cur) * 1.8) break
+        cur = p
+      }
+      return cur
+    }
     let i = 0
-    for (const el of body.querySelectorAll(wanted)) {
-      if (out.length >= 40 || !worth(el)) continue
+    for (const matched of body.querySelectorAll(wanted)) {
+      if (out.length >= 40) break
+      const el = visualRoot(matched)
+      if (!el || !worth(el)) continue
       // do not nest a candidate inside one already taken: a card and its own heading are one pick
       if (out.some((o) => o.el.contains(el) || el.contains(o.el))) continue
       const r = el.getBoundingClientRect(), top = Math.round(r.top + window.scrollY), page = document.documentElement.scrollHeight, style = getComputedStyle(el)
@@ -50,7 +74,8 @@ async function candidates(frame) {
      */
     const kept = []
     for (const c of out) {
-      const twin = kept.find((k) => k.role === c.role && k.section === c.section && Math.abs(k.w - c.w) <= 4 && Math.abs(k.h - c.h) <= 4 && k.image === c.image)
+      // only small look-alikes fold: a row of sidebar buttons is one thing, three feature cards are three shots
+      const twin = c.w * c.h < 20000 && kept.find((k) => k.role === c.role && k.section === c.section && Math.abs(k.w - c.w) <= 4 && Math.abs(k.h - c.h) <= 4 && k.image === c.image)
       if (twin) twin.alike = (twin.alike || 0) + 1; else kept.push(c)
     }
     return kept.map(({ el, ...rest }) => rest)
@@ -94,7 +119,10 @@ async function openPage(browser, at, source, projectId) {
   const frame = page.frameLocator('iframe[title="Source page"]')
   try { await frame.locator('body').waitFor({ timeout: 45000 }) }
   catch { throw new Error(`Cannot film ${source}: it did not render inside the studio in 45 seconds. It is slow, or it refuses to be proxied, which is what a site that signs in against its own api does. Next: try again once if it was slow; otherwise open the studio and pick from your own browser with the bookmarklet.`) }
-  await page.waitForTimeout(4000)
+  await page.waitForTimeout(3000)
+  // a landing page renders below the fold only as it is scrolled, so it is walked once to wake it, then returned to the top
+  await frame.locator('body').evaluate(async (body) => { const h = document.documentElement.scrollHeight; for (let y = 0; y < Math.min(h, 7000); y += 700) { window.scrollTo(0, y); await new Promise((r) => setTimeout(r, 120)) } window.scrollTo(0, 0) }).catch(() => {})
+  await page.waitForTimeout(600)
   const title = await frame.locator('title').first().textContent().catch(() => '') || ''
   /**
    * The page's own ground and ink, read off the rendered document rather than guessed. A body
@@ -127,11 +155,14 @@ export async function inspectSite({ at, url }) {
  * each element should move. One call, so the pieces agree with each other. `pick` is what the
  * person asked for in their own words, and it outranks the default preferences.
  */
-export async function planFilm({ at, title, source, cands, pick, max }) {
+export async function planFilm({ at, title, source, cands, pick, max, pace = 'brisk' }) {
   const system = 'You plan short motion films of product pages. Reply with one JSON object and nothing else.'
+  const many = max >= 6
   const prompt = `Page: ${title || source}\nElements on it, one per line:\n${cands.map(describe).join('\n')}\n\n`
     + (pick ? `The person asked to film: "${pick}". Choose what matches that first.\n` : '')
-    + `Choose up to ${max} elements that make the best short film of this product: prefer a hero heading, a primary button or feature card, and one strong image; avoid nav, footer, and repeats. `
+    + (many
+      ? `Choose ${Math.min(max, cands.length)} distinct elements, as many as that, from across the whole page in reading order: the hero heading and image first, then feature cards, images and headings from further down, so the film shows the product's range. This is a fast film of many short shots; more distinct things beat fewer. Avoid nav and footer. `
+      : `Choose up to ${max} elements that make the best short film of this product: prefer a hero heading, a primary button or feature card, and one strong image; avoid nav, footer, and repeats. `)
     + `Then write the film's words from the page itself, not from imagination: "product" is what this product is in under ten words; "opening" is a title of two to five words that names the product or its promise; "closing" is a title of two to five words that invites the next step. `
     + `For each chosen element write "direction", one sentence on how it should arrive that names its parts, like "the price lands last" or "the headline settles before the subline".\n`
     + `Reply exactly: {"indices":[...],"product":"...","opening":"...","closing":"...","directions":{"<index>":"..."}}`
@@ -156,10 +187,22 @@ async function capture(page, frame, cand) {
   const el = frame.locator(`[data-mn-cand="${cand}"]`).first()
   if (!(await el.count())) return false
   await el.scrollIntoViewIfNeeded().catch(() => {})
+  /**
+   * Handed to the picker, not clicked. The picker takes whatever the pointer is over, and on
+   * notion.so the pointer over a card lands on the invisible anchor stretched across it, so five
+   * of eight picks came back as a non-breaking space. A synthetic mousemove dispatched on the
+   * element itself is not hit-tested: the picker records exactly that element, and "Capture
+   * selection" takes it. The click stays as the fallback for a page where the event does not land.
+   */
+  await el.evaluate((node) => node.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, cancelable: true, view: window }))).catch(() => {})
+  await page.waitForTimeout(120)
+  await label(page, 'Capture selection').click().catch(() => {})
+  try { await page.waitForFunction((n) => document.querySelectorAll('.subject-item').length === n, before + 1, { timeout: 8000 }); return true }
+  catch { /* fall through to the pointer */ }
   const box = await el.boundingBox()
   if (!box) return false
   await el.click({ position: { x: Math.min(8, box.width / 2), y: Math.min(8, box.height / 2) }, force: true }).catch(() => {})
-  try { await page.waitForFunction((n) => document.querySelectorAll('.subject-item').length === n, before + 1, { timeout: 20000 }) }
+  try { await page.waitForFunction((n) => document.querySelectorAll('.subject-item').length === n, before + 1, { timeout: 15000 }) }
   catch { return false }
   return true
 }
@@ -189,7 +232,7 @@ export async function autofilm({ at, url, pick = '', plan = planFilm, seconds = 
     const cands = await candidates(frame)
     if (!cands.length) throw new Error(`Cannot film ${source}: nothing on the page looked worth filming. It may still be loading or need a sign in. Next: try once more; if it needs a sign in, pick from your own browser with the bookmarklet in the studio.`)
     onStep(`Found ${cands.length} things on ${title || source}. Asking the model what to film and what to say.`)
-    const chosen = await plan({ at, title, source, cands, pick, max })
+    const chosen = await plan({ at, title, source, cands, pick, max, pace })
     onStep(chosen.byModel ? `The model chose ${chosen.indices.length}${chosen.product ? ` for "${chosen.product}"` : ''}.` : `The model could not be asked (${chosen.why}), so the most prominent elements were chosen.`)
 
     const captured = []
@@ -200,27 +243,34 @@ export async function autofilm({ at, url, pick = '', plan = planFilm, seconds = 
     }
     if (!captured.length) throw new Error(`Cannot film ${source}: none of the chosen elements could be captured. Next: ask for different elements with pick, or open the studio and pick by hand.`)
 
-    // one treatment per element, with the model's direction for it, kept as we go so the first cut has something to place
+    /**
+     * One treatment per element, all written at once. Each subject is briefed and its motion
+     * started before the next is touched, so eight elements cost one model round rather than
+     * eight in a row; then each is waited for and kept. The motion should fill most of its shot:
+     * measured on a fast film, a 450ms motion with the model's usual ease-out was visibly over in
+     * 135ms and the element then sat still for over a second, which reads as a pop. So a fast
+     * shot of 1.3s gets a 0.9s motion, a brisk one 1.2s, and the direction asks for all of it.
+     */
+    const paceNote = pace === 'calm' ? '' : ' Use the whole duration for the arrival, with the parts staggered across it, rather than an easing that is finished in the first third.'
     for (let k = 0; k < captured.length; k++) {
       await page.locator('.subject-item').nth(k).click()
       const treat = page.getByLabel('Treatments', { exact: true })
       if (await treat.count()) await treat.selectOption(look).catch(() => {})
-      /**
-       * The motion should fill most of its shot. Measured on a fast film, a 450ms motion with the
-       * model's usual ease-out was visibly over in 135ms and the element then sat still for over a
-       * second, which reads as a pop, not a motion. So a fast shot of 1.3s gets a 0.9s motion, a
-       * brisk one 1.2s, and the direction asks for the whole duration to be used.
-       */
       const dur = page.getByLabel('Target duration (s)', { exact: true })
       if (await dur.count()) { await dur.fill(pace === 'fast' ? '0.9' : pace === 'brisk' ? '1.2' : '1.0') }
       const direction = page.getByLabel('Creative direction', { exact: true })
-      const paceNote = pace === 'calm' ? '' : ' Use the whole duration for the arrival, with the parts staggered across it, rather than an easing that is finished in the first third.'
       if (await direction.count()) await direction.fill((String(chosen.directions[String(captured[k])] || '') + paceNote).trim().slice(0, 400))
-      onStep(`Writing a ${look} motion for element ${k + 1} of ${captured.length}.`)
       await label(page, 'Explore motion').click()
-      await page.locator('.motion-card:not(.pending)').first().waitFor({ timeout: 300000 })
-      if (await label(page, 'Keep motion').count()) await label(page, 'Keep motion').first().click()
+      await page.waitForTimeout(150)
     }
+    onStep(`Writing ${captured.length} ${look} motions at once.`)
+    let kept = 0
+    for (let k = 0; k < captured.length; k++) {
+      await page.locator('.subject-item').nth(k).click()
+      try { await page.locator('.motion-card:not(.pending)').first().waitFor({ timeout: 300000 }) } catch { onStep(`Element ${k + 1} got no motion in time, leaving it out.`); continue }
+      if (await label(page, 'Keep motion').count()) { await label(page, 'Keep motion').first().click(); kept++ }
+    }
+    if (!kept) throw new Error('Cannot film: no motion came back for any element. Next: check the model in the studio settings and try again.')
 
     // the cut is assembled with the same function the editor's button calls, over http rather than
     // by clicking, so pace, length and the model's words all pass through one place. it waits for

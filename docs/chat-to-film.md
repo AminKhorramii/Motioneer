@@ -82,6 +82,21 @@ brief, and every selector it clicks is one it wrote onto the page, so a chosen e
 resolves. When the person said what they want, `pick` carries their words and outranks the
 defaults. When the model cannot be asked, prominence chooses and the film says so.
 
+A pick resolves to what a viewer would see, not to the element that matched. On notion.so five of
+eight picks once rendered blank: stretched links, an anchor with `position: absolute; inset: 0`
+laid over a card as its click target and holding one non-breaking space, and a card's content box
+whose white text only reads on its parent's dark ground. An invisible overlay now stands for the
+card beneath it, and a content box takes the container that carries its look when that container
+is not much bigger. The element is then handed to the picker with a synthetic mousemove rather
+than clicked, because the pointer over a card lands on the overlay and the picker takes whatever
+is under the pointer. Large look-alikes stay separate, since three feature cards are three shots;
+only small runs such as a sidebar's buttons fold into one line.
+
+A fast film wants many elements: eight by default, up to twelve, and "lots of elements" means
+ten or more. Their motions are all written at once, each subject briefed and started before the
+next is touched, so eight elements cost one model round rather than eight. Measured on notion.so,
+a fast fifteen second film of eight elements takes about a minute from the request to the file.
+
 `inspect` reads a page the same way without filming it, and returns the list, so an agent can say
 what it sees and ask which to film before a minute of rendering is spent.
 

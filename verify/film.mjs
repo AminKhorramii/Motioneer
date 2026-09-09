@@ -78,6 +78,8 @@ const site = createServer((req, res) => {
       <button style="margin-top:12px;background:#4f56d6;color:#fff;border:0;padding:12px 22px;border-radius:10px">Get started</button>
     </article>
     <div class="hero-image" style="width:520px;height:220px;margin:18px 0 0;border-radius:16px;background:linear-gradient(135deg,#6b73e6,#c98bb0)"></div>
+    <article class="card" style="position:relative;width:520px;margin-top:24px;padding:24px;background:#fff;border-radius:12px"><h3 style="margin:0">Triage feedback</h3><a class="cardAnchor" aria-label="Open" href="#" style="position:absolute;inset:0">&nbsp;</a></article>
+    <div style="width:300px;margin-top:24px;padding:24px;background:#151821;border-radius:12px"><div class="cardContent" style="color:#fff"><h3 style="margin:0">White on dark</h3><p style="margin:8px 0 0;color:#cfd3dc">Reads only on its ground.</p></div></div>
   </body></html>`)
 })
 await new Promise((r) => site.listen(0, '127.0.0.1', r))
@@ -104,6 +106,14 @@ try {
   const planPrompt = prompts.find((p) => /"opening"/.test(p))
   assert.ok(planPrompt && /the card and the headline/.test(planPrompt), 'the person\'s pick should reach the model')
   assert.ok(planPrompt && /card in (hero|body|nav)/.test(planPrompt), 'candidates should be described by role and section')
+  {
+    // every candidate is something a viewer would see: an invisible stretched link stands for its card, a content box for its dark container
+    const lines = planPrompt.split('\n').filter((l) => /^\d+: /.test(l))
+    assert.ok(lines.every((l) => /with an image|"[^"]+"/.test(l)), `no candidate should be an invisible box: ${lines.filter((l) => !/with an image|"[^"]+"/.test(l)).join(' | ')}`)
+    assert.ok(lines.filter((l) => /Triage feedback/.test(l)).length === 1, 'the overlay anchor should resolve to its card once, not twice')
+    const dark = lines.find((l) => /White on dark/.test(l))
+    assert.ok(dark && /div in/.test(dark), `the white-on-dark content box should resolve to its dark container: ${dark}`)
+  }
   /**
    * A candidate's text is what a reader sees, not what the node contains. The card carries its
    * own <style>, and read with textContent it described itself to the model as a keyframes block,
