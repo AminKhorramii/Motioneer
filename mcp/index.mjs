@@ -59,6 +59,7 @@ const INSTRUCTIONS = `Motioneer makes motion for a person's own product. Choose 
 How people say it, and what to call:
 - "make me a video of my site", "demo reel of localhost:3000", "motion film of linear.app": film with the url and dir.
 - "film the pricing cards", "just the hero": film with pick set to those words. If you are not sure what is on the page, inspect first and offer the list.
+- a long or detailed request, with tone, rhythm, mood or how things should move: pass the whole of it in direction, word for word, and the elements it names in pick. Do not summarise it; the plan and every motion read it.
 - "what could you film on this page": inspect, then relay the list in plain words and ask which they want.
 - "open the studio on my app", "let me pick": studio with the url.
 - "animate this component", with markup pasted: motion.
@@ -164,7 +165,8 @@ const TOOLS = [
         look: { type: 'string', enum: ['subtle', 'expressive', 'bold'], description: 'The single treatment written for each element. Subtle by default, which reads as fast and calm.' },
         count: { type: 'number', description: 'How many elements to film, 1 to 12. Eight by default for a fast film, five for brisk, three for calm; when the page offers fewer, the ones found repeat across the shots.' },
         pace: { type: 'string', enum: ['calm', 'brisk', 'fast'], description: 'How it is cut. fast is many short shots of about a second with short titles, brisk is a demo rhythm, calm is a few long shots. Brisk by default.' },
-        pick: { type: 'string', description: 'What the person wants filmed, in their own words, like "the pricing cards and the hero". The model matches it against what is on the page. Leave it out to let the model choose the best three.' },
+        pick: { type: 'string', description: 'Which elements the person wants filmed, in their own words, like "the pricing cards and the hero". The model matches it against what is on the page. Leave it out to let the model choose.' },
+        direction: { type: 'string', description: 'The creative direction for the whole film, in the person\'s words, up to a paragraph: the tone, the rhythm, what to emphasise, how things should arrive, what the titles should feel like. It shapes the plan, the titles and every motion. Pass a detailed request through here whole rather than summarising it.' },
       },
       required: ['url'],
     },
@@ -316,7 +318,7 @@ async function inspect({ url, dir }) {
     + `for example "the pricing cards and the hero"; the model matches pick against this list. Without pick it chooses the best three.`
 }
 
-async function film({ url, dir, seconds, look, count, pick, pace }) {
+async function film({ url, dir, seconds, look, count, pick, pace, direction }) {
   if (!url) throw new Error('film needs a url, a running site or dev server like http://localhost:3000.')
   const at = STUDIO_AT()
   const up = await spawnStudio({ url, dir, at })
@@ -340,7 +342,7 @@ async function film({ url, dir, seconds, look, count, pick, pace }) {
   const wantSeconds = Number(seconds) || (wantPace === 'fast' ? 12 : 20)
   // a fast film wants many elements; a calm one a few. the cap is what a render can carry in a few minutes
   const max = Math.max(1, Math.min(12, Number(count) || (wantPace === 'fast' ? 8 : wantPace === 'brisk' ? 5 : 3)))
-  const result = await autofilm({ at, url, pick: String(pick || '').slice(0, 300), seconds: wantSeconds, look: look || (wantPace === 'calm' ? 'subtle' : 'expressive'), pace: wantPace, max, onStep: (m) => steps.push(m) })
+  const result = await autofilm({ at, url, pick: String(pick || '').slice(0, 600), direction: String(direction || '').slice(0, 1400), seconds: wantSeconds, look: look || (wantPace === 'calm' ? 'subtle' : 'expressive'), pace: wantPace, max, onStep: (m) => steps.push(m) })
   const buf = Buffer.from(await (await fetch(result.url)).arrayBuffer())
   const outDir = dir && path.isAbsolute(dir) ? dir : process.cwd()
   const file = path.join(outDir, `motioneer-film-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.mp4`)

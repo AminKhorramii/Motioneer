@@ -54,7 +54,10 @@ const model = createServer(async (req, res) => {
   if (/"opening"/.test(prompt)) {
     // the plan: the second and first candidates, words taken from the page, a direction for each
     // the card and the block, which is what a real page offers: things with area, not thin lines of text
-    const plan = { indices: [1, 2], product: 'a board for shipping teams', opening: 'Ship it with confidence', closing: 'Get started today', directions: { '1': 'the heading lands, then the button settles last', '2': 'the block rises as one piece' } }
+    // chosen by what the lines say rather than by position, since the page's order is not the point being tested
+    const lines = prompt.split('\n').map((l) => /^(\d+): (.*)$/.exec(l)).filter(Boolean)
+    const card = Number(lines.find((m) => /Everything in one place/.test(m[2]))?.[1]), block = Number(lines.find((m) => /hero in/.test(m[2]) && /520x220/.test(m[2]))?.[1])
+    const plan = { indices: [card, block], product: 'a board for shipping teams', opening: 'Ship it with confidence', closing: 'Get started today', directions: { [card]: 'the heading lands, then the button settles last', [block]: 'the block rises as one piece' } }
     res.writeHead(200, { 'content-type': 'text/event-stream' })
     return res.end('data: ' + JSON.stringify({ choices: [{ delta: { content: JSON.stringify(plan) } }] }) + '\n\ndata: [DONE]\n\n')
   }
@@ -99,7 +102,7 @@ try {
   const steps = []
   const before = await (await fetch(`${at}/__motioneer/editor-config`)).json()
   assert.equal(before.source, null, 'the studio should start aimed at nothing, so the aim is what is being proved')
-  const result = await autofilm({ at, url: siteAt, seconds: 12, look: 'subtle', pace: 'fast', max: 2, pick: 'the card and the headline', onStep: (m) => steps.push(m) })
+  const result = await autofilm({ at, url: siteAt, seconds: 12, look: 'subtle', pace: 'fast', max: 2, pick: 'the card and the headline', direction: 'calm confidence, every arrival settles like paper on a desk', onStep: (m) => steps.push(m) })
   assert.equal(result.captured, 2, 'both chosen elements should be captured')
   assert.ok(result.byModel, 'the plan should have come from the model through the studio, not the fallback')
   assert.equal(result.opening, 'Ship it with confidence', 'the opening title should be the model\'s words')
@@ -109,7 +112,7 @@ try {
   {
     // every candidate is something a viewer would see: an invisible stretched link stands for its card, a content box for its dark container
     const lines = planPrompt.split('\n').filter((l) => /^\d+: /.test(l))
-    assert.ok(lines.every((l) => /with an image|"[^"]+"/.test(l)), `no candidate should be an invisible box: ${lines.filter((l) => !/with an image|"[^"]+"/.test(l)).join(' | ')}`)
+    assert.ok(lines.every((l) => /with an image|a painted block|"[^"]+"/.test(l)), `no candidate should be an invisible box: ${lines.filter((l) => !/with an image|a painted block|"[^"]+"/.test(l)).join(' | ')}`)
     assert.ok(lines.filter((l) => /Triage feedback/.test(l)).length === 1, 'the overlay anchor should resolve to its card once, not twice')
     const dark = lines.find((l) => /White on dark/.test(l))
     assert.ok(dark && /div in/.test(dark), `the white-on-dark content box should resolve to its dark container: ${dark}`)
@@ -123,6 +126,8 @@ try {
   assert.ok(planPrompt && !/@keyframes/.test(planPrompt), 'a candidate\'s own <style> must not be read as its text')
   assert.ok(planPrompt && /Everything in one place/.test(planPrompt), 'the card should describe itself by its heading')
   assert.ok(prompts.some((p) => /settles last|rises as one piece/.test(p)), 'the model\'s direction should reach the motion prompt')
+  assert.ok(planPrompt && /settles like paper/.test(planPrompt), 'the film\'s direction should reach the plan')
+  assert.ok(prompts.filter((p) => /settles like paper/.test(p) && !/"opening"/.test(p)).length >= 2, 'the film\'s direction should reach every motion prompt')
   const saved = await (await fetch(`${at}/__motioneer/projects/${result.projectId}`)).json()
   /**
    * A captured root sits flush in its frame. The block was captured with an 18px top margin, and a

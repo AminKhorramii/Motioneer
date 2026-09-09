@@ -34,8 +34,9 @@ async function candidates(frame) {
      * background of its parent. An overlay stands for what it covers, and a content box takes
      * the container that carries its look, when that container is not much bigger than itself.
      */
-    const visible = (el) => (el.innerText || '').trim().length > 0 || !!el.querySelector('img,picture,video,svg,canvas') || /url\(/.test(getComputedStyle(el).backgroundImage) || el.tagName === 'IMG'
-    const backed = (el) => { const cs = getComputedStyle(el); return (cs.backgroundColor && cs.backgroundColor !== 'transparent' && !/rgba\(\d+, \d+, \d+, 0\)/.test(cs.backgroundColor)) || /url\(/.test(cs.backgroundImage) }
+    // a painted background counts as something to see: a gradient block with no text is a shot, an empty transparent box is not
+    const backed = (el) => { const cs = getComputedStyle(el); return (cs.backgroundColor && cs.backgroundColor !== 'transparent' && !/rgba\(\d+, \d+, \d+, 0\)/.test(cs.backgroundColor)) || cs.backgroundImage !== 'none' }
+    const visible = (el) => (el.innerText || '').trim().length > 0 || !!el.querySelector('img,picture,video,svg,canvas') || el.tagName === 'IMG' || backed(el)
     const area = (el) => { const r = el.getBoundingClientRect(); return r.width * r.height }
     const visualRoot = (el) => {
       if (!visible(el)) { const p = el.parentElement; return p && p !== body && getComputedStyle(el).position === 'absolute' && visible(p) ? p : null }
@@ -43,7 +44,7 @@ async function candidates(frame) {
       for (let n = 0; n < 3; n++) {
         if (backed(cur) || /^(h[1-3]|img|figure|button)$/i.test(cur.tagName)) return cur
         const p = cur.parentElement
-        if (!p || p === body || area(p) > area(cur) * 1.8) break
+        if (!p || p === body || area(p) > area(cur) * 2.5) break
         cur = p
       }
       return cur
@@ -61,7 +62,7 @@ async function candidates(frame) {
       const section = top < 90 ? 'nav' : top < 900 ? 'hero' : top > page - 700 ? 'footer' : 'body'
       const cls = (el.className && typeof el.className === 'string' ? el.className : '').toLowerCase()
       const role = el.tagName === 'IMG' ? 'image' : /^h[1-3]$/i.test(el.tagName) ? 'heading' : /button/i.test(el.tagName) || /cta|button/.test(cls) ? 'button' : /card/.test(cls) ? 'card' : /hero/.test(cls) ? 'hero' : el.tagName.toLowerCase()
-      out.push({ el, i, tag: el.tagName.toLowerCase(), role, section, image, w: Math.round(r.width), h: Math.round(r.height), top,
+      out.push({ el, i, tag: el.tagName.toLowerCase(), role, section, image, painted: !image && backed(el), w: Math.round(r.width), h: Math.round(r.height), top,
         // innerText, not textContent: a section with its own <style> tag reads back as a
         // keyframes block, and the model then plans a film about css instead of the product
         text: (el.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 80) })
@@ -83,7 +84,7 @@ async function candidates(frame) {
 }
 
 /** One line per candidate, the way both the model and an agent read it. */
-export const describe = (c) => `${c.i}: ${c.role} in ${c.section}, ${c.w}x${c.h}${c.image ? ', with an image' : ''}${c.text ? `, "${c.text}"` : ''}${c.alike ? ` (and ${c.alike} more like it)` : ''}`
+export const describe = (c) => `${c.i}: ${c.role} in ${c.section}, ${c.w}x${c.h}${c.image ? ', with an image' : c.painted && !c.text ? ', a painted block' : ''}${c.text ? `, "${c.text}"` : ''}${c.alike ? ` (and ${c.alike} more like it)` : ''}`
 const name = (c) => c ? (c.text || `the ${c.role} in the ${c.section}`) : 'an element'
 
 /**
@@ -155,11 +156,12 @@ export async function inspectSite({ at, url }) {
  * each element should move. One call, so the pieces agree with each other. `pick` is what the
  * person asked for in their own words, and it outranks the default preferences.
  */
-export async function planFilm({ at, title, source, cands, pick, max, pace = 'brisk' }) {
+export async function planFilm({ at, title, source, cands, pick, max, pace = 'brisk', direction = '' }) {
   const system = 'You plan short motion films of product pages. Reply with one JSON object and nothing else.'
   const many = max >= 6
   const prompt = `Page: ${title || source}\nElements on it, one per line:\n${cands.map(describe).join('\n')}\n\n`
     + (pick ? `The person asked to film: "${pick}". Choose what matches that first.\n` : '')
+    + (direction ? `The person's direction for the whole film, which shapes the product line, the titles and every element's direction: "${direction}"\n` : '')
     + (many
       ? `Choose ${Math.min(max, cands.length)} distinct elements, as many as that, from across the whole page in reading order: the hero heading and image first, then feature cards, images and headings from further down, so the film shows the product's range. This is a fast film of many short shots; more distinct things beat fewer. Avoid nav and footer. `
       : `Choose up to ${max} elements that make the best short film of this product: prefer a hero heading, a primary button or feature card, and one strong image; avoid nav, footer, and repeats. `)
@@ -217,7 +219,7 @@ async function capture(page, frame, cand) {
  * @param max       cap on how many elements to capture
  * @param onStep    (message) => void  progress, surfaced to the agent's caller
  */
-export async function autofilm({ at, url, pick = '', plan = planFilm, seconds = 20, look = 'subtle', pace = 'brisk', max = 3, onStep = () => {} }) {
+export async function autofilm({ at, url, pick = '', direction = '', plan = planFilm, seconds = 20, look = 'subtle', pace = 'brisk', max = 3, onStep = () => {} }) {
   const chromium = await loadChromium()
   if (!chromium) throw new Error('Cannot film: the renderer is not installed. Next: open the studio once and set up the local renderer, then ask again.')
   // aim first, every time: a studio already up may be on another site or a folder, and reusing it
@@ -232,7 +234,7 @@ export async function autofilm({ at, url, pick = '', plan = planFilm, seconds = 
     const cands = await candidates(frame)
     if (!cands.length) throw new Error(`Cannot film ${source}: nothing on the page looked worth filming. It may still be loading or need a sign in. Next: try once more; if it needs a sign in, pick from your own browser with the bookmarklet in the studio.`)
     onStep(`Found ${cands.length} things on ${title || source}. Asking the model what to film and what to say.`)
-    const chosen = await plan({ at, title, source, cands, pick, max, pace })
+    const chosen = await plan({ at, title, source, cands, pick, max, pace, direction })
     onStep(chosen.byModel ? `The model chose ${chosen.indices.length}${chosen.product ? ` for "${chosen.product}"` : ''}.` : `The model could not be asked (${chosen.why}), so the most prominent elements were chosen.`)
 
     const captured = []
@@ -258,8 +260,10 @@ export async function autofilm({ at, url, pick = '', plan = planFilm, seconds = 
       if (await treat.count()) await treat.selectOption(look).catch(() => {})
       const dur = page.getByLabel('Target duration (s)', { exact: true })
       if (await dur.count()) { await dur.fill(pace === 'fast' ? '0.9' : pace === 'brisk' ? '1.2' : '1.0') }
-      const direction = page.getByLabel('Creative direction', { exact: true })
-      if (await direction.count()) await direction.fill((String(chosen.directions[String(captured[k])] || '') + paceNote).trim().slice(0, 400))
+      const directionField = page.getByLabel('Creative direction', { exact: true })
+      // the element's own direction first, then the film's, so a detailed brief reaches every motion rather than only the plan
+      const filmNote = direction ? ` The film's direction: ${direction}` : ''
+      if (await directionField.count()) await directionField.fill((String(chosen.directions[String(captured[k])] || '') + paceNote + filmNote).trim().slice(0, 760))
       await label(page, 'Explore motion').click()
       await page.waitForTimeout(150)
     }
