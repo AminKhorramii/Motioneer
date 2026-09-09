@@ -27,15 +27,18 @@ async function candidates(frame) {
      */
     /**
      * A gated page: slack.com keeps its whole content under an ancestor with display none until a
-     * script confirms, and shows a no-script link. When almost nothing is visible and headings sit
-     * under hidden containers, the topmost such container of each is shown, since a page that would
-     * otherwise yield nothing is better read than left empty.
+     * script confirms, and shows a no-script link; nextjs.org shows its hero and keeps every section
+     * below it under a hidden attribute until its scripts arrive, which under the proxy they never
+     * do, so it read as three things. When most of the headings sit under hidden containers, every
+     * such container is shown, since a page that would otherwise yield nothing is better read than
+     * left empty. A menu or a dialog hides a heading or two, never most of the page, so those stay.
      */
-    if ((body.innerText || '').trim().length < 200) {
+    {
       // every hidden ancestor, not only the outermost: slack nests one gate inside another
-      const gates = new Set()
-      for (const h of body.querySelectorAll('h1,h2,h3')) for (let a = h.parentElement; a && a !== body; a = a.parentElement) if (getComputedStyle(a).display === 'none') gates.add(a)
-      if (gates.size && [...body.querySelectorAll('h1,h2,h3')].length >= 3) for (const g of gates) { g.style.setProperty('display', 'block', 'important'); g.removeAttribute('hidden'); g.style.setProperty('visibility', 'visible', 'important'); g.style.setProperty('opacity', '1', 'important') }
+      const gates = new Set(), heads = [...body.querySelectorAll('h1,h2,h3')]
+      let gated = 0
+      for (const h of heads) { let under = false; for (let a = h.parentElement; a && a !== body; a = a.parentElement) if (getComputedStyle(a).display === 'none') { gates.add(a); under = true }; if (under) gated++ }
+      if (gates.size && gated >= 3 && gated * 2 >= heads.length) for (const g of gates) { g.style.setProperty('display', 'block', 'important'); g.removeAttribute('hidden'); g.style.setProperty('visibility', 'visible', 'important'); g.style.setProperty('opacity', '1', 'important') }
     }
     const hiddenHeads = [...body.querySelectorAll('h1,h2,h3')].filter((h) => { const cs = getComputedStyle(h); return cs.opacity === '0' || cs.visibility === 'hidden' }).length
     const veiled = (body.innerText || '').trim().length < 200 && hiddenHeads >= 3
@@ -284,14 +287,20 @@ async function capture(page, frame, cand) {
   await el.evaluate((node) => node.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, cancelable: true, view: window }))).catch(() => {})
   await page.waitForTimeout(120)
   await label(page, 'Capture selection').click().catch(() => {})
-  try { await page.waitForFunction((n) => document.querySelectorAll('.subject-item').length === n, before + 1, { timeout: 8000 }); return true }
-  catch { /* fall through to the pointer */ }
+  /**
+   * Waited for generously, and for at least one rather than exactly one. Freezing a capture on
+   * mongodb.com takes over eight seconds, a megabyte of stylesheet and two fonts, so the pointer
+   * fallback fired while the first capture was still landing, one element became two subjects, and
+   * every element after it was matched to the wrong subject. The index of the subject that arrived
+   * is what the caller keeps, so a stray second one shifts nothing.
+   */
+  const landed = async (timeout) => { try { await page.waitForFunction((n) => document.querySelectorAll('.subject-item').length > n, before, { timeout }); return true } catch { return false } }
+  if (await landed(25000)) return await page.locator('.subject-item').count() - 1
   const box = await el.boundingBox()
-  if (!box) return false
+  if (!box) return -1
   await el.click({ position: { x: Math.min(8, box.width / 2), y: Math.min(8, box.height / 2) }, force: true }).catch(() => {})
-  try { await page.waitForFunction((n) => document.querySelectorAll('.subject-item').length === n, before + 1, { timeout: 15000 }) }
-  catch { return false }
-  return true
+  if (await landed(20000)) return await page.locator('.subject-item').count() - 1
+  return -1
 }
 
 /**
@@ -329,10 +338,10 @@ export async function autofilm({ at, url, pick = '', direction = '', plan = plan
     const chosen = await plan({ at, title, source, cands, pick, max, pace, direction })
     onStep(chosen.byModel ? `The model chose ${chosen.indices.length}${chosen.product ? ` for "${chosen.product}"` : ''}.` : `The model could not be asked (${chosen.why}), so the most prominent elements were chosen.`)
 
-    const captured = []
+    const captured = [], subjectAt = []
     for (const n of chosen.indices) {
       onStep(`Capturing ${name(cands.find((c) => c.i === n))}.`)
-      if (await capture(page, frame, n)) captured.push(n); else onStep('That one could not be captured, skipping it.')
+      const at_ = await capture(page, frame, n); if (at_ >= 0) { captured.push(n); subjectAt.push(at_) } else onStep('That one could not be captured, skipping it.')
       await label(page, 'Source').click().catch(() => {})
     }
     if (!captured.length) throw new Error(`Cannot film ${source}: none of the chosen elements could be captured. Next: ask for different elements with pick, or open the studio and pick by hand.`)
@@ -349,7 +358,7 @@ export async function autofilm({ at, url, pick = '', direction = '', plan = plan
       const probe = await browser.newPage({ viewport: { width: 320, height: 180 } })
       try {
         for (let k = 0; k < captured.length; k++) {
-          const sub = saved.subjects[k]
+          const sub = saved.subjects[subjectAt[k]]
           if (!sub) continue
           const one = createProject('probe'); one.settings.width = 320; one.settings.height = 180; one.settings.background = colours.background; one.subjects = [sub]
           one.tracks = [{ ...firstCut({ ...one, motions: [{ id: 'm', subjectId: sub.id, css: '', scope: 'x', note: '', brief: one.brief, treatment: 'subtle', duration: 1, saved: true }] }).tracks[1], x: 5, y: 5, width: 90, height: 90, start: 0, duration: 5000 }]
@@ -379,17 +388,20 @@ export async function autofilm({ at, url, pick = '', direction = '', plan = plan
     // the whole duration, but from the first frame: asked for a slow arrival, a model once held the
     // root invisible for 850ms of a 1200ms shot and revealed it in the last third, which is a blank shot
     const paceNote = pace === 'calm' ? '' : ' Use the whole duration for the arrival, with the parts staggered across it, rather than an easing that is finished in the first third. Every part is visible and already moving from the very first frame; never hold the root or any part invisible, and keep every delay under 150ms. The last part should still be settling at seventy percent of the duration, so spread the stagger across it and use an ease that is not over in its first third.'
+    // the element's own direction first, then the film's, so a detailed brief reaches every motion rather than only the plan
+    const filmNote = direction ? ` The film's direction: ${direction}` : ''
+    // a refused attempt is retried with its refusal in the brief: the same element failed the same gate twice on railway.com when asked again blind
+    const briefFor = (k, why = '') => (String(chosen.directions[String(captured[k])] || '') + paceNote + filmNote
+      + (why ? ` A previous attempt was refused: ${why.slice(0, 160)}. So animate only transform, opacity, clip-path and filter, and never add or change padding, margin, gap, display, position, overflow, width or height, so the element ends exactly as it was.` : '')).trim().slice(0, 980)
     for (let k = 0; k < captured.length; k++) {
       if (emptyOnes.has(k)) continue
-      await page.locator('.subject-item').nth(k).click()
+      await page.locator('.subject-item').nth(subjectAt[k]).click()
       const treat = page.getByLabel('Treatments', { exact: true })
       if (await treat.count()) await treat.selectOption(look).catch(() => {})
       const dur = page.getByLabel('Target duration (s)', { exact: true })
       if (await dur.count()) { await dur.fill(pace === 'fast' ? '1.0' : pace === 'brisk' ? '1.2' : '1.0') }
       const directionField = page.getByLabel('Creative direction', { exact: true })
-      // the element's own direction first, then the film's, so a detailed brief reaches every motion rather than only the plan
-      const filmNote = direction ? ` The film's direction: ${direction}` : ''
-      if (await directionField.count()) await directionField.fill((String(chosen.directions[String(captured[k])] || '') + paceNote + filmNote).trim().slice(0, 760))
+      if (await directionField.count()) await directionField.fill(briefFor(k))
       await label(page, 'Explore motion').click()
       await page.waitForTimeout(150)
     }
@@ -401,7 +413,7 @@ export async function autofilm({ at, url, pick = '', direction = '', plan = plan
     const failures = []
     for (let k = 0; k < captured.length; k++) {
       if (emptyOnes.has(k)) continue
-      await page.locator('.subject-item').nth(k).click()
+      await page.locator('.subject-item').nth(subjectAt[k]).click()
       const done = page.locator('.motion-card:not(.pending)')
       const settled = page.locator('.motion-card:not(:has(.spinner))')
       let why = ''
@@ -409,7 +421,12 @@ export async function autofilm({ at, url, pick = '', direction = '', plan = plan
         try { await settled.first().waitFor({ timeout: attempt ? 150000 : 300000 }) } catch { why = 'no answer in time'; break }
         if (await done.count()) break
         why = ((await page.locator('.motion-card.pending p').first().textContent().catch(() => '')) || '').trim() || 'the write failed'
-        if (!attempt && (await label(page, 'Retry treatment').count())) { onStep(`Element ${k + 1} got no motion (${why.slice(0, 80)}), asking once more.`); await label(page, 'Retry treatment').first().click(); await page.waitForTimeout(300) }
+        if (!attempt && (await label(page, 'Retry treatment').count())) {
+          onStep(`Element ${k + 1} got no motion (${why.slice(0, 80)}), asking once more with the reason.`)
+          const directionField = page.getByLabel('Creative direction', { exact: true })
+          if (await directionField.count()) await directionField.fill(briefFor(k, why))
+          await label(page, 'Explore motion').click(); await page.waitForTimeout(300)
+        }
       }
       if (await label(page, 'Keep motion').count()) { await label(page, 'Keep motion').first().click(); kept++ }
       else { failures.push(why); onStep(`Element ${k + 1} got no motion (${why.slice(0, 80)}), leaving it out.`) }
@@ -427,10 +444,73 @@ export async function autofilm({ at, url, pick = '', direction = '', plan = plan
       if ((project.motions || []).filter((m) => m.saved).length >= captured.length) break
       await new Promise((r) => setTimeout(r, 300))
     }
-    await new Promise((r) => setTimeout(r, 900))
-    project = await (await fetch(`${at}/__motioneer/projects/${id}`)).json()
+    // the editor saves on its own clock, and a cut sent over a save still on its way was refused as
+    // changed in another tab; its own status line says when it has nothing left to write
+    const settled = async () => {
+      try { await page.waitForFunction(() => /Saved locally/.test(document.querySelector('.save-status')?.textContent || ''), null, { timeout: 12000 }) } catch {}
+      await new Promise((r) => setTimeout(r, 300))
+      return (await fetch(`${at}/__motioneer/projects/${id}`)).json()
+    }
+    project = await settled()
+
+    /**
+     * Each kept motion is played once through the film's own composition and looked at a third of
+     * the way in. On railway.com and supabase.com the model hid the root for most of a one second
+     * shot and revealed it at the end, which the proof reads as a blank shot; the brief asks
+     * against it and the model still does it about one film in five. So a motion whose element
+     * shows under a quarter of its final content a third of the way in is refined once with the
+     * fault named, and the refinement is kept when it passes, else the first stays.
+     */
+    {
+      const probe = await browser.newPage({ viewport: { width: 320, height: 180 } })
+      const litAt = async (ms) => {
+        await probe.evaluate((t) => window.__composition.seek(t), ms).catch(() => {})
+        await probe.waitForTimeout(80)
+        const shot = await probe.screenshot({ type: 'png' }).catch(() => null)
+        if (!shot) return 0
+        const share = await probe.evaluate(async (b64) => {
+          const img = new Image(); img.src = 'data:image/png;base64,' + b64; await img.decode()
+          const c = document.createElement('canvas'); c.width = 320; c.height = 180; const g = c.getContext('2d'); g.drawImage(img, 0, 0)
+          return Array.from(g.getImageData(0, 0, 320, 180).data).filter((_, i) => i % 4 !== 3)
+        }, shot.toString('base64')).catch(() => null)
+        return share ? lit(Uint8Array.from(share)) : 0
+      }
+      const hides = async (sub, motion) => {
+        const one = createProject('probe'); one.settings.width = 320; one.settings.height = 180; one.settings.background = colours.background; one.subjects = [sub]; one.motions = [motion]
+        const track = firstCut(one).tracks.find((t) => t.kind === 'component')
+        if (!track) return false
+        one.tracks = [{ ...track, x: 5, y: 5, width: 90, height: 90, start: 0, duration: 5000 }]
+        await probe.setContent(compositionDocument(one), { waitUntil: 'load' }).catch(() => {})
+        await probe.evaluate(() => window.__composition.ready()).catch(() => {})
+        const third = await litAt(track.entrance + motion.duration / 3), end = await litAt(track.entrance + motion.duration + 200)
+        // the proof's own rule for a shot still empty a third in, so the check and the verdict agree
+        return end > 0.003 && third < 0.002
+      }
+      let touched = false
+      try {
+        for (let k = 0; k < captured.length; k++) {
+          const sub = project.subjects[subjectAt[k]], motion = sub && (project.motions || []).find((m) => m.subjectId === sub.id && m.saved)
+          if (!motion || !(await hides(sub, motion))) continue
+          onStep(`Element ${k + 1} stays hidden for a third of its motion, asking for one that shows from the first frame.`)
+          await page.locator('.subject-item').nth(subjectAt[k]).click()
+          const directionField = page.getByLabel('Creative direction', { exact: true })
+          if (await directionField.count()) await directionField.fill(((await directionField.inputValue()) + ' The previous version kept the whole element invisible for the first third; this one shows the element from its very first frame, with no opacity, clip or transform that hides all of it, and only its parts move into place.').slice(0, 980))
+          const before = await page.locator('.motion-card:not(.pending)').count()
+          if (!(await label(page, 'Refine').count())) continue
+          touched = true
+          await label(page, 'Refine').first().click()
+          try { await page.waitForFunction((n) => document.querySelectorAll('.motion-card:not(.pending)').length > n, before, { timeout: 150000 }) } catch { continue }
+          await page.locator('.motion-card:not(.pending)').last().getByRole('button', { name: 'Keep motion', exact: true }).click()
+          let fresh, next
+          for (let n = 0; n < 20 && !next; n++) { await new Promise((r) => setTimeout(r, 300)); fresh = await (await fetch(`${at}/__motioneer/projects/${id}`)).json(); next = (fresh.motions || []).find((m) => m.subjectId === sub.id && m.saved && m.id !== motion.id) }
+          if (next && (await hides(sub, next))) { await page.locator('.motion-card:not(.pending)').first().getByRole('button', { name: 'Keep motion', exact: true }).click().catch(() => {}); await page.waitForTimeout(600) }
+        }
+      } finally { await probe.close() }
+      // anything kept here moved the revision on, and a cut sent with the old one is refused
+      if (touched) project = await settled()
+    }
     // scenes name candidates; the project's subjects sit in capture order, so a captured index maps to its subject
-    const subjectOf = new Map(captured.map((cand, k) => [cand, emptyOnes.has(k) ? null : project.subjects[k]?.id]).filter(([, id]) => id))
+    const subjectOf = new Map(captured.map((cand, k) => [cand, emptyOnes.has(k) ? null : project.subjects[subjectAt[k]]?.id]).filter(([, id]) => id))
     // a button or a label is never a shot on its own, whatever the plan said: asked twice in the prompt, the model still filmed a lone button
     const minor = new Set(cands.filter((c) => c.role === 'button' || c.role === 'label').map((c) => c.i))
     const scenes = (chosen.scenes || []).map((sc) => ({ ids: sc.elements.filter((n) => !(sc.elements.length === 1 && minor.has(n))).map((n) => subjectOf.get(n)).filter(Boolean), layout: sc.layout, hold: sc.hold })).filter((sc) => sc.ids.length)

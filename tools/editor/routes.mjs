@@ -5,7 +5,13 @@ import { projectStore } from './projects.mjs'
 import { renderer } from './render.mjs'
 import { compositionDocument } from '../../dist-core/core.js'
 const BUILD = fileURLToPath(new URL('../../dist-editor/', import.meta.url))
-async function body(req, limit = 25*1024*1024) { const chunks=[]; let size=0;for await(const d of req){size+=d.length;if(size>limit)throw Object.assign(new Error('This file is too large.'),{status:413});chunks.push(d)}return Buffer.concat(chunks) }
+/**
+ * A project carries every captured element with its stylesheet and its fonts inlined, about a
+ * megabyte each on a site like mongodb.com, and a film of twelve elements passed twenty-five
+ * megabytes; every save after that was refused as too large, so no kept motion ever reached the
+ * cut. The studio runs on the person's own machine, so a body is limited only against a runaway.
+ */
+async function body(req, limit = 400*1024*1024) { const chunks=[]; let size=0;for await(const d of req){size+=d.length;if(size>limit)throw Object.assign(new Error('This file is too large.'),{status:413});chunks.push(d)}return Buffer.concat(chunks) }
 const jsonBody = async req => JSON.parse((await body(req)).toString('utf8') || '{}')
 export function editorRoutes(hooks) {
   const store=projectStore(path.join(hooks.work,'projects')), render=renderer(store)

@@ -124,7 +124,7 @@ try {
   const steps = []
   const before = await (await fetch(`${at}/__motioneer/editor-config`)).json()
   assert.equal(before.source, null, 'the studio should start aimed at nothing, so the aim is what is being proved')
-  const result = await autofilm({ at, url: siteAt, seconds: 12, look: 'subtle', pace: 'fast', max: 2, pick: 'the card and the headline', direction: 'calm confidence, every arrival settles like paper on a desk', onStep: (m) => steps.push(m) })
+  const result = await autofilm({ at, url: siteAt, seconds: 12, look: 'subtle', pace: 'fast', max: 2, pick: 'the card and the headline', direction: 'calm confidence, every arrival settles like paper on a desk', onStep: (m) => { steps.push(m); if (process.env.MOTIONEER_STEPS) console.log('  step', m) } })
   assert.equal(result.captured, 2, 'both chosen elements should be captured')
   assert.ok(result.byModel, 'the plan should have come from the model through the studio, not the fallback')
   assert.equal(result.opening, 'Ship it with confidence', 'the opening title should be the model\'s words')
