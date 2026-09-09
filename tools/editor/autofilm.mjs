@@ -394,14 +394,27 @@ export async function autofilm({ at, url, pick = '', direction = '', plan = plan
       await page.waitForTimeout(150)
     }
     onStep(`Writing ${captured.length} ${look} motions at once.`)
+    // a motion that failed is an answer too: waiting only for a finished card sat five minutes on
+    // every element whose write failed, which read as a hang. a failed card names its reason and
+    // gets one more try, since a model refusal is often a passing one
     let kept = 0
+    const failures = []
     for (let k = 0; k < captured.length; k++) {
       if (emptyOnes.has(k)) continue
       await page.locator('.subject-item').nth(k).click()
-      try { await page.locator('.motion-card:not(.pending)').first().waitFor({ timeout: 300000 }) } catch { onStep(`Element ${k + 1} got no motion in time, leaving it out.`); continue }
+      const done = page.locator('.motion-card:not(.pending)')
+      const settled = page.locator('.motion-card:not(:has(.spinner))')
+      let why = ''
+      for (let attempt = 0; attempt < 2 && !(await done.count()); attempt++) {
+        try { await settled.first().waitFor({ timeout: attempt ? 150000 : 300000 }) } catch { why = 'no answer in time'; break }
+        if (await done.count()) break
+        why = ((await page.locator('.motion-card.pending p').first().textContent().catch(() => '')) || '').trim() || 'the write failed'
+        if (!attempt && (await label(page, 'Retry treatment').count())) { onStep(`Element ${k + 1} got no motion (${why.slice(0, 80)}), asking once more.`); await label(page, 'Retry treatment').first().click(); await page.waitForTimeout(300) }
+      }
       if (await label(page, 'Keep motion').count()) { await label(page, 'Keep motion').first().click(); kept++ }
+      else { failures.push(why); onStep(`Element ${k + 1} got no motion (${why.slice(0, 80)}), leaving it out.`) }
     }
-    if (!kept) throw new Error('Cannot film: no motion came back for any element. Next: check the model in the studio settings and try again.')
+    if (!kept) throw new Error(`Cannot film: no motion came back for any element${failures[0] ? ` (${failures[0].slice(0, 120)})` : ''}. Next: check the model in the studio settings and try again.`)
 
     // the cut is assembled with the same function the editor's button calls, over http rather than
     // by clicking, so pace, length and the model's words all pass through one place. it waits for
