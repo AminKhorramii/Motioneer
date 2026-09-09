@@ -1564,7 +1564,7 @@ const saveSoon = () => {
          a row offering an alternative the store can no longer serve */
       const recent = [...made.entries()].slice(-80)
       writeFileSync(SESSION_AT,
-        JSON.stringify({ at: Date.now(), aim: AIM, nextId, made: recent, bench }))
+        JSON.stringify({ at: Date.now(), port: PORT, aim: AIM, nextId, made: recent, bench }))
     } catch { /* a session that cannot be written is not a reason to stop working */ }
   }, 400)
 }
@@ -1582,7 +1582,9 @@ let inbox = null
 const resumed = (() => {
   try {
     const was = JSON.parse(readFileSync(SESSION_AT, 'utf8'))
-    if (!was || Date.now() - was.at > WARM) return null
+    // only the studio that wrote it, by port: a suite's studio on one port was picking up the aim
+    // of a film lab running on another, and started aimed at somebody else's site
+    if (!was || Date.now() - was.at > WARM || was.port !== PORT) return null
     for (const [id, o] of was.made ?? []) made.set(id, o)
     nextId = Math.max(nextId, Number(was.nextId) || 0)
     bench = was.bench ?? null

@@ -54,7 +54,8 @@ async function candidates(frame) {
       if (el.tagName === 'IMG' && el.naturalWidth > 0 && el.naturalWidth < 64) return false
       return true
     }
-    const wanted = 'h1,h2,h3,button,a[role=button],[class*=card],[class*=Card],[class*=hero],[class*=Hero],figure,img,video,[class*=cta],[class*=CTA]'
+    // a link that carries an image or a heading is a card whatever it is called: anthropic.com builds every product and research card as a plain anchor
+    const wanted = 'h1,h2,h3,button,a[role=button],a:has(> img),a:has(h2),a:has(h3),article,[class*=card],[class*=Card],[class*=hero],[class*=Hero],figure,img,video,[class*=cta],[class*=CTA]'
     /**
      * What a pick resolves to, which is not always the element that matched. Measured on
      * notion.so, five of eight picks rendered blank: two were stretched links, an anchor with
@@ -79,8 +80,26 @@ async function candidates(frame) {
       }
       return cur
     }
+    /**
+     * Tiles first: a row of equal blocks that each carry a heading is a row of cards whatever the
+     * class names say. anthropic.com lays its three release banners as plain columns, and read by
+     * class alone the page was five things, three of them the small headings inside those columns.
+     * They go before the matched list so the card is taken and its heading folds into it, rather
+     * than the heading taken first and the card refused for containing it.
+     */
+    const tiles = []
+    const boxOf = (el) => el.getBoundingClientRect()
+    for (const h of body.querySelectorAll('h2,h3,h4')) {
+      let cur = h.parentElement
+      for (let n = 0; n < 5 && cur && cur !== body; n++, cur = cur.parentElement) {
+        const r = boxOf(cur)
+        if (r.width < 200 || r.width > 720 || r.height < 110 || r.height > 900) continue
+        const kin = [...(cur.parentElement ? cur.parentElement.children : [])].filter((k) => k !== cur && k.tagName === cur.tagName && Math.abs(boxOf(k).width - r.width) <= 8 && Math.abs(boxOf(k).height - r.height) <= 40)
+        if (kin.length >= 1 && !tiles.includes(cur)) { tiles.push(cur); break }
+      }
+    }
     let i = 0
-    for (const matched of body.querySelectorAll(wanted)) {
+    for (const matched of [...tiles, ...body.querySelectorAll(wanted)]) {
       if (out.length >= 40) break
       const el = visualRoot(matched)
       if (!el || !worth(el)) continue
@@ -93,7 +112,9 @@ async function candidates(frame) {
       const section = top < 90 && r.height < 160 ? 'nav' : top < 900 ? 'hero' : top > page - 700 ? 'footer' : 'body'
       const cls = (el.className && typeof el.className === 'string' ? el.className : '').toLowerCase()
       // a one-line h3 under 32px is a label, not a heading: alone in a frame it is a stray word
-      const role = el.tagName === 'IMG' || el.tagName === 'VIDEO' ? 'image' : /^h[1-3]$/i.test(el.tagName) ? (el.tagName === 'H3' && r.height < 32 ? 'label' : 'heading') : /button/i.test(el.tagName) || /cta|button/.test(cls) ? 'button' : /card/.test(cls) ? 'card' : /hero/.test(cls) ? 'hero' : el.tagName.toLowerCase()
+      // a button is small: a link called a button that stands 700px tall with an image in it is a card, and was read as a minor thing never filmed alone
+      const cardish = r.width >= 200 && r.height >= 110 && !!el.querySelector('img,video,h2,h3,picture,svg')
+      const role = el.tagName === 'IMG' || el.tagName === 'VIDEO' ? 'image' : /^h[1-3]$/i.test(el.tagName) ? (el.tagName === 'H3' && r.height < 32 ? 'label' : 'heading') : (/button/i.test(el.tagName) || /cta|button/.test(cls)) && !cardish ? 'button' : /card/.test(cls) || cardish || el.tagName === 'ARTICLE' ? 'card' : /hero/.test(cls) ? 'hero' : el.tagName.toLowerCase()
       const media = el.tagName === 'IMG' || el.tagName === 'VIDEO' ? el : el.querySelector('img,video')
       out.push({ el, i, tag: el.tagName.toLowerCase(), role, section, image, painted: !image && backed(el), src: media ? (media.currentSrc || media.src || '') : '', w: Math.round(r.width), h: Math.round(r.height), top,
         // innerText, not textContent: a section with its own <style> tag reads back as a
@@ -229,6 +250,7 @@ export async function inspectSite({ at, url }) {
   const browser = await chromium.launch({ channel: 'chromium' })
   try {
     const { page, frame, title, colours } = await openPage(browser, at, source)
+    if (/attention required|just a moment|access denied|been blocked|verify you are human|are you a robot|security check/i.test(title || '')) throw new Error(`Cannot open ${source}: that site is behind a bot check, which a proxy cannot pass. Nothing here can fix that. Next: open the studio and pick from your own browser with the bookmarklet.`)
     let cands = await dropDecoration(page, await candidates(frame), () => {})
     for (let n = 0; n < 2 && !cands.length; n++) { await page.waitForTimeout(3000); cands = await dropDecoration(page, await candidates(frame), () => {}) }
     return { source, title, colours, candidates: cands }
@@ -275,7 +297,7 @@ async function capture(page, frame, cand) {
   if (!(await label(page, 'Done picking').count())) await label(page, 'Pick element').click()
   await page.waitForTimeout(250)
   const el = frame.locator(`[data-mn-cand="${cand}"]`).first()
-  if (!(await el.count())) return false
+  if (!(await el.count())) return -1
   await el.scrollIntoViewIfNeeded().catch(() => {})
   /**
    * Handed to the picker, not clicked. The picker takes whatever the pointer is over, and on
@@ -325,6 +347,8 @@ export async function autofilm({ at, url, pick = '', direction = '', plan = plan
     onStep('Opening the editor on the site.')
     const projectId = await freshProject(at, `Film of ${source.replace(/^https?:\/\//, '').replace(/\/$/, '')}`)
     const { page, frame, title, colours } = await openPage(browser, at, source, projectId)
+    // a block page answers 200 and reads as a page of headings: replit.com's was filmed and verified
+    if (/attention required|just a moment|access denied|been blocked|verify you are human|are you a robot|security check/i.test(title || '')) throw new Error(`Cannot open ${source}: that site is behind a bot check, which a proxy cannot pass. Nothing here can fix that. Next: open the studio and pick from your own browser with the bookmarklet.`)
     let cands = await dropDecoration(page, await candidates(frame), onStep)
     // a page still drawing itself is scanned again rather than declared empty
     for (let n = 0; n < 2 && !cands.length; n++) { await page.waitForTimeout(3000); cands = await dropDecoration(page, await candidates(frame), onStep) }
