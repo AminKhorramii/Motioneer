@@ -38,7 +38,9 @@ async function candidates(frame) {
       const cls = (el.className && typeof el.className === 'string' ? el.className : '').toLowerCase()
       const role = el.tagName === 'IMG' ? 'image' : /^h[1-3]$/i.test(el.tagName) ? 'heading' : /button/i.test(el.tagName) || /cta|button/.test(cls) ? 'button' : /card/.test(cls) ? 'card' : /hero/.test(cls) ? 'hero' : el.tagName.toLowerCase()
       out.push({ el, i, tag: el.tagName.toLowerCase(), role, section, image, w: Math.round(r.width), h: Math.round(r.height), top,
-        text: (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80) })
+        // innerText, not textContent: a section with its own <style> tag reads back as a
+        // keyframes block, and the model then plans a film about css instead of the product
+        text: (el.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 80) })
       i++
     }
     /**
@@ -114,7 +116,7 @@ export async function inspectSite({ at, url }) {
   const source = await aim(at, url)
   const browser = await chromium.launch({ channel: 'chromium' })
   try {
-    const { frame, title } = await openPage(browser, at, source)
+    const { frame, title, colours } = await openPage(browser, at, source)
     const cands = await candidates(frame)
     return { source, title, colours, candidates: cands }
   } finally { await browser.close() }

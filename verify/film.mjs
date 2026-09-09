@@ -14,7 +14,7 @@ import { tmpdir } from 'node:os'
 import assert from 'node:assert'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { autofilm } from '../tools/editor/autofilm.mjs'
+import { autofilm, inspectSite } from '../tools/editor/autofilm.mjs'
 import { loadChromium } from '../tools/editor/render.mjs'
 import { proveFilm } from '../tools/editor/proof.mjs'
 import { firstCut, createProject, compositionDocument } from '../dist-core/core.js'
@@ -73,6 +73,7 @@ const site = createServer((req, res) => {
   res.end(`<!doctype html><html><body style="margin:0;padding:40px;background:#eef1f6;font:16px system-ui;color:#1a2233">
     <h1 style="font-size:44px;margin:0 0 24px">Ship it with confidence</h1>
     <article class="card" style="width:520px;padding:28px;background:#fff;border-radius:16px;box-shadow:0 20px 60px #0002;margin-bottom:24px">
+      <style>@keyframes card-surface-in { from { opacity: 1; transform: scale(0.98); } }</style>
       <h2 style="margin:0 0 10px">Everything in one place</h2><p style="color:#5b6472">Your team's work, on one board.</p>
       <button style="margin-top:12px;background:#4f56d6;color:#fff;border:0;padding:12px 22px;border-radius:10px">Get started</button>
     </article>
@@ -103,6 +104,14 @@ try {
   const planPrompt = prompts.find((p) => /"opening"/.test(p))
   assert.ok(planPrompt && /the card and the headline/.test(planPrompt), 'the person\'s pick should reach the model')
   assert.ok(planPrompt && /card in (hero|body|nav)/.test(planPrompt), 'candidates should be described by role and section')
+  /**
+   * A candidate's text is what a reader sees, not what the node contains. The card carries its
+   * own <style>, and read with textContent it described itself to the model as a keyframes block,
+   * so the model named the product after css and wrote titles about it. Read with innerText the
+   * style tag is not rendered and does not count.
+   */
+  assert.ok(planPrompt && !/@keyframes/.test(planPrompt), 'a candidate\'s own <style> must not be read as its text')
+  assert.ok(planPrompt && /Everything in one place/.test(planPrompt), 'the card should describe itself by its heading')
   assert.ok(prompts.some((p) => /settles last|rises as one piece/.test(p)), 'the model\'s direction should reach the motion prompt')
   const saved = await (await fetch(`${at}/__motioneer/projects/${result.projectId}`)).json()
   /**
@@ -131,6 +140,18 @@ try {
   assert.equal(result.background, '#eef1f6', 'the driver should report the background it matched')
   assert.ok(saved.tracks.filter((t) => t.kind === 'component').length >= 7, 'a fast cut should carry many shots, not one per element')
   console.log('ok: the model planned it: chose by the person\'s pick, wrote the titles, and directed each motion')
+  /**
+   * Inspect reads the same page without filming it. It went out referring to a name it never
+   * bound and threw on every call, which nothing here noticed because nothing here called it.
+   */
+  {
+    const seen = await inspectSite({ at, url: siteAt })
+    assert.ok(seen.candidates.length >= 2, `inspect should list what is filmable, got ${seen.candidates.length}`)
+    assert.equal(seen.colours.background, '#eef1f6', 'inspect should report the page\'s own ground')
+    assert.ok(seen.candidates.some((c) => /Everything in one place/.test(c.text)), 'inspect should carry each candidate\'s rendered text')
+    assert.ok(!seen.candidates.some((c) => /@keyframes/.test(c.text)), 'inspect should not read a <style> as an element\'s text')
+    console.log(`ok: inspect lists ${seen.candidates.length} candidates on ${seen.colours.background} without filming`)
+  }
   const buf = Buffer.from(await (await fetch(result.url)).arrayBuffer())
   assert.ok(buf.length > 20000, `the film should be a real mp4, got ${buf.length} bytes`)
   assert.equal(buf.slice(4, 8).toString(), 'ftyp', 'the file should start with an mp4 box')
