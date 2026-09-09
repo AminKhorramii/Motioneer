@@ -48,7 +48,14 @@ export function firstCut(p: Project, opts: CutOptions = {}): Project {
   const byId = new Map(chosen.map(c => [c.s.id, c]))
   const planned = (opts.scenes || []).map(sc => ({ ids: sc.ids.filter(id => byId.has(id)).slice(0, 2), layout: sc.layout, hold: sc.hold || 'normal' })).filter(sc => sc.ids.length)
   const base: Scene[] = planned.length ? planned : chosen.map(c => ({ ids: [c.s.id], layout: 'full', hold: 'normal' }))
-  const shots = shot ? Math.max(base.length, Math.round(body / shot)) : base.length
+  /**
+   * How many shots. A planned cut that is close to the beat count keeps its scenes and stretches
+   * them a little, rather than coming round again: eight scenes in a ten beat film were filmed as
+   * eight plus the hero and a heading twice, which read as padding. Only a plan well short of the
+   * beat, or no plan at all, cycles its elements to fill the length.
+   */
+  const beats = shot ? Math.round(body / shot) : base.length
+  const shots = !shot ? base.length : planned.length && planned.length >= beats * 0.7 ? planned.length : Math.max(base.length, beats)
   const weight = (h?: Hold) => h === 'long' ? 1.5 : h === 'short' ? 0.75 : 1
   const list = Array.from({ length: shots }, (_, i) => ({ ...base[i % base.length], round: Math.floor(i / base.length) }))
   const total = list.reduce((a, sc) => a + weight(sc.hold), 0)

@@ -53,7 +53,12 @@ if (!(await loadChromium())) { console.log('skip: the local renderer is not inst
     const big = createProject('cap'); big.subjects = [{ id: 'tiny', name: 'T', html: '<b>t</b>', css: '', w: 200, h: 100, warnings: [] }]; big.motions = [{ id: 'mt', subjectId: 'tiny', css: '', scope: 'x', note: '', brief: big.brief, treatment: 'subtle', duration: 500, saved: true }]
     const capped = shotsOf(firstCut(big))[0]
     assert.ok(capped.width * 1920 / 100 <= 200 * 2.4 + 1, `a small element is not blown up past 2.4 times, box was ${capped.width}%`)
-    console.log('ok: scenes cut into layouts and holds, a pair sits side by side, and a small element is not blown up into a blur')
+    const eight = Array.from({ length: 8 }, (_, k) => ({ ids: [k % 2 ? 'b' : 'a'], layout: 'full' }))
+    const trusted = firstCut(real, { pace: 'fast', seconds: 15, scenes: eight }), padded = firstCut(real, { pace: 'fast', seconds: 15, scenes: eight.slice(0, 3) })
+    assert.equal(new Set(shotsOf(trusted).map((t) => t.start)).size, 8, 'a plan near the beat count keeps its scenes rather than repeating')
+    assert.ok(new Set(shotsOf(padded).map((t) => t.start)).size >= 9, 'a plan well short of the beat cycles to fill the length')
+    assert.ok(shotsOf(trusted).every((t) => t.duration <= 1800), 'stretched shots stay fast')
+    console.log('ok: scenes cut into layouts and holds, a pair sits side by side, a small element is not blown up into a blur, and a full plan is not padded with repeats')
   }
   console.log('ok: the cut is paced: calm places each motion once, fast fills the length with short shots and short titles')
 }
