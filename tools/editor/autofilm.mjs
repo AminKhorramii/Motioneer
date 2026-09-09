@@ -514,7 +514,8 @@ export async function autofilm({ at, url, pick = '', direction = '', plan = plan
         one.tracks = [{ ...track, x: 5, y: 5, width: 90, height: 90, start: 0, duration: 5000 }]
         await probe.setContent(compositionDocument(one), { waitUntil: 'load' }).catch(() => {})
         await probe.evaluate(() => window.__composition.ready()).catch(() => {})
-        const third = await litAt(track.entrance + motion.duration / 3), end = await litAt(track.entrance + motion.duration + 200)
+        // 300ms in, the instant the proof reads, whatever the motion's length: a third of a long motion let one through that the verdict then named
+        const third = await litAt(track.entrance + Math.min(300, motion.duration / 3)), end = await litAt(track.entrance + motion.duration + 200)
         // the proof's own rule for a shot still empty a third in, so the check and the verdict agree
         return end > 0.003 && third < 0.002
       }
