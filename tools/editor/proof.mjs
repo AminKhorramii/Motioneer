@@ -104,6 +104,8 @@ export async function proveFilm({ file, pace = 'calm', seconds, cuts: planned })
   }
   const seen = boundaries.filter((b) => b.seen)
   const cuts = seen.length
+  // which planned cuts did not show, and which shots start empty, as times, so a driver can find the shot and mend it
+  const missing = Array.isArray(planned) && planned.length ? boundaries.map((b, k) => (b.seen ? null : planned[k])).filter((v) => v !== null) : []
   const marks = [0, ...seen.map((b) => b.at), fs.length]
   const shots = marks.slice(1).map((m, k) => (m - marks[k]) / FPS * 1000)
   const avgShotMs = Math.round(shots.reduce((a, b) => a + b, 0) / shots.length), longestShotMs = Math.round(Math.max(...shots))
@@ -134,7 +136,8 @@ export async function proveFilm({ file, pace = 'calm', seconds, cuts: planned })
   const arriveMs = arrivals.length ? Math.round(arrivals.reduce((a, b) => a + b, 0) / arrivals.length) : 0
   const blank = lits.filter((l) => l < 0.002).length / fs.length
   // a shot that is still empty a third of a second in: a motion that hides its root before revealing it
-  const lateShots = seen.filter((b) => { const i = Math.min(fs.length - 1, b.at + Math.round(FPS * 0.3)); return lits[i] < 0.002 }).length
+  const lateAt = seen.filter((b) => { const i = Math.min(fs.length - 1, b.at + Math.round(FPS * 0.3)); return lits[i] < 0.002 }).map((b) => Math.round(b.at / FPS * 1000))
+  const lateShots = lateAt.length
 
   const notes = []
   const want = pace === 'fast' ? { minCuts: Math.max(6, Math.round(total / 2)), maxAvg: 1800 } : pace === 'brisk' ? { minCuts: Math.max(3, Math.round(total / 4)), maxAvg: 3200 } : { minCuts: 1, maxAvg: Infinity }
@@ -145,7 +148,7 @@ export async function proveFilm({ file, pace = 'calm', seconds, cuts: planned })
   if (arrivals.length && arriveMs < 200) notes.push(arriveMs < 50 ? 'elements pop in at once rather than arrive' : `elements pop in rather than arrive, settling in about ${arriveMs}ms`)
   if (lateShots) notes.push(`${lateShots} shot${lateShots === 1 ? '' : 's'} still empty a third of a second in, a motion that hides its element before revealing it`)
   if (seconds && Math.abs(total - seconds) > 1.5) notes.push(`it runs ${total.toFixed(0)} seconds, not the ${seconds} asked for`)
-  return { seconds: Math.round(total), cuts, planned: Array.isArray(planned) ? planned.length : null, shots: shots.length, avgShotMs, longestShotMs, arriveMs, lateShots, blank: Math.round(blank * 100) / 100, ok: notes.length === 0, notes }
+  return { seconds: Math.round(total), cuts, planned: Array.isArray(planned) ? planned.length : null, shots: shots.length, avgShotMs, longestShotMs, arriveMs, lateShots, late: lateAt, missing, blank: Math.round(blank * 100) / 100, ok: notes.length === 0, notes }
 }
 
 /** One sentence an agent can repeat. */

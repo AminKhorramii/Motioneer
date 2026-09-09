@@ -123,6 +123,33 @@ shot, not from reasoning about pages in the abstract, and each has a check in th
   part visible and moving from the first frame, and the proof counts shots still empty a third of
   a second in.
 
+## What makes it agent native
+
+An agent does not watch the studio; it reads replies and calls tools. Four things make that a
+conversation rather than a single shot:
+
+- The planner sees the page. Every candidate is screenshotted where it stands and laid on a
+  contact sheet, one jpeg with each tile numbered, that goes to the model with the list. The
+  same sheet comes back from inspect as an image, so the agent can show the person what is there
+  and choose with them. Pictures reach the model whichever provider writes: as content blocks on
+  the wire, and as a stream-json turn into the claude command.
+- The verdict acts before it reports. The film is measured off its frames, and when the proof
+  names a shot that starts empty or a cut that did not show, the driver mends that one thing,
+  asking once more for the motion or dropping the shot, and cuts and renders again. One round,
+  since every failed verdict over forty sites was one such item and a render is twenty seconds.
+- A film is revised, not remade. `revise` takes the projectId a film returned and a change: pace,
+  length, titles, shots to drop by number or element by name, another order. The captures and
+  motions stay, the shape of the cut is read back from the project, and the film is cut, rendered
+  and measured again in about half a minute. Only new elements need film again, with pick.
+- The reply is structured as well as said. Film and revise return the projectId, the file, every
+  shot with its elements and layout, each element's fate (filmed, rendered empty, no motion and
+  why, not captured), the verdict and the repairs, so the agent names a weak shot by number and
+  offers a specific change instead of "want another?".
+
+A refused motion is retried with its refusal in the brief, and when the refusal was that no
+selector reached anything, with an outline of the element's own markup, so the second sheet names
+parts that exist.
+
 ## What forty landing pages taught
 
 The same loop over forty sites, `tools/film-lab.mjs` with a file of addresses, found the classes a

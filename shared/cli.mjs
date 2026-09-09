@@ -130,8 +130,16 @@ function give() {
  * ours to show, but the fact of it is, so it goes to a separate callback that never touches the
  * reply.
  */
-export async function runClaude(system, user, { model = CLI_MODEL(), bin = 'claude', onDelta, onThink, thinking, callMs, env, signal } = {}) {
-  const streaming = typeof onDelta === 'function'
+export async function runClaude(system, user, { model = CLI_MODEL(), bin = 'claude', onDelta, onThink, thinking, callMs, env, signal, images } = {}) {
+  /**
+   * Pictures go in as a stream-json user turn, the one input the command accepts them in, and
+   * that input insists on stream-json output, so a call with images reads the stream even when
+   * nobody asked for deltas. Measured: a contact sheet of a page went through whole and the
+   * model read every tile's text back.
+   */
+  const pics = Array.isArray(images) ? images.filter((i) => i && i.data) : []
+  const streaming = typeof onDelta === 'function' || pics.length > 0
+  onDelta = typeof onDelta === 'function' ? onDelta : () => {}
   /**
    * How much this call may think, in tokens, or null to leave the model's own budget alone.
    *
@@ -155,6 +163,7 @@ export async function runClaude(system, user, { model = CLI_MODEL(), bin = 'clau
       bin,
       [
         '-p',
+        ...(pics.length ? ['--input-format', 'stream-json'] : []),
         ...(streaming
           ? ['--output-format', 'stream-json', '--include-partial-messages', '--verbose']
           : ['--output-format', 'json']),
@@ -315,6 +324,8 @@ export async function runClaude(system, user, { model = CLI_MODEL(), bin = 'clau
         return done({ error: (err || out || 'no reply').slice(0, 200) })
       }
     })
-    child.stdin.end(user)
+    child.stdin.end(pics.length
+      ? JSON.stringify({ type: 'user', message: { role: 'user', content: [...pics.map((i) => ({ type: 'image', source: { type: 'base64', media_type: i.mime || 'image/jpeg', data: i.data } })), { type: 'text', text: user }] } }) + '\n'
+      : user)
   })
 }

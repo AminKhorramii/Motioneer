@@ -2819,12 +2819,14 @@ anywhere on the studio. Nothing is installed and nothing leaves this machine.</p
      * rather than as something the caller has to parse.
      */
     if (url.pathname === '/__motioneer/ask' && req.method === 'POST') {
-      const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d; if (b.length > 60_000) req.destroy() }); req.on('end', () => ok(b || '{}')) }))
+      // room for a few pictures: a contact sheet of a page is a jpeg of a few hundred kilobytes
+      const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d; if (b.length > 12_000_000) req.destroy() }); req.on('end', () => ok(b || '{}')) }))
       const system = String(body.system || 'Answer plainly.').slice(0, 4000), prompt = String(body.prompt || '').slice(0, 40_000)
       if (!prompt.trim()) return json(res, { error: 'ask needs a prompt' }, 400)
+      const images = Array.isArray(body.images) ? body.images.filter((i) => i && typeof i.data === 'string' && i.data.length < 6_000_000).slice(0, 4).map((i) => ({ mime: /^image\/(jpeg|png|webp)$/.test(i.mime) ? i.mime : 'image/jpeg', data: i.data })) : []
       let last = 'no reply'
       for (let n = 0; n < 2; n++) {
-        const reply = await askProvider(system, prompt, MODEL, { callMs: CALL_MS, thinking: THINK, env: CLEAN_ENV, maxTokens: 2000 })
+        const reply = await askProvider(system, prompt, MODEL, { callMs: CALL_MS, thinking: THINK, env: CLEAN_ENV, maxTokens: 2000, images })
           .catch((e) => ({ error: String(e && e.message ? e.message : e).slice(0, 200) }))
         if (reply && reply.error) { last = reply.error; continue }
         const text = typeof reply === 'string' ? reply : (reply && reply.text) || ''

@@ -37,7 +37,16 @@ const VERSION = await readFile(path.join(ROOT, 'package.json'), 'utf8')
   .catch(() => '0.0.0')
 
 const send = (msg) => process.stdout.write(JSON.stringify(msg) + '\n')
-const ok = (id, text) => send({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text }] } })
+/**
+ * A reply is words first, then pictures, then a structured copy of the same facts. The words are
+ * for the person, the structure is for the agent: a film's shots, each element's fate and the
+ * verdict as fields rather than as a paragraph to parse, so the next step can be reasoned about.
+ */
+const ok = (id, reply) => {
+  const r = typeof reply === 'string' ? { text: reply } : reply
+  const content = [{ type: 'text', text: r.text }, ...(r.images || []).filter((i) => i && i.data).map((i) => ({ type: 'image', data: i.data, mimeType: i.mime || 'image/jpeg' }))]
+  send({ jsonrpc: '2.0', id, result: { content, ...(r.structured ? { structuredContent: r.structured } : {}) } })
+}
 const fail = (id, text) => send({ jsonrpc: '2.0', id, result: { isError: true, content: [{ type: 'text', text }] } })
 
 
@@ -53,7 +62,8 @@ const INSTRUCTIONS = `Motioneer makes motion for a person's own product. Choose 
 - film: they want a video, a demo, a reel, or say "motion video". One call does everything and returns an MP4 path. Always pass dir as the absolute path of their project so the file lands beside their work. Pace is the cut: "fast", "quick", "punchy" or "lots of cuts" means pace "fast", which is many one second shots of many elements, about 12 seconds and eight elements unless they say otherwise; "demo" or "showcase" means pace "brisk" and about 20; "calm", "slow" or "elegant" means pace "calm" with look "subtle". "Lots of elements", "everything on the page" or "a lot of motions" means count 10 to 12. Fast and brisk films use look "expressive" unless they ask otherwise.
 - studio: they want to pick elements and compare motions by hand, or say "studio". It returns as soon as the room is open; do not wait or retry, tell them where it is.
 - motion: they want CSS for markup they already have, with nothing to look at first.
-- inspect: they want to see or choose what gets filmed first, or ask what is on a page. Follow it with film and pick.
+- inspect: they want to see or choose what gets filmed first, or ask what is on a page. It returns the list and a contact sheet image of the elements, each tile numbered; look at it, describe or show what is there, then follow with film and pick.
+- revise: they react to a film with a change: slower, faster, shorter, longer, different titles, drop a shot or an element, another order. Pass the projectId the film returned; the captures and motions are kept and only the cut and render are redone, in about half a minute. Only filming again with pick adds elements that were never filmed.
 - open: after a film, or whenever they ask to see the editor or a file.
 
 How people say it, and what to call:
@@ -63,16 +73,18 @@ How people say it, and what to call:
 - "what could you film on this page": inspect, then relay the list in plain words and ask which they want.
 - "open the studio on my app", "let me pick": studio with the url.
 - "animate this component", with markup pasted: motion.
+- "make it slower", "too long, ten seconds", "drop the footer shot", "put the hero last", "call it Ship Faster": revise with the projectId and only the fields that change. "drop" takes shot numbers from the reply or words from an element's name; "order" takes shot numbers.
+- "add the pricing cards": film again with the same url, pick naming them, and the same pace and seconds.
 
 When a tool fails its message starts with "Cannot" and ends with "Next:". Relay the reason and the next step as given, and do not invent a different cause. Retry only when the next step says to.
 
 While film runs it can take a minute or two: it opens the site, captures, writes motions, cuts and renders. Say that once, then wait for the result rather than polling or calling it again.
 
-When film returns it includes a line measured from the rendered frames, "Verified" or "Checked": how many cuts, how long the shots are, whether anything is blank. Repeat that line, it is the proof the film is what they asked for. If it says the film came out slower than asked, say so plainly and offer to film again with count 6 rather than claiming it is fast. Then relay what it filmed and where the file is in one or two sentences, and offer exactly these three choices, as selectable options if you can present options, otherwise as a short list:
+Film and revise return the same facts twice: as words, and as structured content with the projectId, the file, every shot numbered with its elements and layout, each element's fate (filmed, rendered empty, no motion with the reason, not captured), the verdict and the repairs it made to itself. Reason from the fields: name a weak shot by number when offering a change, and pass the projectId to revise. When film returns it includes a line measured from the rendered frames, "Verified" or "Checked": how many cuts, how long the shots are, whether anything is blank. Repeat that line, it is the proof the film is what they asked for. If it says the film came out slower than asked, say so plainly and offer to film again with count 6 rather than claiming it is fast. Then relay what it filmed and where the file is in one or two sentences, and offer exactly these three choices, as selectable options if you can present options, otherwise as a short list:
 1. Open the editor, to change the cut, swap a motion or add a title.
 2. Open the video.
 3. Continue chatting.
-Call open with target "editor" or "video" for the first two, then stop and let them look. For the third, ask what they would like next.
+Call open with target "editor" or "video" for the first two, then stop and let them look. For the third, ask what they would like next, and offer one concrete revision you can see in the fields, like dropping a shot whose element is a bare heading, or a slower cut when the shots average under a second.
 
 A site that needs a sign in cannot be proxied; if capture finds nothing, say so and point them to the bookmarklet in the studio rather than retrying.`
 
@@ -187,6 +199,30 @@ const TOOLS = [
         dir: { type: 'string', description: 'Absolute project path, so a studio opened for this lands on their project.' },
       },
       required: ['url'],
+    },
+  },
+  {
+    name: 'revise',
+    description:
+      'Change a film that film already made, without filming it again: a different pace or length, '
+      + 'new titles, shots dropped, elements taken out, or the shots in another order. The captures '
+      + 'and motions are kept, the film is cut and rendered again in about half a minute, measured '
+      + 'off its frames, and a new MP4 path comes back. Use it whenever the person reacts to a film '
+      + 'with a change: "slower", "shorter", "drop the footer", "put the hero last", "call it X". To '
+      + 'add elements that were not filmed, call film again with pick.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: { type: 'string', description: 'The projectId the last film reply carried.' },
+        dir: { type: 'string', description: 'Absolute project path, where the new MP4 is saved.' },
+        pace: { type: 'string', enum: ['calm', 'brisk', 'fast'], description: 'A new cut rhythm. Leave out to keep the current one.' },
+        seconds: { type: 'number', description: 'A new length. Leave out to keep the current one.' },
+        opening: { type: 'string', description: 'A new opening title, two to five words.' },
+        closing: { type: 'string', description: 'A new closing title.' },
+        drop: { type: 'array', items: { type: 'string' }, description: 'Shots or elements to remove: a shot number from the reply like "3", or words from an element\'s name like "footer" or "pricing".' },
+        order: { type: 'array', items: { type: 'number' }, description: 'Shot numbers in the order they should now come, first ones first; unnamed shots follow.' },
+      },
+      required: ['projectId'],
     },
   },
   {
@@ -313,9 +349,11 @@ async function inspect({ url, dir }) {
   const { inspectSite, describe } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'autofilm.mjs')).href)
   const seen = await inspectSite({ at, url })
   const lines = seen.candidates.map(describe)
-  return `${seen.title || seen.source} has ${seen.candidates.length} things worth filming:\n${lines.join('\n')}\n\n`
+  const text = `${seen.title || seen.source} has ${seen.candidates.length} things worth filming:\n${lines.join('\n')}\n\n`
+    + (seen.sheet ? `The image is a contact sheet of the first ${seen.sheet.tiles} of them, each tile labelled with its index, so you can see what each looks like and show or describe them to the person.\n` : '')
     + `To film some of them, call film with the same url and pick set to what the person wants in their words, `
-    + `for example "the pricing cards and the hero"; the model matches pick against this list. Without pick it chooses the best three.`
+    + `for example "the pricing cards and the hero", or the indices; the model matches pick against this list. Without pick it chooses the best on its own.`
+  return { text, images: seen.sheet ? [seen.sheet] : [], structured: { title: seen.title, source: seen.source, background: seen.colours?.background, elements: seen.candidates.map((c) => ({ index: c.i, role: c.role, section: c.section, width: c.w, height: c.h, image: !!c.image, text: c.text || '', alike: c.alike || 0 })) } }
 }
 
 async function film({ url, dir, seconds, look, count, pick, pace, direction }) {
@@ -343,18 +381,57 @@ async function film({ url, dir, seconds, look, count, pick, pace, direction }) {
   // a fast film wants many elements; a calm one a few. the cap is what a render can carry in a few minutes
   const max = Math.max(1, Math.min(12, Number(count) || (wantPace === 'fast' ? 8 : wantPace === 'brisk' ? 5 : 3)))
   const result = await autofilm({ at, url, pick: String(pick || '').slice(0, 600), direction: String(direction || '').slice(0, 1400), seconds: wantSeconds, look: look || (wantPace === 'calm' ? 'subtle' : 'expressive'), pace: wantPace, max, onStep: (m) => steps.push(m) })
-  const buf = Buffer.from(await (await fetch(result.url)).arrayBuffer())
+  const file = await keepFile(result, dir)
+  const { proofLine } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'proof.mjs')).href)
+  const verified = proofLine(result.proof)
+  const structured = shape(result, file, wantPace)
+  const mended = result.repairs?.length ? ` It mended itself once before the final render: ${result.repairs.join('; ')}.` : ''
+  const fates = result.elements.filter((e) => e.status !== 'filmed')
+  const leftOut = fates.length ? ` Left out: ${fates.map((e) => `${e.name} (${e.status})`).join('; ')}.` : ''
+  return { structured, text: `Filmed ${result.captured} element${result.captured === 1 ? '' : 's'} from ${url}${result.product ? `, "${result.product}",` : ''} into a ${Math.round(result.seconds)} second ${wantPace} film`
+    + `${result.opening ? ` titled "${result.opening}"` : ''}, ${result.shots} shots of ${result.distinct} distinct element${result.distinct === 1 ? '' : 's'} in ${result.layouts} layout${result.layouts === 1 ? '' : 's'}, saved to ${file} (${(buf.length / 1e6).toFixed(1)} MB). ${verified} The studio is still open at ${at}. What it did: ${steps.join(' ')}\n\n`
+    + mended + leftOut + ` The shots are numbered in the structured result; revise with this projectId (${result.projectId}) changes the cut without filming again. `
+    + `Now offer the person these three choices, as options if you can: open the editor, open the video, or continue chatting. `
+    + `For the first two call open with target "editor" or target "video" and path "${file}", then stop so they can look.` }
+}
+
+/** The rendered file, moved from where the driver measured it to where the person works. */
+async function keepFile(result, dir) {
   const outDir = dir && path.isAbsolute(dir) ? dir : process.cwd()
   const file = path.join(outDir, `motioneer-film-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.mp4`)
-  await writeFile(file, buf)
-  // measured off the frames, so the reply reports what was made rather than what was meant
-  const { proveFilm, proofLine } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'proof.mjs')).href)
-  const proof = await proveFilm({ file, pace: wantPace, seconds: wantSeconds, cuts: result.cutTimes }).catch((e) => ({ ok: false, notes: [`it could not be measured: ${e.message}`] }))
-  const verified = proofLine(proof)
-  return `Filmed ${result.captured} element${result.captured === 1 ? '' : 's'} from ${url}${result.product ? `, "${result.product}",` : ''} into a ${Math.round(result.seconds)} second ${wantPace} film`
-    + `${result.opening ? ` titled "${result.opening}"` : ''}, ${result.shots} shots of ${result.distinct} distinct element${result.distinct === 1 ? '' : 's'} in ${result.layouts} layout${result.layouts === 1 ? '' : 's'}, saved to ${file} (${(buf.length / 1e6).toFixed(1)} MB). ${verified} The studio is still open at ${at}. What it did: ${steps.join(' ')}\n\n`
-    + `Now offer the person these three choices, as options if you can: open the editor, open the video, or continue chatting. `
-    + `For the first two call open with target "editor" or target "video" and path "${file}", then stop so they can look.`
+  const buf = result.file ? await readFile(result.file).catch(() => null) : null
+  await writeFile(file, buf || Buffer.from(await (await fetch(result.url)).arrayBuffer()))
+  return file
+}
+
+/** The same facts as fields: what an agent reasons about between one film and the next. */
+function shape(result, file, pace) {
+  return {
+    projectId: result.projectId, studio: result.at, file, source: result.source, seconds: Math.round(result.seconds), pace,
+    titles: { opening: result.opening || '', closing: result.closing || '' }, background: result.background,
+    shots: (result.shotList || []).map((s) => ({ shot: s.shot, at: s.at, seconds: s.seconds, elements: s.elements, layout: s.layout })),
+    elements: result.elements || [],
+    verdict: { ok: !!result.proof?.ok, notes: result.proof?.notes || [], cuts: result.proof?.cuts, arriveMs: result.proof?.arriveMs, blank: result.proof?.blank },
+    repairs: result.repairs || result.changes || [],
+    next: ['open the editor', 'open the video', 'revise: pace, seconds, titles, drop, order', 'film again with pick to add elements'],
+  }
+}
+
+/**
+ * A film changed rather than remade. The studio that made it is still open with the project,
+ * so this goes straight to the cut and the render, and comes back in the time a render takes.
+ */
+async function revise({ projectId, dir, pace, seconds, opening, closing, drop, order }) {
+  if (!projectId) throw new Error('Cannot revise: revise needs the projectId a film returned. Next: pass it, or film first.')
+  const at = STUDIO_AT()
+  if (!(await answering(at))) throw new Error(`Cannot revise: the studio at ${at} is not open any more, so the project is not reachable. Next: film again.`)
+  const { revise: reviseFilm } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'autofilm.mjs')).href)
+  const steps = []
+  const result = await reviseFilm({ at, projectId: String(projectId), pace, seconds, opening, closing, drop, order, onStep: (m) => steps.push(m) })
+  const file = await keepFile(result, dir)
+  const { proofLine } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'proof.mjs')).href)
+  return { structured: shape(result, file, result.pace), text: `Revised the film: ${result.changes.join('; ') || 'cut again as it was'}. Now ${result.shots} shots of ${result.distinct} element${result.distinct === 1 ? '' : 's'} in ${Math.round(result.seconds)} seconds, ${result.pace}, saved to ${file}. ${proofLine(result.proof)} `
+    + `Offer the same three choices: open the editor, open the video, or continue chatting; the video is at "${file}".` }
 }
 
 /**
@@ -511,6 +588,7 @@ async function call(name, args, id) {
   if (name === 'motion') return ok(id, await motion(args ?? {}))
   if (name === 'film') return ok(id, await film(args ?? {}))
   if (name === 'inspect') return ok(id, await inspect(args ?? {}))
+  if (name === 'revise') return ok(id, await revise(args ?? {}))
   if (name === 'open') return ok(id, await open(args ?? {}))
   /**
    * A name nobody serves is answered rather than ignored.

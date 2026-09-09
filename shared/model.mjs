@@ -175,6 +175,7 @@ export async function write(system, user, config = {}, opts = {}) {
       callMs: opts.callMs,
       thinking: opts.thinking,
       env: opts.env,
+      images: opts.images,
     }).catch((e) => ({ error: String(e && e.message ? e.message : e).slice(0, 200) }))
   }
 
@@ -183,6 +184,7 @@ export async function write(system, user, config = {}, opts = {}) {
     base: at.base,
     maxTokens: opts.maxTokens ?? 4000,
     signal: opts.signal,
+    images: opts.images,
   })
 }
 

@@ -27,10 +27,10 @@ src/                   what the studio imports through a built bundle, because n
   core.ts              the barrel, exporting exactly what runs outside a browser
 
 mcp/
-  index.mjs            Motioneer as a tool an agent calls: inspect reads a page, film makes the video, studio opens the room, motion skips it, open shows what was made
+  index.mjs            Motioneer as a tool an agent calls: inspect reads a page and shows it, film makes the video, revise changes it without filming again, studio opens the room, motion skips it, open shows what was made
 
 tools/editor/
-  autofilm.mjs         the headless driver behind film and inspect, and the plan it asks the model for
+  autofilm.mjs         the headless driver behind film, inspect and revise: the plan it asks the model for with a contact sheet, the repair round the proof drives, and the cut read back for a revision
   proof.mjs            a rendered film measured off its frames: cuts, shot length, blank frames
 
 site/

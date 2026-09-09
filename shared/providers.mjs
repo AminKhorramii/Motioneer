@@ -39,13 +39,26 @@ const base = () => env('MOTIONEER_API_BASE')
  */
 const openaiBase = () => base() || env('MOTIONEER_OPENAI_BASE') || 'https://api.openai.com'
 
+/**
+ * A user turn with pictures in front of the words, in the shape each wire wants. Plain text
+ * stays a string, since every provider accepts that and some older gateways accept only that.
+ * An image is { mime, data } with the data already base64.
+ */
+export const withImages = (text, images, shape) => {
+  const pics = Array.isArray(images) ? images.filter((i) => i && i.data) : []
+  if (!pics.length) return text
+  return shape === 'openai'
+    ? [...pics.map((i) => ({ type: 'image_url', image_url: { url: `data:${i.mime || 'image/jpeg'};base64,${i.data}` } })), { type: 'text', text }]
+    : [...pics.map((i) => ({ type: 'image', source: { type: 'base64', media_type: i.mime || 'image/jpeg', data: i.data } })), { type: 'text', text }]
+}
+
 export const REQUESTS = {
   openai: (system, user, key, opts = {}) => ({
     url: `${opts.base || openaiBase()}/v1/chat/completions`,
     headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
     body: {
       model: opts.model || model('gpt-5.2'),
-      messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
+      messages: [{ role: 'system', content: system }, { role: 'user', content: withImages(user, opts.images, 'openai') }],
       max_completion_tokens: opts.maxTokens || 8000,
       stream: true,
     },
@@ -65,7 +78,7 @@ export const REQUESTS = {
       // nine sections of copy runs past 2000, and a truncated reply is a lost page
       max_tokens: opts.maxTokens || 8000,
       system,
-      messages: [{ role: 'user', content: user }],
+      messages: [{ role: 'user', content: withImages(user, opts.images, 'anthropic') }],
       stream: true,
     },
     delta: (j) => (j?.type === 'content_block_delta' ? j?.delta?.text ?? '' : ''),

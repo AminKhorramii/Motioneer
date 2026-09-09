@@ -98,7 +98,7 @@ console.log('\n  what it offers')
 const list = await rpc('tools/list', {})
 const tools = list.result?.tools ?? []
 const names = tools.map((t) => t.name).sort()
-ok('five tools, film, inspect, motion, open and studio', names.join(',') === 'film,inspect,motion,open,studio', names.join(','))
+ok('six tools, film, inspect, motion, open, revise and studio', names.join(',') === 'film,inspect,motion,open,revise,studio', names.join(','))
 ok('every one has a description an agent can act on',
   tools.every((t) => (t.description ?? '').length > 80))
 ok('every one has an object schema', tools.every((t) => t.inputSchema?.type === 'object'))
@@ -117,6 +117,10 @@ ok('and the etiquette maps fast to the fast pace and asks for the measured line 
 ok('inspect requires the url, and film accepts pick in the person\'s words',
   (tools.find((t) => t.name === 'inspect')?.inputSchema?.required ?? []).includes('url')
   && !!tools.find((t) => t.name === 'film')?.inputSchema?.properties?.pick)
+const noProject = await callTool('revise', {})
+ok('revise without a project says what it cannot do and what to do next', noProject.isError && /^Cannot revise/.test(noProject.text) && /Next:/.test(noProject.text), noProject.text)
+ok('revise takes drop and order, since a reaction to a film is a change to its shots',
+  !!tools.find((t) => t.name === 'revise')?.inputSchema?.properties?.drop && !!tools.find((t) => t.name === 'revise')?.inputSchema?.properties?.order)
 const noUrl = await callTool('inspect', {})
 ok('inspect without a url says what it cannot do and what to do next', noUrl.isError && /^Cannot/.test(noUrl.text) && /Next:/.test(noUrl.text), noUrl.text.slice(0, 70))
 

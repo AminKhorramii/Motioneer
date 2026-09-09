@@ -67,10 +67,16 @@ const port = Number(process.env.MOTIONEER_PORT || 4397), at = `http://localhost:
 const temp = await mkdtemp(path.join(tmpdir(), 'motioneer-film-'))
 await mkdir(path.join(temp, '.studio'), { recursive: true })
 
+// how many model turns carried a picture, since the planner is meant to see the page
+let sheets = 0
+
 const prompts = []
 const model = createServer(async (req, res) => {
   let body = ''; for await (const b of req) body += b
-  const prompt = JSON.parse(body).messages.at(-1).content
+  const turn = JSON.parse(body).messages.at(-1).content
+  // a turn with pictures is an array of parts; the words are the text part, and the pictures are counted for the check below
+  const prompt = typeof turn === 'string' ? turn : turn.filter((p) => p.type === 'text').map((p) => p.text).join('\n')
+  if (Array.isArray(turn) && turn.some((p) => p.type === 'image_url')) sheets++
   prompts.push(prompt)
   if (/"opening"/.test(prompt)) {
     // the plan: the second and first candidates, words taken from the page, a direction for each
@@ -127,6 +133,7 @@ try {
   const result = await autofilm({ at, url: siteAt, seconds: 12, look: 'subtle', pace: 'fast', max: 2, pick: 'the card and the headline', direction: 'calm confidence, every arrival settles like paper on a desk', onStep: (m) => { steps.push(m); if (process.env.MOTIONEER_STEPS) console.log('  step', m) } })
   assert.equal(result.captured, 2, 'both chosen elements should be captured')
   assert.ok(result.byModel, 'the plan should have come from the model through the studio, not the fallback')
+  assert.ok(sheets >= 1, 'the planner should have been shown a contact sheet of the candidates')
   assert.equal(result.opening, 'Ship it with confidence', 'the opening title should be the model\'s words')
   const planPrompt = prompts.find((p) => /"opening"/.test(p))
   assert.ok(planPrompt && /the card and the headline/.test(planPrompt), 'the person\'s pick should reach the model')
@@ -223,8 +230,27 @@ try {
   assert.ok(proof.cuts >= 6, `a fast 12 second film should show at least 6 cuts, measured ${proof.cuts}`)
   assert.ok(proof.arriveMs >= 200, `elements should visibly arrive rather than pop, measured ${proof.arriveMs}ms`)
   assert.equal(proof.lateShots, 0, 'no shot should still be empty a third of a second in')
+  // the driver measured the film itself and says what became of every element, so an agent reasons on fields rather than a paragraph
+  assert.ok(result.proof && result.proof.ok, `the driver should carry its own verdict: ${JSON.stringify(result.proof?.notes)}`)
+  assert.ok(Array.isArray(result.elements) && result.elements.length === 2 && result.elements.every((e) => e.status === 'filmed'), `every chosen element should be reported filmed, got ${JSON.stringify(result.elements)}`)
+  assert.ok(Array.isArray(result.shotList) && result.shotList.length === result.shots && result.shotList[0].elements.length >= 1, 'the shots should be listed with their elements')
   const calmVerdict = await proveFilm({ file: mp4, pace: 'calm', seconds: 12, cuts: result.cutTimes })
   assert.ok(calmVerdict.ok, 'the same film passes a calm verdict, which asks less')
+
+  /**
+   * A film revised rather than remade: the shots read back from the cut, one dropped, a new
+   * length, cut and rendered again in the time a render takes, and measured. The revision must
+   * keep what the plan decided about layouts, since a person asking for "shorter" did not ask
+   * for a slideshow.
+   */
+  const { revise } = await import('../tools/editor/autofilm.mjs')
+  const revised = await revise({ at, projectId: result.projectId, seconds: 9, drop: ['1'], onStep: (m) => { if (process.env.MOTIONEER_STEPS) console.log('  step', m) } })
+  assert.ok(revised.changes.some((c) => /dropped shot 1/.test(c)) && revised.changes.some((c) => /9 seconds/.test(c)), `the revision should say what it changed, got ${JSON.stringify(revised.changes)}`)
+  assert.ok(Math.abs(revised.seconds - 9) < 1.5, `the revised film should be about 9 seconds, got ${revised.seconds}`)
+  assert.ok(revised.shots < result.shots, `dropping a shot of a short film should leave fewer shots, ${result.shots} became ${revised.shots}`)
+  assert.ok(revised.layouts >= 2, `the revision should keep the plan's layouts, got ${revised.layouts}`)
+  assert.ok(revised.proof && revised.proof.cuts === revised.cutTimes.length, `every cut of the revision should show in its frames: ${JSON.stringify(revised.proof?.notes)}`)
+  console.log(`ok: revised to ${revised.shots} shots in ${revised.seconds}s with ${revised.layouts} layouts, ${revised.changes.join('; ')}`)
   console.log(`ok: measured off the frames: ${proof.cuts} cuts, shots ${(proof.avgShotMs / 1000).toFixed(1)}s on average, elements arriving over ${proof.arriveMs}ms, ${Math.round(proof.blank * 100)}% blank`)
   console.log('ok: it reported each step:', steps.length, 'steps')
   console.log('film verification passed')
