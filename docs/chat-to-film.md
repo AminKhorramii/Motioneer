@@ -100,6 +100,18 @@ a fast fifteen second film of eight elements takes about a minute from the reque
 `inspect` reads a page the same way without filming it, and returns the list, so an agent can say
 what it sees and ask which to film before a minute of rendering is spent.
 
+## Scenes
+
+The plan speaks in scenes, not only in elements: an ordered list of shots, each with one or two
+elements, a layout and a hold. `full` is one element centred; `detail` is one pushed in close;
+`pair` is two side by side, the second arriving a beat after the first; `stack` is a heading above
+the visual it introduces on the page. `long` holds the hero, `short` passes a small detail. The
+cut lays each scene out, weights the holds so they still fill the length asked for, and caps how
+far a small element is blown up at 2.4 times its natural size, because a 300 pixel card drawn five
+times over is a blur where a heading, being vector, is not. Without a plan every kept motion is
+one full shot, which is what the editor's button makes. The reply says the shape: "10 shots of 8
+distinct elements in 3 layouts".
+
 ## Pace, and the proof
 
 "A fast video" is a fast cut, not a quiet motion. `pace` is what shapes it, and it lives in the

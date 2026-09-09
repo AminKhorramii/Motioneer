@@ -352,7 +352,7 @@ async function film({ url, dir, seconds, look, count, pick, pace, direction }) {
   const proof = await proveFilm({ file, pace: wantPace, seconds: wantSeconds, cuts: result.cutTimes }).catch((e) => ({ ok: false, notes: [`it could not be measured: ${e.message}`] }))
   const verified = proofLine(proof)
   return `Filmed ${result.captured} element${result.captured === 1 ? '' : 's'} from ${url}${result.product ? `, "${result.product}",` : ''} into a ${Math.round(result.seconds)} second ${wantPace} film`
-    + `${result.opening ? ` titled "${result.opening}"` : ''}, saved to ${file} (${(buf.length / 1e6).toFixed(1)} MB). ${verified} The studio is still open at ${at}. What it did: ${steps.join(' ')}\n\n`
+    + `${result.opening ? ` titled "${result.opening}"` : ''}, ${result.shots} shots of ${result.distinct} distinct element${result.distinct === 1 ? '' : 's'} in ${result.layouts} layout${result.layouts === 1 ? '' : 's'}, saved to ${file} (${(buf.length / 1e6).toFixed(1)} MB). ${verified} The studio is still open at ${at}. What it did: ${steps.join(' ')}\n\n`
     + `Now offer the person these three choices, as options if you can: open the editor, open the video, or continue chatting. `
     + `For the first two call open with target "editor" or target "video" and path "${file}", then stop so they can look.`
 }

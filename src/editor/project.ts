@@ -17,7 +17,11 @@ export function newTrack(kind: Track['kind'], name: string, at = 0): Track {
   return { id: uid(), kind, name, color: '#f4f4f5', fontSize: 64, start: at, duration: 5000, entrance: 0, x: 15, y: 20, width: 70, height: 60, hidden: false, locked: false, moves: [], volume: 0.7, sourceStart: 0, fadeIn: 200, fadeOut: 400 }
 }
 export type Pace = 'calm' | 'brisk' | 'fast'
-export type CutOptions = { pace?: Pace; seconds?: number; opening?: string; closing?: string; background?: string; ink?: string }
+export type Layout = 'full' | 'detail' | 'pair' | 'stack'
+export type Hold = 'long' | 'normal' | 'short'
+/** One shot of the film: one or two elements, how they are laid out, and how long it holds against the others. */
+export type Scene = { ids: string[]; layout?: Layout; hold?: Hold }
+export type CutOptions = { pace?: Pace; seconds?: number; opening?: string; closing?: string; background?: string; ink?: string; scenes?: Scene[] }
 /**
  * The first cut, paced. Calm spreads the kept motions across the film with long titles, the way
  * a person expects when they press the button. Brisk and fast are what "a demo" and "a fast video"
@@ -34,26 +38,57 @@ export function firstCut(p: Project, opts: CutOptions = {}): Project {
   const asked = opts.seconds ? Math.min(120000, Math.max(6000, Math.round(opts.seconds * 1000))) : 0
   const span = asked || (shot ? Math.min(120000, Math.max(10000, 2 * title + Math.max(6, chosen.length * 2) * shot)) : Math.min(120000, Math.max(15000, 6000 + chosen.length * 6000)))
   const body = span - 2 * title
-  const shots = shot ? Math.max(chosen.length, Math.round(body / shot)) : chosen.length
-  const step = body / shots
+  /**
+   * The shots. Scenes come from the plan when there is one: a heading paired with the visual it
+   * introduces, two cards side by side, a screenshot full bleed, a detail pushed in close, the
+   * hero held longer. Without a plan every kept motion is one full shot. A brisk or fast film
+   * then fills its length: when there are fewer scenes than beats, they come round again with
+   * the frame nudged and tightened so a repeat reads as a new shot and not a freeze.
+   */
+  const byId = new Map(chosen.map(c => [c.s.id, c]))
+  const planned = (opts.scenes || []).map(sc => ({ ids: sc.ids.filter(id => byId.has(id)).slice(0, 2), layout: sc.layout, hold: sc.hold || 'normal' })).filter(sc => sc.ids.length)
+  const base: Scene[] = planned.length ? planned : chosen.map(c => ({ ids: [c.s.id], layout: 'full', hold: 'normal' }))
+  const shots = shot ? Math.max(base.length, Math.round(body / shot)) : base.length
+  const weight = (h?: Hold) => h === 'long' ? 1.5 : h === 'short' ? 0.75 : 1
+  const list = Array.from({ length: shots }, (_, i) => ({ ...base[i % base.length], round: Math.floor(i / base.length) }))
+  const total = list.reduce((a, sc) => a + weight(sc.hold), 0)
   // the film stands on the site's own background, with ink that reads on it, so a dark headline off a light page is not lost on a dark stage
   const ink = opts.ink || (opts.background ? contrastInk(opts.background) : '#f4f4f5')
   const opening = { ...newTrack('title', 'Opening'), text: opts.opening || 'Meet your next great idea', color: ink, x: 10, y: 35, width: 80, height: 25, duration: title, fontSize: 76 }
   const end = { ...newTrack('title', 'Closing', span - title), text: opts.closing || 'See it in action', color: ink, x: 10, y: 35, width: 80, height: 25, duration: title, fontSize: 76 }
-  const cuts: Track[] = Array.from({ length: shots }, (_, i) => {
-    const { s, m } = chosen[i % chosen.length], round = Math.floor(i / chosen.length), at = title + i * step
+  /**
+   * Where each element sits, by layout. A box is shrunk when it would blow an element up more
+   * than 2.4 times its natural size, because a 300 pixel card drawn five times over is a blur
+   * where a heading, being vector, is not; the cap keeps a small card small and lets text grow.
+   */
+  const boxes = (layout: Layout | undefined, n: number): { x: number; y: number; width: number; height: number }[] => {
+    if (n === 2 && layout === 'stack') return [{ x: 12, y: 10, width: 76, height: 32 }, { x: 12, y: 46, width: 76, height: 46 }]
+    if (n === 2) return [{ x: 4, y: 18, width: 44, height: 64 }, { x: 52, y: 18, width: 44, height: 64 }]
+    if (layout === 'detail') return [{ x: 4, y: 8, width: 92, height: 84 }]
+    return [{ x: 12, y: 16, width: 76, height: 68 }]
+  }
+  const fit = (box: { x: number; y: number; width: number; height: number }, s: Subject) => {
+    const scale = Math.min(p.settings.width * box.width / 100 / s.w, p.settings.height * box.height / 100 / s.h)
+    if (scale <= 2.4) return box
+    const f = 2.4 / scale, width = box.width * f, height = box.height * f
+    return { x: box.x + (box.width - width) / 2, y: box.y + (box.height - height) / 2, width, height }
+  }
+  let at = title
+  const cuts: Track[] = []
+  list.forEach((sc, i) => {
+    const step = body * weight(sc.hold) / total
     // a repeat is framed differently enough to read as a new shot: tighter each time round, and
     // swinging to the other side, because a four percent nudge of one small heading was measured
     // as no cut at all off the frames
-    const nudge = round % 2 ? 8 : -2, tighten = Math.min(24, round * 8)
-    /**
-     * A brisk or fast shot keeps moving after its motion lands: a slow push in on even shots, a
-     * slow drift on odd ones. Measured on a fast film, the motion was over in the first tenth of
-     * the shot and the element then sat still for a second, which reads as a slideshow. The drift
-     * is small enough to be felt rather than seen, and it is what makes a cut feel filmed.
-     */
+    const nudge = sc.round % 2 ? 8 : sc.round ? -2 : 0, tighten = Math.min(24, sc.round * 8)
     const moves = shot ? [i % 2 === 0 ? { at, duration: step, x: 0, y: 0, scale: 1.035, ease: 'linear' } : { at, duration: step, x: -1.2, y: 0.4, scale: 1.02, ease: 'linear' }] : []
-    return { ...newTrack('component', s.name, at), duration: step, subjectId: s.id, motionId: m!.id, width: 76 - tighten, x: 12 + nudge + tighten / 2, y: 16 + tighten / 2, height: 68 - tighten, moves }
+    boxes(sc.layout, sc.ids.length).forEach((box, k) => {
+      const { s, m } = byId.get(sc.ids[k])!
+      const b = fit({ x: box.x + nudge + tighten / 2 * (box.width / 76), y: box.y + tighten / 2 * (box.height / 68), width: box.width - tighten * (box.width / 76), height: box.height - tighten * (box.height / 68) }, s)
+      // the second element of a pair arrives a beat after the first, so the shot reads left to right or top to bottom
+      cuts.push({ ...newTrack('component', s.name, at), duration: step, subjectId: s.id, motionId: m!.id, entrance: k * 160, ...b, moves })
+    })
+    at += step
   })
   const camera = pace === 'calm' ? [{ at: title, duration: body, x: 0, y: 0, scale: 1.04, ease: 'ease-in-out' }] : [{ at: title, duration: body, x: 0, y: 0, scale: 1.06, ease: 'linear' }]
   return { ...p, tracks: [opening, ...cuts, end], camera, settings: { ...p.settings, duration: span, from: 0, to: span, ...(opts.background ? { background: opts.background } : {}) } }

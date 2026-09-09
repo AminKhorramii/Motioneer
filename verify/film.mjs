@@ -39,6 +39,20 @@ if (!(await loadChromium())) { console.log('skip: the local renderer is not inst
   assert.notDeepEqual([shotsOf(fast)[0].x, shotsOf(fast)[0].width], [shotsOf(fast)[2].x, shotsOf(fast)[2].width], 'a repeated element is framed differently so it cuts rather than freezes')
   assert.ok(shotsOf(fast).every((t) => t.moves.length === 1 && t.moves[0].duration === t.duration), 'every fast shot keeps moving across its whole length')
   assert.ok(shotsOf(calm).every((t) => t.moves.length === 0), 'a calm shot holds still, the way the editor\'s button always did')
+  {
+    const scened = firstCut(p, { pace: 'fast', seconds: 12, scenes: [{ ids: ['a'], layout: 'full', hold: 'long' }, { ids: ['a', 'b'], layout: 'pair' }, { ids: ['b', 'a'], layout: 'stack', hold: 'short' }, { ids: ['b'], layout: 'detail' }] })
+    const comps = shotsOf(scened), starts = [...new Set(comps.map((t) => t.start))]
+    assert.ok(comps.length > starts.length, 'a pair or a stack puts two elements in one shot')
+    const pair = comps.filter((t) => t.start === starts[1])
+    assert.equal(pair.length, 2, 'the second scene is a pair'); assert.ok(pair[0].x < 50 && pair[1].x >= 50, 'a pair sits side by side'); assert.equal(pair[1].entrance, 160, 'the second of a pair arrives a beat later')
+    const first = comps.filter((t) => t.start === starts[0])[0], third = comps.filter((t) => t.start === starts[2])[0]
+    assert.ok(first.duration > third.duration, 'a long hold outlasts a short one')
+    assert.ok(comps.some((t) => t.width > 80), 'a detail scene is framed close')
+    const big = createProject('cap'); big.subjects = [{ id: 'tiny', name: 'T', html: '<b>t</b>', css: '', w: 200, h: 100, warnings: [] }]; big.motions = [{ id: 'mt', subjectId: 'tiny', css: '', scope: 'x', note: '', brief: big.brief, treatment: 'subtle', duration: 500, saved: true }]
+    const capped = shotsOf(firstCut(big))[0]
+    assert.ok(capped.width * 1920 / 100 <= 200 * 2.4 + 1, `a small element is not blown up past 2.4 times, box was ${capped.width}%`)
+    console.log('ok: scenes cut into layouts and holds, a pair sits side by side, and a small element is not blown up into a blur')
+  }
   console.log('ok: the cut is paced: calm places each motion once, fast fills the length with short shots and short titles')
 }
 
@@ -57,7 +71,8 @@ const model = createServer(async (req, res) => {
     // chosen by what the lines say rather than by position, since the page's order is not the point being tested
     const lines = prompt.split('\n').map((l) => /^(\d+): (.*)$/.exec(l)).filter(Boolean)
     const card = Number(lines.find((m) => /Everything in one place/.test(m[2]))?.[1]), block = Number(lines.find((m) => /hero in/.test(m[2]) && /520x220/.test(m[2]))?.[1])
-    const plan = { indices: [card, block], product: 'a board for shipping teams', opening: 'Ship it with confidence', closing: 'Get started today', directions: { [card]: 'the heading lands, then the button settles last', [block]: 'the block rises as one piece' } }
+    const plan = { indices: [card, block], product: 'a board for shipping teams', opening: 'Ship it with confidence', closing: 'Get started today', directions: { [card]: 'the heading lands, then the button settles last', [block]: 'the block rises as one piece' },
+      scenes: [{ elements: [card], layout: 'full', hold: 'long' }, { elements: [card, block], layout: 'pair', hold: 'normal' }, { elements: [block], layout: 'detail', hold: 'short' }] }
     res.writeHead(200, { 'content-type': 'text/event-stream' })
     return res.end('data: ' + JSON.stringify({ choices: [{ delta: { content: JSON.stringify(plan) } }] }) + '\n\ndata: [DONE]\n\n')
   }
@@ -154,6 +169,11 @@ try {
   assert.ok(saved.tracks.filter((t) => t.kind === 'title').every((t) => t.color === '#111318'), 'titles on a light ground should be dark')
   assert.equal(result.background, '#eef1f6', 'the driver should report the background it matched')
   assert.ok(saved.tracks.filter((t) => t.kind === 'component').length >= 7, 'a fast cut should carry many shots, not one per element')
+  {
+    const comps = saved.tracks.filter((t) => t.kind === 'component'), starts = new Set(comps.map((t) => t.start))
+    assert.ok(comps.length > starts.size, 'the plan\'s pair scene should put two elements in one shot')
+    assert.ok(result.layouts >= 3 && result.distinct === 2, `the film should report its shape, got ${result.layouts} layouts of ${result.distinct} elements`)
+  }
   console.log('ok: the model planned it: chose by the person\'s pick, wrote the titles, and directed each motion')
   /**
    * Inspect reads the same page without filming it. It went out referring to a name it never

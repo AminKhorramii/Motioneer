@@ -167,15 +167,19 @@ export async function planFilm({ at, title, source, cands, pick, max, pace = 'br
       : `Choose up to ${max} elements that make the best short film of this product: prefer a hero heading, a primary button or feature card, and one strong image; avoid nav, footer, and repeats. `)
     + `Then write the film's words from the page itself, not from imagination: "product" is what this product is in under ten words; "opening" is a title of two to five words that names the product or its promise; "closing" is a title of two to five words that invites the next step. `
     + `For each chosen element write "direction", one sentence on how it should arrive that names its parts, like "the price lands last" or "the headline settles before the subline".\n`
-    + `Reply exactly: {"indices":[...],"product":"...","opening":"...","closing":"...","directions":{"<index>":"..."}}`
+    + `Then cut it into "scenes", an ordered list of shots. Each scene has "elements", one or two chosen indices; "layout", one of full, detail, pair, stack; and "hold", one of long, normal, short. Use pair for two cards or images side by side, stack for a heading above the visual it introduces on the page, detail for one screenshot or image pushed in close, full otherwise. Hold the hero long and small details short. `
+    + (many ? `Aim for ${Math.min(max, cands.length)} to ${Math.min(max + 3, cands.length + 2)} scenes; an element may appear in two scenes if the second is a different layout.\n` : `One or two scenes per element.\n`)
+    + `Reply exactly: {"indices":[...],"product":"...","opening":"...","closing":"...","directions":{"<index>":"..."},"scenes":[{"elements":[i,j],"layout":"pair","hold":"normal"}]}`
   const r = await fetch(`${at}/__motioneer/ask`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ system, prompt, json: true }) })
     .then((x) => x.json()).catch((e) => ({ error: e.message }))
   const plan = r && r.json && typeof r.json === 'object' ? r.json : null
   const valid = plan && Array.isArray(plan.indices) ? plan.indices.map(Number).filter((n) => cands.some((c) => c.i === n)).slice(0, max) : []
-  if (valid.length) return { indices: valid, product: String(plan.product || '').slice(0, 120), opening: String(plan.opening || '').slice(0, 60), closing: String(plan.closing || '').slice(0, 60), directions: plan.directions && typeof plan.directions === 'object' ? plan.directions : {}, byModel: true }
+  const layouts = ['full', 'detail', 'pair', 'stack'], holds = ['long', 'normal', 'short']
+  const scenes = Array.isArray(plan?.scenes) ? plan.scenes.map((sc) => ({ elements: (Array.isArray(sc?.elements) ? sc.elements : [sc?.element]).map(Number).filter((n) => valid.includes(n)).slice(0, 2), layout: layouts.includes(sc?.layout) ? sc.layout : 'full', hold: holds.includes(sc?.hold) ? sc.hold : 'normal' })).filter((sc) => sc.elements.length) : []
+  if (valid.length) return { indices: valid, scenes, product: String(plan.product || '').slice(0, 120), opening: String(plan.opening || '').slice(0, 60), closing: String(plan.closing || '').slice(0, 60), directions: plan.directions && typeof plan.directions === 'object' ? plan.directions : {}, byModel: true }
   // prominence, when the model could not be asked: near the top, large, headings and cards ahead of bare images
   const byProminence = [...cands].filter((c) => c.section !== 'nav' && c.section !== 'footer').sort((a, b) => (b.w * b.h) / (b.top + 400) - (a.w * a.h) / (a.top + 400))
-  return { indices: byProminence.slice(0, max).map((c) => c.i), product: '', opening: '', closing: '', directions: {}, byModel: false, why: r && r.error ? r.error : 'no plan came back' }
+  return { indices: byProminence.slice(0, max).map((c) => c.i), scenes: [], product: '', opening: '', closing: '', directions: {}, byModel: false, why: r && r.error ? r.error : 'no plan came back' }
 }
 
 /**
@@ -289,15 +293,21 @@ export async function autofilm({ at, url, pick = '', direction = '', plan = plan
     }
     await new Promise((r) => setTimeout(r, 900))
     project = await (await fetch(`${at}/__motioneer/projects/${id}`)).json()
-    const cut = firstCut(project, { pace, seconds, opening: chosen.opening, closing: chosen.closing, background: colours.background })
+    // scenes name candidates; the project's subjects sit in capture order, so a captured index maps to its subject
+    const subjectOf = new Map(captured.map((cand, k) => [cand, project.subjects[k]?.id]).filter(([, id]) => id))
+    const scenes = (chosen.scenes || []).map((sc) => ({ ids: sc.elements.map((n) => subjectOf.get(n)).filter(Boolean), layout: sc.layout, hold: sc.hold })).filter((sc) => sc.ids.length)
+    const cut = firstCut(project, { pace, seconds, opening: chosen.opening, closing: chosen.closing, background: colours.background, scenes })
     const components = cut.tracks.filter((t) => t.kind === 'component').length
+    const shotsMade = new Set(cut.tracks.filter((t) => t.kind === 'component').map((t) => t.start)).size
+    const distinct = new Set(cut.tracks.filter((t) => t.kind === 'component').map((t) => t.subjectId)).size
+    const layoutsUsed = new Set((scenes.length ? scenes : []).map((sc) => sc.layout || 'full')).size || 1
     if (!components) throw new Error('Cannot cut: no kept motion was saved, so there was nothing to place. Next: try again; if it repeats, open the studio and keep a motion by hand.')
     const put = await fetch(`${at}/__motioneer/projects/${id}`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(cut) }).then((r) => r.json()).catch((e) => ({ error: e.message }))
     if (put.error) throw new Error(`Cannot cut: ${put.error} Next: try again.`)
     const ms = cut.settings.duration
     // every boundary in the cut: each shot's start and the closing title's, for the proof to check in place
     const cutTimes = [...new Set(cut.tracks.filter((t) => t.kind !== 'title' || t.start > 0).map((t) => Math.round(t.start)))].sort((a, b) => a - b)
-    onStep(`${components} shots on the site's own ${colours.background} background${chosen.opening ? `, titled "${chosen.opening}"` : ''}${chosen.closing ? ` and "${chosen.closing}"` : ''}.`)
+    onStep(`${shotsMade} shots of ${distinct} elements in ${layoutsUsed} layout${layoutsUsed === 1 ? '' : 's'} on the site's own ${colours.background} background${chosen.opening ? `, titled "${chosen.opening}"` : ''}${chosen.closing ? ` and "${chosen.closing}"` : ''}.`)
 
     onStep('Rendering. This runs a real browser for every frame and takes about a minute for a short film.')
     const start = await (await fetch(`${at}/__motioneer/projects/${id}/renders`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).json()
@@ -308,7 +318,7 @@ export async function autofilm({ at, url, pick = '', direction = '', plan = plan
       const job = jobs.find((j) => j.id === start.id)
       if (!job) continue
       if (job.state === 'error') throw new Error(`Cannot render: ${job.message || 'the render failed'}. Next: open the studio and export from there to see the frame it stopped on.`)
-      if (job.state === 'complete') return { projectId: id, at, jobId: job.id, url: `${at}${job.url}`, captured: captured.length, components, cutTimes, background: colours.background, seconds: ms / 1000, product: chosen.product, opening: chosen.opening, closing: chosen.closing, byModel: chosen.byModel }
+      if (job.state === 'complete') return { projectId: id, at, jobId: job.id, url: `${at}${job.url}`, captured: captured.length, components, shots: shotsMade, distinct, layouts: layoutsUsed, cutTimes, background: colours.background, seconds: ms / 1000, product: chosen.product, opening: chosen.opening, closing: chosen.closing, byModel: chosen.byModel }
     }
     throw new Error('Cannot render: it did not finish in twenty minutes. Next: open the studio, the export is still listed there.')
   } finally {
