@@ -59,6 +59,8 @@ export function compositionRuntime(initial: Project, assetRoot: string) {
      * box it was measured in, with the same width, so the scale the track computes still holds.
      */
     if (root) { root.style.height = 'auto'; root.style.minHeight = subject.h + 'px' }
+    // a root was picked because it was seen, so display none inlined on it is a gate's leftover, not a choice
+    if (root && root.style.display === 'none') { root.style.display = 'block'; parsed.body.querySelectorAll<HTMLElement>('[style]').forEach(el => { if (el.style.display === 'none') el.style.display = '' }) }
     /**
      * Border-box at the measured width. The picker inlines the computed width, which for a
      * content-box element excludes its padding, so a heading measured 1030 wide came back as
@@ -77,6 +79,12 @@ export function compositionRuntime(initial: Project, assetRoot: string) {
       if (el.style.opacity === '0') el.style.opacity = '1'
       if (el.style.visibility === 'hidden') el.style.visibility = 'visible'
     })
+    /**
+     * Hiding written in a stylesheet is lifted too, once the copy has loaded: slack.com holds every
+     * heading at opacity zero through a class its reveal script would remove, and seven of eight
+     * captures rendered as nothing. Only what no animation targets is lifted, since a motion's
+     * own first keyframe is allowed to start from zero.
+     */
     frame.height = String(Math.round(subject.h * 1.17))
     const styles = (subject.css + '\n' + (motion?.css || '')).replace(/<\/style/gi, '<\\/style')
     let done!: () => void
@@ -89,7 +97,7 @@ export function compositionRuntime(initial: Project, assetRoot: string) {
       for (const image of Array.from(d.images)) await image.decode().catch(() => {})
       for (const animation of d.getAnimations()) { animation.pause(); animation.currentTime = 0 }
     } } finally { clearTimeout(timeout); pending.delete(wait); done(); void seek(now) } }
-    frame.srcdoc = '<!doctype html><html><head><style>html,body{margin:0;padding:0;background:transparent;width:100%;height:100%;overflow:hidden}*{box-sizing:border-box}' + styles + 'html,body{margin:0!important;padding:0!important;display:block!important;background:transparent!important;width:100%!important;height:100%!important;overflow:hidden!important}</style></head><body>' + parsed.body.innerHTML + '<script>window.__animations=document.getAnimations();window.__animations.forEach(a=>{a.pause();a.currentTime=0})</script></body></html>'
+    frame.srcdoc = '<!doctype html><html><head><style>html,body{margin:0;padding:0;background:transparent;width:100%;height:100%;overflow:hidden}*{box-sizing:border-box}' + styles + 'html,body{margin:0!important;padding:0!important;display:block!important;background:transparent!important;width:100%!important;height:100%!important;overflow:hidden!important}</style></head><body>' + parsed.body.innerHTML + '<script>window.__animations=document.getAnimations();window.__animations.forEach(a=>{a.pause();a.currentTime=0});for(const el of document.querySelectorAll("*")){const cs=getComputedStyle(el);if((cs.opacity==="0"||cs.visibility==="hidden")&&!el.getAnimations({subtree:false}).length){el.style.setProperty("opacity","1","important");el.style.setProperty("visibility","visible","important")}}</script></body></html>'
     holder.append(frame)
   }
   function update(p: Project) {

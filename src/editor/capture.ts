@@ -9,6 +9,13 @@ export async function freezeCapture(html:string,css:string,source:string) {
   for(const img of parsed.querySelectorAll('img')){img.src=absolute(img.getAttribute('src')||'');img.removeAttribute('srcset');img.removeAttribute('loading')}
   const rewrite=(text:string)=>text.replace(/url\(\s*(["']?)(.*?)\1\s*\)/gi,(_,_q,url)=>`url("${url.startsWith('#')||url.startsWith('data:')?url:absolute(url)}")`)
   parsed.querySelectorAll('[style]').forEach(el=>el.setAttribute('style',rewrite(el.getAttribute('style')||'')))
+  /**
+   * A rule that hides everything is a gate, not a style. slack.com ships body * { display: none !important }
+   * for browsers without its script, the picker copied it into every capture, and seven of eight
+   * captures drew as nothing. A selector of everything with display none is dropped whole.
+   */
+  const gate=/(^|[{},])\s*(?:html|body)?\s*\*\s*\{[^{}]*display\s*:\s*none[^{}]*\}/g
+  if(gate.test(css)){css=css.replace(gate,'$1');parsed.querySelectorAll<HTMLElement>('[style]').forEach(el=>{if(el.style.display==='none')el.style.display=''})}
   css=rewrite(css);html=parsed.body.innerHTML
   const frame=document.createElement('iframe');frame.style.cssText='position:fixed;width:1px;height:1px;left:-20000px;top:0;visibility:hidden';frame.setAttribute('aria-hidden','true')
   const loaded=new Promise<void>(resolve=>{frame.onload=()=>resolve()});frame.srcdoc=`<!doctype html><html><head><style>${css.replace(/<\/style/gi,'')}</style></head><body>${html}</body></html>`;document.body.append(frame)

@@ -194,6 +194,8 @@ async function openPage(browser, at, source, projectId) {
     return false
   }).catch(() => false)
   await page.waitForTimeout(hydrated ? 1500 : 500)
+  // then until the tree holds still: railway.com re-rendered after the scan, every marked element was replaced, and five of eight could not be captured
+  await frame.locator('body').evaluate((body) => new Promise((res) => { let t; const done = () => { o.disconnect(); res() }; const o = new MutationObserver(() => { clearTimeout(t); t = setTimeout(done, 1200) }); o.observe(body, { subtree: true, childList: true }); t = setTimeout(done, 1200); setTimeout(done, 10000) })).catch(() => {})
   await frame.locator('body').evaluate(async (body) => { const h = document.documentElement.scrollHeight; for (let y = 0; y < Math.min(h, 7000); y += 700) { window.scrollTo(0, y); await new Promise((r) => setTimeout(r, 120)) } window.scrollTo(0, 0) }).catch(() => {})
   await page.waitForTimeout(600)
   const title = await frame.locator('title').first().textContent().catch(() => '') || ''
@@ -292,11 +294,16 @@ export async function planFilm({ at, title, source, cands, pick, max, pace = 'br
  * Drive one capture through the real picker. The element already wears data-mn-cand from
  * candidates(), so the click lands on exactly what was chosen.
  */
-async function capture(page, frame, cand) {
+async function capture(page, frame, cand, about) {
   const before = await page.locator('.subject-item').count()
   if (!(await label(page, 'Done picking').count())) await label(page, 'Pick element').click()
   await page.waitForTimeout(250)
   const el = frame.locator(`[data-mn-cand="${cand}"]`).first()
+  // a page that re-rendered since the scan lost its marks: the element is found again by what it said and how big it was
+  if (!(await el.count()) && about) await frame.locator('body').evaluate((body, a) => {
+    const words = (n) => (n.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 80)
+    for (const n of body.querySelectorAll(a.tag || '*')) { const r = n.getBoundingClientRect(); if (Math.abs(r.width - a.w) <= 8 && Math.abs(r.height - a.h) <= 8 && (!a.text || words(n) === a.text)) { n.setAttribute('data-mn-cand', String(a.i)); return } }
+  }, about).catch(() => {})
   if (!(await el.count())) return -1
   await el.scrollIntoViewIfNeeded().catch(() => {})
   /**
@@ -365,7 +372,7 @@ export async function autofilm({ at, url, pick = '', direction = '', plan = plan
     const captured = [], subjectAt = []
     for (const n of chosen.indices) {
       onStep(`Capturing ${name(cands.find((c) => c.i === n))}.`)
-      const at_ = await capture(page, frame, n); if (at_ >= 0) { captured.push(n); subjectAt.push(at_) } else onStep('That one could not be captured, skipping it.')
+      const at_ = await capture(page, frame, n, cands.find((c) => c.i === n)); if (at_ >= 0) { captured.push(n); subjectAt.push(at_) } else onStep('That one could not be captured, skipping it.')
       await label(page, 'Source').click().catch(() => {})
     }
     if (!captured.length) throw new Error(`Cannot film ${source}: none of the chosen elements could be captured. Next: ask for different elements with pick, or open the studio and pick by hand.`)
@@ -395,6 +402,7 @@ export async function autofilm({ at, url, pick = '', direction = '', plan = plan
             const c = document.createElement('canvas'); c.width = 320; c.height = 180; const g = c.getContext('2d'); g.drawImage(img, 0, 0)
             return Array.from(g.getImageData(0, 0, 320, 180).data).filter((_, i) => i % 4 !== 3)
           }, shot.toString('base64')).catch(() => null)
+          if (process.env.MOTIONEER_DEBUG) onStep(`probe ${k} subject ${subjectAt[k]} ${sub.name} ${sub.w}x${sub.h} html ${sub.html.length} lit ${share ? lit(Uint8Array.from(share)).toFixed(4) : 'none'} bg ${colours.background}`)
           if (share && lit(Uint8Array.from(share)) < 0.003) emptyOnes.add(k)
         }
       } finally { await probe.close() }
@@ -416,7 +424,7 @@ export async function autofilm({ at, url, pick = '', direction = '', plan = plan
     const filmNote = direction ? ` The film's direction: ${direction}` : ''
     // a refused attempt is retried with its refusal in the brief: the same element failed the same gate twice on railway.com when asked again blind
     const briefFor = (k, why = '') => (String(chosen.directions[String(captured[k])] || '') + paceNote + filmNote
-      + (why ? ` A previous attempt was refused: ${why.slice(0, 160)}. So animate only transform, opacity, clip-path and filter, and never add or change padding, margin, gap, display, position, overflow, width or height, so the element ends exactly as it was.` : '')).trim().slice(0, 980)
+      + (why ? ` A previous attempt was refused: ${why.slice(0, 160)}. ${/nothing on the component is animating/.test(why) ? 'So write selectors that reach this markup: animate the root itself and its direct children as [data-mn] > *, not classes you assume are there.' : 'So animate only transform, opacity, clip-path and filter, and never add or change padding, margin, gap, display, position, overflow, width or height, so the element ends exactly as it was.'}` : '')).trim().slice(0, 980)
     for (let k = 0; k < captured.length; k++) {
       if (emptyOnes.has(k)) continue
       await page.locator('.subject-item').nth(subjectAt[k]).click()
