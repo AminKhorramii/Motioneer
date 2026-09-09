@@ -346,7 +346,7 @@ async function renderProject(at, id, onStep) {
 }
 
 /** The rendered file fetched to a temporary path and measured off its frames. */
-async function proveRender(url, { pace, seconds, cuts }) {
+export async function proveRender(url, { pace, seconds, cuts }) {
   const file = path.join(tmpdir(), `motioneer-proof-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.mp4`)
   await writeFile(file, Buffer.from(await (await fetch(url)).arrayBuffer()))
   const proof = await proveFilm({ file, pace, seconds, cuts }).catch((e) => ({ ok: false, notes: [`it could not be measured: ${e.message}`], late: [], missing: [] }))
@@ -421,12 +421,13 @@ async function capture(page, frame, cand, about) {
  * @param url       the site to film; the studio is aimed at it first, every time
  * @param pick      what the person asked to film, in their words, which outranks the defaults
  * @param plan      async ({ at, title, source, cands, pick, max }) => plan; planFilm asks the studio's model
+ * @param prove     async (url, { pace, seconds, cuts }) => { file, proof }; proveRender measures the rendered file, and a suite can hand in a verdict
  * @param seconds   film length; the first cut spaces the picks across it
  * @param look      'subtle' | 'expressive' | 'bold', the single treatment written per element
  * @param max       cap on how many elements to capture
  * @param onStep    (message) => void  progress, surfaced to the agent's caller
  */
-export async function autofilm({ at, url, pick = '', direction = '', plan = planFilm, seconds = 20, look = 'subtle', pace = 'brisk', max = 3, onStep = () => {} }) {
+export async function autofilm({ at, url, pick = '', direction = '', plan = planFilm, prove = proveRender, seconds = 20, look = 'subtle', pace = 'brisk', max = 3, onStep = () => {} }) {
   const chromium = await loadChromium()
   if (!chromium) throw new Error('Cannot film: the renderer is not installed. Next: open the studio once and set up the local renderer, then ask again.')
   // aim first, every time: a studio already up may be on another site or a folder, and reusing it
@@ -622,22 +623,39 @@ export async function autofilm({ at, url, pick = '', direction = '', plan = plan
       const third = await litAt(track.entrance + Math.min(300, motion.duration / 3)), end = await litAt(track.entrance + motion.duration + 200)
       return end > 0.003 && third < 0.002
     }
+    /**
+     * Once the driver has saved a cut, the editor page holds an older revision and every save it
+     * makes after that is refused as changed in another tab, so a motion refined after the render
+     * was written and never kept. Before such a refine the page is reloaded, which reopens the
+     * project at the revision the server has.
+     */
+    let editorStale = false
+    const freshenEditor = async () => {
+      if (!editorStale) return
+      await page.reload({ waitUntil: 'domcontentloaded' })
+      await page.locator('.subject-item').first().waitFor({ timeout: 20000 }).catch(() => {})
+      await page.getByRole('button', { name: /^Motions/ }).first().click().catch(() => {})
+      editorStale = false
+    }
     /** Ask once more for element k's motion with the fault named; true when a better one was kept. */
     const refineStart = async (k) => {
       const sub = project.subjects[subjectAt[k]], motion = sub && (project.motions || []).find((m) => m.subjectId === sub.id && m.saved)
-      if (!motion) return false
+      if (!motion) { if (process.env.MOTIONEER_DEBUG) onStep('refine: no saved motion'); return false }
+      await freshenEditor()
       await page.locator('.subject-item').nth(subjectAt[k]).click()
       const directionField = page.getByLabel('Creative direction', { exact: true })
       if (await directionField.count()) await directionField.fill(((await directionField.inputValue()) + ' The previous version kept the whole element invisible for the first third; this one shows the element from its very first frame, with no opacity, clip or transform that hides all of it, and only its parts move into place.').slice(0, 1400))
       const before = await page.locator('.motion-card:not(.pending)').count()
-      if (!(await label(page, 'Refine').count())) return false
+      if (!(await label(page, 'Refine').count())) { if (process.env.MOTIONEER_DEBUG) onStep('refine: no refine button'); return false }
       await label(page, 'Refine').first().click()
-      try { await page.waitForFunction((n) => document.querySelectorAll('.motion-card:not(.pending)').length > n, before, { timeout: 150000 }) } catch { return false }
+      try { await page.waitForFunction((n) => document.querySelectorAll('.motion-card:not(.pending)').length > n, before, { timeout: 150000 }) } catch { if (process.env.MOTIONEER_DEBUG) onStep('refine: no new card'); return false }
+      if (process.env.MOTIONEER_DEBUG) onStep('refine: cards ' + JSON.stringify(await page.locator('.motion-card').evaluateAll((cards) => cards.map((c) => c.className + ' ' + [...c.querySelectorAll('button')].map((b) => b.getAttribute('aria-label')).join('/')))))
       await page.locator('.motion-card:not(.pending)').last().getByRole('button', { name: 'Keep motion', exact: true }).click()
       let fresh, next
       for (let n = 0; n < 20 && !next; n++) { await new Promise((r) => setTimeout(r, 300)); fresh = await (await fetch(`${at}/__motioneer/projects/${id}`)).json(); next = (fresh.motions || []).find((m) => m.subjectId === sub.id && m.saved && m.id !== motion.id) }
-      if (next && (await hides(sub, next))) { await page.locator('.motion-card:not(.pending)').first().getByRole('button', { name: 'Keep motion', exact: true }).click().catch(() => {}); await page.waitForTimeout(600); project = await settled(); return false }
+      if (next && (await hides(sub, next))) { if (process.env.MOTIONEER_DEBUG) onStep('refine: the new one hides too'); await page.locator('.motion-card:not(.pending)').first().getByRole('button', { name: 'Keep motion', exact: true }).click().catch(() => {}); await page.waitForTimeout(600); project = await settled(); return false }
       project = await settled()
+      if (!next && process.env.MOTIONEER_DEBUG) onStep(`refine: no new saved motion; motions ${JSON.stringify((fresh?.motions || []).map((m) => [m.subjectId === sub.id, m.saved, m.id === motion.id]))}`)
       return !!next
     }
     const repairs = []
@@ -664,7 +682,9 @@ export async function autofilm({ at, url, pick = '', direction = '', plan = plan
       if (!components) throw new Error('Cannot cut: no kept motion was saved, so there was nothing to place. Next: try again; if it repeats, open the studio and keep a motion by hand.')
       const put = await fetch(`${at}/__motioneer/projects/${id}`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(cut) }).then((r) => r.json()).catch((e) => ({ error: e.message }))
       if (put.error) throw new Error(`Cannot cut: ${put.error} Next: try again.`)
-      project = put
+      // read back rather than trusting the save's echo, since the repair below looks subjects and motions up on it
+      project = await (await fetch(`${at}/__motioneer/projects/${id}`)).json()
+      editorStale = true
       const shots = shotList(cut)
       return { cut, shots, shotsMade: shots.length, distinct: new Set(cut.tracks.filter((t) => t.kind === 'component').map((t) => t.subjectId)).size, layoutsUsed: new Set(scenes.map((sc) => sc.layout || 'full')).size || 1, cutTimes: boundariesOf(cut) }
     }
@@ -672,7 +692,7 @@ export async function autofilm({ at, url, pick = '', direction = '', plan = plan
     let made = await assemble(scenes)
     onStep(`${made.shotsMade} shots of ${made.distinct} elements in ${made.layoutsUsed} layout${made.layoutsUsed === 1 ? '' : 's'} on the site's own ${colours.background} background${chosen.opening ? `, titled "${chosen.opening}"` : ''}${chosen.closing ? ` and "${chosen.closing}"` : ''}.`)
     let rendered = await renderProject(at, id, onStep)
-    let proved = await proveRender(rendered.url, { pace, seconds, cuts: made.cutTimes })
+    let proved = await prove(rendered.url, { pace, seconds, cuts: made.cutTimes })
 
     /**
      * One round of repair from the verdict, since the proof names what is wrong: a shot still
@@ -697,6 +717,7 @@ export async function autofilm({ at, url, pick = '', direction = '', plan = plan
       for (const ms of (proved.proof.late || []).slice(0, 2)) {
         const shot = made.shots.find((sh) => Math.abs(sh.at * 1000 - ms) <= 260)
         const k = shot ? kOf(shot.ids[0]) : -1
+        if (process.env.MOTIONEER_DEBUG) onStep(`repair: late ${ms} shot ${JSON.stringify(shot)} k ${k} subjects ${JSON.stringify(project.subjects.map((s) => s.id))} subjectAt ${JSON.stringify(subjectAt)}`)
         if (k >= 0) { onStep(`Shot ${shot.shot} starts empty, asking for a motion of ${nameOf(shot.ids[0])} that shows from the first frame.`); if (await refineStart(k)) { repairs.push(`rewrote the motion of ${nameOf(shot.ids[0])} because its shot started empty`); continue } }
         dropShot(ms, 'because it started empty')
       }
@@ -707,7 +728,7 @@ export async function autofilm({ at, url, pick = '', direction = '', plan = plan
         project = await settled()
         made = await assemble(scenes)
         rendered = await renderProject(at, id, onStep)
-        proved = await proveRender(rendered.url, { pace, seconds, cuts: made.cutTimes })
+        proved = await prove(rendered.url, { pace, seconds, cuts: made.cutTimes })
       }
     }
     const elements = chosen.indices.map((n) => ({ index: n, name: name(cands.find((c) => c.i === n)), status: fate.get(n) || 'not captured' }))

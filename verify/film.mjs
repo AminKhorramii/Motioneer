@@ -251,6 +251,23 @@ try {
   assert.ok(revised.layouts >= 2, `the revision should keep the plan's layouts, got ${revised.layouts}`)
   assert.ok(revised.proof && revised.proof.cuts === revised.cutTimes.length, `every cut of the revision should show in its frames: ${JSON.stringify(revised.proof?.notes)}`)
   console.log(`ok: revised to ${revised.shots} shots in ${revised.seconds}s with ${revised.layouts} layouts, ${revised.changes.join('; ')}`)
+
+  /**
+   * The verdict mends before it reports. Handed a proof that calls the first shot empty, the
+   * driver asks for that element's motion again or drops the shot, cuts and renders once more,
+   * and says what it did; the second verdict is the one that comes back. The fault is injected
+   * because a mock motion never hides its root, and a real one does about one film in five.
+   */
+  const { proveRender } = await import('../tools/editor/autofilm.mjs')
+  let verdicts = 0
+  const lying = async (url, opts) => { const real = await proveRender(url, opts); verdicts++; return verdicts === 1 ? { ...real, proof: { ...real.proof, ok: false, late: [opts.cuts[0]], notes: ['1 shot still empty a third of a second in'] } } : real }
+  const mendSteps = []
+  const mended = await autofilm({ at, url: siteAt, seconds: 12, look: 'subtle', pace: 'fast', max: 2, pick: 'the card and the headline', prove: lying, onStep: (m) => { mendSteps.push(m); if (process.env.MOTIONEER_STEPS) console.log('  mend', m) } })
+  assert.equal(verdicts, 2, 'a failed verdict should lead to one more render and one more verdict')
+  assert.ok(mended.repairs.length === 1 && /rewrote|dropped/.test(mended.repairs[0]), `the film should say what it mended, got ${JSON.stringify(mended.repairs)}`)
+  assert.ok(mendSteps.some((m) => /^Mending the film/.test(m)) && mendSteps.filter((m) => /^Rendering/.test(m)).length === 2, 'it should say it is mending and render twice')
+  assert.ok(mended.proof.ok, `the verdict returned should be the second one: ${JSON.stringify(mended.proof.notes)}`)
+  console.log(`ok: a failed verdict was mended: ${mended.repairs[0]}`)
   console.log(`ok: measured off the frames: ${proof.cuts} cuts, shots ${(proof.avgShotMs / 1000).toFixed(1)}s on average, elements arriving over ${proof.arriveMs}ms, ${Math.round(proof.blank * 100)}% blank`)
   console.log('ok: it reported each step:', steps.length, 'steps')
   console.log('film verification passed')
