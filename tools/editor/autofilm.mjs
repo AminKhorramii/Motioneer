@@ -94,7 +94,19 @@ async function openPage(browser, at, source, projectId) {
   catch { throw new Error(`Cannot film ${source}: it did not render inside the studio in 45 seconds. It is slow, or it refuses to be proxied, which is what a site that signs in against its own api does. Next: try again once if it was slow; otherwise open the studio and pick from your own browser with the bookmarklet.`) }
   await page.waitForTimeout(4000)
   const title = await frame.locator('title').first().textContent().catch(() => '') || ''
-  return { page, frame, title: title.trim() }
+  /**
+   * The page's own ground and ink, read off the rendered document rather than guessed. A body
+   * with no background falls through to the html element, then to white, because that is what a
+   * browser paints; the ink is whatever the body's text is. These become the film's background
+   * and its title colour, so the film stands on the site's colours instead of a dark stage of
+   * its own, and a dark headline off a light page stays visible.
+   */
+  const colours = await frame.locator('body').evaluate((body) => {
+    const hex = (rgb) => { const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/.exec(rgb || ''); if (!m || (m[4] !== undefined && Number(m[4]) === 0)) return null; return '#' + [m[1], m[2], m[3]].map((v) => Number(v).toString(16).padStart(2, '0')).join('') }
+    const ground = hex(getComputedStyle(body).backgroundColor) || hex(getComputedStyle(document.documentElement).backgroundColor) || '#ffffff'
+    return { background: ground, color: hex(getComputedStyle(body).color) || null }
+  }).catch(() => ({ background: '#101319', color: null }))
+  return { page, frame, title: title.trim(), colours }
 }
 export async function inspectSite({ at, url }) {
   const chromium = await loadChromium()
@@ -104,7 +116,7 @@ export async function inspectSite({ at, url }) {
   try {
     const { frame, title } = await openPage(browser, at, source)
     const cands = await candidates(frame)
-    return { source, title, candidates: cands }
+    return { source, title, colours, candidates: cands }
   } finally { await browser.close() }
 }
 
@@ -171,7 +183,7 @@ export async function autofilm({ at, url, pick = '', plan = planFilm, seconds = 
   try {
     onStep('Opening the editor on the site.')
     const projectId = await freshProject(at, `Film of ${source.replace(/^https?:\/\//, '').replace(/\/$/, '')}`)
-    const { page, frame, title } = await openPage(browser, at, source, projectId)
+    const { page, frame, title, colours } = await openPage(browser, at, source, projectId)
     const cands = await candidates(frame)
     if (!cands.length) throw new Error(`Cannot film ${source}: nothing on the page looked worth filming. It may still be loading or need a sign in. Next: try once more; if it needs a sign in, pick from your own browser with the bookmarklet in the studio.`)
     onStep(`Found ${cands.length} things on ${title || source}. Asking the model what to film and what to say.`)
@@ -221,7 +233,7 @@ export async function autofilm({ at, url, pick = '', plan = planFilm, seconds = 
     }
     await new Promise((r) => setTimeout(r, 900))
     project = await (await fetch(`${at}/__motioneer/projects/${id}`)).json()
-    const cut = firstCut(project, { pace, seconds, opening: chosen.opening, closing: chosen.closing })
+    const cut = firstCut(project, { pace, seconds, opening: chosen.opening, closing: chosen.closing, background: colours.background })
     const components = cut.tracks.filter((t) => t.kind === 'component').length
     if (!components) throw new Error('Cannot cut: no kept motion was saved, so there was nothing to place. Next: try again; if it repeats, open the studio and keep a motion by hand.')
     const put = await fetch(`${at}/__motioneer/projects/${id}`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(cut) }).then((r) => r.json()).catch((e) => ({ error: e.message }))
@@ -229,7 +241,7 @@ export async function autofilm({ at, url, pick = '', plan = planFilm, seconds = 
     const ms = cut.settings.duration
     // every boundary in the cut: each shot's start and the closing title's, for the proof to check in place
     const cutTimes = [...new Set(cut.tracks.filter((t) => t.kind !== 'title' || t.start > 0).map((t) => Math.round(t.start)))].sort((a, b) => a - b)
-    onStep(`${components} shots${chosen.opening ? `, titled "${chosen.opening}"` : ''}${chosen.closing ? ` and "${chosen.closing}"` : ''}.`)
+    onStep(`${components} shots on the site's own ${colours.background} background${chosen.opening ? `, titled "${chosen.opening}"` : ''}${chosen.closing ? ` and "${chosen.closing}"` : ''}.`)
 
     onStep('Rendering. This runs a real browser for every frame and takes about a minute for a short film.')
     const start = await (await fetch(`${at}/__motioneer/projects/${id}/renders`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).json()
@@ -240,7 +252,7 @@ export async function autofilm({ at, url, pick = '', plan = planFilm, seconds = 
       const job = jobs.find((j) => j.id === start.id)
       if (!job) continue
       if (job.state === 'error') throw new Error(`Cannot render: ${job.message || 'the render failed'}. Next: open the studio and export from there to see the frame it stopped on.`)
-      if (job.state === 'complete') return { projectId: id, at, jobId: job.id, url: `${at}${job.url}`, captured: captured.length, components, cutTimes, seconds: ms / 1000, product: chosen.product, opening: chosen.opening, closing: chosen.closing, byModel: chosen.byModel }
+      if (job.state === 'complete') return { projectId: id, at, jobId: job.id, url: `${at}${job.url}`, captured: captured.length, components, cutTimes, background: colours.background, seconds: ms / 1000, product: chosen.product, opening: chosen.opening, closing: chosen.closing, byModel: chosen.byModel }
     }
     throw new Error('Cannot render: it did not finish in twenty minutes. Next: open the studio, the export is still listed there.')
   } finally {

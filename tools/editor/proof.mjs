@@ -29,7 +29,26 @@ async function frames(ffmpeg, file) {
   })
 }
 
-const lit = (f) => { let on = 0; for (let i = 0; i < f.length; i += 3) if (f[i] > 40 || f[i + 1] > 40 || f[i + 2] > 40) on++; return on / (f.length / 3) }
+/**
+ * The share of the frame that is content rather than ground. The ground is the frame's most
+ * common colour, found on a coarse grid, so a film on a white site counts its dark headline the
+ * same way a film on a dark site counts its light one. Brightness alone called a white stage
+ * "lit" everywhere and a dark headline on it nothing at all.
+ */
+const lit = (f) => {
+  const seen = new Map()
+  for (let i = 0; i < f.length; i += 3) { const k = ((f[i] >> 4) << 8) | ((f[i + 1] >> 4) << 4) | (f[i + 2] >> 4); seen.set(k, (seen.get(k) || 0) + 1) }
+  let ground = 0, most = -1
+  for (const [k, n] of seen) if (n > most) { most = n; ground = k }
+  // the ground's exact colour is the mean of the pixels in its bucket: a bucket's corner was off
+  // by up to 15 a channel, which made a light ground count as content everywhere
+  let sr = 0, sg = 0, sb = 0, count = 0
+  for (let i = 0; i < f.length; i += 3) if ((((f[i] >> 4) << 8) | ((f[i + 1] >> 4) << 4) | (f[i + 2] >> 4)) === ground) { sr += f[i]; sg += f[i + 1]; sb += f[i + 2]; count++ }
+  const gr = sr / count, gg = sg / count, gb = sb / count
+  let on = 0
+  for (let i = 0; i < f.length; i += 3) if (Math.abs(f[i] - gr) + Math.abs(f[i + 1] - gg) + Math.abs(f[i + 2] - gb) > 30) on++
+  return on / (f.length / 3)
+}
 /**
  * The share of pixels that changed, not the average change. A film's elements cover a few
  * percent of a dark frame, so a real cut averaged over the whole picture reads as almost nothing:
@@ -69,8 +88,15 @@ export async function proveFilm({ file, pace = 'calm', seconds, cuts: planned })
       const a = frameAt(ms - 150), b = frameAt(ms + 250)
       let best = -1, bestAt = -1
       for (let i = a; i <= b; i++) { const v = soft(i); if (v > best) { best = v; bestAt = i } }
-      // a boundary is seen when something changed noticeably right where it should
-      return { at: bestAt, seen: best > 0.03 }
+      /**
+       * A boundary is seen when the change right there is large against what is on screen, not
+       * against the whole frame: a film of one small heading repeated, on example.com, changes
+       * under two percent of the frame at a cut because the heading is under two percent of the
+       * frame, while a card that fills a third of it changes a third. Forty percent of the
+       * content around the boundary, or three percent of the frame outright, is a cut.
+       */
+      const around = Math.max(lits[Math.max(1, a)], lits[Math.min(fs.length - 1, b)], 0.005)
+      return { at: bestAt, seen: best > 0.03 || best >= around * 0.4 }
     })
   } else {
     boundaries = []

@@ -96,17 +96,27 @@ one cut function the editor's button also calls, so the two never disagree:
 | brisk | 2 seconds | about 2.4 seconds each, filling the length | a demo, the default |
 | fast | 1.2 seconds | about 1.3 seconds each, filling the length | "fast", "quick", "lots of cuts" |
 
-When there are fewer kept motions than shots, the elements come round again with the frame
-nudged and tightened a little, so a repeat reads as a new shot and not a freeze. Each brisk or
+The film stands on the site's own colours. The driver reads the rendered page's background,
+falling through body to html to white the way a browser paints, and the cut takes it as the film's
+background with title ink chosen for contrast on it. A dark headline captured off a light page is
+therefore still a dark headline on a light film, rather than lost on a dark stage.
+
+When there are fewer kept motions than shots, the elements come round again, each time round
+tighter and swung to the other side, so a repeat reads as a new shot and not a freeze. A four
+percent nudge was measured as no cut at all off the frames of a one-heading film, which is why
+the swing is what it is. A captured root also drops the margin the picker inlined from the page:
+the frame is sized to the element's own box, and a heading with a 16px top margin once rendered
+16px down and lost its foot. Each brisk or
 fast shot also keeps moving after its motion lands, a slow push in or a slow drift, because a
 motion that is over in the first tenth of a shot followed by a second of stillness reads as a
 slideshow. The motion itself is asked to fill most of the shot, 0.9 seconds of a 1.3 second fast
 shot, and to use the whole of that rather than an easing that is finished in the first third.
 
 Every film is then measured off its rendered frames rather than trusted. `tools/editor/proof.mjs`
-decodes the file at ten frames a second, counts the cuts as sharp changes between neighbours,
-times the shots between them, measures how long each element takes to arrive after a cut, and
-checks that nothing is blank. Arrival is the number behind "the elements are not animated": a
+decodes the file at ten frames a second, checks each cut the plan made at its own time rather than
+guessing cuts from pixels, times the shots between them, measures how long each element takes to
+arrive after a cut, and checks that nothing is blank, judging content against the frame's own
+ground colour so a light film and a dark one are read the same way. Arrival is the number behind "the elements are not animated": a
 450 millisecond motion with the model's usual ease-out settled in about 135 milliseconds, a pop,
 and the verdict now says so rather than calling it a motion. The verdict compares that to the
 pace requested and the reply carries it: "Verified from the frames: 12 cuts in 12 seconds, shots

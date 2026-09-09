@@ -17,7 +17,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { autofilm } from '../tools/editor/autofilm.mjs'
 import { loadChromium } from '../tools/editor/render.mjs'
 import { proveFilm } from '../tools/editor/proof.mjs'
-import { firstCut, createProject } from '../dist-core/core.js'
+import { firstCut, createProject, compositionDocument } from '../dist-core/core.js'
 
 const root = path.dirname(fileURLToPath(new URL('.', import.meta.url)))
 if (!(await loadChromium())) { console.log('skip: the local renderer is not installed, so the film path cannot be exercised here'); process.exit(0) }
@@ -27,6 +27,9 @@ if (!(await loadChromium())) { console.log('skip: the local renderer is not inst
   const p = createProject('pace'); p.subjects = [{ id: 'a', name: 'A', html: '<b>a</b>', css: '', w: 100, h: 50, warnings: [] }, { id: 'b', name: 'B', html: '<b>b</b>', css: '', w: 100, h: 50, warnings: [] }]
   p.motions = [{ id: 'ma', subjectId: 'a', css: '', scope: 'x', note: '', brief: p.brief, treatment: 'subtle', duration: 500, saved: true }, { id: 'mb', subjectId: 'b', css: '', scope: 'x', note: '', brief: p.brief, treatment: 'subtle', duration: 500, saved: true }]
   const calm = firstCut(p), fast = firstCut(p, { pace: 'fast', seconds: 12, opening: 'Hello', closing: 'Bye' })
+  const light = firstCut(p, { background: '#f7f7f8' }), dark = firstCut(p, { background: '#0b0c10' })
+  assert.equal(light.settings.background, '#f7f7f8'); assert.equal(light.tracks[0].color, '#111318', 'dark ink on a light ground')
+  assert.equal(dark.tracks[0].color, '#f4f4f5', 'light ink on a dark ground'); assert.equal(calm.settings.background, p.settings.background, 'no background given leaves the project\'s own')
   const shotsOf = (c) => c.tracks.filter((t) => t.kind === 'component')
   assert.equal(shotsOf(calm).length, 2, 'calm places each kept motion once')
   assert.ok(shotsOf(fast).length >= 7, `fast fills 12 seconds with short shots, got ${shotsOf(fast).length}`)
@@ -73,7 +76,7 @@ const site = createServer((req, res) => {
       <h2 style="margin:0 0 10px">Everything in one place</h2><p style="color:#5b6472">Your team's work, on one board.</p>
       <button style="margin-top:12px;background:#4f56d6;color:#fff;border:0;padding:12px 22px;border-radius:10px">Get started</button>
     </article>
-    <div class="hero-image" style="width:520px;height:220px;border-radius:16px;background:linear-gradient(135deg,#6b73e6,#c98bb0)"></div>
+    <div class="hero-image" style="width:520px;height:220px;margin:18px 0 0;border-radius:16px;background:linear-gradient(135deg,#6b73e6,#c98bb0)"></div>
   </body></html>`)
 })
 await new Promise((r) => site.listen(0, '127.0.0.1', r))
@@ -102,8 +105,30 @@ try {
   assert.ok(planPrompt && /card in (hero|body|nav)/.test(planPrompt), 'candidates should be described by role and section')
   assert.ok(prompts.some((p) => /settles last|rises as one piece/.test(p)), 'the model\'s direction should reach the motion prompt')
   const saved = await (await fetch(`${at}/__motioneer/projects/${result.projectId}`)).json()
+  /**
+   * A captured root sits flush in its frame. The block was captured with an 18px top margin, and a
+   * frame sized to its box once rendered it 18px down and clipped its foot. Rendered through the
+   * same composition the film uses, its top must be at 0.
+   */
+  {
+    const block = saved.subjects.find((x) => /margin:18px/.test(x.html)) || saved.subjects.find((x) => /hero-image/.test(x.html))
+    assert.ok(block, 'the block with the top margin should have been captured')
+    const one = createProject('flush'); one.settings.width = block.w; one.settings.height = block.h; one.subjects = [block]
+    one.tracks = [{ ...firstCut(one).tracks[0], kind: 'component', name: 'b', subjectId: block.id, motionId: undefined, x: 0, y: 0, width: 100, height: 100, start: 0, duration: 5000 }]
+    const chromium = await loadChromium(); const browser = await chromium.launch({ channel: 'chromium' })
+    try {
+      const page = await browser.newPage({ viewport: { width: block.w + 20, height: block.h + 20 } })
+      await page.setContent(compositionDocument(one), { waitUntil: 'load' }); await page.waitForTimeout(800)
+      const top = await page.evaluate(() => { const f = document.querySelector('iframe'); const root = f.contentDocument.body.firstElementChild; return root.getBoundingClientRect().top })
+      assert.ok(Math.abs(top) < 1, `a captured root should sit flush at the top of its frame, it sat at ${top}px`)
+      console.log('ok: a captured root sits flush in its frame, its page margin dropped')
+    } finally { await browser.close() }
+  }
   const titles = saved.tracks.filter((t) => t.kind === 'title').map((t) => t.text)
   assert.deepEqual(titles, ['Ship it with confidence', 'Get started today'], 'both title tracks should carry the model\'s words')
+  assert.equal(saved.settings.background, '#eef1f6', 'the film should stand on the site\'s own background')
+  assert.ok(saved.tracks.filter((t) => t.kind === 'title').every((t) => t.color === '#111318'), 'titles on a light ground should be dark')
+  assert.equal(result.background, '#eef1f6', 'the driver should report the background it matched')
   assert.ok(saved.tracks.filter((t) => t.kind === 'component').length >= 7, 'a fast cut should carry many shots, not one per element')
   console.log('ok: the model planned it: chose by the person\'s pick, wrote the titles, and directed each motion')
   const buf = Buffer.from(await (await fetch(result.url)).arrayBuffer())

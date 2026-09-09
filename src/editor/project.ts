@@ -17,7 +17,7 @@ export function newTrack(kind: Track['kind'], name: string, at = 0): Track {
   return { id: uid(), kind, name, color: '#f4f4f5', fontSize: 64, start: at, duration: 5000, entrance: 0, x: 15, y: 20, width: 70, height: 60, hidden: false, locked: false, moves: [], volume: 0.7, sourceStart: 0, fadeIn: 200, fadeOut: 400 }
 }
 export type Pace = 'calm' | 'brisk' | 'fast'
-export type CutOptions = { pace?: Pace; seconds?: number; opening?: string; closing?: string }
+export type CutOptions = { pace?: Pace; seconds?: number; opening?: string; closing?: string; background?: string; ink?: string }
 /**
  * The first cut, paced. Calm spreads the kept motions across the film with long titles, the way
  * a person expects when they press the button. Brisk and fast are what "a demo" and "a fast video"
@@ -36,12 +36,16 @@ export function firstCut(p: Project, opts: CutOptions = {}): Project {
   const body = span - 2 * title
   const shots = shot ? Math.max(chosen.length, Math.round(body / shot)) : chosen.length
   const step = body / shots
-  const opening = { ...newTrack('title', 'Opening'), text: opts.opening || 'Meet your next great idea', x: 10, y: 35, width: 80, height: 25, duration: title, fontSize: 76 }
-  const end = { ...newTrack('title', 'Closing', span - title), text: opts.closing || 'See it in action', x: 10, y: 35, width: 80, height: 25, duration: title, fontSize: 76 }
+  // the film stands on the site's own background, with ink that reads on it, so a dark headline off a light page is not lost on a dark stage
+  const ink = opts.ink || (opts.background ? contrastInk(opts.background) : '#f4f4f5')
+  const opening = { ...newTrack('title', 'Opening'), text: opts.opening || 'Meet your next great idea', color: ink, x: 10, y: 35, width: 80, height: 25, duration: title, fontSize: 76 }
+  const end = { ...newTrack('title', 'Closing', span - title), text: opts.closing || 'See it in action', color: ink, x: 10, y: 35, width: 80, height: 25, duration: title, fontSize: 76 }
   const cuts: Track[] = Array.from({ length: shots }, (_, i) => {
     const { s, m } = chosen[i % chosen.length], round = Math.floor(i / chosen.length), at = title + i * step
-    // a repeat is framed a little differently, alternating sides and a touch tighter, so it cuts rather than freezes
-    const nudge = round % 2 ? 4 : 0, tighten = Math.min(8, round * 2)
+    // a repeat is framed differently enough to read as a new shot: tighter each time round, and
+    // swinging to the other side, because a four percent nudge of one small heading was measured
+    // as no cut at all off the frames
+    const nudge = round % 2 ? 8 : -2, tighten = Math.min(24, round * 8)
     /**
      * A brisk or fast shot keeps moving after its motion lands: a slow push in on even shots, a
      * slow drift on odd ones. Measured on a fast film, the motion was over in the first tenth of
@@ -52,7 +56,15 @@ export function firstCut(p: Project, opts: CutOptions = {}): Project {
     return { ...newTrack('component', s.name, at), duration: step, subjectId: s.id, motionId: m!.id, width: 76 - tighten, x: 12 + nudge + tighten / 2, y: 16 + tighten / 2, height: 68 - tighten, moves }
   })
   const camera = pace === 'calm' ? [{ at: title, duration: body, x: 0, y: 0, scale: 1.04, ease: 'ease-in-out' }] : [{ at: title, duration: body, x: 0, y: 0, scale: 1.06, ease: 'linear' }]
-  return { ...p, tracks: [opening, ...cuts, end], camera, settings: { ...p.settings, duration: span, from: 0, to: span } }
+  return { ...p, tracks: [opening, ...cuts, end], camera, settings: { ...p.settings, duration: span, from: 0, to: span, ...(opts.background ? { background: opts.background } : {}) } }
+}
+/** Light ink on a dark ground and dark ink on a light one, by the ground's relative luminance. */
+export function contrastInk(hex: string): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim())
+  if (!m) return '#f4f4f5'
+  const n = parseInt(m[1], 16), lin = (c: number) => { const v = c / 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4 }
+  const lum = 0.2126 * lin(n >> 16) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255)
+  return lum > 0.35 ? '#111318' : '#f4f4f5'
 }
 /** Reject malformed documents at the disk boundary instead of poisoning future sessions. */
 export function validateProject(raw: unknown): Project {

@@ -44,6 +44,14 @@ export function compositionRuntime(initial: Project, assetRoot: string) {
     parsed.querySelectorAll('script,iframe,object,embed,base,meta,link').forEach(el => el.remove())
     parsed.querySelectorAll('*').forEach(el => { for (const attr of [...el.attributes]) if (/^on/i.test(attr.name) || /^(javascript|vbscript):/i.test(attr.value.trim())) el.removeAttribute(attr.name) })
     if (motion && /^data-[\w-]+$/.test(motion.scope)) parsed.body.firstElementChild?.setAttribute(motion.scope, '')
+    /**
+     * The root of a capture wears no margin here. The picker inlines the element's computed
+     * margin along with everything else, and this frame is sized to the element's own box, so a
+     * heading with a 16px top margin rendered 16px down in a 28px frame and lost its lower half
+     * to overflow. The margin was the page's spacing around the element, not part of it.
+     */
+    const root = parsed.body.firstElementChild as HTMLElement | null
+    if (root) root.style.margin = '0'
     const styles = (subject.css + '\n' + (motion?.css || '')).replace(/<\/style/gi, '<\\/style')
     let done!: () => void
     const wait = new Promise<void>(resolve => { done = resolve }); pending.add(wait)
