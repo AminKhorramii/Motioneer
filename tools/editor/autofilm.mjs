@@ -63,7 +63,8 @@ async function candidates(frame) {
       const r = el.getBoundingClientRect(), top = Math.round(r.top + window.scrollY), page = document.documentElement.scrollHeight, style = getComputedStyle(el)
       el.setAttribute('data-mn-cand', String(i))
       const image = !!el.querySelector('img,picture,video,svg') || /url\(/.test(style.backgroundImage) || el.tagName === 'IMG' || el.tagName === 'VIDEO'
-      const section = top < 90 ? 'nav' : top < 900 ? 'hero' : top > page - 700 ? 'footer' : 'body'
+      // nav is high and short; a hero section that starts at the top of the page is not nav
+      const section = top < 90 && r.height < 160 ? 'nav' : top < 900 ? 'hero' : top > page - 700 ? 'footer' : 'body'
       const cls = (el.className && typeof el.className === 'string' ? el.className : '').toLowerCase()
       // a one-line h3 under 32px is a label, not a heading: alone in a frame it is a stray word
       const role = el.tagName === 'IMG' || el.tagName === 'VIDEO' ? 'image' : /^h[1-3]$/i.test(el.tagName) ? (el.tagName === 'H3' && r.height < 32 ? 'label' : 'heading') : /button/i.test(el.tagName) || /cta|button/.test(cls) ? 'button' : /card/.test(cls) ? 'card' : /hero/.test(cls) ? 'hero' : el.tagName.toLowerCase()
@@ -128,9 +129,24 @@ async function openPage(browser, at, source, projectId) {
   await page.goto(at, { waitUntil: 'domcontentloaded' })
   const frame = page.frameLocator('iframe[title="Source page"]')
   try { await frame.locator('body').waitFor({ timeout: 45000 }) }
-  catch { throw new Error(`Cannot film ${source}: it did not render inside the studio in 45 seconds. It is slow, or it refuses to be proxied, which is what a site that signs in against its own api does. Next: try again once if it was slow; otherwise open the studio and pick from your own browser with the bookmarklet.`) }
-  await page.waitForTimeout(3000)
-  // a landing page renders below the fold only as it is scrolled, so it is walked once to wake it, then returned to the top
+  catch {
+    // a frame whose document cannot be read left the proxy: the page sent itself to its own origin, whose policy forbids framing
+    const escaped = await page.evaluate(() => { const f = document.querySelector('iframe[title="Source page"]'); try { return !!f && !f.contentDocument } catch { return true } }).catch(() => false)
+    throw new Error(escaped
+      ? `Cannot film ${source}: the page navigated the frame back to its own address, which refuses to be framed, so the studio cannot read it. Next: open the studio and pick from your own browser with the bookmarklet.`
+      : `Cannot film ${source}: it did not render inside the studio in 45 seconds. It is slow, or it refuses to be proxied, which is what a site that signs in against its own api does. Next: try again once if it was slow; otherwise open the studio and pick from your own browser with the bookmarklet.`)
+  }
+  /**
+   * Wait for the page to be a page. A landing rendered on the client, vercel.com among them,
+   * has a body within a second and its words several seconds later, and read at seven seconds it
+   * offered nothing to film. So the frame is given up to fifteen seconds to carry real text, then
+   * walked once to wake what renders on scroll, and returned to the top.
+   */
+  const hydrated = await frame.locator('body').evaluate(async (body) => {
+    for (let n = 0; n < 30; n++) { if ((body.innerText || '').trim().length > 200 || body.querySelectorAll('img,video').length > 2) return true; await new Promise((r) => setTimeout(r, 500)) }
+    return false
+  }).catch(() => false)
+  await page.waitForTimeout(hydrated ? 1500 : 500)
   await frame.locator('body').evaluate(async (body) => { const h = document.documentElement.scrollHeight; for (let y = 0; y < Math.min(h, 7000); y += 700) { window.scrollTo(0, y); await new Promise((r) => setTimeout(r, 120)) } window.scrollTo(0, 0) }).catch(() => {})
   await page.waitForTimeout(600)
   const title = await frame.locator('title').first().textContent().catch(() => '') || ''
@@ -187,7 +203,8 @@ export async function inspectSite({ at, url }) {
   const browser = await chromium.launch({ channel: 'chromium' })
   try {
     const { page, frame, title, colours } = await openPage(browser, at, source)
-    const cands = await dropDecoration(page, await candidates(frame), () => {})
+    let cands = await dropDecoration(page, await candidates(frame), () => {})
+    for (let n = 0; n < 2 && !cands.length; n++) { await page.waitForTimeout(3000); cands = await dropDecoration(page, await candidates(frame), () => {}) }
     return { source, title, colours, candidates: cands }
   } finally { await browser.close() }
 }
@@ -276,8 +293,15 @@ export async function autofilm({ at, url, pick = '', direction = '', plan = plan
     onStep('Opening the editor on the site.')
     const projectId = await freshProject(at, `Film of ${source.replace(/^https?:\/\//, '').replace(/\/$/, '')}`)
     const { page, frame, title, colours } = await openPage(browser, at, source, projectId)
-    const cands = await dropDecoration(page, await candidates(frame), onStep)
-    if (!cands.length) throw new Error(`Cannot film ${source}: nothing on the page looked worth filming. It may still be loading or need a sign in. Next: try once more; if it needs a sign in, pick from your own browser with the bookmarklet in the studio.`)
+    let cands = await dropDecoration(page, await candidates(frame), onStep)
+    // a page still drawing itself is scanned again rather than declared empty
+    for (let n = 0; n < 2 && !cands.length; n++) { await page.waitForTimeout(3000); cands = await dropDecoration(page, await candidates(frame), onStep) }
+    if (!cands.length) {
+      const words = await frame.locator('body').evaluate((b) => (b.innerText || '').trim().length).catch(() => 0)
+      throw new Error(words > 200
+        ? `Cannot film ${source}: the page rendered but nothing on it matched a heading, a card, a button or an image. Next: say what to film with pick, or open the studio and pick by hand.`
+        : `Cannot film ${source}: the page stayed empty inside the studio, which is what a bot check or a sign in looks like from here. Next: open the studio and pick from your own browser with the bookmarklet.`)
+    }
     onStep(`Found ${cands.length} things on ${title || source}. Asking the model what to film and what to say.`)
     const chosen = await plan({ at, title, source, cands, pick, max, pace, direction })
     onStep(chosen.byModel ? `The model chose ${chosen.indices.length}${chosen.product ? ` for "${chosen.product}"` : ''}.` : `The model could not be asked (${chosen.why}), so the most prominent elements were chosen.`)
