@@ -10,7 +10,8 @@
 import { spawn } from 'node:child_process'
 import { loadFfmpeg } from './render.mjs'
 
-const W = 160, H = 90, FPS = 4
+// 320 by 180: at half that, a line of text is one pixel tall and its fade cannot be seen at all
+const W = 320, H = 180, FPS = 10
 
 /** Decode to small rgb frames in memory. */
 async function frames(ffmpeg, file) {
@@ -36,47 +37,89 @@ const lit = (f) => { let on = 0; for (let i = 0; i < f.length; i += 3) if (f[i] 
  * percent of the pixels, and a motion mid-shot covered 2 to 3 percent. Counting pixels sees the
  * cut; averaging hid it.
  */
-const changed = (a, b) => { let n = 0; for (let i = 0; i < a.length; i += 3) if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) > 60) n++; return n / (a.length / 3) }
+const changed = (a, b, floor = 60) => { let n = 0; for (let i = 0; i < a.length; i += 3) if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) > floor) n++; return n / (a.length / 3) }
+/**
+ * A cut is a hard change on more than 3 percent of the pixels, or a soft one on more than 10:
+ * one dark screenshot replacing another moved only 2.3 percent of pixels hard and 18 soft, while
+ * nothing inside a shot, motion or drift, passed 8 soft. Or an element appearing out of a blank
+ * frame, which is what a shot looks like when its motion starts from invisible.
+ */
+const isCut = (a, b, litA, litB) => changed(a, b) > 0.03 || changed(a, b, 18) > 0.10 || (litA <= 0.004 && litB >= 0.012)
 
 /**
- * @returns { seconds, cuts, shots, avgShotMs, longestShotMs, blank, ok, notes[] }
- *   cuts   how many times the picture changed sharply
- *   shots  the cut count plus one
- *   blank  the share of sampled frames with nothing lit
- *   ok     whether it meets the pace that was asked for
+ * @param cuts   the times in ms at which the cut planned a boundary, when known; each is checked
+ *               where it should be rather than guessed from pixels, because a fade of a big white
+ *               card changes a third of the picture every step and no pixel rule tells that apart
+ *               from a cut. Without a plan, boundaries are detected and the count is a best guess.
+ * @returns { seconds, cuts, planned, shots, avgShotMs, longestShotMs, arriveMs, blank, ok, notes[] }
  */
-export async function proveFilm({ file, pace = 'calm', seconds }) {
+export async function proveFilm({ file, pace = 'calm', seconds, cuts: planned }) {
   const ffmpeg = await loadFfmpeg()
   if (!ffmpeg) return { ok: false, notes: ['the renderer is not installed, so the film could not be measured'] }
   const fs = await frames(ffmpeg, file)
   if (fs.length < 2) return { ok: false, notes: ['the file decoded to fewer than two frames'] }
-  const total = fs.length / FPS
-  let cuts = 0, last = 0
-  const shots = [], lits = fs.map(lit)
-  for (let i = 1; i < fs.length; i++) {
-    /**
-     * A cut is one of two things, measured on two fast films of linear.app: a jump in the share
-     * of pixels that changed, which sat at 3.5 to 7 percent at cuts against 1 to 3 during a motion;
-     * or an element appearing out of a blank frame, which is what a shot looks like when its
-     * motion starts from invisible and the sample lands on the boundary. Either counts once, and
-     * not within 600ms of the last, so the motion that follows a cut is never a second cut.
-     */
-    const jump = changed(fs[i], fs[i - 1]) > 0.03, appeared = lits[i - 1] <= 0.004 && lits[i] >= 0.012
-    if ((jump || appeared) && i - last >= Math.ceil(FPS * 0.6)) { cuts++; shots.push((i - last) / FPS * 1000); last = i }
+  const total = fs.length / FPS, lits = fs.map(lit)
+  const soft = (i) => changed(fs[i], fs[i - 1], 18)
+  const frameAt = (ms) => Math.max(1, Math.min(fs.length - 1, Math.round(ms / 1000 * FPS)))
+
+  // boundaries: the planned ones checked in place, or detected when nothing was planned
+  let boundaries
+  if (Array.isArray(planned) && planned.length) {
+    boundaries = planned.map((ms) => {
+      const a = frameAt(ms - 150), b = frameAt(ms + 250)
+      let best = -1, bestAt = -1
+      for (let i = a; i <= b; i++) { const v = soft(i); if (v > best) { best = v; bestAt = i } }
+      // a boundary is seen when something changed noticeably right where it should
+      return { at: bestAt, seen: best > 0.03 }
+    })
+  } else {
+    boundaries = []
+    for (let i = 1, l = 0; i < fs.length; i++) { if (isCut(fs[i], fs[i - 1], lits[i - 1], lits[i]) && i - l >= Math.ceil(FPS * 0.6)) { boundaries.push({ at: i, seen: true }); l = i } }
   }
-  shots.push((fs.length - last) / FPS * 1000)
-  const blank = lits.filter((l) => l < 0.002).length / fs.length
+  const seen = boundaries.filter((b) => b.seen)
+  const cuts = seen.length
+  const marks = [0, ...seen.map((b) => b.at), fs.length]
+  const shots = marks.slice(1).map((m, k) => (m - marks[k]) / FPS * 1000)
   const avgShotMs = Math.round(shots.reduce((a, b) => a + b, 0) / shots.length), longestShotMs = Math.round(Math.max(...shots))
+
+  /**
+   * How long an element takes to arrive after a boundary: the time to reach 80 percent of all the
+   * change above the shot's own baseline in its first second. A pop gets there in one step; a fade
+   * or a staggered arrival takes most of the second. The baseline is subtracted because a brisk
+   * shot drifts and keeps a large element changing about three percent a step, and measured on
+   * change rather than on what is lit because a fading card is lit early and keeps brightening for
+   * its whole fade. Measured: motions asked for 450ms arrived in about 100 to 150ms, a pop; asked
+   * for 900ms, 400 to 700.
+   */
+  const arrivals = []
+  seen.forEach((b, k) => {
+    const end = Math.min(fs.length - 1, (seen[k + 1]?.at ?? fs.length) - 1, b.at + Math.round(FPS * 1.2))
+    const steps = []
+    for (let i = b.at + 1; i <= end; i++) steps.push(soft(i))
+    if (steps.length < 4) return
+    const tail = steps.slice(Math.round(steps.length / 2)).sort((x, y) => x - y), baseline = tail[Math.floor(tail.length / 2)] || 0
+    const excess = steps.slice(0, Math.round(FPS * 1.0)).map((v) => Math.max(0, v - baseline))
+    const total = excess.reduce((a, c) => a + c, 0)
+    if (total < 0.01) { arrivals.push(0); return }
+    let sum = 0, reached = excess.length
+    for (let j = 0; j < excess.length; j++) { sum += excess[j]; if (sum >= total * 0.8) { reached = j; break } }
+    arrivals.push((reached + 1) / FPS * 1000)
+  })
+  const arriveMs = arrivals.length ? Math.round(arrivals.reduce((a, b) => a + b, 0) / arrivals.length) : 0
+  const blank = lits.filter((l) => l < 0.002).length / fs.length
+
   const notes = []
   const want = pace === 'fast' ? { minCuts: Math.max(6, Math.round(total / 2)), maxAvg: 1800 } : pace === 'brisk' ? { minCuts: Math.max(3, Math.round(total / 4)), maxAvg: 3200 } : { minCuts: 1, maxAvg: Infinity }
+  if (Array.isArray(planned) && planned.length && cuts < planned.length) notes.push(`${planned.length - cuts} of the ${planned.length} planned cuts did not show in the frames`)
   if (cuts < want.minCuts) notes.push(`only ${cuts} cuts in ${total.toFixed(0)} seconds, ${pace} asks for at least ${want.minCuts}`)
   if (avgShotMs > want.maxAvg) notes.push(`shots average ${(avgShotMs / 1000).toFixed(1)}s, ${pace} asks for under ${(want.maxAvg / 1000).toFixed(1)}s`)
   if (blank > 0.15) notes.push(`${Math.round(blank * 100)}% of the frames are blank`)
+  if (arrivals.length && arriveMs < 200) notes.push(arriveMs < 50 ? 'elements pop in at once rather than arrive' : `elements pop in rather than arrive, settling in about ${arriveMs}ms`)
   if (seconds && Math.abs(total - seconds) > 1.5) notes.push(`it runs ${total.toFixed(0)} seconds, not the ${seconds} asked for`)
-  return { seconds: Math.round(total), cuts, shots: shots.length, avgShotMs, longestShotMs, blank: Math.round(blank * 100) / 100, ok: notes.length === 0, notes }
+  return { seconds: Math.round(total), cuts, planned: Array.isArray(planned) ? planned.length : null, shots: shots.length, avgShotMs, longestShotMs, arriveMs, blank: Math.round(blank * 100) / 100, ok: notes.length === 0, notes }
 }
 
 /** One sentence an agent can repeat. */
 export const proofLine = (r) => r.ok
-  ? `Verified from the frames: ${r.cuts} cuts in ${r.seconds} seconds, shots of ${(r.avgShotMs / 1000).toFixed(1)}s on average, nothing blank.`
+  ? `Verified from the frames: ${r.cuts}${r.planned ? ` of ${r.planned} planned` : ''} cuts in ${r.seconds} seconds, shots of ${(r.avgShotMs / 1000).toFixed(1)}s on average, each element arriving over about ${(r.arriveMs / 1000).toFixed(1)}s, nothing blank.`
   : `Checked the frames: ${r.notes.join('; ')}.`

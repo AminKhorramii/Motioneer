@@ -39,10 +39,17 @@ export function firstCut(p: Project, opts: CutOptions = {}): Project {
   const opening = { ...newTrack('title', 'Opening'), text: opts.opening || 'Meet your next great idea', x: 10, y: 35, width: 80, height: 25, duration: title, fontSize: 76 }
   const end = { ...newTrack('title', 'Closing', span - title), text: opts.closing || 'See it in action', x: 10, y: 35, width: 80, height: 25, duration: title, fontSize: 76 }
   const cuts: Track[] = Array.from({ length: shots }, (_, i) => {
-    const { s, m } = chosen[i % chosen.length], round = Math.floor(i / chosen.length)
+    const { s, m } = chosen[i % chosen.length], round = Math.floor(i / chosen.length), at = title + i * step
     // a repeat is framed a little differently, alternating sides and a touch tighter, so it cuts rather than freezes
     const nudge = round % 2 ? 4 : 0, tighten = Math.min(8, round * 2)
-    return { ...newTrack('component', s.name, title + i * step), duration: step, subjectId: s.id, motionId: m!.id, width: 76 - tighten, x: 12 + nudge + tighten / 2, y: 16 + tighten / 2, height: 68 - tighten }
+    /**
+     * A brisk or fast shot keeps moving after its motion lands: a slow push in on even shots, a
+     * slow drift on odd ones. Measured on a fast film, the motion was over in the first tenth of
+     * the shot and the element then sat still for a second, which reads as a slideshow. The drift
+     * is small enough to be felt rather than seen, and it is what makes a cut feel filmed.
+     */
+    const moves = shot ? [i % 2 === 0 ? { at, duration: step, x: 0, y: 0, scale: 1.035, ease: 'linear' } : { at, duration: step, x: -1.2, y: 0.4, scale: 1.02, ease: 'linear' }] : []
+    return { ...newTrack('component', s.name, at), duration: step, subjectId: s.id, motionId: m!.id, width: 76 - tighten, x: 12 + nudge + tighten / 2, y: 16 + tighten / 2, height: 68 - tighten, moves }
   })
   const camera = pace === 'calm' ? [{ at: title, duration: body, x: 0, y: 0, scale: 1.04, ease: 'ease-in-out' }] : [{ at: title, duration: body, x: 0, y: 0, scale: 1.06, ease: 'linear' }]
   return { ...p, tracks: [opening, ...cuts, end], camera, settings: { ...p.settings, duration: span, from: 0, to: span } }

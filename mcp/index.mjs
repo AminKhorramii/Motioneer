@@ -346,7 +346,7 @@ async function film({ url, dir, seconds, look, count, pick, pace }) {
   await writeFile(file, buf)
   // measured off the frames, so the reply reports what was made rather than what was meant
   const { proveFilm, proofLine } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'proof.mjs')).href)
-  const proof = await proveFilm({ file, pace: wantPace, seconds: wantSeconds }).catch((e) => ({ ok: false, notes: [`it could not be measured: ${e.message}`] }))
+  const proof = await proveFilm({ file, pace: wantPace, seconds: wantSeconds, cuts: result.cutTimes }).catch((e) => ({ ok: false, notes: [`it could not be measured: ${e.message}`] }))
   const verified = proofLine(proof)
   return `Filmed ${result.captured} element${result.captured === 1 ? '' : 's'} from ${url}${result.product ? `, "${result.product}",` : ''} into a ${Math.round(result.seconds)} second ${wantPace} film`
     + `${result.opening ? ` titled "${result.opening}"` : ''}, saved to ${file} (${(buf.length / 1e6).toFixed(1)} MB). ${verified} The studio is still open at ${at}. What it did: ${steps.join(' ')}\n\n`

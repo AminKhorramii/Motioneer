@@ -34,6 +34,8 @@ if (!(await loadChromium())) { console.log('skip: the local renderer is not inst
   assert.equal(fast.tracks[0].text, 'Hello'); assert.equal(fast.tracks.at(-1).text, 'Bye')
   assert.ok(fast.tracks[0].duration <= 1200 && fast.settings.duration === 12000, 'fast titles are short and the length is what was asked')
   assert.notDeepEqual([shotsOf(fast)[0].x, shotsOf(fast)[0].width], [shotsOf(fast)[2].x, shotsOf(fast)[2].width], 'a repeated element is framed differently so it cuts rather than freezes')
+  assert.ok(shotsOf(fast).every((t) => t.moves.length === 1 && t.moves[0].duration === t.duration), 'every fast shot keeps moving across its whole length')
+  assert.ok(shotsOf(calm).every((t) => t.moves.length === 0), 'a calm shot holds still, the way the editor\'s button always did')
   console.log('ok: the cut is paced: calm places each motion once, fast fills the length with short shots and short titles')
 }
 
@@ -54,8 +56,9 @@ const model = createServer(async (req, res) => {
     return res.end('data: ' + JSON.stringify({ choices: [{ delta: { content: JSON.stringify(plan) } }] }) + '\n\ndata: [DONE]\n\n')
   }
   const kind = /Treatment: bold/.test(prompt) ? 'bold' : /Treatment: subtle/.test(prompt) ? 'subtle' : 'expressive'
-  const css = '@media (prefers-reduced-motion: no-preference){[data-mn] > *{animation:rise 900ms ease-out both}'
-    + '[data-mn] > :nth-child(2){animation-delay:80ms}@keyframes rise{from{transform:translateY(14px);opacity:0}to{transform:none;opacity:1}}}'
+  // the root arrives and its parts follow, the way a gated motion does; a sheet that moved only children would leave a childless block popping in
+  const css = '@media (prefers-reduced-motion: no-preference){[data-mn]{animation:rise 900ms ease-out both}[data-mn] > *{animation:rise 900ms ease-out both}'
+    + '[data-mn] > :nth-child(2){animation-delay:120ms}[data-mn] > :nth-child(3){animation-delay:240ms}@keyframes rise{from{transform:translateY(14px);opacity:0}to{transform:none;opacity:1}}}'
   res.writeHead(200, { 'content-type': 'text/event-stream' })
   res.end('data: ' + JSON.stringify({ choices: [{ delta: { content: JSON.stringify({ css, scope: 'data-mn', note: kind + ' rise' }) } }] }) + '\n\ndata: [DONE]\n\n')
 })
@@ -125,12 +128,15 @@ try {
   assert.ok(lit(b) > 0.002, `a component should be on screen mid-film, only ${(lit(b) * 100).toFixed(2)}% of it was lit`)
   console.log(`ok: the film is not blank (opening ${(lit(a) * 100).toFixed(1)}% lit, middle ${(lit(b) * 100).toFixed(1)}% lit)`)
   // the verifier, on the real file: a fast film must measure as fast off its own frames
-  const proof = await proveFilm({ file: mp4, pace: 'fast', seconds: 12 })
+  assert.ok(Array.isArray(result.cutTimes) && result.cutTimes.length >= 7, `the driver should hand back where it cut, got ${JSON.stringify(result.cutTimes)}`)
+  const proof = await proveFilm({ file: mp4, pace: 'fast', seconds: 12, cuts: result.cutTimes })
+  assert.equal(proof.cuts, result.cutTimes.length, `every planned cut should show in the frames: ${proof.notes.join('; ')}`)
   assert.ok(proof.ok, `the proof should pass for a fast film: ${proof.notes.join('; ')}`)
   assert.ok(proof.cuts >= 6, `a fast 12 second film should show at least 6 cuts, measured ${proof.cuts}`)
-  const calmVerdict = await proveFilm({ file: mp4, pace: 'calm', seconds: 12 })
+  assert.ok(proof.arriveMs >= 200, `elements should visibly arrive rather than pop, measured ${proof.arriveMs}ms`)
+  const calmVerdict = await proveFilm({ file: mp4, pace: 'calm', seconds: 12, cuts: result.cutTimes })
   assert.ok(calmVerdict.ok, 'the same film passes a calm verdict, which asks less')
-  console.log(`ok: measured off the frames: ${proof.cuts} cuts, shots ${(proof.avgShotMs / 1000).toFixed(1)}s on average, ${Math.round(proof.blank * 100)}% blank`)
+  console.log(`ok: measured off the frames: ${proof.cuts} cuts, shots ${(proof.avgShotMs / 1000).toFixed(1)}s on average, elements arriving over ${proof.arriveMs}ms, ${Math.round(proof.blank * 100)}% blank`)
   console.log('ok: it reported each step:', steps.length, 'steps')
   console.log('film verification passed')
 } catch (e) {

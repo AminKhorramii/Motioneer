@@ -191,11 +191,17 @@ export async function autofilm({ at, url, pick = '', plan = planFilm, seconds = 
       await page.locator('.subject-item').nth(k).click()
       const treat = page.getByLabel('Treatments', { exact: true })
       if (await treat.count()) await treat.selectOption(look).catch(() => {})
-      // a fast cut wants a motion that is over before the next shot; a calm one can take its time
+      /**
+       * The motion should fill most of its shot. Measured on a fast film, a 450ms motion with the
+       * model's usual ease-out was visibly over in 135ms and the element then sat still for over a
+       * second, which reads as a pop, not a motion. So a fast shot of 1.3s gets a 0.9s motion, a
+       * brisk one 1.2s, and the direction asks for the whole duration to be used.
+       */
       const dur = page.getByLabel('Target duration (s)', { exact: true })
-      if (await dur.count()) { await dur.fill(pace === 'fast' ? '0.45' : pace === 'brisk' ? '0.6' : '0.8') }
+      if (await dur.count()) { await dur.fill(pace === 'fast' ? '0.9' : pace === 'brisk' ? '1.2' : '1.0') }
       const direction = page.getByLabel('Creative direction', { exact: true })
-      if (await direction.count()) await direction.fill(String(chosen.directions[String(captured[k])] || '').slice(0, 300))
+      const paceNote = pace === 'calm' ? '' : ' Use the whole duration for the arrival, with the parts staggered across it, rather than an easing that is finished in the first third.'
+      if (await direction.count()) await direction.fill((String(chosen.directions[String(captured[k])] || '') + paceNote).trim().slice(0, 400))
       onStep(`Writing a ${look} motion for element ${k + 1} of ${captured.length}.`)
       await label(page, 'Explore motion').click()
       await page.locator('.motion-card:not(.pending)').first().waitFor({ timeout: 300000 })
@@ -221,6 +227,8 @@ export async function autofilm({ at, url, pick = '', plan = planFilm, seconds = 
     const put = await fetch(`${at}/__motioneer/projects/${id}`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(cut) }).then((r) => r.json()).catch((e) => ({ error: e.message }))
     if (put.error) throw new Error(`Cannot cut: ${put.error} Next: try again.`)
     const ms = cut.settings.duration
+    // every boundary in the cut: each shot's start and the closing title's, for the proof to check in place
+    const cutTimes = [...new Set(cut.tracks.filter((t) => t.kind !== 'title' || t.start > 0).map((t) => Math.round(t.start)))].sort((a, b) => a - b)
     onStep(`${components} shots${chosen.opening ? `, titled "${chosen.opening}"` : ''}${chosen.closing ? ` and "${chosen.closing}"` : ''}.`)
 
     onStep('Rendering. This runs a real browser for every frame and takes about a minute for a short film.')
@@ -232,7 +240,7 @@ export async function autofilm({ at, url, pick = '', plan = planFilm, seconds = 
       const job = jobs.find((j) => j.id === start.id)
       if (!job) continue
       if (job.state === 'error') throw new Error(`Cannot render: ${job.message || 'the render failed'}. Next: open the studio and export from there to see the frame it stopped on.`)
-      if (job.state === 'complete') return { projectId: id, at, jobId: job.id, url: `${at}${job.url}`, captured: captured.length, components, seconds: ms / 1000, product: chosen.product, opening: chosen.opening, closing: chosen.closing, byModel: chosen.byModel }
+      if (job.state === 'complete') return { projectId: id, at, jobId: job.id, url: `${at}${job.url}`, captured: captured.length, components, cutTimes, seconds: ms / 1000, product: chosen.product, opening: chosen.opening, closing: chosen.closing, byModel: chosen.byModel }
     }
     throw new Error('Cannot render: it did not finish in twenty minutes. Next: open the studio, the export is still listed there.')
   } finally {
