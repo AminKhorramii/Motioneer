@@ -6,6 +6,7 @@ with each other kept outside it.
 ```
 tools/
   studio.mjs           the room: the proxy, the picker, the transport, the rail, the export
+  film-lab.mjs         film a site through the real server and lay out every shot to judge it, the loop every film fix came from
 
 shared/                everything the studio uses that is not the room itself
   page.mjs             the page it serves. One template literal, so watch the backslashes
