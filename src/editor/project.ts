@@ -6,7 +6,7 @@ export type Motion = { id: string; subjectId: string; css: string; scope: string
 export type Move = { at: number; duration: number; x: number; y: number; scale: number; ease: string }
 export type Track = { id: string; kind: 'component' | 'title' | 'image' | 'audio'; name: string; subjectId?: string; motionId?: string; assetId?: string; text?: string; color: string; fontSize: number; start: number; duration: number; entrance: number; x: number; y: number; width: number; height: number; hidden: boolean; locked: boolean; moves: Move[]; volume: number; sourceStart: number; fadeIn: number; fadeOut: number; after?: { key: string; mode: 'after' | 'with'; gap: number } }
 export type Asset = { id: string; name: string; kind: 'image' | 'audio'; mime: string; duration?: number; waveform?: number[]; width?: number; height?: number }
-export type Arrangement = { id: string; name: string; tracks: Track[]; camera: Move[] }
+export type Arrangement = { id: string; name: string; tracks: Track[]; camera: Move[]; settings?: Project['settings'] }
 export type Project = { version: 1; id: string; revision: number; name: string; updatedAt: number; source: string; subjects: Subject[]; motions: Motion[]; tracks: Track[]; camera: Move[]; assets: Asset[]; arrangements: Arrangement[]; settings: { width: number; height: number; fps: number; duration: number; background: string; from: number; to: number }; brief: Brief }
 export const uid = () => crypto.randomUUID()
 export const defaultBrief: Brief = { purpose: 'entrance', intensity: 'range', duration: 1000, direction: '' }
@@ -115,8 +115,10 @@ export function validateProject(raw: unknown): Project {
   for (const key of ['subjects', 'motions', 'tracks', 'camera', 'assets', 'arrangements'] as const) if (!Array.isArray(p[key]) || p[key].length > 500) throw new Error('The project contains an invalid collection.')
   if (!p.name?.trim() || p.name.length > 200 || typeof p.source !== 'string') throw new Error('Give the project a name of at most 200 characters.')
   const finite = (n: unknown, lo: number, hi: number) => typeof n === 'number' && Number.isFinite(n) && n >= lo && n <= hi
-  const s = p.settings
+  const checkSettings = (s: Project['settings']) => {
   if (!s || !finite(s.duration, 100, 120000) || !finite(s.width, 100, 3840) || !finite(s.height, 100, 3840) || ![30, 60].includes(s.fps) || !finite(s.from, 0, s.duration) || !finite(s.to, s.from + 1, s.duration) || !/^#[0-9a-f]{6}$/i.test(s.background)) throw new Error('The film settings are invalid. Films can be up to two minutes long.')
+  }
+  checkSettings(p.settings)
   const ids = (items: { id: string }[]) => { const set = new Set<string>(); for (const v of items) { if (!v || !/^[a-zA-Z0-9_-]{1,100}$/.test(v.id) || set.has(v.id)) throw new Error('Project items must have unique identifiers.'); set.add(v.id) } return set }
   const subjects = ids(p.subjects), motions = ids(p.motions), assets = ids(p.assets); ids(p.tracks)
   for (const a of p.assets) if (!['audio', 'image'].includes(a.kind) || typeof a.name !== 'string' || typeof a.mime !== 'string') throw new Error('Invalid asset.')
@@ -130,6 +132,6 @@ export function validateProject(raw: unknown): Project {
     checkMoves(t.moves)
   } }
   checkTracks(p.tracks); checkMoves(p.camera)
-  for (const a of p.arrangements) { checkTracks(a.tracks); checkMoves(a.camera) }
+  for (const a of p.arrangements) { checkTracks(a.tracks); checkMoves(a.camera); if(a.settings) checkSettings(a.settings) }
   return p
 }

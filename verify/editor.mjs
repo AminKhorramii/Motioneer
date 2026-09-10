@@ -1,5 +1,6 @@
 /** The current editor, driven through its public UI and HTTP API, with a deterministic local model. */
 import assert from 'node:assert/strict'
+import { verifyFilmUX } from './film-ux.mjs'
 import { createServer } from 'node:http'
 import { spawn } from 'node:child_process'
 import { mkdtemp, mkdir, writeFile, readFile } from 'node:fs/promises'
@@ -20,10 +21,10 @@ const mock=createServer(async(req,res)=>{
 await writeFile(path.join(temp,'.studio/model.json'),JSON.stringify({provider:'openai',base:mockOrigin+'/v1',model:'fixture',key:'fixture',chosen:true}))
 const child=spawn(process.execPath,[path.join(root,'tools/studio.mjs'),'--app',mockOrigin],{cwd:temp,env:{...process.env,MOTIONEER_PORT:String(port),MOTIONEER_NO_OPEN:'1'},stdio:['ignore','pipe','pipe']});let logs='';child.stdout.on('data',b=>logs+=b);child.stderr.on('data',b=>logs+=b)
 const request=async(route,body,method)=>{const r=await fetch(origin+'/__motioneer/'+route,{method:method||(body?'POST':'GET'),headers:{'content-type':'application/json'},body:body?JSON.stringify(body):undefined});return {status:r.status,data:await r.json()}}
-let browser
+let browser,page
 try{
   for(let i=0;i<80;i++){try{if((await fetch(origin+'/__motioneer/model')).ok)break}catch{}await new Promise(r=>setTimeout(r,100))}
-  browser=await chromium.launch();const page=await browser.newPage({viewport:{width:1440,height:900}});const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>void d.accept())
+  browser=await chromium.launch();page=await browser.newPage({viewport:{width:1440,height:900}});const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>void d.accept())
   await page.goto(origin);await page.getByRole('button',{name:'Pick element',exact:true}).waitFor();console.log('ok: current editor opens')
   for(let i=0;i<3;i++){
     await page.getByRole('button',{name:'Source',exact:true}).click();if(await page.getByRole('button',{name:'Pick element',exact:true}).count())await page.getByRole('button',{name:'Pick element',exact:true}).click();
@@ -32,7 +33,7 @@ try{
   }
   assert.equal(modelCalls,9);assert.equal(await page.locator('.subject-item').count(),3);console.log('ok: captures three real elements and generates all nine treatments through the provider and gates')
   await page.screenshot({path:path.join(out,'motion-comparison.png')})
-  await page.getByRole('button',{name:'Film',exact:true}).click();await page.getByRole('button',{name:'Create first cut',exact:true}).click();assert.equal(await page.locator('.track-row').count(),5)
+  await page.getByRole('button',{name:'Film',exact:true}).click();for(const [width,height] of [[1280,800],[1440,900],[1680,1000]]){await page.setViewportSize({width,height});await page.screenshot({path:path.join(out,`film-empty-${width}.png`)})}await page.setViewportSize({width:1440,height:900});await page.locator('.library').getByRole('button',{name:'Create first cut',exact:true}).click();await page.getByRole('button',{name:'Create cut',exact:true}).click();assert.equal(await page.locator('.clip').count(),5);assert.equal(await page.locator('.track-row').count(),1)
   await page.getByRole('button',{name:'Title',exact:false}).first().count() // the opening and closing titles are editable tracks
   await page.getByRole('button',{name:'Film settings',exact:true}).click();await page.getByLabel('Film length (s)',{exact:true}).fill('30')
   // A real imported wave exercises waveform decoding, asset persistence, preview, and later rendering.
@@ -41,15 +42,18 @@ try{
   const pixel=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRzUAAAAASUVORK5CYII=','base64')
   await page.locator('input[type=file]').setInputFiles({name:'Logo.png',mimeType:'image/png',buffer:pixel});await page.locator('.clip.image').waitFor()
   await page.getByLabel('X position %',{exact:true}).fill('30');await page.getByRole('button',{name:'Undo',exact:true}).click();assert.equal(await page.getByLabel('X position %',{exact:true}).inputValue(),'15');await page.getByRole('button',{name:'Redo',exact:true}).click();assert.equal(await page.getByLabel('X position %',{exact:true}).inputValue(),'30')
-  await page.getByRole('button',{name:'Film settings',exact:true}).click();await page.getByRole('button',{name:'Add movement at playhead',exact:true}).click();assert.equal(await page.locator('.movement').count(),2)
+  await page.getByRole('button',{name:'Camera',exact:true}).click();await page.getByRole('button',{name:'Add movement at playhead',exact:true}).click();assert.equal(await page.locator('.movement').count(),2)
   await page.getByRole('button',{name:'Play',exact:true}).click();await page.waitForTimeout(550);await page.getByRole('button',{name:'Pause',exact:true}).click()
   const position=await page.locator('.ruler').boundingBox();await page.mouse.click(position.x+position.width*0.15,position.y+18)
+  await verifyFilmUX(page,request)
+  await page.getByRole('button',{name:'Projects clip',exact:true}).click();await page.getByLabel('Playhead time (s)',{exact:true}).fill('12');await page.getByLabel('Playhead time (s)',{exact:true}).press('Enter')
   await page.screenshot({path:path.join(out,'film-editor.png')});await page.setViewportSize({width:1280,height:800});await page.screenshot({path:path.join(out,'film-editor-1280.png')})
+  await page.setViewportSize({width:1680,height:1000});await page.screenshot({path:path.join(out,'film-editor-1680.png')});await page.setViewportSize({width:1280,height:800})
   const bounds=await page.locator('.app-header,.library,.inspector,.film-center,.transport').evaluateAll(els=>els.map(e=>({name:e.className,x:e.getBoundingClientRect().x,right:e.getBoundingClientRect().right,scroll:e.scrollWidth,width:e.clientWidth})))
   assert(bounds.every(b=>b.x>=0&&b.right<=1281));assert.equal(errors.length,0,errors.join('\n'))
   await page.waitForFunction(()=>document.querySelector('.save-status')?.textContent==='Saved locally')
   const id=await page.evaluate(()=>localStorage.getItem('motioneer-project'));const saved=await request('projects/'+id);assert.equal(saved.data.tracks.length,7);assert.equal(saved.data.subjects.length,3);assert.equal(saved.data.assets.length,2)
-  await page.reload();await page.getByRole('button',{name:'Film',exact:true}).click();assert.equal(await page.locator('.track-row').count(),7);console.log('ok: first cut, media, numeric edits, undo/redo, camera, responsive layout and reopening')
+  await page.reload();await page.getByRole('button',{name:'Film',exact:true}).click();assert.equal(await page.locator('.clip').count(),7);console.log('ok: first cut, media, numeric edits, undo/redo, camera, responsive layout and reopening')
   const conflict=await request('projects/'+id,{...saved.data,name:'Other tab'},'PUT');assert.equal(conflict.status,200);const stale=await request('projects/'+id,saved.data,'PUT');assert.equal(stale.status,409);console.log('ok: stale revisions cannot overwrite another tab')
   const html=await fetch(origin+`/__motioneer/projects/${id}/html`).then(r=>r.text());await writeFile(path.join(out,'fixture-film.html'),html)
   const offline=await browser.newPage();const network=[];await offline.route('http**/*',r=>{network.push(r.request().url());void r.abort()});await offline.goto('file://'+path.join(out,'fixture-film.html'));await offline.waitForTimeout(200);assert.equal(network.length,0,network.join('\n'));await offline.close();console.log('ok: exported composition opens without network requests')
@@ -66,6 +70,7 @@ try{
     const job=(await request(`projects/${id}/renders`,{})).data;assert(job.id,JSON.stringify(job));let finished
     for(let i=0;i<600;i++){const list=(await request(`projects/${id}/renders`)).data;finished=list.find(j=>j.id===job.id);if(i%20===0)console.log('export:',finished.message);if(['complete','error','cancelled'].includes(finished.state))break;await new Promise(r=>setTimeout(r,1000))}
     assert.equal(finished.state,'complete',finished.message);assert.equal(finished.total,900)
+    await page.getByRole('button',{name:'Export ready',exact:true}).waitFor();await page.getByRole('button',{name:'Export ready',exact:true}).click();await page.getByRole('dialog',{name:'Export film',exact:true}).waitFor();await page.getByRole('button',{name:'Close',exact:true}).click()
     const video=await fetch(origin+finished.url).then(r=>r.arrayBuffer());const videoPath=path.join(out,'verified-film.mp4');await writeFile(videoPath,Buffer.from(video))
     const ffmpeg=path.join(homedir(),'.cache/motioneer/renderer-1/node_modules/ffmpeg-static/ffmpeg')
     const run=(args)=>new Promise((resolve,reject)=>{const c=spawn(ffmpeg,args);let log='';c.stderr.on('data',b=>log+=b);c.on('error',reject);c.on('exit',code=>code===0?resolve(log):reject(new Error(log)))})
@@ -82,4 +87,4 @@ try{
     const cancel=(await request(`projects/${id}/renders`,{})).data;await request(`projects/${id}/renders/${cancel.id}`,undefined,'DELETE');for(let n=0;n<30;n++){const jobs=(await request(`projects/${id}/renders`)).data;if(jobs.find(j=>j.id===cancel.id)?.state==='cancelled')break;await new Promise(r=>setTimeout(r,200))}assert.equal((await request(`projects/${id}/renders`)).data.find(j=>j.id===cancel.id).state,'cancelled');console.log('ok: cancelling an export releases the renderer')
   }
   console.log('editor verification passed')
-}catch(e){console.error(logs.slice(-5000));throw e}finally{await browser?.close();child.kill('SIGTERM');mock.close()}
+}catch(e){await page?.screenshot({path:path.join(out,'film-ux-failure.png')}).catch(()=>{});console.error(logs.slice(-5000));throw e}finally{await browser?.close();child.kill('SIGTERM');mock.close()}

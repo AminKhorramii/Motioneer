@@ -316,6 +316,9 @@ export const live = (arr) => (arr && arr.cars ? arr.cars : [])
  * car, linked or not, precisely so there is something to fall back to.
  */
 export function resolve(arr) {
+  // Keep this solver self-contained: the film embeds it in its offline runtime.
+  const num = (v, fallback = 0) => Number.isFinite(Number(v)) ? Number(v) : fallback
+  const runs = car => Math.max(0, num(car && car.motion && car.motion.ms, 600))
   const cars = (arr && arr.cars) ? arr.cars : []
   const at = cars.map((c) => Math.max(0, num(c.at)))
   const byKey = new Map()

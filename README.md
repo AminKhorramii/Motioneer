@@ -84,6 +84,7 @@ so the ones you can actually see come first.
 **Keep what you like.** Saved motions live in your browser, so a restart does not lose them, and
 each comes away as one file that opens anywhere. **Film** renders what is on screen frame by frame
 and encodes it in the page itself, so posting a clip needs nothing installed.
+The [Film editing guide](docs/film-editing.md) covers cuts, layers, movement, and keyboard controls.
 
 ## The stylesheet
 

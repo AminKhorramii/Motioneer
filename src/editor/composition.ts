@@ -1,36 +1,17 @@
-import type { Project, Track, Move } from './project'
+import type { Project, Track } from './project'
+import { createFilmMath } from './filmMath'
+// @ts-expect-error The legacy arithmetic is JavaScript.
+import { resolve } from '../../shared/arrange.mjs'
 export type Composition = { update: (p: Project) => void; seek: (ms: number, playing?: boolean) => Promise<void>; ready: () => Promise<void> }
 declare global { interface Window { __composition?: Composition; __assetSources?: Record<string,string> } }
 /** Runs unchanged in the canvas, exported HTML, and the renderer's Chromium page. No closures. */
-export function compositionRuntime(initial: Project, assetRoot: string) {
+export function compositionRuntime(initial: Project, assetRoot: string, math: ReturnType<typeof createFilmMath>) {
   let project = initial, now = 0
   const stage = document.getElementById('stage')!, camera = document.getElementById('camera')!
+  stage.addEventListener('pointerdown',e=>{if(parent!==window&&(e.target===stage||e.target===camera))parent.postMessage({motioneer:'select-track',id:null},location.origin)})
   const animations = new Map<string, Animation[]>(); const nodes = new Map<string, HTMLElement>(), signatures = new Map<string, string>(), pending = new Set<Promise<void>>()
-  const clamp = (x: number, a: number, b: number) => Math.max(a, Math.min(b, x))
-  const ease = (x: number, kind: string) => kind === 'linear' ? x : kind === 'ease-in' ? x*x : kind === 'ease-out' ? 1-(1-x)*(1-x) : x*x*(3-2*x)
-  function position(moves: Move[], time: number) {
-    let last = { x: 0, y: 0, scale: 1 }
-    for (const m of [...moves].sort((a,b) => a.at-b.at)) {
-      if (time < m.at) break
-      const ratio = ease(clamp((time-m.at)/m.duration, 0, 1), m.ease)
-      const value = { x: last.x+(m.x-last.x)*ratio, y: last.y+(m.y-last.y)*ratio, scale: last.scale+(m.scale-last.scale)*ratio }
-      if (time < m.at+m.duration) return value
-      last = value
-    }
-    return last
-  }
-  function starts() {
-    const values = new Map<string,number>(), visiting = new Set<string>()
-    const one = (t: Track): number => {
-      if (values.has(t.id)) return values.get(t.id)!
-      if (visiting.has(t.id)) return t.start
-      visiting.add(t.id)
-      const parent = t.after && project.tracks.find(x => x.id === t.after!.key)
-      const at = parent ? clamp(one(parent)+(t.after!.mode === 'after' ? parent.duration : 0)+t.after!.gap, 0, 120000) : t.start
-      visiting.delete(t.id); values.set(t.id, at); return at
-    }
-    project.tracks.forEach(one); return values
-  }
+  const {clamp,ease,position}=math
+  const starts=()=>{const at=math.timing(project).at;return new Map(project.tracks.map((t,i)=>[t.id,at[i]]))}
   function component(t: Track, holder: HTMLElement) {
     const subject = project.subjects.find(s => s.id === t.subjectId), motion = project.motions.find(m => m.id === t.motionId)
     if (!subject) return
@@ -107,7 +88,7 @@ export function compositionRuntime(initial: Project, assetRoot: string) {
     p.tracks.forEach((t,index) => {
       let node = nodes.get(t.id)
       if (!node) { node = document.createElement(t.kind === 'audio' ? 'audio' : 'div'); node.dataset.track = t.id; nodes.set(t.id,node); camera.append(node)
-        node.addEventListener('pointerdown', e => { if (parent !== window) parent.postMessage({ motioneer: 'select-track', id: t.id, shift: e.shiftKey || e.metaKey }, location.origin) }) }
+        node.addEventListener('pointerdown', e => { if (parent !== window) parent.postMessage({ motioneer: 'select-track', id: t.id, shift: e.shiftKey, toggle: e.metaKey || e.ctrlKey }, location.origin) }) }
       node.style.cssText = `position:absolute;left:${t.x}%;top:${t.y}%;width:${t.width}%;height:${t.height}%;z-index:${index};transform-origin:center;`
       if (t.kind === 'component') {
         component(t,node)
@@ -144,5 +125,5 @@ export function compositionRuntime(initial: Project, assetRoot: string) {
 }
 export function compositionDocument(project: Project, assetRoot = `/__motioneer/projects/${project.id}/assets/`): string {
   const json = (v: unknown) => JSON.stringify(v).replace(/</g,'\\u003c')
-  return `<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;overflow:hidden;background:transparent}#stage{position:relative;overflow:hidden}#camera{position:absolute;inset:0;transform-origin:center}</style></head><body><div id="stage"><div id="camera"></div></div><script>(${compositionRuntime.toString()})(${json(project)},${json(assetRoot)})</script></body></html>`
+  return `<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;overflow:hidden;background:transparent}#stage{position:relative;overflow:hidden}#camera{position:absolute;inset:0;transform-origin:center}</style></head><body><div id="stage"><div id="camera"></div></div><script>(${compositionRuntime.toString()})(${json(project)},${json(assetRoot)},(${createFilmMath.toString()})(${resolve.toString()}))</script></body></html>`
 }
