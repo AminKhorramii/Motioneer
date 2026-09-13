@@ -14,12 +14,15 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { loadChromium } from './render.mjs'
 import { lit, proveFilm } from './proof.mjs'
-import { firstCut, createProject, compositionDocument } from '../../dist-core/core.js'
+import { firstCut, createProject, compositionDocument, contrastInk } from '../../dist-core/core.js'
 
 import { candidates, aim, freshProject, openPage, contactSheet, dropDecoration, describe, reveal } from './survey.mjs'
+import { withSoundtrack, scoreStyle } from './soundtrack.mjs'
 export { inspectSite, describe, contactSheet } from './survey.mjs'
 const label = (page, name) => page.getByRole('button', { name, exact: true })
 const name = (c) => c ? (c.text || `the ${c.role} in the ${c.section}`) : 'an element'
+const validColour=(value,label)=>{if(value!==undefined&&!/^#[0-9a-f]{6}$/i.test(value))throw new Error(`Cannot film: ${label} must be a six-digit hex color. Next: pass a color such as #101319.`);return value}
+const titleScale=cut=>({...cut,tracks:cut.tracks.map(t=>t.kind==='title'?{...t,fontSize:(t.text||'').length>32?96:128}:t)})
 
 export async function planFilm({ at, title, source, cands, pick, max, pace = 'brisk', direction = '', sheet = null }) {
   // A general product film should first explain the product. When complete interfaces exist,
@@ -35,7 +38,7 @@ export async function planFilm({ at, title, source, cands, pick, max, pace = 'br
     + (many
       ? `Choose up to ${Math.min(max, cands.length)} distinct substantive elements from across the whole page in reading order: the hero heading and complete product interfaces first, then feature cards and images from further down. Choose fewer when the alternatives are navigation, account switchers, minor labels or repeats. Never spend a capture on a logo already represented by the opening title. Avoid nav and footer links. `
       : `Choose up to ${max} elements that make the best short film of this product: prefer a hero heading, a primary button or feature card, and one strong image; avoid nav, footer, and repeats. `)
-    + `Then write the film's words from the page itself, not from imagination: "product" is what this product is in under ten words; "opening" is a title of two to five words that names the product or its promise; "closing" is a title of two to five words that invites the next step. `
+    + `Then write the film's words from the page itself, not from imagination: "product" is what this product is in under ten words; "opening" should identify the actual brand, preferably just its name rather than repeating the hero's promise; "closing" should be the site's domain or a specific invitation found on the page. Respect any exact titles requested. `
     + `For each chosen element write "direction", one sentence on how it should arrive that names its parts, like "the price lands last" or "the headline settles before the subline".\n`
     + `Then cut it into "scenes", an ordered list of shots. Each scene has "elements", one or two chosen indices; "layout", one of full, detail, pair, stack; and "hold", one of long, normal, short. Use pair for two cards or images side by side, stack for a heading or label above the visual it introduces on the page, detail for one screenshot or image pushed in close, full otherwise. A label, a one-line h3, is never a scene on its own; use it only as the top of a stack, or leave it out. A button is never a scene on its own either: pair it with the card or heading it belongs to, or leave it out. Hold the hero long and small details short. `
     + (many ? `Aim for ${Math.min(max, cands.length)} to ${Math.min(max + 3, cands.length + 2)} scenes; an element may appear in two scenes if the second is a different layout.\n` : `One or two scenes per element.\n`)
@@ -83,12 +86,12 @@ export async function proveRender(url, { pace, seconds, cuts }) {
 }
 
 /** Every boundary in a cut: each shot's start and the closing title's, for the proof to check in place. */
-const boundariesOf = (cut) => [...new Set(cut.tracks.filter((t) => t.kind !== 'title' || t.start > 0).map((t) => Math.round(t.start)))].sort((a, b) => a - b)
+const boundariesOf = (cut) => [...new Set(cut.tracks.filter((t) => !t.hidden && t.kind !== 'audio' && (t.kind !== 'title' || t.start > 0)).map((t) => Math.round(t.start)))].sort((a, b) => a - b)
 
 /** The shots of a cut as a list an agent can read: when, how long, which elements, which layout. */
 export function shotList(cut) {
   const byStart = new Map()
-  for (const t of cut.tracks.filter((t) => t.kind === 'component')) { if (!byStart.has(t.start)) byStart.set(t.start, []); byStart.get(t.start).push(t) }
+  for (const t of cut.tracks.filter((t) => t.kind === 'component' && !t.hidden)) { if (!byStart.has(t.start)) byStart.set(t.start, []); byStart.get(t.start).push(t) }
   return [...byStart.entries()].sort((a, b) => a[0] - b[0]).map(([start, tracks], i) => {
     const names = [...new Set(tracks.map((t) => cut.subjects.find((s) => s.id === t.subjectId)?.name || t.name))]
     const layout = tracks.length > 1 ? (Math.abs(tracks[0].y - tracks[1].y) > Math.abs(tracks[0].x - tracks[1].x) ? 'stack' : 'pair') : tracks[0].width > 82 || tracks[0].width < 55 ? 'detail' : 'full'
@@ -107,7 +110,7 @@ function scenesOf(project) {
  * Drive one capture through the real picker. The element already wears data-mn-cand from
  * candidates(), so the click lands on exactly what was chosen.
  */
-async function capture(page, frame, cand, about) {
+async function capture(page, frame, cand, about, pixels) {
   const before = await page.locator('.subject-item').count()
   if (!(await label(page, 'Done picking').count())) await label(page, 'Pick element').click()
   await page.waitForTimeout(250)
@@ -119,6 +122,14 @@ async function capture(page, frame, cand, about) {
   }, about).catch(() => {})
   if (!(await el.count())) return -1
   await reveal(el)
+  if(pixels){
+    // Picker highlights and editor notifications must never become source pixels.
+    if(await label(page,'Done picking').count())await label(page,'Done picking').click()
+    const box=await el.boundingBox(),data=await el.screenshot({type:'png',animations:'disabled',style:'.studio > .toast{visibility:hidden!important}',timeout:5000}).catch(()=>null)
+    if(!box||!data)return -1
+    await label(page,'Pick element').click()
+    pixels.set(before,{data:'data:image/png;base64,'+data.toString('base64'),w:Math.round(box.width),h:Math.round(box.height)})
+  }
   /**
    * Handed to the picker, not clicked. The picker takes whatever the pointer is over, and on
    * notion.so the pointer over a card lands on the invisible anchor stretched across it, so five
@@ -156,19 +167,21 @@ async function capture(page, frame, cand, about) {
  * @param max       cap on how many elements to capture
  * @param onStep    (message) => void  progress, surfaced to the agent's caller
  */
-export async function autofilm({ at, url, pick = '', direction = '', plan = planFilm, prove = proveRender, seconds = 20, fps = 30, look = 'subtle', pace = 'brisk', max = 3, onStep = () => {} }) {
+export async function autofilm({ at, url, language = 'en', theme, background, ink, captureMode = 'dom', pick = '', direction = '', plan = planFilm, prove = proveRender, seconds = 20, fps = 30, soundtrack = 'none', look = 'subtle', pace = 'brisk', max = 3, onStep = () => {} }) {
   if (![30,60].includes(fps)) throw new Error('Cannot film: frame rate must be 30 or 60. Next: choose one of those frame rates.')
+  validColour(background,'background');validColour(ink,'ink')
+  if(!['dom','pixels'].includes(captureMode))throw new Error('Cannot film: captureMode must be dom or pixels. Next: choose dom for layered motion or pixels for faithful flat captures.')
   const chromium = await loadChromium()
   if (!chromium) throw new Error('Cannot film: the renderer is not installed. Next: open the studio once and set up the local renderer, then ask again.')
   // aim first, every time: a studio already up may be on another site or a folder, and reusing it
   // as found is how a film once timed out on an empty frame
-  const source = await aim(at, url)
+  let source = await aim(at, url)
   // channel:'chromium' to use the full build the renderer installed, since it omits the headless shell
   const browser = await chromium.launch({ channel: 'chromium' })
   try {
     onStep('Opening the editor on the site.')
     const projectId = await freshProject(at, `Film of ${source.replace(/^https?:\/\//, '').replace(/\/$/, '')}`)
-    const { page, frame, title, colours } = await openPage(browser, at, source, projectId)
+    const opened=await openPage(browser,at,source,projectId,language,theme),{page,frame,title,colours}=opened;source=opened.source
     // a block page answers 200 and reads as a page of headings: replit.com's was filmed and verified
     if (/attention required|just a moment|access denied|been blocked|verify you are human|are you a robot|security check/i.test(title || '')) throw new Error(`Cannot open ${source}: that site is behind a bot check, which a proxy cannot pass. Nothing here can fix that. Next: open the studio and pick from your own browser with the bookmarklet.`)
     let cands = await dropDecoration(page, await candidates(frame), onStep)
@@ -180,17 +193,18 @@ export async function autofilm({ at, url, pick = '', direction = '', plan = plan
         ? `Cannot film ${source}: the page rendered but nothing on it matched a heading, a card, a button or an image. Next: say what to film with pick, or open the studio and pick by hand.`
         : `Cannot film ${source}: the page stayed empty inside the studio, which is what a bot check or a sign in looks like from here. Next: open the studio and pick from your own browser with the bookmarklet.`)
     }
-    onStep(`Found ${cands.length} things on ${title || source}. Asking the model what to film and what to say.`)
-    const sheet = await contactSheet(page, frame, cands)
+    onStep(`Found ${cands.length} things on ${title || source}. Preparing their visual references.`)
+    const sheet = await contactSheet(page, frame, cands, onStep)
+    onStep('Asking the model what to film and what to say.')
     const chosen = await plan({ at, title, source, cands, pick, max, pace, direction, sheet })
     onStep(chosen.byModel ? `The model chose ${chosen.indices.length}${chosen.product ? ` for "${chosen.product}"` : ''}.` : `The model could not be asked (${chosen.why}), so the most prominent elements were chosen.`)
 
     // what became of each chosen element, for a reply that says so rather than a count
     const fate = new Map(chosen.indices.map((n) => [n, 'not captured']))
-    const captured = [], subjectAt = []
+    const captured = [], subjectAt = [], pixels = captureMode==='pixels'?new Map():null
     for (const n of chosen.indices) {
       onStep(`Capturing ${name(cands.find((c) => c.i === n))}.`)
-      const at_ = await capture(page, frame, n, cands.find((c) => c.i === n))
+      const at_ = await capture(page, frame, n, cands.find((c) => c.i === n), pixels)
       if (at_ >= 0) {
         captured.push(n); subjectAt.push(at_); fate.set(n, 'captured')
         // named after what it is rather than its tag, so a shot list and the editor's rail say "the image in the hero", not "div"
@@ -201,6 +215,22 @@ export async function autofilm({ at, url, pick = '', direction = '', plan = plan
       await label(page, 'Source').click().catch(() => {})
     }
     if (!captured.length) throw new Error(`Cannot film ${source}: none of the chosen elements could be captured. Next: ask for different elements with pick, or open the studio and pick by hand.`)
+    if(pixels){
+      // The last picked subject is still inside the editor's autosave debounce.
+      // Wait for its save before replacing captures, or a reload drops that subject.
+      await page.locator('.save-status[title="Saved locally"]').waitFor({timeout:15000})
+      const saved=await(await fetch(`${at}/__motioneer/projects/${projectId}`)).json()
+      saved.subjects=saved.subjects.map((sub,i)=>{
+        const shot=pixels.get(i);if(!shot)return sub
+        return {...sub,w:shot.w,h:shot.h,shot:shot.data,css:'',html:`<div style="width:${shot.w}px;height:${shot.h}px"><img src="${shot.data}" width="${shot.w}" height="${shot.h}" style="display:block;width:100%;height:100%" alt=""></div>`,warnings:['Captured as pixels to preserve source fidelity. Motion moves the whole image; its internal layers are not editable.']}
+      })
+      const put=await fetch(`${at}/__motioneer/projects/${projectId}`,{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(saved)}).then(r=>r.json())
+      if(put.error)throw new Error(`Cannot preserve the visual capture: ${put.error}. Next: try again.`)
+      await page.reload({waitUntil:'domcontentloaded'})
+      await page.locator('.subject-item').first().waitFor({timeout:20000})
+      onStep('Preserved source pixels for faithful flat motion; internal layers stay flattened.')
+    }
+
 
     /**
      * Each capture is drawn once through the film's own composition before a motion is written for
@@ -260,7 +290,7 @@ export async function autofilm({ at, url, pick = '', direction = '', plan = plan
       }, html).catch(() => '')
     }
     const briefFor = (k, why = '', outline = '') => (String(chosen.directions[String(captured[k])] || '') + paceNote + filmNote
-      + (why ? ` A previous attempt was refused: ${why.slice(0, 160)}. ${/nothing on the component is animating/.test(why) ? `So write selectors that reach this markup${outline ? `, which is ${outline.slice(0, 400)}` : ''}: animate the root itself and its direct children as [data-mn] > *, not classes you assume are there.` : 'So animate only transform, opacity, clip-path and filter, and never add or change padding, margin, gap, display, position, overflow, width or height, so the element ends exactly as it was.'}` : '')).trim().slice(0, 1400)
+      + (why ? ` A previous attempt was refused: ${why.slice(0, 160)}. ${/nothing on the component is animating/.test(why) ? `So write selectors that reach this markup${outline ? `, which is ${outline.slice(0, 400)}` : ''}: animate the root itself and its direct children as [data-mn] > *, not classes you assume are there.` : 'Preserve captured transform matrices. Prefer independent translate and scale, ending at zero and one. Never change padding, margin, gap, display, position, overflow, width or height.'}` : '')).trim().slice(0, 1400)
     for (let k = 0; k < captured.length; k++) {
       if (emptyOnes.has(k)) continue
       await page.locator('.subject-item').nth(subjectAt[k]).click()
@@ -416,8 +446,10 @@ export async function autofilm({ at, url, pick = '', direction = '', plan = plan
 
     /** Cut the project with these scenes, save it, and say what the cut is. */
     const assemble = async (scenes) => {
-      const cut = firstCut(project, { pace, seconds, opening: chosen.opening, closing: chosen.closing, background: colours.background, scenes })
+      let cut = titleScale(firstCut(project, { pace, seconds, opening: chosen.opening, closing: chosen.closing, background: background ?? colours.background, ink, scenes }))
       cut.settings.fps = fps
+      cut.source = source
+      if(soundtrack!=='none')cut=await withSoundtrack(cut,{at,style:soundtrack,onStep})
       const components = cut.tracks.filter((t) => t.kind === 'component').length
       if (!components) throw new Error('Cannot cut: no kept motion was saved, so there was nothing to place. Next: try again; if it repeats, open the studio and keep a motion by hand.')
       const put = await fetch(`${at}/__motioneer/projects/${id}`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(cut) }).then((r) => r.json()).catch((e) => ({ error: e.message }))
@@ -476,7 +508,7 @@ export async function autofilm({ at, url, pick = '', direction = '', plan = plan
       const filmed = sub && made.cut.tracks.some(t => t.kind === 'component' && t.subjectId === sub.id)
       return { index: n, subjectId: sub?.id || null, name: name(cands.find((c) => c.i === n)), status: filmed ? 'filmed' : fate.get(n) === 'filmed' ? 'not used in final cut' : fate.get(n) || 'not captured', warnings: sub?.warnings || [] }
     })
-    return { projectId: id, at, jobId: rendered.jobId, url: rendered.url, file: proved.file, proof: proved.proof, repairs, elements, shotList: made.shots, captured: captured.length, components: made.cut.tracks.filter((t) => t.kind === 'component').length, shots: made.shotsMade, distinct: made.distinct, layouts: made.layoutsUsed, cutTimes: made.cutTimes, background: colours.background, seconds: made.cut.settings.duration / 1000, product: chosen.product, opening: chosen.opening, closing: chosen.closing, byModel: chosen.byModel, source, title }
+    return { projectId: id, at, fps: made.cut.settings.fps, soundtrack: scoreStyle(made.cut) || 'none', jobId: rendered.jobId, url: rendered.url, file: proved.file, proof: proved.proof, repairs, elements, shotList: made.shots, captured: captured.length, components: made.cut.tracks.filter((t) => t.kind === 'component').length, shots: made.shotsMade, distinct: made.distinct, layouts: made.layoutsUsed, cutTimes: made.cutTimes, background: made.cut.settings.background, seconds: made.cut.settings.duration / 1000, product: chosen.product, opening: chosen.opening, closing: chosen.closing, byModel: chosen.byModel, source, title }
   } finally {
     await browser.close()
   }
@@ -489,7 +521,9 @@ export async function autofilm({ at, url, pick = '', direction = '', plan = plan
  * with the same function the editor's button calls, renders and measures. "Make it slower", "drop
  * the footer shot", "put the hero last", "call it something else" are all this.
  */
-export async function revise({ at, projectId, pace, seconds, opening, closing, drop = [], order = [], motionDirection = '', motionElements = [], onStep = () => {} }) {
+export async function revise({ at, projectId, pace, seconds, opening, closing, drop = [], order = [], motionDirection = '', motionElements = [], fps, soundtrack, background, ink, onStep = () => {} }) {
+  validColour(background,'background');validColour(ink,'ink')
+  if(fps!==undefined&&![30,60].includes(fps))throw new Error('Cannot revise: frame rate must be 30 or 60. Next: choose one of those frame rates.')
   let project = await (await fetch(`${at}/__motioneer/projects/${projectId}`)).json()
   if (!project || project.error || !Array.isArray(project.tracks)) throw new Error(`Cannot revise: no project ${projectId} in this studio. Next: film again, or pass the projectId a film returned.`)
   const was = shotList(project)
@@ -497,8 +531,8 @@ export async function revise({ at, projectId, pace, seconds, opening, closing, d
   const avg = was.reduce((a, s) => a + s.seconds, 0) / was.length
   const wasPace = avg < 1.8 ? 'fast' : avg < 3.4 ? 'brisk' : 'calm'
   const titles = project.tracks.filter((t) => t.kind === 'title').sort((a, b) => a.start - b.start)
-  const want = { pace: ['calm', 'brisk', 'fast'].includes(pace) ? pace : wasPace, seconds: Number(seconds) || Math.round(project.settings.duration / 1000), opening: opening != null ? String(opening).slice(0, 60) : titles[0]?.text || '', closing: closing != null ? String(closing).slice(0, 60) : titles[titles.length - 1]?.text || '', background: project.settings.background }
-  let scenes = scenesOf(project)
+  const want = { pace: ['calm', 'brisk', 'fast'].includes(pace) ? pace : wasPace, seconds: Number(seconds) || Math.round(project.settings.duration / 1000), opening: opening != null ? String(opening).slice(0, 60) : titles[0]?.text || '', closing: closing != null ? String(closing).slice(0, 60) : titles[titles.length - 1]?.text || '', background: background ?? project.settings.background, ink:ink??(background===undefined?titles[0]?.color:undefined) }
+  let scenes = scenesOf(project).map((scene,i)=>({...scene,number:i+1}))
   const changes = []
   const previous = {id:crypto.randomUUID(),name:'Before revision',tracks:structuredClone(project.tracks),camera:structuredClone(project.camera),settings:{...project.settings}}
   if (motionDirection.trim()) {
@@ -525,8 +559,8 @@ export async function revise({ at, projectId, pace, seconds, opening, closing, d
     changes.push(`refined ${subjects.map(s=>s.name).join(', ')}`)
   } else if (motionElements.length) throw new Error('Cannot revise: motionElements needs motionDirection. Next: describe how those elements should move.')
   for (const d of [].concat(drop).map((v) => String(v).trim()).filter(Boolean)) {
-    if (/^\d+$/.test(d)) { const i = Number(d) - 1; if (scenes[i]) { changes.push(`dropped shot ${d}`); scenes.splice(i, 1) } ; continue }
-    const hit = project.subjects.filter((s) => s.name.toLowerCase().includes(d.toLowerCase()))
+    if (/^\d+$/.test(d)) { const number = Number(d); if (scenes.some(s=>s.number===number)) { changes.push(`dropped shot ${d}`); scenes=scenes.filter(s=>s.number!==number) } ; continue }
+    const hit = project.subjects.filter((s) => s.id===d || s.name.toLowerCase().includes(d.toLowerCase()))
     if (!hit.length) { changes.push(`no element called "${d}"`); continue }
     const ids = new Set(hit.map((s) => s.id))
     const before = scenes.length
@@ -534,18 +568,25 @@ export async function revise({ at, projectId, pace, seconds, opening, closing, d
     changes.push(before === scenes.length ? `took ${hit.map((s) => s.name).join(', ')} out of its shots` : `dropped ${hit.map((s) => s.name).join(', ')}`)
   }
   if (Array.isArray(order) && order.length) {
-    const wanted = order.map(Number).filter((n) => Number.isInteger(n) && n >= 1 && n <= scenes.length)
-    if (wanted.length) { const rest = scenes.filter((_, i) => !wanted.includes(i + 1)); scenes = [...wanted.map((n) => scenes[n - 1]), ...rest]; changes.push(`reordered the shots to ${wanted.join(', ')} first`) }
+    const wanted = [...new Set(order.map(Number))].filter((n) => Number.isInteger(n) && scenes.some(s=>s.number===n))
+    if (wanted.length) { const rest = scenes.filter(s => !wanted.includes(s.number)); scenes = [...wanted.map(n => scenes.find(s=>s.number===n)), ...rest]; changes.push(`reordered the shots to ${wanted.join(', ')} first`) }
   }
   if (!scenes.length) throw new Error('Cannot revise: every shot was dropped. Next: drop fewer, or film again.')
   if (want.pace !== wasPace) changes.push(`cut ${want.pace}`)
   if (want.seconds !== Math.round(project.settings.duration / 1000)) changes.push(`${want.seconds} seconds long`)
+  if(background!=null||ink!=null)changes.push('new film colors')
   if (opening != null || closing != null) changes.push('new titles')
   onStep(`Revising: ${changes.join('; ') || 'nothing asked, cutting it again as it was'}.`)
   // A note about movement changes references only. Recutting here would lose hand placement,
   // audio, camera, and linked timing even though none of them was part of the request.
   const recut = pace != null || seconds != null || opening != null || closing != null || drop.length || order.length
-  const cut = recut ? firstCut(project, { ...want, scenes }) : project
+  let cut = recut ? titleScale(firstCut(project, { ...want, scenes })) : project
+  if(background!==undefined)cut={...cut,settings:{...cut.settings,background}}
+  if(ink!==undefined||background!==undefined)cut={...cut,tracks:cut.tracks.map(t=>t.kind==='title'?{...t,color:ink??contrastInk(background)}:t)}
+  if(recut)cut.tracks.push(...project.tracks.filter(t=>t.kind==='audio'))
+  if(fps!==undefined){cut.settings={...cut.settings,fps};changes.push(`${fps} fps`)}
+  const score=soundtrack??(recut?scoreStyle(project):undefined)
+  if(score!==undefined){cut=await withSoundtrack(cut,{at,style:score,onStep});changes.push(score==='none'?'removed the generated soundtrack':`${score} soundtrack`)}
   cut.arrangements = [...cut.arrangements,previous]
   const put = await fetch(`${at}/__motioneer/projects/${projectId}`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(cut) }).then((r) => r.json()).catch((e) => ({ error: e.message }))
   if (put.error) throw new Error(`Cannot revise: ${put.error} Next: try again.`)
@@ -553,5 +594,5 @@ export async function revise({ at, projectId, pace, seconds, opening, closing, d
   const rendered = await renderProject(at, projectId, onStep)
   const proved = await proveRender(rendered.url, { pace: want.pace, seconds: want.seconds, cuts: cutTimes })
   const distinct = new Set(cut.tracks.filter((t) => t.kind === 'component').map((t) => t.subjectId)).size
-  return { projectId, at, jobId: rendered.jobId, url: rendered.url, file: proved.file, proof: proved.proof, changes, shotList: shots, shots: shots.length, distinct, layouts: new Set(shots.map((s) => s.layout)).size, cutTimes, seconds: cut.settings.duration / 1000, pace: want.pace, opening: want.opening, closing: want.closing, background: want.background, source: project.source, elements: project.subjects.map((s) => ({ name: s.name, status: cut.tracks.some((t) => t.subjectId === s.id) ? 'filmed' : 'left out' })) }
+  return { projectId, at, fps: cut.settings.fps, soundtrack: scoreStyle(cut) || 'none', jobId: rendered.jobId, url: rendered.url, file: proved.file, proof: proved.proof, changes, shotList: shots, shots: shots.length, distinct, layouts: new Set(shots.map((s) => s.layout)).size, cutTimes, seconds: cut.settings.duration / 1000, pace: want.pace, opening: want.opening, closing: want.closing, background: want.background, source: project.source, elements: project.subjects.map((s) => ({ subjectId:s.id,name: s.name,warnings:s.warnings, status: cut.tracks.some((t) => t.subjectId === s.id) ? 'filmed' : 'left out' })) }
 }

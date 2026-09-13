@@ -15,9 +15,10 @@ import assert from 'node:assert'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { autofilm, inspectSite } from '../tools/editor/autofilm.mjs'
-import { candidates } from '../tools/editor/survey.mjs'
+import { candidates, reveal } from '../tools/editor/survey.mjs'
 import { componentBrief, briefStyles } from '../shared/component-brief.mjs'
 import { reviewFilm } from '../tools/editor/review.mjs'
+import { withSoundtrack, scoreStyle, scoreWav } from '../tools/editor/soundtrack.mjs'
 import { loadChromium } from '../tools/editor/render.mjs'
 import { proveFilm } from '../tools/editor/proof.mjs'
 import { firstCut, createProject, compositionDocument } from '../dist-core/core.js'
@@ -41,6 +42,11 @@ if (!(await loadChromium())) { console.log('skip: the local renderer is not inst
     assert.ok(found.some(c=>c.scene&&c.text==='AI and automations product interface'),'later sections receive attention')
     assert.ok(found.some(c=>c.scene&&c.matchText==='Roadmap Milestones Cycle time'),'a scene keeps its actual text so it can be found after the page rerenders')
     assert.ok(found.length<=32 && found.filter(c=>c.text==='Cycle time').length===0,'inner controls do not replace a complete scene')
+    await page.setContent('<style>@keyframes entry{from{translate:0 80px}to{translate:0 0}}#panel{animation:entry 5s both}</style><div id="panel">A settling interface</div>')
+    await reveal(page.locator('#panel'))
+    assert.equal(await page.locator('#panel').evaluate(el=>getComputedStyle(el).translate),'0px','capture waits for a finite source entrance to reach its resting state')
+    const missingAt=Date.now();await reveal(page.locator('#removed-by-rerender'))
+    assert.ok(Date.now()-missingAt<1500,'a removed reference does not spend the default locator timeout per candidate')
   } finally {await browser.close()}
   console.log('ok: complete product scenes survive a long page and the model reads visible structure instead of embedded pixels')
 }
@@ -129,6 +135,9 @@ const modelAt = `http://127.0.0.1:${model.address().port}`
 
 const site = createServer((req, res) => {
   res.writeHead(200, { 'content-type': 'text/html' })
+  if(req.url==='/missing')return res.end('<html><title>Not found</title><body><h1>Page not found</h1><p>This is an error page with enough words to look like normal content. Try the homepage for the real product.</p></body></html>')
+  if(req.url==='/dutch')return res.end('<html lang="nl-NL"><body><h1>Een product voor teams</h1><a href="/en-nl">English</a><p>Dit is een Nederlandse pagina voor een product, met een bestaande link naar de Engelse versie van dezelfde website.</p></body></html>')
+  if(req.url==='/en-nl')return res.end('<html lang="en-NL"><title>English product</title><style>@media(prefers-color-scheme:dark){body{background:#101319;color:white}}</style><body><h1>A product for teams</h1><p>The English product page, linked from the Dutch page. A reliable film follows the existing language link instead of guessing a URL that might not exist.</p></body></html>')
   res.end(`<!doctype html><html><body style="margin:0;padding:40px;background:#eef1f6;font:16px system-ui;color:#1a2233">
     <h1 style="font-size:44px;margin:0 0 24px">Ship it with confidence</h1>
     <article class="card" style="width:520px;padding:28px;background:#fff;border-radius:16px;box-shadow:0 20px 60px #0002;margin-bottom:24px">
@@ -158,7 +167,7 @@ try {
   const steps = []
   const before = await (await fetch(`${at}/__motioneer/editor-config`)).json()
   assert.equal(before.source, null, 'the studio should start aimed at nothing, so the aim is what is being proved')
-  const result = await autofilm({ at, url: siteAt, seconds: 12, look: 'subtle', pace: 'fast', max: 2, pick: 'the card and the headline', direction: 'calm confidence, every arrival settles like paper on a desk', onStep: (m) => { steps.push(m); if (process.env.MOTIONEER_STEPS) console.log('  step', m) } })
+  const result = await autofilm({ at, url: siteAt, seconds: 12, soundtrack: 'pulse', look: 'subtle', pace: 'fast', max: 2, pick: 'the card and the headline', direction: 'calm confidence, every arrival settles like paper on a desk', onStep: (m) => { steps.push(m); if (process.env.MOTIONEER_STEPS) console.log('  step', m) } })
   assert.equal(result.captured, 2, 'both chosen elements should be captured')
   assert.equal(refusedCalls,2); assert.ok(recoveredCalls>0 && result.elements.every(e=>e.status==='filmed'),'a delayed retry must reach the final cut')
   assert.ok(result.byModel, 'the plan should have come from the model through the studio, not the fallback')
@@ -187,6 +196,12 @@ try {
   assert.ok(planPrompt && /settles like paper/.test(planPrompt), 'the film\'s direction should reach the plan')
   assert.ok(prompts.filter((p) => /settles like paper/.test(p) && !/"opening"/.test(p)).length >= 2, 'the film\'s direction should reach every motion prompt')
   const saved = await (await fetch(`${at}/__motioneer/projects/${result.projectId}`)).json()
+  assert.equal(scoreStyle(saved),'pulse')
+  const audio=saved.tracks.find(t=>t.kind==='audio'),asset=saved.assets.find(a=>a.id===audio?.assetId)
+  assert.ok(audio&&asset.duration===saved.settings.duration&&asset.waveform.some(v=>v>.01),'the original score is an editable, non-silent audio asset filling the cut')
+  const wav=scoreWav({seconds:1,style:'ambient',seed:'check'}).data
+  assert.equal(wav.readUInt32LE(40),24000*4)
+  assert.equal(wav.readInt16LE(44),0,'the score starts without a click')
   /**
    * A captured root sits flush in its frame. The block was captured with an 18px top margin, and a
    * frame sized to its box once rendered it 18px down and clipped its foot. Rendered through the
@@ -273,7 +288,11 @@ try {
    * for a slideshow.
    */
   const { revise } = await import('../tools/editor/autofilm.mjs')
-  const revised = await revise({ at, projectId: result.projectId, seconds: 9, drop: ['1'], onStep: (m) => { if (process.env.MOTIONEER_STEPS) console.log('  step', m) } })
+  const revised = await revise({ at, projectId: result.projectId, seconds: 9, drop: ['1','2'], order:[4,3], background:'#101319',ink:'#3ecf8e', onStep: (m) => { if (process.env.MOTIONEER_STEPS) console.log('  step', m) } })
+  const colored=await(await fetch(`${at}/__motioneer/projects/${result.projectId}`)).json()
+  assert.equal(colored.settings.background,'#101319');assert.ok(colored.tracks.filter(t=>t.kind==='title').every(t=>t.color==='#3ecf8e'),'a requested palette reaches the saved film and title tracks')
+  assert.equal(revised.shots,result.shots-2,'multiple numbered drops address the original cut without shifting later indices')
+  assert.deepEqual(revised.shotList[0].elements,result.shotList[3].elements,'order uses the same original shot numbers as drop')
   assert.ok(revised.changes.some((c) => /dropped shot 1/.test(c)) && revised.changes.some((c) => /9 seconds/.test(c)), `the revision should say what it changed, got ${JSON.stringify(revised.changes)}`)
   assert.ok(Math.abs(revised.seconds - 9) < 1.5, `the revised film should be about 9 seconds, got ${revised.seconds}`)
   assert.ok(revised.shots < result.shots, `dropping a shot of a short film should leave fewer shots, ${result.shots} became ${revised.shots}`)
@@ -305,6 +324,9 @@ try {
   assert.equal(after.tracks.find(t=>t.id===hiddenTrack.id).motionId,hiddenTrack.motionId,'hidden layers keep their motion')
   for(const m of hand.motions)assert.equal(after.motions.find(n=>n.id===m.id).css,m.css,'existing generated CSS stays immutable')
   assert.deepEqual(after.arrangements.at(-1).tracks,hand.tracks);assert.deepEqual(after.arrangements.at(-1).settings,hand.settings)
+  assert.equal(after.tracks.filter(t=>t.kind==='audio').length,1,'recutting and refinement do not duplicate the score')
+  const silent=await withSoundtrack({...after,tracks:[...after.tracks,{...audio,id:crypto.randomUUID(),assetId:'custom-audio'}]},{at,style:'none'})
+  assert.deepEqual(silent.tracks.filter(t=>t.kind==='audio').map(t=>t.assetId),['custom-audio'],'silence removes the generated score without removing imported audio')
   const review=await reviewFilm(refined.file,{shots:refined.shotList,seconds:refined.seconds})
   assert.ok((await stat(review.path)).size>5000 && review.data && review.samples.length>=3,'the agent receives a storyboard from the rendered MP4')
   console.log('ok: motion notes preserve the edit, save the previous arrangement, and return a rendered storyboard')
@@ -320,7 +342,9 @@ try {
   let verdicts = 0
   const lying = async (url, opts) => { const real = await proveRender(url, opts); verdicts++; return verdicts === 1 ? { ...real, proof: { ...real.proof, ok: false, late: [opts.cuts[0]], notes: ['1 shot still empty a third of a second in'] } } : real }
   const mendSteps = []
-  const mended = await autofilm({ at, url: siteAt, seconds: 12, look: 'subtle', pace: 'fast', max: 2, pick: 'the card and the headline', prove: lying, onStep: (m) => { mendSteps.push(m); if (process.env.MOTIONEER_STEPS) console.log('  mend', m) } })
+  const mended = await autofilm({ at, url: siteAt, seconds: 12, look: 'subtle', pace: 'fast', max: 2, pick: 'the card and the headline', captureMode:'pixels', prove: lying, onStep: (m) => { mendSteps.push(m); if (process.env.MOTIONEER_STEPS) console.log('  mend', m) } })
+  const photographed=await(await fetch(`${at}/__motioneer/projects/${mended.projectId}`)).json()
+  assert.ok(photographed.subjects.every(s=>s.html.includes('data:image/png;base64,')&&s.warnings.some(w=>w.includes('pixels'))),'pixel capture preserves source appearance with an explicit flattening warning')
   assert.equal(verdicts, 2, 'a failed verdict should lead to one more render and one more verdict')
   assert.ok(mended.repairs.length === 1 && /rewrote|dropped/.test(mended.repairs[0]), `the film should say what it mended, got ${JSON.stringify(mended.repairs)}`)
   assert.ok(mendSteps.some((m) => /^Mending the film/.test(m)) && mendSteps.filter((m) => /^Rendering/.test(m)).length === 2, 'it should say it is mending and render twice')
@@ -328,6 +352,11 @@ try {
   console.log(`ok: a failed verdict was mended: ${mended.repairs[0]}`)
   console.log(`ok: measured off the frames: ${proof.cuts} cuts, shots ${(proof.avgShotMs / 1000).toFixed(1)}s on average, elements arriving over ${proof.arriveMs}ms, ${Math.round(proof.blank * 100)}% blank`)
   console.log('ok: it reported each step:', steps.length, 'steps')
+  const localized=await inspectSite({at,url:siteAt+'/dutch',language:'en',theme:'dark'})
+  assert.ok(localized.source.endsWith('/en-nl')&&localized.title==='English product','locale selection follows a real link on the site')
+  assert.equal(localized.colours.background,'#101319','requested dark appearance survives the locale redirect')
+  await assert.rejects(()=>inspectSite({at,url:siteAt+'/missing'}),/page-not-found/,'an error page is refused before generating a film')
+  console.log('ok: locale selection follows existing links and page-not-found screens cannot become films')
   console.log('film verification passed')
 } catch (e) {
   console.error(log.slice(-3000)); throw e

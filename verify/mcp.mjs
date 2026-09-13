@@ -127,6 +127,14 @@ ok('film offers 60 fps and revision can change motion without recapturing',
   tools.find(t=>t.name==='film')?.inputSchema?.properties?.fps?.enum.includes(60)
   && tools.find(t=>t.name==='revise')?.inputSchema?.properties?.motionDirection
   && tools.find(t=>t.name==='revise')?.inputSchema?.properties?.motionElements)
+ok('finishing options and locale selection are available through the same agent tools',
+  tools.find(t=>t.name==='film')?.inputSchema?.properties?.soundtrack?.enum.includes('none')
+  && tools.find(t=>t.name==='film')?.inputSchema?.properties?.language
+  && tools.find(t=>t.name==='film')?.inputSchema?.properties?.captureMode?.enum.includes('pixels')
+  && tools.find(t=>t.name==='film')?.inputSchema?.properties?.theme?.enum.includes('dark')
+  && tools.find(t=>t.name==='revise')?.inputSchema?.properties?.background
+  && tools.find(t=>t.name==='revise')?.inputSchema?.properties?.fps?.enum.includes(60)
+  && tools.find(t=>t.name==='revise')?.inputSchema?.properties?.soundtrack?.enum.includes('playful'))
 ok('agents are told to review the delivered frames and disclose partial coverage',
   /storyboard decoded from the final MP4/.test(hello.result.instructions) && /partial coverage/.test(hello.result.instructions))
 const tracked=await rpc('tools/call',{name:'revise',arguments:{},_meta:{progressToken:'review-test'}})

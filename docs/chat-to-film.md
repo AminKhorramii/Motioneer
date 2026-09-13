@@ -33,6 +33,34 @@ MCP `_meta.progressToken`, and gets the MP4, a storyboard decoded from that MP4,
 coverage and frame checks. Claude CLI uses its supported `sonnet`, `opus`, and `haiku` aliases
 by default, so a new setup follows the models available in the installed CLI.
 
+Film now defaults to 60 fps and an original synthesized score: ambient for calm films, pulse
+otherwise, with playful available for lighter briefs. `soundtrack: "none"` makes a silent film.
+The score is an ordinary audio track with its own asset and waveform, so it can be mixed, muted,
+or replaced in the editor. Recutting regenerates its timing while retaining imported audio.
+`revise` accepts `fps` and `soundtrack` as finishing notes without recapturing the page.
+
+A brief can request `theme: "dark"` or `"light"` in `film` and `inspect`. This sets the browser
+color-scheme preference before capture, including after locale redirects; sites that ignore
+that preference keep their own appearance. Optional `background` and `ink` accept six-digit
+hex colors for the film canvas and titles; a palette-only revision preserves the cut. Shot numbers in `revise.drop` and `revise.order`
+refer to the original returned cut, even when several shots are removed together.
+See [ten exercised film prompts](film-examples.md) for examples and the finishing loop.
+
+Pass `language` as the request's two-letter language code (English by default). The survey
+follows a matching language link already on the page when available, instead of guessing a
+locale URL. Page-not-found screens are rejected before generation. Source entrance animations
+settle before capture, and motion instructions preserve the transforms already positioning UI.
+
+When the reference looks correct but DOM capture loses canvas graphics, imagery or fonts,
+`film` can use `captureMode: "pixels"`. It photographs each selected source element before
+generating motion. The film stays editable, but each photographed element is one flat image;
+its internal text and layers cannot move separately. DOM capture remains the default.
+
+The agent should inspect the delivered storyboard and make up to two focused revision passes
+when a shot is visibly weak. Storyboards sample the later part of each shot so a deliberate
+entrance is not mistaken for lasting cropping. The opening identifies the brand and the closing
+uses its domain or a specific invitation from the page; an exact requested title takes priority.
+
 For a note such as "make the planning panels glide more slowly", call `revise` with
 `motionDirection` and `motionElements` (subject IDs or words from the returned element names).
 It creates new motion versions and updates their clip references, preserving placement, timing,

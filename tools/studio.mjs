@@ -2489,6 +2489,7 @@ const editor = editorRoutes({
     if (!subject || typeof subject.html !== 'string' || !subject.html.trim()) throw new Error('Pick a component before generating motion.')
     const brief = motionBrief(rawBrief), direction = motionDirection(brief, treatment)
     const about = `The captured component, with embedded pixels and hidden responsive copies omitted so its visible structure can be read:\n${componentBrief(subject.html)}\nIts CSS:\n${briefStyles(subject.css)}\n${direction}`
+      + '\nCaptured transform matrices are part of the layout. Never animate transform to none on elements that already have a transform: that destroys their placement. Prefer independent translate and scale keyframes, ending at translate:0 0 and scale:1, which compose with the captured transform. Preserve any existing independent translate/scale values too. Do not animate hidden responsive copies. Avoid changing opacity permanently: finish at each element\'s captured opacity, or use a motion with no opacity change.'
       + (previous ? `\nRefine this existing motion, preserving its idea unless the direction requests otherwise:\n${String(previous.css).slice(0, 10000)}` : '')
     let why = ''
     for (let i = 0; i < 2; i++) {

@@ -34,6 +34,7 @@ tools/editor/
   autofilm.mjs         the headless driver behind film, inspect and revise: the plan it asks the model for with a contact sheet, the repair round the proof drives, and the cut read back for a revision
   survey.mjs           page discovery and capture preparation: complete product scenes, representative candidates, and their contact sheet
   review.mjs           a storyboard decoded from the delivered MP4, returned to the agent for visual review
+  soundtrack.mjs       original synthesized music fitted to the cut, stored as editable project audio
   proof.mjs            a rendered film measured off its frames: cuts, shot length, blank frames
 
 site/

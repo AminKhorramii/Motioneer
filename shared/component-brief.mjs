@@ -21,7 +21,7 @@ export function componentBrief(html, limit = 18000) {
       const tag = open[1].toLowerCase(), style = /\bstyle=("[^"]*"|'[^']*')/i.exec(token)?.[1]?.slice(1,-1) || ''
       const hidden = stack.some(x=>x.hidden) || /(?:^|;)\s*display\s*:\s*none\b/i.test(style) || /\shidden(?:\s|=|>)/i.test(token)
       let short = token.replace(/\sstyle=("[^"]*"|'[^']*')/gi, '').replace(/\s(?:srcset|d|points)=("[^"]*"|'[^']*')/gi, '').replace(/\b(src|poster)=(['"])data:[\s\S]*?\2/gi, '$1="embedded"')
-      const rest = style.split(';').filter(s=>/^\s*(?:transform|opacity|display)\s*:/.test(s)).join(';')
+      const rest = style.split(';').filter(s=>/^\s*(?:transform|translate|scale|rotate|opacity|display)\s*:/.test(s)).join(';')
       if(rest)short=short.replace(/\s*\/?>$/,` style="${rest.replace(/"/g,'&quot;')}">`)
       const written = !hidden && size + short.length < limit
       if(written){out.push(short);size+=short.length}else if(!hidden)omitted=true

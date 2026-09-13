@@ -82,13 +82,17 @@ When a tool fails its message starts with "Cannot" and ends with "Next:". Relay 
 
 While film runs it can take a minute or two: it opens the site, captures, writes motions, cuts and renders. Say that once, then wait for the result rather than polling or calling it again.
 
-Film and revise also return a storyboard decoded from the final MP4. Look at it before calling the result finished: inspect legibility, framing, repetition and missing content. The numeric verdict checks cuts and blank frames, not artistic quality. Name any remaining limitation plainly. Coverage reports whether the requested captures actually reached the final cut; never describe partial coverage as complete. Use the returned artifact paths to hand over the video and storyboard. If your client supports MCP progress, pass a progressToken to receive the live stages.
+Pass theme dark or light when the creative brief specifies that appearance; this sets the source browser preference, not a recoloring of captured interfaces. Set background and ink when the brief requests a particular stage/title palette; the page preference alone does not set the film canvas. Keep the full creative prompt in direction and honor its requested duration. Pass language as the request's two-letter language code; the tool follows locale links actually present on the page. Do not guess /en or other paths after a locale mismatch.
+
+Films default to 60 fps with an original, editable synthesized soundtrack (ambient for calm, pulse otherwise). Use playful for a light, colorful brief. Honor requests for silence with soundtrack none. Do not promise commercial stock music or a composed-to-order song.
+
+Film and revise also return a storyboard decoded from the final MP4. Look at it before calling the result finished: inspect legibility, framing, repetition and missing content. If a shot is visibly weak, make up to two focused revision passes before delivery: remove irrelevant shots, adjust the cut, or refine a named motion. If essential content is absent, inspect and film again with an explicit pick. When source references look correct but the DOM render loses images, fonts or canvas content, use captureMode pixels to preserve the selected visuals and disclose that motion then moves flattened images. Review the new storyboard after each pass. Do not silently accept a film of tiny labels or near-identical shots as a polished showcase. The numeric verdict checks cuts and blank frames, not artistic quality. Name any remaining limitation plainly. Coverage reports whether the requested captures actually reached the final cut; never describe partial coverage as complete. Use the returned artifact paths to hand over the video and storyboard. If your client supports MCP progress, pass a progressToken to receive the live stages.
 
 Film and revise return the same facts twice: as words, and as structured content with the projectId, the file, every shot numbered with its elements and layout, each element's fate (filmed, rendered empty, no motion with the reason, not captured), the verdict and the repairs it made to itself. Reason from the fields: name a weak shot by number when offering a change, and pass the projectId to revise. When film returns it includes a line measured from the rendered frames, "Verified" or "Checked": how many cuts, how long the shots are, whether anything is blank. Repeat that line, it is the proof the film is what they asked for. If it says the film came out slower than asked, say so plainly and offer to film again with count 6 rather than claiming it is fast. Then relay what it filmed and where the file is in one or two sentences, and offer exactly these three choices, as selectable options if you can present options, otherwise as a short list:
 1. Open the editor, to change the cut, swap a motion or add a title.
 2. Open the video.
 3. Continue chatting.
-Call open with target "editor" or "video" for the first two, then stop and let them look. For the third, ask what they would like next, and offer one concrete revision you can see in the fields, like dropping a shot whose element is a bare heading, or a slower cut when the shots average under a second.
+Call open only when the person explicitly asks to open something or selects that option. Creating a video is not a request to launch a player. For the third, ask what they would like next, and offer one concrete revision you can see in the fields, like dropping a shot whose element is a bare heading, or a slower cut when the shots average under a second.
 
 A site that needs a sign in cannot be proxied; if capture finds nothing, say so and point them to the bookmarklet in the studio rather than retrying.`
 
@@ -177,8 +181,14 @@ const TOOLS = [
       properties: {
         url: { type: 'string', description: 'The running site or dev server to film, like http://localhost:3000.' },
         dir: { type: 'string', description: 'Absolute project path. The MP4 is saved here; pass it so the file lands where the person is working.' },
+        captureMode: { type: 'string', enum: ['dom','pixels'], description: 'film only: dom preserves editable internal structure (default). pixels photographs each selected source element before generating motion, preserving fonts, canvas and images when DOM capture loses them; motion then moves a flat image.' },
+        theme: { type: 'string', enum: ['light','dark'], description: 'Preferred source-page color scheme. Pass dark or light when the brief requests it; sites that support system appearance will use that theme. Captured content keeps its source colors.' },
+        language: { type: 'string', description: 'Two-letter language code, en by default. If the site opens in another language, follows an existing locale link when available. Use the language of the request; never guess a locale URL.' },
         seconds: { type: 'number', description: 'How long the film should be. About 20 by default.' },
-        fps: { type: 'number', enum: [30,60], description: 'Frames per second. 30 by default; use 60 for smooth product movement.' },
+        fps: { type: 'number', enum: [30,60], description: 'Frames per second. 60 by default for smooth product movement; 30 for smaller exports.' },
+        background: { type: 'string', description: 'Optional six-digit hex stage background, such as #101319. Changes the film canvas, not captured source colors.' },
+        ink: { type: 'string', description: 'Optional six-digit hex title color. Without it, titles contrast with the stage background.' },
+        soundtrack: { type: 'string', enum: ['none','ambient','pulse','playful'], description: 'Original synthesized music fitted to the cut. Defaults to ambient for calm films and pulse otherwise. Use playful for a light rhythmic feel, none for silent output.' },
         look: { type: 'string', enum: ['subtle', 'expressive', 'bold'], description: 'The single treatment written for each element. Subtle by default, which reads as fast and calm.' },
         count: { type: 'number', description: 'How many elements to film, 1 to 12. Eight by default for a fast film, five for brisk, three for calm; when the page offers fewer, the ones found repeat across the shots.' },
         pace: { type: 'string', enum: ['calm', 'brisk', 'fast'], description: 'How it is cut. fast is many short shots of about a second with short titles, brisk is a demo rhythm, calm is a few long shots. Brisk by default.' },
@@ -201,6 +211,8 @@ const TOOLS = [
       type: 'object',
       properties: {
         url: { type: 'string', description: 'The running site or dev server to look at.' },
+        theme: { type: 'string', enum: ['light','dark'], description: 'Preferred source-page color scheme. Pass dark or light when the brief requests it; sites that support system appearance will use that theme. Captured content keeps its source colors.' },
+        language: { type: 'string', description: 'Two-letter preferred language, en by default. Follows a linked locale when available.' },
         dir: { type: 'string', description: 'Absolute project path, so a studio opened for this lands on their project.' },
       },
       required: ['url'],
@@ -224,8 +236,12 @@ const TOOLS = [
         seconds: { type: 'number', description: 'A new length. Leave out to keep the current one.' },
         opening: { type: 'string', description: 'A new opening title, two to five words.' },
         closing: { type: 'string', description: 'A new closing title.' },
-        drop: { type: 'array', items: { type: 'string' }, description: 'Shots or elements to remove: a shot number from the reply like "3", or words from an element\'s name like "footer" or "pricing".' },
+        drop: { type: 'array', items: { type: 'string' }, description: 'Shots or elements to remove: a shot number from the reply like "3", an exact subjectId, or words from an element\'s name like "footer" or "pricing".' },
         order: { type: 'array', items: { type: 'number' }, description: 'Shot numbers in the order they should now come, first ones first; unnamed shots follow.' },
+        fps: { type: 'number', enum: [30,60], description: 'Change export frame rate without changing the edit.' },
+        background: { type: 'string', description: 'Optional six-digit hex stage background, such as #101319. Changes the film canvas, not captured source colors.' },
+        ink: { type: 'string', description: 'Optional six-digit hex title color. Without it, titles contrast with the stage background.' },
+        soundtrack: { type: 'string', enum: ['none','ambient','pulse','playful'], description: 'Add or replace the generated score; none removes only the generated score. Existing imported audio is preserved.' },
         motionDirection: { type: 'string', description: 'How to change existing motions. Creates new versions while preserving placement, timing, camera, and audio unless a cut change is also requested.' },
         motionElements: { type: 'array', items: { type: 'string' }, description: 'Subject IDs or words from element names whose motions should change. Leave out to refine all visible component elements. Requires motionDirection.' },
       },
@@ -349,12 +365,12 @@ async function open({ target, path: file }) {
  * Read a page the way film would, and say what is on it, so the agent can talk about it and the
  * person can point at what they want filmed before a minute of rendering is spent.
  */
-async function inspect({ url, dir }) {
+async function inspect({ url, dir, language, theme }) {
   if (!url) throw new Error('Cannot inspect: inspect needs a url. Next: pass the running site or dev server.')
   const at = STUDIO_AT()
   if (!(await spawnStudio({ url, dir, at }))) throw new Error(`Cannot inspect: no studio would open at ${at}. Next: run \`npm run studio\` and ask again.`)
   const { inspectSite, describe } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'autofilm.mjs')).href)
-  const seen = await inspectSite({ at, url })
+  const seen = await inspectSite({ at, url, language, theme })
   const lines = seen.candidates.map(describe)
   const text = `${seen.title || seen.source} has ${seen.candidates.length} things worth filming:\n${lines.join('\n')}\n\n`
     + (seen.sheet ? `The image is a contact sheet of the first ${seen.sheet.tiles} of them, each tile labelled with its index, so you can see what each looks like and show or describe them to the person.\n` : '')
@@ -363,7 +379,7 @@ async function inspect({ url, dir }) {
   return { text, images: seen.sheet ? [seen.sheet] : [], structured: { title: seen.title, source: seen.source, background: seen.colours?.background, elements: seen.candidates.map((c) => ({ index: c.i, role: c.role, section: c.section, width: c.w, height: c.h, image: !!c.image, text: c.text || '', alike: c.alike || 0 })) } }
 }
 
-async function film({ url, dir, seconds, fps, look, count, pick, pace, direction }, progress = () => {}) {
+async function film({ url, dir, language, theme, captureMode, seconds, fps, soundtrack, background, ink, look, count, pick, pace, direction }, progress = () => {}) {
   if (!url) throw new Error('film needs a url, a running site or dev server like http://localhost:3000.')
   const at = STUDIO_AT()
   const up = await spawnStudio({ url, dir, at })
@@ -387,7 +403,7 @@ async function film({ url, dir, seconds, fps, look, count, pick, pace, direction
   const wantSeconds = Number(seconds) || (wantPace === 'fast' ? 12 : 20)
   // a fast film wants many elements; a calm one a few. the cap is what a render can carry in a few minutes
   const max = Math.max(1, Math.min(12, Number(count) || (wantPace === 'fast' ? 8 : wantPace === 'brisk' ? 5 : 3)))
-  const result = await autofilm({ at, url, pick: String(pick || '').slice(0, 600), direction: String(direction || '').slice(0, 1400), seconds: wantSeconds, fps: fps ?? 30, look: look || (wantPace === 'calm' ? 'subtle' : 'expressive'), pace: wantPace, max, onStep: (m) => {steps.push(m);progress(m)} })
+  const result = await autofilm({ at, url, language, theme, captureMode, background, ink, pick: String(pick || '').slice(0, 600), direction: String(direction || '').slice(0, 1400), seconds: wantSeconds, fps: fps ?? 60, soundtrack: soundtrack ?? (wantPace === 'calm' ? 'ambient' : 'pulse'), look: look || (wantPace === 'calm' ? 'subtle' : 'expressive'), pace: wantPace, max, onStep: (m) => {steps.push(m);progress(m)} })
   const file = await keepFile(result, dir)
   const review = await reviewResult(result,file,progress)
   const buf = { length: (await stat(file)).size }
@@ -400,8 +416,8 @@ async function film({ url, dir, seconds, fps, look, count, pick, pace, direction
   return { structured, images: review ? [review] : [], text: `Filmed ${result.distinct} of ${result.elements.length} selected element${result.elements.length === 1 ? '' : 's'} from ${url}${result.product ? `, "${result.product}",` : ''} into a ${Math.round(result.seconds)} second ${wantPace} film`
     + `${result.opening ? ` titled "${result.opening}"` : ''}, ${result.shots} shots of ${result.distinct} distinct element${result.distinct === 1 ? '' : 's'} in ${result.layouts} layout${result.layouts === 1 ? '' : 's'}, saved to ${file} (${(buf.length / 1e6).toFixed(1)} MB). ${verified} The studio is still open at ${at}. What it did: ${steps.join(' ')}\n\n`
     + mended + leftOut + ` The shots are numbered in the structured result; revise with this projectId (${result.projectId}) changes the cut without filming again. `
-    + `Now offer the person these three choices, as options if you can: open the editor, open the video, or continue chatting. `
-    + `For the first two call open with target "editor" or target "video" and path "${file}", then stop so they can look.` }
+    + `Review the storyboard before delivery. If it has weak framing or repeated minor elements, use a focused revision or inspect and film again. Then hand over the video and storyboard with any remaining limitations. `
+    + `Only call open if the person asks to launch the editor or player.` }
 }
 
 /** The rendered file, moved from where the driver measured it to where the person works. */
@@ -426,7 +442,7 @@ async function reviewResult(result,file,progress) {
 /** The same facts as fields: what an agent reasons about between one film and the next. */
 function shape(result, file, pace) {
   return {
-    projectId: result.projectId, studio: result.at, file, source: result.source, seconds: Math.round(result.seconds), pace,
+    projectId: result.projectId, studio: result.at, file, source: result.source, seconds: Math.round(result.seconds), fps: result.fps, soundtrack: result.soundtrack, pace,
     titles: { opening: result.opening || '', closing: result.closing || '' }, background: result.background,
     shots: (result.shotList || []).map((s) => ({ shot: s.shot, at: s.at, seconds: s.seconds, elements: s.elements, layout: s.layout })),
     elements: result.elements || [],
@@ -444,13 +460,13 @@ function shape(result, file, pace) {
  * A film changed rather than remade. The studio that made it is still open with the project,
  * so this goes straight to the cut and the render, and comes back in the time a render takes.
  */
-async function revise({ projectId, dir, pace, seconds, opening, closing, drop, order, motionDirection, motionElements }, progress = () => {}) {
+async function revise({ projectId, dir, pace, seconds, opening, closing, drop, order, motionDirection, motionElements, fps, soundtrack, background, ink }, progress = () => {}) {
   if (!projectId) throw new Error('Cannot revise: revise needs the projectId a film returned. Next: pass it, or film first.')
   const at = STUDIO_AT()
   if (!(await answering(at))) throw new Error(`Cannot revise: the studio at ${at} is not open any more, so the project is not reachable. Next: film again.`)
   const { revise: reviseFilm } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'autofilm.mjs')).href)
   const steps = []
-  const result = await reviseFilm({ at, projectId: String(projectId), pace, seconds, opening, closing, drop, order, motionDirection, motionElements, onStep: (m) => {steps.push(m);progress(m)} })
+  const result = await reviseFilm({ at, projectId: String(projectId), pace, seconds, opening, closing, drop, order, motionDirection, motionElements, fps, soundtrack, background, ink, onStep: (m) => {steps.push(m);progress(m)} })
   const file = await keepFile(result, dir)
   const review=await reviewResult(result,file,progress)
   const { proofLine } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'proof.mjs')).href)

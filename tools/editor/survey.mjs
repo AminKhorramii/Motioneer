@@ -180,8 +180,9 @@ export async function freshProject(at, name) {
   if (!made || !made.id) throw new Error(`Cannot film: a project could not be created${made && made.error ? `: ${made.error}` : ''}. Next: try again.`)
   return made.id
 }
-export async function openPage(browser, at, source, projectId) {
-  const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } })
+export async function openPage(browser, at, source, projectId, language = 'en', theme) {
+  if(theme!==undefined&&!['light','dark'].includes(theme))throw new Error('Cannot film: theme must be light or dark. Next: choose one of those appearances.')
+  const page = await browser.newPage({ viewport: { width: 1600, height: 1000 }, ...(theme ? {colorScheme:theme} : {}) })
   if(process.env.MOTIONEER_DEBUG)page.on('response',async response=>{
     if(response.url().endsWith('/__motioneer/generate')){const m=await response.json().catch(()=>({}));console.error('motion reply',JSON.stringify({subjectId:m.subjectId,scope:m.scope,id:m.id,error:m.error}))}
   })
@@ -212,6 +213,22 @@ export async function openPage(browser, at, source, projectId) {
   await frame.locator('body').evaluate(async (body) => { const h = document.documentElement.scrollHeight; for (let y = 0; y < Math.min(h, 24000); y += 700) { window.scrollTo(0, y); await new Promise((r) => setTimeout(r, 120)) } window.scrollTo(0, 0) }).catch(() => {})
   await page.waitForTimeout(600)
   const title = await frame.locator('title').first().textContent().catch(() => '') || ''
+  const heading=await frame.locator('h1').first().textContent({timeout:1000}).catch(()=>'')
+  if(/\b404\b|page not found|page doesn.t exist|page could not be found/i.test(title+' '+heading))throw new Error('Cannot film: this address returned a page-not-found screen. Next: use the correct homepage or a working product URL instead of filming the error page.')
+  // Follow only a locale the site links to. Guessing /en filmed Stripe's 404 page.
+  if(language&&/^[a-z]{2}$/i.test(language)){
+    const alternate=await frame.locator('html').evaluate((html,{language,source,at})=>{
+      const lang=html.lang.toLowerCase(),wanted=language.toLowerCase();if(!lang||lang.split('-')[0]===wanted)return null
+      const region=lang.split('-')[1],links=[...html.querySelectorAll('a[href],link[hreflang][href]')].map(el=>{
+        const u=new URL(el.getAttribute('href'),source);if(u.origin===new URL(at).origin)u.host=new URL(source).host,u.protocol=new URL(source).protocol
+        if(u.origin!==new URL(source).origin)return null
+        const code=el.getAttribute('hreflang')?.toLowerCase()||u.pathname.split('/')[1].toLowerCase()
+        return code===wanted||code.startsWith(wanted+'-')?{url:u.href,score:code===wanted+'-'+region?2:code===wanted?1:0}:null
+      }).filter(Boolean).sort((a,b)=>b.score-a.score)
+      return links[0]?.url||null
+    },{language,source,at}).catch(()=>null)
+    if(alternate&&alternate!==source){const localized=await aim(at,alternate);await page.close();return {...await openPage(browser,at,localized,projectId,null,theme),source:localized}}
+  }
   /**
    * The page's own ground and ink, read off the rendered document rather than guessed. A body
    * with no background falls through to the html element, then to white, because that is what a
@@ -224,7 +241,7 @@ export async function openPage(browser, at, source, projectId) {
     const ground = hex(getComputedStyle(body).backgroundColor) || hex(getComputedStyle(document.documentElement).backgroundColor) || '#ffffff'
     return { background: ground, color: hex(getComputedStyle(body).color) || null }
   }).catch(() => ({ background: '#101319', color: null }))
-  return { page, frame, title: title.trim(), colours }
+  return { page, frame, title: title.trim(), colours, source }
 }
 /**
  * Is an image a picture or decoration? Linear's hero glow is a real PNG that is itself a soft
@@ -258,13 +275,13 @@ export async function dropDecoration(page, cands, onStep) {
   if (kept.length < cands.length) onStep(`Left out ${cands.length - kept.length} decorative image${cands.length - kept.length === 1 ? '' : 's'} with no detail in it.`)
   return kept
 }
-export async function inspectSite({ at, url }) {
+export async function inspectSite({ at, url, language = 'en', theme }) {
   const chromium = await loadChromium()
   if (!chromium) throw new Error('Cannot inspect: the renderer is not installed. Next: open the studio once and set up the local renderer.')
-  const source = await aim(at, url)
+  let source = await aim(at, url)
   const browser = await chromium.launch({ channel: 'chromium' })
   try {
-    const { page, frame, title, colours } = await openPage(browser, at, source)
+    const opened=await openPage(browser,at,source,undefined,language,theme),{page,frame,title,colours}=opened;source=opened.source
     if (/attention required|just a moment|access denied|been blocked|verify you are human|are you a robot|security check/i.test(title || '')) throw new Error(`Cannot open ${source}: that site is behind a bot check, which a proxy cannot pass. Nothing here can fix that. Next: open the studio and pick from your own browser with the bookmarklet.`)
     let cands = await dropDecoration(page, await candidates(frame), () => {})
     for (let n = 0; n < 2 && !cands.length; n++) { await page.waitForTimeout(3000); cands = await dropDecoration(page, await candidates(frame), () => {}) }
@@ -279,13 +296,15 @@ export async function inspectSite({ at, url }) {
  * proxied page and laid on a grid with its index in the corner, as one jpeg a few hundred
  * kilobytes large. Every surveyed candidate is included, up to thirty-two tiles.
  */
-export async function contactSheet(page, frame, cands) {
+export async function contactSheet(page, frame, cands, onStep = () => {}) {
   const tiles = []
   for (const c of cands) {
     const el = frame.locator(`[data-mn-cand="${c.i}"]`).first()
+    if(!await el.count())continue
     await reveal(el)
-    const shot = await el.screenshot({ type: 'jpeg', quality: 65, timeout: 4000 }).catch(() => null)
+    const shot = await el.screenshot({ type: 'jpeg', quality: 65, animations:'disabled', timeout: 2500 }).catch(() => null)
     if (shot) tiles.push({ i: c.i, data: shot.toString('base64') })
+    if(tiles.length&&tiles.length%8===0)onStep(`Prepared ${tiles.length} visual references for the film plan.`)
   }
   if (!tiles.length) return null
   const data = await page.evaluate(async (tiles) => {
@@ -308,13 +327,21 @@ export async function contactSheet(page, frame, cands) {
 
 /** Scroll reveals must finish before either the planner or the picker freezes the component. */
 export async function reveal(el) {
+  if(!await el.count())return
   await el.scrollIntoViewIfNeeded({timeout:4000}).catch(() => {})
   await el.evaluate(async node => {
     await new Promise(r => setTimeout(r, 450))
+    // Freeze finite entrance effects at their resting state before taking computed styles.
+    // Capturing halfway through a reveal baked its offset into the next generated motion.
+    for(const a of node.getAnimations({subtree:true})){
+      const timing=a.effect?.getComputedTiming()
+      if(timing&&Number.isFinite(timing.endTime)&&timing.endTime>0)try{a.finish()}catch{}
+    }
+    await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))
     for (let p = node; p && p !== document.body; p = p.parentElement) {
       const cs = getComputedStyle(p)
       if (cs.display !== 'none' && Number(cs.opacity) === 0) p.style.setProperty('opacity','1','important')
       if (cs.visibility === 'hidden') p.style.setProperty('visibility','visible','important')
     }
-  }).catch(() => {})
+  },null,{timeout:4000}).catch(() => {})
 }
