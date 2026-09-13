@@ -436,3 +436,23 @@ paths, luminous gradient petals, optical contours and spatial wireframes.
 > rules and asymmetric poster compositions. Keep product headings accurate and concise.
 
 See [six Figma film directions](figma-examples.md) for a complete collection of reusable prompts.
+
+## Deep techno collections
+
+For deeper, faster films, `reel` and `rescore` support six additional music identities:
+`hypnosis` (rolling minimal), `warehouse` (industrial rumble), `submerge` (filtered dub),
+`acidline` (resonant acid), `fracture` (broken rhythm), and `alloy` (metallic percussion).
+These use dedicated kick synthesis, bass patterns, percussion, filtered stereo echoes and
+low-end ducking. Each saved phrase renders deterministically.
+
+Pass `bpm` to `reel` to put music and scene boundaries on the same grid. It fits a whole number
+of beats to the requested 6–30 second duration and returns the actual tempo. Product scenes
+and the closing hold retain at least four beats; impossible combinations ask for fewer scenes
+or a longer film. At 20 seconds, tempos in multiples of three fit exactly. `rescore` keeps
+its existing behavior: tempo changes music while preserving the visual edit.
+
+> Create a 20-second Linear hybrid film using Motioneer reel. Set brand Linear, domain linear.app,
+> concept Phase Lock, music hypnosis, bpm 144, art studio. Use almost-black, lavender and bone-white.
+> An eclipse disc and restrained typography become a study of alignment. Interleave real Linear
+> issue, planning and code-review captures with graphic scale changes. Deep kick, rolling sub,
+> very few high notes. Keep source imagery readable and review the storyboard before delivery.

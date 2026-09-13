@@ -80,7 +80,7 @@ How people say it, and what to call:
 
 When a tool fails its message starts with "Cannot" and ends with "Next:". Relay the reason and the next step as given, and do not invent a different cause. Retry only when the next step says to.
 
-For super-snappy, artistic brand films, kinetic typography, motion-identity references, or crazy creative launch videos, use reel. Ground the brief in a distinct brand metaphor and pass the full direction. Reel authors graphic scenes with typography, diagrams and a coordinated instrumental score; it is a different creative mode from filming captured interfaces. For a mix of real website elements and artistic graphics use mode hybrid with a captured projectId or url. Hybrid renders real capture pixels, while its diagrams are illustrative. Name the source fidelity plainly. Use a new reel call for visual revisions, preserving the previous project. For music-only changes use rescore: it creates a new take with the same visual edit. Reel supports 6–30 seconds, including 20-second films. Choose a distinct music profile for each brand and carry musical direction through the brief.
+For super-snappy, artistic brand films, kinetic typography, motion-identity references, or crazy creative launch videos, use reel. Ground the brief in a distinct brand metaphor and pass the full direction. Reel authors graphic scenes with typography, diagrams and a coordinated instrumental score; it is a different creative mode from filming captured interfaces. For a mix of real website elements and artistic graphics use mode hybrid with a captured projectId or url. Hybrid renders real capture pixels, while its diagrams are illustrative. Name the source fidelity plainly. Use a new reel call for visual revisions, preserving the previous project. For music-only changes use rescore: it creates a new take with the same visual edit. Reel supports 6–30 seconds, including 20-second films. Choose a distinct music profile for each brand and carry musical direction through the brief. For deep fast techno use hypnosis, warehouse, submerge, acidline, fracture or alloy, and set bpm (144–162 works well).
 
 While film runs it can take a minute or two: it opens the site, captures, writes motions, cuts and renders. Say that once, then wait for the result rather than polling or calling it again.
 
@@ -212,8 +212,9 @@ const TOOLS = [
       projectId:{type:'string',description:'Optional existing film in this studio; hybrid mode uses its actual captured visuals; graphic mode uses names as context. It is not modified.'},
       direction:{type:'string',description:'The full creative brief: concept, metaphors, typography, rhythm, reference observations. Give each brand a distinct idea.'},
       seconds:{type:'number',minimum:6,maximum:30,description:'6 to 30 seconds, 12 by default.'},
+      bpm:{type:'number',minimum:80,maximum:180,description:'Optional target tempo shared by music and cuts. Fits whole beats to the exact film length; actual BPM is returned. Deep fast techno usually uses 144 to 162.'},
       art:{type:'string',enum:['studio','editorial','playful','chrome','technical','print'],description:'Visual direction with bundled display typography and material treatment. Studio is sculptural, editorial is serif-led, playful is elastic, chrome is luminous, technical is precise, print is bold and optical.'},
-      music:{type:'string',enum:['glass','liquid','paper','monolith','elastic','voltage','current','branch','prism','conversation'],description:'Musical identity: glass minimal electronica, liquid swung garage, paper intimate keys, monolith cinematic sub, elastic electro funk, voltage acid breaks, current dub techno, branch digital counterpoint, prism melodic electronica, conversation warm broken soul. The director chooses when omitted.'},
+      music:{type:'string',enum:['glass','liquid','paper','monolith','elastic','voltage','current','branch','prism','conversation','hypnosis','warehouse','submerge','acidline','fracture','alloy'],description:'Musical identity: glass minimal electronica, liquid swung garage, paper intimate keys, monolith cinematic sub, elastic electro funk, voltage acid breaks, current dub techno, branch digital counterpoint, prism melodic electronica, conversation warm broken soul. For deep fast techno use hypnosis (rolling), warehouse (industrial), submerge (dub), acidline (acid), fracture (broken), or alloy (metallic). The director chooses when omitted.'},
       palette:{type:'array',minItems:3,maxItems:3,items:{type:'string',pattern:'^#[0-9a-fA-F]{6}$'},description:'Three six-digit hex colors in dark, accent, paper order. Optional; the director chooses when omitted.'},
       dir:{type:'string',description:'Absolute output folder for the MP4 and storyboard.'}
     },required:['brand']}
@@ -223,7 +224,7 @@ const TOOLS = [
     description:'Change only the music of an existing film or reel. Creates a new independent editable take, preserving visuals, timing, camera and the original project. Composes an original instrumental score and returns MP4, WAV and storyboard. Use for a new musical identity without rebuilding the visuals.',
     inputSchema:{type:'object',properties:{
       projectId:{type:'string',description:'Existing film or reel projectId.'},
-      music:{type:'string',enum:['glass','liquid','paper','monolith','elastic','voltage','current','branch','prism','conversation'],description:'Musical identity. Choose a different orchestration and groove for each brand.'},
+      music:{type:'string',enum:['glass','liquid','paper','monolith','elastic','voltage','current','branch','prism','conversation','hypnosis','warehouse','submerge','acidline','fracture','alloy'],description:'Musical identity. Choose a different orchestration and groove for each brand.'},
       direction:{type:'string',description:'Musical brief: instrumentation, groove, feeling and melodic character. The composer writes a phrase for this direction.'},
       bpm:{type:'number',minimum:40,maximum:400,description:'Use the original reel BPM to keep music on its edit grid. Inferred from clip lengths when omitted.'},
       dir:{type:'string',description:'Absolute output directory for MP4, WAV and storyboard.'}
@@ -451,11 +452,11 @@ async function film({ url, dir, language, theme, captureMode, seconds, fps, soun
     + `Only call open if the person asks to launch the editor or player.` }
 }
 
-async function reel({brand,domain,projectId,url,mode='graphic',direction,seconds=12,palette,music,art,concept,dir},progress=()=>{}) {
+async function reel({brand,domain,projectId,url,mode='graphic',direction,seconds=12,palette,music,art,concept,bpm,dir},progress=()=>{}) {
   const at=STUDIO_AT()
   if(!(await answering(at))&&!(await spawnStudio({url:domain?'https://'+domain:undefined,dir,at})))throw new Error('Cannot make a reel: the studio could not start. Next: open the studio and retry.')
   const {kineticReel}=await import(pathToFileURL(path.join(ROOT,'tools/editor/kinetic.mjs')).href)
-  const result=await kineticReel({at,brand,domain,projectId,url,mode,direction,seconds,palette,music,art,concept,onStep:progress})
+  const result=await kineticReel({at,brand,domain,projectId,url,mode,direction,seconds,palette,music,art,concept,bpm,onStep:progress})
   const file=await keepFile(result,dir),review=await reviewResult(result,file,progress)
   const sourceSheet=result.sourceSheet?file.replace(/\.mp4$/,'-sources.jpg'):null
   if(sourceSheet)await writeFile(sourceSheet,Buffer.from(result.sourceSheet.data,'base64'))

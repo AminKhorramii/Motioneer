@@ -39,7 +39,8 @@ tools/editor/
   hybrid.mjs           source capture snapshots and contact sheets, product reveal/detail/split choreography with traceable source IDs
   art-direction.mjs    six reusable typography and material directions, with bundled portable display fonts
   kinetic-scenes.mjs   graphic scene vocabulary: typography, orbital systems, ribbons, nodes, stacks and portals using the shared composition runtime
-  music.mjs            ten instrumental identities, melodic phrases, grooves and stereo synthesis tied to scene cuts
+  music.mjs            sixteen instrumental identities, melodic phrases, grooves and stereo synthesis tied to scene cuts
+  techno.mjs           six deep techno arrangements with dedicated percussion, resonant bass, filtered echoes and kick ducking
   rescore.mjs          a music-only take that copies assets and preserves the complete visual edit
   soundtrack.mjs       original synthesized music fitted to the cut, stored as editable project audio
   proof.mjs            a rendered film measured off its frames: cuts, shot length, blank frames

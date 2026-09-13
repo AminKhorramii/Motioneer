@@ -44,6 +44,9 @@ if (!(await loadChromium())) { console.log('skip: the local renderer is not inst
   }
   for(let i=0;i<scores.length;i++)for(let j=0;j<i;j++)assert.notDeepEqual(scores[i].data,scores[j].data,'different orchestration changes the actual audio')
   assert.deepEqual(scores[0].data,musicWav({seconds:4,seed:'same phrase',bpm:120,cuts:[1,2,3.3],music:{profile:'glass',root:45,motif:[0,2,4,1]}}).data,'a saved phrase renders deterministically')
+  const techno=musicWav({seconds:4,seed:'same phrase',bpm:156,cuts:[1,2,3.3],music:{profile:'acidline',root:45,motif:[0,2,4,1]}})
+  assert.ok(techno.data.equals(musicWav({seconds:4,seed:'same phrase',bpm:156,cuts:[1,2,3.3],music:{profile:'acidline',root:45,motif:[0,2,4,1]}}).data),'techno repeats the exact saved phrase')
+  assert.ok(!techno.data.equals(musicWav({seconds:4,seed:'same phrase',bpm:144,cuts:[1,2,3.3],music:{profile:'acidline',root:45,motif:[0,2,4,1]}}).data),'tempo changes the performed groove')
   const extended=musicWav({seconds:20,seed:'twenty',bpm:120,cuts:[2,4,8,12,18],music:{profile:'prism'}})
   assert.equal(extended.data.length,44+20*48000*4,'twenty seconds includes the whole final tail')
   assert.equal(extended.events.at(-1).at,18,'the cadence lands on the closing scene')
@@ -60,7 +63,7 @@ if (!(await loadChromium())) { console.log('skip: the local renderer is not inst
     const expected=musicWav({seconds:5,seed:'range',bpm:120,cuts:[-2,2],music:{profile:'glass'}})
     assert.deepEqual(delivered,expected.data,'musical accents follow resolved linked timing inside the export range')
   }finally{await new Promise(r=>upload.close(r))}
-  console.log('ok: ten musical identities render distinct, deterministic stereo scores with a complete 20-second cadence')
+  console.log('ok: sixteen musical identities render distinct, deterministic stereo scores with a complete 20-second cadence')
 }
 
 // Product carousel posters remain real source assets even when their slides are hidden.
@@ -134,6 +137,15 @@ if (!(await loadChromium())) { console.log('skip: the local renderer is not inst
     // A brand reel is authored scene animation, with safe copy and deterministic scrubbing.
     const raw={concept:'Connected ideas',motif:'nodes',palette:['#101319','#aaff77','#fff8ee'],scenes:SCENES.map((type,i)=>({type,text:i===1?'Build <script>':'Build together',beats:2,tone:'dark'}))}
     const named=normalizeReel(raw,{brand:'Figma',concept:'Paper &amp; Ink',seconds:20,art:'editorial'})
+    const fast=normalizeReel(raw,{brand:'Linear',seconds:20,bpm:153,music:'fracture'})
+    const timed=reelProject(createProject('Tempo'),fast)
+    assert.equal(timed.bpm,153);assert.equal(timed.shots.at(-1).at+timed.shots.at(-1).seconds,20)
+    for(const shot of timed.shots)assert.ok(Math.abs(shot.at*153/60-Math.round(shot.at*153/60))<.01,'cuts stay on whole musical beats')
+    assert.throws(()=>normalizeReel(raw,{brand:'Linear',seconds:20,bpm:0}),/tempo/)
+    const sourceClips=[{id:'source'}],hybridRaw={...raw,scenes:raw.scenes.map((s,i)=>[3,6,9].includes(i)?{...s,type:'product',capture:0}:s)}
+    const synced=normalizeReel(hybridRaw,{brand:'Linear',seconds:20,bpm:159,captures:sourceClips})
+    assert.ok(synced.scenes.filter(s=>s.type==='product').every(s=>s.beats>=4),'fast music leaves readable source holds')
+    assert.throws(()=>normalizeReel(hybridRaw,{brand:'Linear',seconds:6,bpm:80,captures:sourceClips}),/Cannot fit/)
     assert.equal(named.concept,'Paper & Ink');assert.equal(named.scenes[0].text,'Figma');assert.equal(named.scenes.at(-1).text,'Figma','a collection title never replaces its brand cards')
     const wordless=normalizeReel({...raw,scenes:raw.scenes.map(s=>({...s,text:s.type==='echo'?'':s.text}))},{brand:'Example',seconds:6})
     assert.equal(wordless.scenes.find((_,i)=>raw.scenes[i].type==='echo').type,'grid','a wordless type beat becomes visible geometry rather than an empty frame')
