@@ -21,11 +21,9 @@ export async function websiteMedia({at,url,minimum=2,onStep=()=>{}}){
    }catch{onStep('A rendered product panel could not be captured; continuing with the available visuals.')}
   }
   const source=page.url(),posters=await page.evaluate(()=>[...new Set([...document.querySelectorAll('video[poster]')].map(v=>v.poster))].filter(p=>/^https?:/.test(p)&&!/customer|testimonial/i.test(p)).slice(0,10))
-  let media=posters.map(url=>({url,kind:'video poster'}))
-  if(media.length<2){
-   const images=await page.evaluate(discoverProductImages)
-   media=[...media,...images].filter((v,i,a)=>/^https?:/.test(v.url)&&a.findIndex(n=>n.url===v.url)===i).slice(0,12)
-  }
+  const images=await page.evaluate(discoverProductImages)
+  // Screenshots remain available even when a page embeds several tutorial videos.
+  const media=[...images,...posters.map(url=>({url,kind:'video poster'}))].filter((v,i,a)=>/^https?:/.test(v.url)&&a.findIndex(n=>n.url===v.url)===i).slice(0,12)
   for(const item of media){
    if(subjects.length>=12)break
    const poster=item.url

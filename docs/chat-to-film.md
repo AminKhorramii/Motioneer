@@ -508,7 +508,8 @@ recordings or an external music model. Existing musical profiles remain availabl
 The landing page remains the primary visual source when `referenceUrls` are supplied. Its
 published product frames and components are captured first; documentation adds supporting
 screenshots. Discovery recognizes rendered HTML/SVG product panels as well as native images
-and video posters. It scrolls the page to settle reveals, captures panels at 2× resolution,
+and video posters. Native screenshots stay ahead of tutorial posters, including pages with
+several videos. It scrolls the page to settle reveals, captures panels at 2× resolution,
 keeps the complete illustration instead of duplicating nested rows, and rejects decorative
 backgrounds. These captures retain the page’s pixels, not editable internal DOM layers.
 A bounded contact sheet allocates room across sources so a large page cannot
