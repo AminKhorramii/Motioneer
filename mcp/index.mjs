@@ -16,7 +16,7 @@
  */
 
 import { spawn } from 'node:child_process'
-import { readFile, writeFile, stat } from 'node:fs/promises'
+import { readFile, writeFile, stat, mkdir } from 'node:fs/promises'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import path from 'node:path'
 
@@ -75,10 +75,14 @@ How people say it, and what to call:
 - "animate this component", with markup pasted: motion.
 - "make it slower", "too long, ten seconds", "drop the footer shot", "put the hero last", "call it Ship Faster": revise with the projectId and only the fields that change. "drop" takes shot numbers from the reply or words from an element's name; "order" takes shot numbers.
 - "add the pricing cards": film again with the same url, pick naming them, and the same pace and seconds.
+- "cinematic", "polished launch film", or "state of the art": film with pace brisk, seconds 24, fps 60, count 8, and the person's creative direction. Prefer complete product interfaces and a coherent story over isolated controls.
+- "make the cards glide more slowly": revise with motionDirection carrying the note and motionElements naming the cards from the last reply. This preserves the cut and creates new motion versions.
 
 When a tool fails its message starts with "Cannot" and ends with "Next:". Relay the reason and the next step as given, and do not invent a different cause. Retry only when the next step says to.
 
 While film runs it can take a minute or two: it opens the site, captures, writes motions, cuts and renders. Say that once, then wait for the result rather than polling or calling it again.
+
+Film and revise also return a storyboard decoded from the final MP4. Look at it before calling the result finished: inspect legibility, framing, repetition and missing content. The numeric verdict checks cuts and blank frames, not artistic quality. Name any remaining limitation plainly. Coverage reports whether the requested captures actually reached the final cut; never describe partial coverage as complete. Use the returned artifact paths to hand over the video and storyboard. If your client supports MCP progress, pass a progressToken to receive the live stages.
 
 Film and revise return the same facts twice: as words, and as structured content with the projectId, the file, every shot numbered with its elements and layout, each element's fate (filmed, rendered empty, no motion with the reason, not captured), the verdict and the repairs it made to itself. Reason from the fields: name a weak shot by number when offering a change, and pass the projectId to revise. When film returns it includes a line measured from the rendered frames, "Verified" or "Checked": how many cuts, how long the shots are, whether anything is blank. Repeat that line, it is the proof the film is what they asked for. If it says the film came out slower than asked, say so plainly and offer to film again with count 6 rather than claiming it is fast. Then relay what it filmed and where the file is in one or two sentences, and offer exactly these three choices, as selectable options if you can present options, otherwise as a short list:
 1. Open the editor, to change the cut, swap a motion or add a title.
@@ -174,6 +178,7 @@ const TOOLS = [
         url: { type: 'string', description: 'The running site or dev server to film, like http://localhost:3000.' },
         dir: { type: 'string', description: 'Absolute project path. The MP4 is saved here; pass it so the file lands where the person is working.' },
         seconds: { type: 'number', description: 'How long the film should be. About 20 by default.' },
+        fps: { type: 'number', enum: [30,60], description: 'Frames per second. 30 by default; use 60 for smooth product movement.' },
         look: { type: 'string', enum: ['subtle', 'expressive', 'bold'], description: 'The single treatment written for each element. Subtle by default, which reads as fast and calm.' },
         count: { type: 'number', description: 'How many elements to film, 1 to 12. Eight by default for a fast film, five for brisk, three for calm; when the page offers fewer, the ones found repeat across the shots.' },
         pace: { type: 'string', enum: ['calm', 'brisk', 'fast'], description: 'How it is cut. fast is many short shots of about a second with short titles, brisk is a demo rhythm, calm is a few long shots. Brisk by default.' },
@@ -221,6 +226,8 @@ const TOOLS = [
         closing: { type: 'string', description: 'A new closing title.' },
         drop: { type: 'array', items: { type: 'string' }, description: 'Shots or elements to remove: a shot number from the reply like "3", or words from an element\'s name like "footer" or "pricing".' },
         order: { type: 'array', items: { type: 'number' }, description: 'Shot numbers in the order they should now come, first ones first; unnamed shots follow.' },
+        motionDirection: { type: 'string', description: 'How to change existing motions. Creates new versions while preserving placement, timing, camera, and audio unless a cut change is also requested.' },
+        motionElements: { type: 'array', items: { type: 'string' }, description: 'Subject IDs or words from element names whose motions should change. Leave out to refine all visible component elements. Requires motionDirection.' },
       },
       required: ['projectId'],
     },
@@ -356,7 +363,7 @@ async function inspect({ url, dir }) {
   return { text, images: seen.sheet ? [seen.sheet] : [], structured: { title: seen.title, source: seen.source, background: seen.colours?.background, elements: seen.candidates.map((c) => ({ index: c.i, role: c.role, section: c.section, width: c.w, height: c.h, image: !!c.image, text: c.text || '', alike: c.alike || 0 })) } }
 }
 
-async function film({ url, dir, seconds, look, count, pick, pace, direction }) {
+async function film({ url, dir, seconds, fps, look, count, pick, pace, direction }, progress = () => {}) {
   if (!url) throw new Error('film needs a url, a running site or dev server like http://localhost:3000.')
   const at = STUDIO_AT()
   const up = await spawnStudio({ url, dir, at })
@@ -380,8 +387,9 @@ async function film({ url, dir, seconds, look, count, pick, pace, direction }) {
   const wantSeconds = Number(seconds) || (wantPace === 'fast' ? 12 : 20)
   // a fast film wants many elements; a calm one a few. the cap is what a render can carry in a few minutes
   const max = Math.max(1, Math.min(12, Number(count) || (wantPace === 'fast' ? 8 : wantPace === 'brisk' ? 5 : 3)))
-  const result = await autofilm({ at, url, pick: String(pick || '').slice(0, 600), direction: String(direction || '').slice(0, 1400), seconds: wantSeconds, look: look || (wantPace === 'calm' ? 'subtle' : 'expressive'), pace: wantPace, max, onStep: (m) => steps.push(m) })
+  const result = await autofilm({ at, url, pick: String(pick || '').slice(0, 600), direction: String(direction || '').slice(0, 1400), seconds: wantSeconds, fps: fps ?? 30, look: look || (wantPace === 'calm' ? 'subtle' : 'expressive'), pace: wantPace, max, onStep: (m) => {steps.push(m);progress(m)} })
   const file = await keepFile(result, dir)
+  const review = await reviewResult(result,file,progress)
   const buf = { length: (await stat(file)).size }
   const { proofLine } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'proof.mjs')).href)
   const verified = proofLine(result.proof)
@@ -389,7 +397,7 @@ async function film({ url, dir, seconds, look, count, pick, pace, direction }) {
   const mended = result.repairs?.length ? ` It mended itself once before the final render: ${result.repairs.join('; ')}.` : ''
   const fates = result.elements.filter((e) => e.status !== 'filmed')
   const leftOut = fates.length ? ` Left out: ${fates.map((e) => `${e.name} (${e.status})`).join('; ')}.` : ''
-  return { structured, text: `Filmed ${result.captured} element${result.captured === 1 ? '' : 's'} from ${url}${result.product ? `, "${result.product}",` : ''} into a ${Math.round(result.seconds)} second ${wantPace} film`
+  return { structured, images: review ? [review] : [], text: `Filmed ${result.distinct} of ${result.elements.length} selected element${result.elements.length === 1 ? '' : 's'} from ${url}${result.product ? `, "${result.product}",` : ''} into a ${Math.round(result.seconds)} second ${wantPace} film`
     + `${result.opening ? ` titled "${result.opening}"` : ''}, ${result.shots} shots of ${result.distinct} distinct element${result.distinct === 1 ? '' : 's'} in ${result.layouts} layout${result.layouts === 1 ? '' : 's'}, saved to ${file} (${(buf.length / 1e6).toFixed(1)} MB). ${verified} The studio is still open at ${at}. What it did: ${steps.join(' ')}\n\n`
     + mended + leftOut + ` The shots are numbered in the structured result; revise with this projectId (${result.projectId}) changes the cut without filming again. `
     + `Now offer the person these three choices, as options if you can: open the editor, open the video, or continue chatting. `
@@ -399,10 +407,20 @@ async function film({ url, dir, seconds, look, count, pick, pace, direction }) {
 /** The rendered file, moved from where the driver measured it to where the person works. */
 async function keepFile(result, dir) {
   const outDir = dir && path.isAbsolute(dir) ? dir : process.cwd()
+  await mkdir(outDir,{recursive:true})
   const file = path.join(outDir, `motioneer-film-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.mp4`)
   const buf = result.file ? await readFile(result.file).catch(() => null) : null
   await writeFile(file, buf || Buffer.from(await (await fetch(result.url)).arrayBuffer()))
   return file
+}
+
+async function reviewResult(result,file,progress) {
+  progress('Inspecting frames from the finished video.')
+  try {
+    const {reviewFilm}=await import(pathToFileURL(path.join(ROOT,'tools','editor','review.mjs')).href)
+    const review=await reviewFilm(file,{shots:result.shotList,seconds:result.seconds})
+    result.storyboard=review.path;return review
+  } catch(e) {result.reviewError=String(e.message||e);return null}
 }
 
 /** The same facts as fields: what an agent reasons about between one film and the next. */
@@ -412,6 +430,10 @@ function shape(result, file, pace) {
     titles: { opening: result.opening || '', closing: result.closing || '' }, background: result.background,
     shots: (result.shotList || []).map((s) => ({ shot: s.shot, at: s.at, seconds: s.seconds, elements: s.elements, layout: s.layout })),
     elements: result.elements || [],
+    coverage: {selected:result.elements?.length || 0,filmed:result.distinct,complete:(result.elements || []).every(e=>e.status==='filmed')},
+    planning: result.byModel === undefined ? 'existing cut' : result.byModel ? 'model' : 'prominence fallback',
+    artifacts: {video:file,storyboard:result.storyboard || null},
+    reviewError: result.reviewError || null,
     verdict: { ok: !!result.proof?.ok, notes: result.proof?.notes || [], cuts: result.proof?.cuts, arriveMs: result.proof?.arriveMs, blank: result.proof?.blank },
     repairs: result.repairs || result.changes || [],
     next: ['open the editor', 'open the video', 'revise: pace, seconds, titles, drop, order', 'film again with pick to add elements'],
@@ -422,16 +444,17 @@ function shape(result, file, pace) {
  * A film changed rather than remade. The studio that made it is still open with the project,
  * so this goes straight to the cut and the render, and comes back in the time a render takes.
  */
-async function revise({ projectId, dir, pace, seconds, opening, closing, drop, order }) {
+async function revise({ projectId, dir, pace, seconds, opening, closing, drop, order, motionDirection, motionElements }, progress = () => {}) {
   if (!projectId) throw new Error('Cannot revise: revise needs the projectId a film returned. Next: pass it, or film first.')
   const at = STUDIO_AT()
   if (!(await answering(at))) throw new Error(`Cannot revise: the studio at ${at} is not open any more, so the project is not reachable. Next: film again.`)
   const { revise: reviseFilm } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'autofilm.mjs')).href)
   const steps = []
-  const result = await reviseFilm({ at, projectId: String(projectId), pace, seconds, opening, closing, drop, order, onStep: (m) => steps.push(m) })
+  const result = await reviseFilm({ at, projectId: String(projectId), pace, seconds, opening, closing, drop, order, motionDirection, motionElements, onStep: (m) => {steps.push(m);progress(m)} })
   const file = await keepFile(result, dir)
+  const review=await reviewResult(result,file,progress)
   const { proofLine } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'proof.mjs')).href)
-  return { structured: shape(result, file, result.pace), text: `Revised the film: ${result.changes.join('; ') || 'cut again as it was'}. Now ${result.shots} shots of ${result.distinct} element${result.distinct === 1 ? '' : 's'} in ${Math.round(result.seconds)} seconds, ${result.pace}, saved to ${file}. ${proofLine(result.proof)} `
+  return { structured: shape(result, file, result.pace), images: review ? [review] : [], text: `Revised the film: ${result.changes.join('; ') || 'cut again as it was'}. Now ${result.shots} shots of ${result.distinct} element${result.distinct === 1 ? '' : 's'} in ${Math.round(result.seconds)} seconds, ${result.pace}, saved to ${file}. ${proofLine(result.proof)} `
     + `Offer the same three choices: open the editor, open the video, or continue chatting; the video is at "${file}".` }
 }
 
@@ -459,6 +482,12 @@ async function motion(args) {
   // the markup is what the selectors have to name, so it goes over whole rather than summarised
   const seen = html.slice(0, 6000)
   const styles = args?.css ? `\n\nIts stylesheet, for the timing to fit:\n${String(args.css).slice(0, 4000)}` : ''
+  let browserPromise
+  const browserForChecks=()=>browserPromise ||= (async()=>{
+    const {loadChromium}=await import(pathToFileURL(path.join(ROOT,'tools','editor','render.mjs')).href)
+    const installed=await loadChromium(), chromium=installed || (await import('playwright').catch(()=>null))?.chromium
+    return chromium ? chromium.launch(installed?{channel:'chromium'}:{}) : null
+  })().catch(()=>null)
 
   /**
    * How many distinct frames a component shows over four seconds with a stylesheet applied.
@@ -478,15 +507,13 @@ async function motion(args) {
      * were watched and which were only read, because a check reported as done when it was skipped
      * is the one kind of green this repository refuses to print.
      */
-    const pw = await import('playwright').catch(() => null)
-    if (!pw) return null
-    const { chromium } = pw
-    const browser = await chromium.launch()
+    const browser = await browserForChecks()
+    if(!browser)return null
+    const ctx = await browser.newContext({ viewport: { width: 420, height: 420 } })
     try {
-      const ctx = await browser.newContext({ viewport: { width: 420, height: 420 } })
       const tab = await ctx.newPage()
       const scoped = scope ? markup.replace(/<(\w+)/, `<$1 ${scope}`) : markup
-      await tab.setContent(`<style>${css}</style>${scoped}`, { waitUntil: 'load' })
+      await tab.setContent(`<style>${core.safeStyle(args?.css || '')}\n${css}</style>${scoped}`, { waitUntil: 'load' })
       const shots = new Set()
       for (let i = 0; i < 8; i++) {
         await tab.waitForTimeout(i === 0 ? 60 : 480)
@@ -494,7 +521,7 @@ async function motion(args) {
       }
       return { distinct: shots.size }
     } finally {
-      await browser.close()
+      await ctx.close()
     }
   }
 
@@ -540,6 +567,7 @@ async function motion(args) {
     }
     return { ...t, distinct: seen.distinct }
   }))
+  await browserPromise?.then(b=>b?.close()).catch(()=>{})
 
   const kept = watched.filter((t) => t && !t.faults.length)
   const dropped = tried.filter((t) => t && t.faults.length)
@@ -584,12 +612,15 @@ async function motion(args) {
         + 'selectors are known to match and the movement is known to be visible.')
 }
 
-async function call(name, args, id) {
+async function call(name, args, id, meta) {
+  let step=0
+  const progress=message=>{if(typeof meta?.progressToken==='string'||typeof meta?.progressToken==='number')send({jsonrpc:'2.0',method:'notifications/progress',params:{progressToken:meta.progressToken,progress:step++,message}})}
+  if(name==='film'||name==='revise')progress('Preparing the film workspace.')
   if (name === 'studio') return ok(id, await studio(args ?? {}))
   if (name === 'motion') return ok(id, await motion(args ?? {}))
-  if (name === 'film') return ok(id, await film(args ?? {}))
+  if (name === 'film') return ok(id, await film(args ?? {},progress))
   if (name === 'inspect') return ok(id, await inspect(args ?? {}))
-  if (name === 'revise') return ok(id, await revise(args ?? {}))
+  if (name === 'revise') return ok(id, await revise(args ?? {},progress))
   if (name === 'open') return ok(id, await open(args ?? {}))
   /**
    * A name nobody serves is answered rather than ignored.
@@ -649,7 +680,7 @@ process.stdin.on('data', async (chunk) => {
     } else if (msg.method === 'tools/list') {
       send({ jsonrpc: '2.0', id: msg.id, result: { tools: TOOLS } })
     } else if (msg.method === 'tools/call') {
-      await call(msg.params?.name, msg.params?.arguments, msg.id).catch((e) =>
+      await call(msg.params?.name, msg.params?.arguments, msg.id, msg.params?._meta).catch((e) =>
         fail(msg.id, String(e instanceof Error ? e.message : e).slice(0, 300)),
       )
     } else if (msg.id !== undefined) {

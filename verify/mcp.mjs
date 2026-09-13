@@ -52,6 +52,7 @@ const mcp = spawn('node', ['mcp/index.mjs'], {
   env: { ...process.env, MOTIONEER_PORT: String(PORT), MOTIONEER_NO_OPEN: '1' },
 })
 const waiting = new Map()
+const notifications = []
 let buf = ''
 mcp.stdout.on('data', (d) => {
   buf += d
@@ -60,6 +61,7 @@ mcp.stdout.on('data', (d) => {
   for (const line of lines) {
     try {
       const m = JSON.parse(line)
+      if(m.method==='notifications/progress')notifications.push(m.params)
       if (waiting.has(m.id)) { waiting.get(m.id)(m); waiting.delete(m.id) }
     } catch { /* a log line rather than a message */ }
   }
@@ -121,6 +123,15 @@ const noProject = await callTool('revise', {})
 ok('revise without a project says what it cannot do and what to do next', noProject.isError && /^Cannot revise/.test(noProject.text) && /Next:/.test(noProject.text), noProject.text)
 ok('revise takes drop and order, since a reaction to a film is a change to its shots',
   !!tools.find((t) => t.name === 'revise')?.inputSchema?.properties?.drop && !!tools.find((t) => t.name === 'revise')?.inputSchema?.properties?.order)
+ok('film offers 60 fps and revision can change motion without recapturing',
+  tools.find(t=>t.name==='film')?.inputSchema?.properties?.fps?.enum.includes(60)
+  && tools.find(t=>t.name==='revise')?.inputSchema?.properties?.motionDirection
+  && tools.find(t=>t.name==='revise')?.inputSchema?.properties?.motionElements)
+ok('agents are told to review the delivered frames and disclose partial coverage',
+  /storyboard decoded from the final MP4/.test(hello.result.instructions) && /partial coverage/.test(hello.result.instructions))
+const tracked=await rpc('tools/call',{name:'revise',arguments:{},_meta:{progressToken:'review-test'}})
+ok('a long tool carries correlated progress without losing its terminal error',
+  tracked.result?.isError && notifications.some(n=>n.progressToken==='review-test'&&n.progress===0&&n.message))
 const noUrl = await callTool('inspect', {})
 ok('inspect without a url says what it cannot do and what to do next', noUrl.isError && /^Cannot/.test(noUrl.text) && /Next:/.test(noUrl.text), noUrl.text.slice(0, 70))
 

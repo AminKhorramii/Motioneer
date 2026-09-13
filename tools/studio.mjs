@@ -23,6 +23,7 @@
  */
 
 import { editorRoutes } from './editor/routes.mjs'
+import { loadChromium } from './editor/render.mjs'
 import { createServer } from 'node:http'
 import net from 'node:net'
 import { randomUUID } from 'node:crypto'
@@ -31,6 +32,7 @@ import { spawn } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { hasClaude } from '../shared/cli.mjs'
+import { componentBrief, briefStyles } from '../shared/component-brief.mjs'
 import { isLocal, allowed } from '../shared/guard.mjs'
 import { page } from '../shared/page.mjs'
 import { PROVIDERS, write as askProvider, check as checkProvider, publicly, missing, resolve }
@@ -1101,16 +1103,24 @@ if(framed) parent.postMessage({motioneer:'ready'},'*'); else arm(true);
  * playwright is a devDependency of this repo and absent from the published package, so it is imported
  * only when reached and its absence is a skipped check rather than a crash.
  */
-let lens = null
+let lens = null, lensWhy = ''
 async function eyes() {
   if (lens !== null) return lens
-  try {
-    const { chromium } = await import('playwright')
-    lens = { browser: await chromium.launch() }
-  } catch { lens = { why: 'playwright is not installed here, so the rendered check did not run' } }
-  // said once, because a check that quietly does not run is worse than one that is not there
-  console.log(lens.browser ? '  rendering each option once to check it comes to rest where it started'
-    : `  ${lens.why}`)
+  // The export installs full Chromium, without the headless shell. The old default launch
+  // skipped validation on that installation, and parallel calls also launched a browser each.
+  lens = (async () => {
+    try {
+      const installed = await loadChromium()
+      const chromium = installed || (await import('playwright')).chromium
+      const browser = await chromium.launch(installed ? {channel:'chromium'} : {})
+      console.log('  rendering each option once to check it comes to rest where it started')
+      return {browser}
+    } catch (e) {
+      const why = 'The motion check could not open a browser: ' + String(e.message || e).split('\n')[0].slice(0,160)
+      if(why!==lensWhy){console.log('  '+why);lensWhy=why}
+      lens=null;return {why}
+    }
+  })()
   return lens
 }
 
@@ -2478,7 +2488,7 @@ const editor = editorRoutes({
   generate: async ({ subject, brief: rawBrief, treatment, previous }, signal) => {
     if (!subject || typeof subject.html !== 'string' || !subject.html.trim()) throw new Error('Pick a component before generating motion.')
     const brief = motionBrief(rawBrief), direction = motionDirection(brief, treatment)
-    const about = `The captured component:\n${subject.html.slice(0, 14000)}\nIts CSS:\n${String(subject.css || '').slice(0, 6000)}\n${direction}`
+    const about = `The captured component, with embedded pixels and hidden responsive copies omitted so its visible structure can be read:\n${componentBrief(subject.html)}\nIts CSS:\n${briefStyles(subject.css)}\n${direction}`
       + (previous ? `\nRefine this existing motion, preserving its idea unless the direction requests otherwise:\n${String(previous.css).slice(0, 10000)}` : '')
     let why = ''
     for (let i = 0; i < 2; i++) {

@@ -34,7 +34,7 @@ export const PROVIDERS = [
     needs: [],
     browser: false,
     local: true,
-    models: ['claude-sonnet-5', 'claude-opus-4-8', 'claude-haiku-4-5-20251001'],
+    models: ['sonnet', 'opus', 'haiku'],
     note: 'Uses the claude command already signed in here, so there is no key to paste.',
   },
   {

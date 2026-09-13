@@ -14,6 +14,7 @@ shared/                everything the studio uses that is not the room itself
   model.mjs            which service writes the motion, and the catalogue of the ones it can
   providers.mjs        the two wire formats worth speaking, since most vendors speak one of them
   cli.mjs              the claude command, when that is what is writing
+  component-brief.mjs   visible capture structure for the model, with frozen pixels and hidden responsive copies omitted
   guard.mjs            what the proxy may fetch, which matters the moment this is not on a laptop
   raster.mjs           a document drawn to a canvas at a chosen instant, for filming
   mp4.mjs              those canvases encoded, with a muxer, because a browser has no mp4 writer
@@ -31,6 +32,8 @@ mcp/
 
 tools/editor/
   autofilm.mjs         the headless driver behind film, inspect and revise: the plan it asks the model for with a contact sheet, the repair round the proof drives, and the cut read back for a revision
+  survey.mjs           page discovery and capture preparation: complete product scenes, representative candidates, and their contact sheet
+  review.mjs           a storyboard decoded from the delivered MP4, returned to the agent for visual review
   proof.mjs            a rendered film measured off its frames: cuts, shot length, blank frames
 
 site/

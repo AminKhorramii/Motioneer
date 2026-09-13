@@ -9,18 +9,41 @@
  */
 import { createServer } from 'node:http'
 import { spawn } from 'node:child_process'
-import { mkdtemp, mkdir, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, writeFile, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import assert from 'node:assert'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { autofilm, inspectSite } from '../tools/editor/autofilm.mjs'
+import { candidates } from '../tools/editor/survey.mjs'
+import { componentBrief, briefStyles } from '../shared/component-brief.mjs'
+import { reviewFilm } from '../tools/editor/review.mjs'
 import { loadChromium } from '../tools/editor/render.mjs'
 import { proveFilm } from '../tools/editor/proof.mjs'
 import { firstCut, createProject, compositionDocument } from '../dist-core/core.js'
 
 const root = path.dirname(fileURLToPath(new URL('.', import.meta.url)))
 if (!(await loadChromium())) { console.log('skip: the local renderer is not installed, so the film path cannot be exercised here'); process.exit(0) }
+
+// Linear's frozen pixels and mobile copy occupied the prompt before its desktop panels appeared.
+{
+  const markup='<div><div style="display:none"><p>Hidden mobile copy</p></div><img src="data:image/png;base64,'+'a'.repeat(50000)+'"><svg><path d="'+'x'.repeat(50000)+'"></path></svg><section class="desktop"><h2 title="a > b">Visible review panels</h2><p>Actual product content</p></section></div>'
+  const brief=componentBrief(markup)
+  assert.ok(brief.includes('Visible review panels')&&brief.includes('Actual product content')&&!brief.includes('Hidden mobile copy')&&!brief.includes('data:image'),'the model sees the visible content after embedded assets')
+  assert.ok(brief.length<1000 && brief.endsWith('</div>'))
+  assert.ok(briefStyles('@font-face{src:url("data:font/woff2;base64,'+'a'.repeat(9000)+'")} .desktop{color:red}').includes('.desktop{color:red}'))
+  const browser=await(await loadChromium()).launch({channel:'chromium'})
+  try {
+    const page=await browser.newPage({viewport:{width:1280,height:900}})
+    await page.setContent(`<body style="margin:0"><h1>Product for teams</h1><div style="display:flex;flex-wrap:wrap">${Array.from({length:55},(_,i)=>`<article class="card" style="width:210px;height:115px"><h3>Issue ${i}</h3><p>Small task</p></article>`).join('')}</div><section><h2>Planning and monitoring</h2><div class="product-illustration" style="width:1000px;height:620px"><p>Roadmap</p><p>Milestones</p><p>Cycle time</p><svg></svg></div></section><section><h2>AI and automations</h2><div class="agent-preview" style="width:1000px;height:620px"><p>Agent one</p><p>Agent two</p><p>Review</p></div></section></body>`)
+    const found=await candidates(page)
+    assert.ok(found.some(c=>c.scene&&c.text==='Planning and monitoring product interface'),'a complete scene is found after more than forty cards')
+    assert.ok(found.some(c=>c.scene&&c.text==='AI and automations product interface'),'later sections receive attention')
+    assert.ok(found.some(c=>c.scene&&c.matchText==='Roadmap Milestones Cycle time'),'a scene keeps its actual text so it can be found after the page rerenders')
+    assert.ok(found.length<=32 && found.filter(c=>c.text==='Cycle time').length===0,'inner controls do not replace a complete scene')
+  } finally {await browser.close()}
+  console.log('ok: complete product scenes survive a long page and the model reads visible structure instead of embedded pixels')
+}
 
 // the cut's rhythm, before any browser: fast means many short shots and short titles
 {
@@ -68,7 +91,7 @@ const temp = await mkdtemp(path.join(tmpdir(), 'motioneer-film-'))
 await mkdir(path.join(temp, '.studio'), { recursive: true })
 
 // how many model turns carried a picture, since the planner is meant to see the page
-let sheets = 0
+let sheets = 0, refusedCalls = 0, recoveredCalls = 0
 
 const prompts = []
 const model = createServer(async (req, res) => {
@@ -91,8 +114,13 @@ const model = createServer(async (req, res) => {
   }
   const kind = /Treatment: bold/.test(prompt) ? 'bold' : /Treatment: subtle/.test(prompt) ? 'subtle' : 'expressive'
   // the root arrives and its parts follow, the way a gated motion does; a sheet that moved only children would leave a childless block popping in
-  const css = '@media (prefers-reduced-motion: no-preference){[data-mn]{animation:rise 900ms ease-out both}[data-mn] > *{animation:rise 900ms ease-out both}'
+  let css = '@media (prefers-reduced-motion: no-preference){[data-mn]{animation:rise 900ms ease-out both}[data-mn] > *{animation:rise 900ms ease-out both}'
     + '[data-mn] > :nth-child(2){animation-delay:120ms}[data-mn] > :nth-child(3){animation-delay:240ms}@keyframes rise{from{transform:translateY(14px);opacity:0}to{transform:none;opacity:1}}}'
+  // Both server attempts fail first. The editor retry must wait for its new task, not read the old failure.
+  if (/Everything in one place/.test(prompt) && refusedCalls < 2) {
+    refusedCalls++
+    css = '@media (prefers-reduced-motion: no-preference){:root{animation:bad 900ms both}@keyframes bad{from{opacity:0}to{opacity:1}}}'
+  } else if (/A previous attempt was refused/.test(prompt)) { recoveredCalls++; await new Promise(r=>setTimeout(r,800)) }
   res.writeHead(200, { 'content-type': 'text/event-stream' })
   res.end('data: ' + JSON.stringify({ choices: [{ delta: { content: JSON.stringify({ css, scope: 'data-mn', note: kind + ' rise' }) } }] }) + '\n\ndata: [DONE]\n\n')
 })
@@ -132,6 +160,7 @@ try {
   assert.equal(before.source, null, 'the studio should start aimed at nothing, so the aim is what is being proved')
   const result = await autofilm({ at, url: siteAt, seconds: 12, look: 'subtle', pace: 'fast', max: 2, pick: 'the card and the headline', direction: 'calm confidence, every arrival settles like paper on a desk', onStep: (m) => { steps.push(m); if (process.env.MOTIONEER_STEPS) console.log('  step', m) } })
   assert.equal(result.captured, 2, 'both chosen elements should be captured')
+  assert.equal(refusedCalls,2); assert.ok(recoveredCalls>0 && result.elements.every(e=>e.status==='filmed'),'a delayed retry must reach the final cut')
   assert.ok(result.byModel, 'the plan should have come from the model through the studio, not the fallback')
   assert.ok(sheets >= 1, 'the planner should have been shown a contact sheet of the candidates')
   assert.equal(result.opening, 'Ship it with confidence', 'the opening title should be the model\'s words')
@@ -251,6 +280,35 @@ try {
   assert.ok(revised.layouts >= 2, `the revision should keep the plan's layouts, got ${revised.layouts}`)
   assert.ok(revised.proof && revised.proof.cuts === revised.cutTimes.length, `every cut of the revision should show in its frames: ${JSON.stringify(revised.proof?.notes)}`)
   console.log(`ok: revised to ${revised.shots} shots in ${revised.seconds}s with ${revised.layouts} layouts, ${revised.changes.join('; ')}`)
+  // A motion note preserves the hand edit and creates a recoverable new version, without recapturing.
+  let hand = await (await fetch(`${at}/__motioneer/projects/${result.projectId}`)).json()
+  hand.camera=[{at:0,duration:9000,x:.1,y:0,scale:1.01,ease:'linear'}];hand.settings.fps=60
+  const selected=hand.tracks.find(t=>t.kind==='component');selected.x+=1
+  const alternative={...hand.motions.find(m=>m.id===selected.motionId),id:crypto.randomUUID(),treatment:'bold'}
+  hand.motions.push(alternative)
+  const alternateTrack={...selected,id:crypto.randomUUID(),motionId:alternative.id,start:selected.start+100,duration:Math.max(200,selected.duration-100),x:selected.x+2}
+  const hiddenTrack={...selected,id:crypto.randomUUID(),hidden:true}
+  hand.tracks.push(alternateTrack,hiddenTrack)
+  hand=await(await fetch(`${at}/__motioneer/projects/${hand.id}`,{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(hand)})).json()
+  await assert.rejects(()=>revise({at,projectId:hand.id,motionDirection:'glide gently',motionElements:['a missing element']}),/none of those elements/)
+  assert.equal((await(await fetch(`${at}/__motioneer/projects/${hand.id}`)).json()).revision,hand.revision,'an unmatched note must not save')
+  const refined=await revise({at,projectId:hand.id,motionDirection:'a slower paper glide, preserve the structure',motionElements:[selected.subjectId]})
+  const after=await(await fetch(`${at}/__motioneer/projects/${hand.id}`)).json()
+  const withoutMotion=tracks=>tracks.map(({motionId,...t})=>t)
+  assert.deepEqual(withoutMotion(after.tracks),withoutMotion(hand.tracks),'motion refinement preserves every placement and timing value')
+  assert.deepEqual(after.camera,hand.camera);assert.deepEqual(after.settings,hand.settings)
+  assert.ok(after.motions.length>hand.motions.length && after.tracks.find(t=>t.id===selected.id).motionId!==selected.motionId)
+  const revisedMotion=t=>after.motions.find(m=>m.id===after.tracks.find(n=>n.id===t.id).motionId)
+  assert.equal(revisedMotion(selected).parentId,selected.motionId)
+  assert.equal(revisedMotion(alternateTrack).parentId,alternative.id,'each used treatment refines its own previous version')
+  assert.notEqual(revisedMotion(selected).id,revisedMotion(alternateTrack).id,'different treatments remain different')
+  assert.equal(after.tracks.find(t=>t.id===hiddenTrack.id).motionId,hiddenTrack.motionId,'hidden layers keep their motion')
+  for(const m of hand.motions)assert.equal(after.motions.find(n=>n.id===m.id).css,m.css,'existing generated CSS stays immutable')
+  assert.deepEqual(after.arrangements.at(-1).tracks,hand.tracks);assert.deepEqual(after.arrangements.at(-1).settings,hand.settings)
+  const review=await reviewFilm(refined.file,{shots:refined.shotList,seconds:refined.seconds})
+  assert.ok((await stat(review.path)).size>5000 && review.data && review.samples.length>=3,'the agent receives a storyboard from the rendered MP4')
+  console.log('ok: motion notes preserve the edit, save the previous arrangement, and return a rendered storyboard')
+
 
   /**
    * The verdict mends before it reports. Handed a proof that calls the first shot empty, the

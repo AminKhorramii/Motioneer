@@ -524,6 +524,7 @@ export function judgeMotion(raw: { css?: unknown; scope?: string; note?: unknown
   const clean = safeStyle(raw.css)
   if (!clean) return { why: 'The reply carried no usable motion CSS.' }
   const scope = scopeOf(clean, raw.scope ?? fallbackScope), css = namespaced(clean, scope)
+  if (!scope) return { why: 'The motion needs a data attribute selector on the captured component. A global selector such as :root cannot be saved as a scoped motion.' }
   const faults = [...unmoved({html:'',css,note:''},{parts}), ...brittle(css), ...janky(css), ...unstill(css), ...leaks(css,scope)]
   if (faults.length) return { why: faults[0] }
   return { css, scope, note: String(raw.note ?? '').slice(0, 150) }

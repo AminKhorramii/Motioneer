@@ -22,10 +22,31 @@ The whole loop is now one MCP tool. `film` takes a url and returns the path to a
 choosing what to film with the model and cutting and rendering with no clicks. The steps below
 are what it does inside, and what an agent can still drive one at a time when it wants control.
 
+In Claude Code, a complete starting prompt is:
+
+> Make a polished 24-second launch film from https://linear.app at 60 fps. Keep its typography
+> and dark surfaces. Show the complete product interfaces, then their details. Review the
+> rendered storyboard before handing it over.
+
+The agent passes the creative direction to `film`, receives live progress when it supplies an
+MCP `_meta.progressToken`, and gets the MP4, a storyboard decoded from that MP4, and structured
+coverage and frame checks. Claude CLI uses its supported `sonnet`, `opus`, and `haiku` aliases
+by default, so a new setup follows the models available in the installed CLI.
+
+For a note such as "make the planning panels glide more slowly", call `revise` with
+`motionDirection` and `motionElements` (subject IDs or words from the returned element names).
+It creates new motion versions and updates their clip references, preserving placement, timing,
+camera, and audio when no cut change is requested. Every revision saves the previous tracks,
+camera, and film settings as an arrangement. A rejected refinement leaves the saved film intact.
+
+The storyboard is for visual judgment; the numeric verdict checks cuts, arrival, and blank
+frames. Neither is a claim of artistic quality. Report partial coverage and capture warnings,
+and inspect cropped text, weak contrast, and repeated shots before calling a film finished.
+
 | Step | How an agent does it |
 | --- | --- |
 | Look first | `inspect` MCP tool with `{ url }` lists what is worth filming, by role and section |
-| The whole thing | `film` MCP tool with `{ url, pace?, pick?, seconds?, look?, count? }` returns an MP4 path and a measured verdict |
+| The whole thing | `film` MCP tool with `{ url, pace?, pick?, seconds?, fps?, look?, count?, direction? }` returns an MP4, storyboard, coverage, and measured verdict |
 | Open a site | `POST /__motioneer/target` with `{ "url": "…" }`, or the `studio` tool |
 | Capture an element | the `film` tool does it headless; by hand it is the picker or the bookmarklet |
 | Write three motions | `POST /__motioneer/generate` with the captured subject, a brief and a treatment |

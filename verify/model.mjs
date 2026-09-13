@@ -17,12 +17,17 @@ import { createServer } from 'node:http'
 import { readFileSync } from 'node:fs'
 import { PROVIDERS, providerById, resolve, missing, publicly, write, check } from '../shared/model.mjs'
 import { REQUESTS } from '../shared/providers.mjs'
+import { judgeMotion } from '../dist-core/core.js'
 
 let bad = 0
 const ok = (how, cond, detail = '') => {
   console.log(`  ${cond ? 'ok  ' : 'FAIL'} ${how}${detail ? `  ${detail}` : ''}`)
   if (!cond) bad++
 }
+
+// A declared scope without a selector once bypassed leak detection and failed only when saved.
+const globalMotion=judgeMotion({scope:'data-mn',css:'@media (prefers-reduced-motion:no-preference){:root{animation:rise 900ms both}@keyframes rise{from{opacity:0}to{opacity:1}}}'})
+ok('an unscoped motion is rejected before it can reach the project',!globalMotion.css&&/data attribute selector/.test(globalMotion.why||''))
 
 /* ── a server that answers in both formats, so the round trip is real ─────────────────────────── */
 const seen = []
