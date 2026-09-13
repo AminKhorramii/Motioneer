@@ -6,6 +6,38 @@ a route or a tool, so this page is the map an agent follows today and the two ga
 need a person's hand. It is written for whoever drives the tool from a conversation, whether that
 is Claude Code through the MCP server or a script through the HTTP routes.
 
+## Artistic brand films
+
+For kinetic typography and graphic identity films, use the `reel` MCP tool. It plans an original
+visual concept, builds 8 to 20 animated scenes, scores their beat grid with synthesized percussion,
+and returns a 1080p, 60 fps MP4 and a storyboard. Duration is 6 to 30 seconds, defaulting to 12.
+Each scene is an ordinary editable component clip; the film uses the same preview and export
+renderer as a captured film. Creating a reel always creates a new project.
+Concurrent prompts wait for the studio export slot, with progress messages, instead of losing
+the completed plan to a busy-renderer error. Cancelling an export reports promptly.
+
+> Make a 12-second artistic brand reel for Linear, linear.app. Precision becomes momentum:
+> orbital paths align, giant Focus / Align / Move / Ship typography, violet on near-black,
+> extreme scale changes, purposeful bursts and a clear final hold. Use reel and review its
+> rendered storyboard before delivery.
+
+Pass `brand`, `domain`, `direction`, optional `seconds`, optional `palette` (three six-digit hex
+colors: dark, accent, paper), and an absolute output `dir`. An optional `projectId` grounds the
+planner in the names of existing captures without changing that project. These are authored
+illustrative brand graphics, not captured product interfaces or official brand campaign assets.
+Use `film` when the person wants to show the actual website or product UI.
+
+The choreography vocabulary includes impact type, typographic echoes, orbital linework, modular
+grids, ribbons, node diagrams, spatial tunnels, splits, card stacks, bursts and a brand/domain
+resolve. The planner chooses their sequence, words, palette, motif and beat lengths. It uses the
+studio's configured provider, including Claude CLI, so ordinary prompts use the same production
+path as the example renders. Results vary with the model's creative plan.
+
+Review the storyboard and sample motion within shots. Numeric proof catches missing cuts and
+blank frames, not artistic quality. For another creative direction call `reel` again, preserving
+the previous version. Do not use generic `revise` to recut a reel: that operation builds a
+capture-style sequence, so the tool refuses authored reels before changing them. See [kinetic reel prompts](kinetic-examples.md).
+
 ## What is there today
 
 Start the studio on the site. It proxies the page so the picker can read it, and it serves the

@@ -59,9 +59,16 @@ export async function planFilm({ at, title, source, cands, pick, max, pace = 'br
  * Render a project through the studio and hand back the file's url. Every frame is a real
  * browser, so a short film takes about a minute; twenty minutes is the ceiling.
  */
-async function renderProject(at, id, onStep) {
+export async function renderProject(at, id, onStep = () => {}) {
   onStep('Rendering. This runs a real browser for every frame and takes about a minute for a short film.')
-  const start = await (await fetch(`${at}/__motioneer/projects/${id}/renders`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).json()
+  let start
+  for (let n = 0; n < 600; n++) {
+    const response = await fetch(`${at}/__motioneer/projects/${id}/renders`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
+    start = await response.json()
+    if (response.status !== 409 || !/export is already running/i.test(start.error || '')) break
+    if (n % 15 === 0) onStep('Waiting for the current export to finish. Your film is saved.')
+    await new Promise(r => setTimeout(r, 2000))
+  }
   if (start.error) throw new Error(`Cannot render: ${start.error} Next: wait for the running export to finish, or cancel it in the studio.`)
   let reported = -1
   for (let n = 0; n < 600; n++) {
@@ -72,6 +79,7 @@ async function renderProject(at, id, onStep) {
     const percent = job.total ? Math.floor(10 * job.done / job.total) * 10 : 0
     if (percent > reported) {reported=percent;onStep(`Exporting ${percent} percent.`)}
     if (job.state === 'error') throw new Error(`Cannot render: ${job.message || 'the render failed'}. Next: open the studio and export from there to see the frame it stopped on.`)
+    if (job.state === 'cancelled') throw new Error('Cannot render: the export was cancelled. Next: export the saved project when ready.')
     if (job.state === 'complete') return { jobId: job.id, url: `${at}${job.url}` }
   }
   throw new Error('Cannot render: it did not finish in twenty minutes. Next: open the studio, the export is still listed there.')
@@ -526,6 +534,7 @@ export async function revise({ at, projectId, pace, seconds, opening, closing, d
   if(fps!==undefined&&![30,60].includes(fps))throw new Error('Cannot revise: frame rate must be 30 or 60. Next: choose one of those frame rates.')
   let project = await (await fetch(`${at}/__motioneer/projects/${projectId}`)).json()
   if (!project || project.error || !Array.isArray(project.tracks)) throw new Error(`Cannot revise: no project ${projectId} in this studio. Next: film again, or pass the projectId a film returned.`)
+  if (project.tracks.some(t => t.kind === 'component' && project.motions.some(m => m.id === t.motionId && m.scope === 'data-kinetic'))) throw new Error('Cannot revise: this is an authored graphic reel and capture recutting would replace its scene design. Next: use reel with a new direction, or edit its clips in the studio; the saved reel is unchanged.')
   const was = shotList(project)
   if (!was.length) throw new Error('Cannot revise: this project has no shots yet. Next: film first, then revise the result.')
   const avg = was.reduce((a, s) => a + s.seconds, 0) / was.length

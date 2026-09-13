@@ -100,7 +100,7 @@ console.log('\n  what it offers')
 const list = await rpc('tools/list', {})
 const tools = list.result?.tools ?? []
 const names = tools.map((t) => t.name).sort()
-ok('six tools, film, inspect, motion, open, revise and studio', names.join(',') === 'film,inspect,motion,open,revise,studio', names.join(','))
+ok('seven tools, film, inspect, motion, open, reel, revise and studio', names.join(',') === 'film,inspect,motion,open,reel,revise,studio', names.join(','))
 ok('every one has a description an agent can act on',
   tools.every((t) => (t.description ?? '').length > 80))
 ok('every one has an object schema', tools.every((t) => t.inputSchema?.type === 'object'))
@@ -123,6 +123,7 @@ const noProject = await callTool('revise', {})
 ok('revise without a project says what it cannot do and what to do next', noProject.isError && /^Cannot revise/.test(noProject.text) && /Next:/.test(noProject.text), noProject.text)
 ok('revise takes drop and order, since a reaction to a film is a change to its shots',
   !!tools.find((t) => t.name === 'revise')?.inputSchema?.properties?.drop && !!tools.find((t) => t.name === 'revise')?.inputSchema?.properties?.order)
+ok('artistic briefs have an authored reel tool with explicit creative direction',tools.find(t=>t.name==='reel')?.inputSchema?.properties?.direction && /use reel/.test(hello.result.instructions))
 ok('film offers 60 fps and revision can change motion without recapturing',
   tools.find(t=>t.name==='film')?.inputSchema?.properties?.fps?.enum.includes(60)
   && tools.find(t=>t.name==='revise')?.inputSchema?.properties?.motionDirection

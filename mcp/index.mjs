@@ -80,6 +80,8 @@ How people say it, and what to call:
 
 When a tool fails its message starts with "Cannot" and ends with "Next:". Relay the reason and the next step as given, and do not invent a different cause. Retry only when the next step says to.
 
+For super-snappy, artistic brand films, kinetic typography, motion-identity references, or crazy creative launch videos, use reel. Ground the brief in a distinct brand metaphor and pass the full direction. Reel authors graphic scenes with typography, diagrams and a matched percussion track; it is a different creative mode from filming captured interfaces. Name its illustrative nature plainly. Use a new reel call for creative revisions, preserving the previous project.
+
 While film runs it can take a minute or two: it opens the site, captures, writes motions, cuts and renders. Say that once, then wait for the result rather than polling or calling it again.
 
 Pass theme dark or light when the creative brief specifies that appearance; this sets the source browser preference, not a recoloring of captured interfaces. Set background and ink when the brief requests a particular stage/title palette; the page preference alone does not set the film canvas. Keep the full creative prompt in direction and honor its requested duration. Pass language as the request's two-letter language code; the tool follows locale links actually present on the page. Do not guess /en or other paths after a locale mismatch.
@@ -188,7 +190,7 @@ const TOOLS = [
         fps: { type: 'number', enum: [30,60], description: 'Frames per second. 60 by default for smooth product movement; 30 for smaller exports.' },
         background: { type: 'string', description: 'Optional six-digit hex stage background, such as #101319. Changes the film canvas, not captured source colors.' },
         ink: { type: 'string', description: 'Optional six-digit hex title color. Without it, titles contrast with the stage background.' },
-        soundtrack: { type: 'string', enum: ['none','ambient','pulse','playful'], description: 'Original synthesized music fitted to the cut. Defaults to ambient for calm films and pulse otherwise. Use playful for a light rhythmic feel, none for silent output.' },
+        soundtrack: { type: 'string', enum: ['none','ambient','pulse','playful','percussive'], description: 'Original synthesized music fitted to the cut. Defaults to ambient for calm films and pulse otherwise. Use playful for a light rhythmic feel, none for silent output.' },
         look: { type: 'string', enum: ['subtle', 'expressive', 'bold'], description: 'The single treatment written for each element. Subtle by default, which reads as fast and calm.' },
         count: { type: 'number', description: 'How many elements to film, 1 to 12. Eight by default for a fast film, five for brisk, three for calm; when the page offers fewer, the ones found repeat across the shots.' },
         pace: { type: 'string', enum: ['calm', 'brisk', 'fast'], description: 'How it is cut. fast is many short shots of about a second with short titles, brisk is a demo rhythm, calm is a few long shots. Brisk by default.' },
@@ -197,6 +199,19 @@ const TOOLS = [
       },
       required: ['url'],
     },
+  },
+  {
+    name: 'reel',
+    description: 'Create an art-directed kinetic brand film with original animated graphics, huge typography, diagrams, spatial motifs, fast cuts and a beat-matched percussion score. Prefer this for artistic, snappy launch films and brand identity reels. These are authored illustrative graphics, not recordings of a product UI. A new editable project preserves the original film.',
+    inputSchema: {type:'object',properties:{
+      brand:{type:'string',minLength:1,maxLength:24,description:'Company or product name.'},
+      domain:{type:'string',description:'Brand domain for the closing card, without protocol.'},
+      projectId:{type:'string',description:'Optional existing film in this studio; its capture names ground the creative plan. It is not modified.'},
+      direction:{type:'string',description:'The full creative brief: concept, metaphors, typography, rhythm, reference observations. Give each brand a distinct idea.'},
+      seconds:{type:'number',minimum:6,maximum:30,description:'6 to 30 seconds, 12 by default.'},
+      palette:{type:'array',minItems:3,maxItems:3,items:{type:'string',pattern:'^#[0-9a-fA-F]{6}$'},description:'Three six-digit hex colors in dark, accent, paper order. Optional; the director chooses when omitted.'},
+      dir:{type:'string',description:'Absolute output folder for the MP4 and storyboard.'}
+    },required:['brand']}
   },
   {
     name: 'inspect',
@@ -241,7 +256,7 @@ const TOOLS = [
         fps: { type: 'number', enum: [30,60], description: 'Change export frame rate without changing the edit.' },
         background: { type: 'string', description: 'Optional six-digit hex stage background, such as #101319. Changes the film canvas, not captured source colors.' },
         ink: { type: 'string', description: 'Optional six-digit hex title color. Without it, titles contrast with the stage background.' },
-        soundtrack: { type: 'string', enum: ['none','ambient','pulse','playful'], description: 'Add or replace the generated score; none removes only the generated score. Existing imported audio is preserved.' },
+        soundtrack: { type: 'string', enum: ['none','ambient','pulse','playful','percussive'], description: 'Add or replace the generated score; none removes only the generated score. Existing imported audio is preserved.' },
         motionDirection: { type: 'string', description: 'How to change existing motions. Creates new versions while preserving placement, timing, camera, and audio unless a cut change is also requested.' },
         motionElements: { type: 'array', items: { type: 'string' }, description: 'Subject IDs or words from element names whose motions should change. Leave out to refine all visible component elements. Requires motionDirection.' },
       },
@@ -418,6 +433,15 @@ async function film({ url, dir, language, theme, captureMode, seconds, fps, soun
     + mended + leftOut + ` The shots are numbered in the structured result; revise with this projectId (${result.projectId}) changes the cut without filming again. `
     + `Review the storyboard before delivery. If it has weak framing or repeated minor elements, use a focused revision or inspect and film again. Then hand over the video and storyboard with any remaining limitations. `
     + `Only call open if the person asks to launch the editor or player.` }
+}
+
+async function reel({brand,domain,projectId,direction,seconds=12,palette,dir},progress=()=>{}) {
+  const at=STUDIO_AT()
+  if(!(await answering(at))&&!(await spawnStudio({url:domain?'https://'+domain:undefined,dir,at})))throw new Error('Cannot make a reel: the studio could not start. Next: open the studio and retry.')
+  const {kineticReel}=await import(pathToFileURL(path.join(ROOT,'tools/editor/kinetic.mjs')).href)
+  const result=await kineticReel({at,brand,domain,projectId,direction,seconds,palette,onStep:progress})
+  const file=await keepFile(result,dir),review=await reviewResult(result,file,progress)
+  return {structured:{projectId:result.projectId,studio:at,file,seconds,fps:60,style:'kinetic',soundtrack:'percussive',bpm:result.bpm,concept:result.plan.concept,plan:result.plan,shots:result.shotList,sourceProjectId:result.sourceProjectId,artifacts:{video:file,storyboard:result.storyboard||null},reviewError:result.reviewError||null,verdict:result.proof,limitation:'Original illustrative brand graphics, not captured product UI.'},images:review?[review]:[],text:`Created ${brand}: ${result.plan.concept}. ${result.shotList.length} authored graphic scenes in ${seconds} seconds, 60 fps, with original percussion. Video: ${file}. Review the storyboard for typography and composition. The original film is preserved. For a new creative direction use reel again; generic revise rebuilds a capture-style cut and is not appropriate for these authored scenes. These are illustrative brand graphics, not actual product screenshots.`}
 }
 
 /** The rendered file, moved from where the driver measured it to where the person works. */
@@ -631,9 +655,10 @@ async function motion(args) {
 async function call(name, args, id, meta) {
   let step=0
   const progress=message=>{if(typeof meta?.progressToken==='string'||typeof meta?.progressToken==='number')send({jsonrpc:'2.0',method:'notifications/progress',params:{progressToken:meta.progressToken,progress:step++,message}})}
-  if(name==='film'||name==='revise')progress('Preparing the film workspace.')
+  if(name==='film'||name==='revise'||name==='reel')progress('Preparing the film workspace.')
   if (name === 'studio') return ok(id, await studio(args ?? {}))
   if (name === 'motion') return ok(id, await motion(args ?? {}))
+  if (name === 'reel') return ok(id, await reel(args ?? {},progress))
   if (name === 'film') return ok(id, await film(args ?? {},progress))
   if (name === 'inspect') return ok(id, await inspect(args ?? {}))
   if (name === 'revise') return ok(id, await revise(args ?? {},progress))

@@ -14,17 +14,45 @@ import { tmpdir } from 'node:os'
 import assert from 'node:assert'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { autofilm, inspectSite } from '../tools/editor/autofilm.mjs'
+import { autofilm, inspectSite, renderProject, revise as reviseFilm } from '../tools/editor/autofilm.mjs'
 import { candidates, reveal } from '../tools/editor/survey.mjs'
 import { componentBrief, briefStyles } from '../shared/component-brief.mjs'
 import { reviewFilm } from '../tools/editor/review.mjs'
 import { withSoundtrack, scoreStyle, scoreWav } from '../tools/editor/soundtrack.mjs'
 import { loadChromium } from '../tools/editor/render.mjs'
+import {normalizeReel,reelProject} from '../tools/editor/kinetic.mjs'
+import {SCENES} from '../tools/editor/kinetic-scenes.mjs'
 import { proveFilm } from '../tools/editor/proof.mjs'
 import { firstCut, createProject, compositionDocument } from '../dist-core/core.js'
 
 const root = path.dirname(fileURLToPath(new URL('.', import.meta.url)))
 if (!(await loadChromium())) { console.log('skip: the local renderer is not installed, so the film path cannot be exercised here'); process.exit(0) }
+
+// Concurrent prompts keep their saved creative work while the shared export slot is busy.
+{
+  let starts=0, cancelled=false
+  const queue=createServer((req,res)=>{
+    res.setHeader('content-type','application/json')
+    if(!req.url.endsWith('/renders'))return res.end(JSON.stringify({tracks:[{kind:'component',motionId:'graphic'}],motions:[{id:'graphic',scope:'data-kinetic'}]}))
+    if(req.method==='POST'){
+      if(++starts===1){res.statusCode=409;return res.end(JSON.stringify({error:'An export is already running. Wait for it or cancel it first.'}))}
+      return res.end(JSON.stringify({id:'export'}))
+    }
+    res.end(JSON.stringify([{id:'export',state:cancelled?'cancelled':'complete',url:'/film.mp4',done:1,total:1}]))
+  })
+  await new Promise(r=>queue.listen(0,'127.0.0.1',r))
+  const origin=`http://127.0.0.1:${queue.address().port}`,steps=[]
+  try {
+    const rendered=await renderProject(origin,'saved-project',m=>steps.push(m))
+    assert.equal(starts,2);assert.equal(rendered.url,origin+'/film.mp4')
+    assert.ok(steps.some(s=>s.includes('Your film is saved')),'queue feedback explains that generation is preserved')
+    cancelled=true
+    await assert.rejects(()=>renderProject(origin,'saved-project'),/export was cancelled/)
+    await assert.rejects(()=>reviseFilm({at:origin,projectId:'saved-project',pace:'fast'}),/authored graphic reel/)
+    assert.equal(starts,3,'capture revision refuses an authored reel before a save or export')
+    console.log('ok: competing prompts wait for export capacity and cancellation reports immediately')
+  } finally {await new Promise(r=>queue.close(r))}
+}
 
 // Linear's frozen pixels and mobile copy occupied the prompt before its desktop panels appeared.
 {
@@ -42,6 +70,26 @@ if (!(await loadChromium())) { console.log('skip: the local renderer is not inst
     assert.ok(found.some(c=>c.scene&&c.text==='AI and automations product interface'),'later sections receive attention')
     assert.ok(found.some(c=>c.scene&&c.matchText==='Roadmap Milestones Cycle time'),'a scene keeps its actual text so it can be found after the page rerenders')
     assert.ok(found.length<=32 && found.filter(c=>c.text==='Cycle time').length===0,'inner controls do not replace a complete scene')
+    // A brand reel is authored scene animation, with safe copy and deterministic scrubbing.
+    const raw={concept:'Connected ideas',motif:'nodes',palette:['#101319','#aaff77','#fff8ee'],scenes:SCENES.map((type,i)=>({type,text:i===1?'Build <script>':'Build together',beats:2,tone:'dark'}))}
+    const wordless=normalizeReel({...raw,scenes:raw.scenes.map(s=>({...s,text:s.type==='echo'?'':s.text}))},{brand:'Example',seconds:6})
+    assert.equal(wordless.scenes.find((_,i)=>raw.scenes[i].type==='echo').type,'grid','a wordless type beat becomes visible geometry rather than an empty frame')
+    const reelPlan=normalizeReel(raw,{brand:'Example',domain:'example.com',seconds:6})
+    const made=reelProject(createProject('fixture'),reelPlan)
+    assert.equal(made.project.settings.fps,60);assert.equal(made.shots.length,SCENES.length)
+    assert.equal(made.project.tracks.at(-1).start+made.project.tracks.at(-1).duration,6000,'authored scenes fill the requested duration exactly')
+    assert.throws(()=>normalizeReel(raw,{brand:'Example',seconds:6,palette:['red']}),/three hex colors/)
+    assert.ok(made.project.subjects[1].html.includes('&lt;script&gt;'),'creative copy is escaped as text')
+    await page.setContent(compositionDocument(made.project))
+    await page.evaluate(()=>window.__composition.ready())
+    const sample=async t=>{await page.evaluate(t=>window.__composition.seek(t),t);await page.waitForTimeout(40);return page.screenshot()}
+    const early=await sample(40),late=await sample(240),again=await sample(40)
+    assert.notDeepEqual(early,late,'graphic scenes visibly animate inside a shot')
+    assert.deepEqual(early,again,'scrubbing a graphic scene returns to the same pixels')
+    assert.equal(await page.locator('[data-track]').count(),SCENES.length,'each scene remains an editable timeline clip')
+    const rhythm=scoreWav({seconds:2,style:'percussive',seed:'Example',cuts:[.4,.8,1.2],bpm:150})
+    assert.ok(rhythm.waveform.some(v=>v>.1)&&rhythm.waveform.every(v=>v<=.73),'percussion is audible without clipping')
+    console.log('ok: kinetic scenes animate and scrub deterministically, escape copy, fill the timeline and carry a bounded percussion score')
     await page.setContent('<style>@keyframes entry{from{translate:0 80px}to{translate:0 0}}#panel{animation:entry 5s both}</style><div id="panel">A settling interface</div>')
     await reveal(page.locator('#panel'))
     assert.equal(await page.locator('#panel').evaluate(el=>getComputedStyle(el).translate),'0px','capture waits for a finite source entrance to reach its resting state')
