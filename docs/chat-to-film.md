@@ -27,7 +27,7 @@ colors: dark, accent, paper), and an absolute output `dir`. Reels support 6–30
 For a film combining actual website elements with authored graphics, use `mode: "hybrid"`.
 Pass an existing captured `projectId`, or a `url` to capture automatically first. URL capture
 looks for published product-video posters, including hidden carousel slides, and falls back to
-the normal capture flow when fewer than two are available. Uniformly empty captures are refused. The director
+full-resolution published images when fewer than two posters are available, then the normal capture flow when neither provides enough material. Image descriptions are preserved and portraits/logos are excluded. Uniformly empty captures are refused. The director
 sees a contact sheet of the captures and chooses product reveals, detail crops and split layouts
 between graphic bursts. These scenes hold longer than the graphic beats. The result includes
 capture IDs, source names, warnings and a source contact sheet next to the rendered storyboard.
@@ -422,3 +422,17 @@ for that range; linked visual timing determines its cut accents.
 
 > Make a 20-second hybrid film for Framer, with music prism: velvet pads, climbing plucks and
 > a beautiful final bloom. Build a complete musical phrase and leave room to read the product.
+
+## Aesthetics-led collections
+
+Pass `art` to reel to choose an actual display typeface and material treatment: `studio`,
+`editorial`, `playful`, `chrome`, `technical`, or `print`. Each film embeds its display font so
+preview and export do not depend on installed fonts or live font services. Existing films
+keep their stored CSS. The director can combine poster and specimen layouts with bezier
+paths, luminous gradient petals, optical contours and spatial wireframes.
+
+> Make a 20-second Figma hybrid film. Use art editorial, music paper, ivory, ink and a restrained
+> vermilion accent. Mix real Figma brush and typography artwork with oversized serif type, fine
+> rules and asymmetric poster compositions. Keep product headings accurate and concise.
+
+See [six Figma film directions](figma-examples.md) for a complete collection of reusable prompts.

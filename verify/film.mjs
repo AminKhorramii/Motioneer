@@ -18,6 +18,7 @@ import { autofilm, inspectSite, renderProject, revise as reviseFilm } from '../t
 import { candidates, reveal } from '../tools/editor/survey.mjs'
 import { componentBrief, briefStyles } from '../shared/component-brief.mjs'
 import { reviewFilm } from '../tools/editor/review.mjs'
+import {ART,artStyles} from '../tools/editor/art-direction.mjs'
 import {MUSIC,musicWav} from '../tools/editor/music.mjs'
 import {rescoreFilm} from '../tools/editor/rescore.mjs'
 import { withSoundtrack, scoreStyle, scoreWav } from '../tools/editor/soundtrack.mjs'
@@ -69,6 +70,7 @@ if (!(await loadChromium())) { console.log('skip: the local renderer is not inst
     if(req.url==='/a.svg'||req.url==='/b.svg'){res.setHeader('content-type','image/svg+xml');return res.end(`<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400"><rect width="640" height="400" fill="white"/><rect x="70" y="60" width="500" height="280" fill="${req.url==='/a.svg'?'#8855dd':'#228866'}"/><text x="120" y="210" font-size="50" fill="white">Product preview</text></svg>`)}
     if(req.method==='POST'){res.setHeader('content-type','application/json');return res.end(JSON.stringify(createProject('poster fixture')))}
     if(req.method==='PUT'){let body='';for await(const c of req)body+=c;saved=JSON.parse(body);res.setHeader('content-type','application/json');return res.end(JSON.stringify(saved))}
+    if(req.url==='/images'){res.setHeader('content-type','text/html');return res.end('<img src="/a.svg" alt="Vector editing canvas" style="width:500px"><img src="/b.svg" alt="Brush controls" style="width:500px"><img src="/b.svg" alt="Customer headshot" style="width:500px">')}
     res.setHeader('content-type','text/html');res.end('<video poster="/a.svg"></video><video style="display:none" poster="/b.svg"></video><video poster="/customer-story.svg"></video>')
   })
   await new Promise(r=>source.listen(0,'127.0.0.1',r));const origin=`http://127.0.0.1:${source.address().port}`
@@ -80,6 +82,9 @@ if (!(await loadChromium())) { console.log('skip: the local renderer is not inst
     assert.equal(inventory.captures.length,2,'imported product previews survive composition snapshotting')
     const blank={...createProject('blank'),subjects:[{id:'blank',name:'Empty white card',html:'<div style="background:white;width:640px;height:400px"></div>',css:'',w:640,h:400,warnings:[]} ]}
     await assert.rejects(()=>captureInventory(blank,{at:origin}),/render empty/,'a uniformly empty source card cannot become a hybrid product shot')
+    const imageProject=await websiteMedia({at:origin,url:origin+'/images'})
+    assert.equal(imageProject,saved.id);assert.equal(saved.subjects.length,2)
+    assert.deepEqual(saved.subjects.map(s=>s.name),['Vector editing canvas','Brush controls'],'published images retain semantic names and skip portraits')
     console.log('ok: hidden website product posters retain their source pixels, and empty captures are rejected')
   }finally{await new Promise(r=>source.close(r))}
 }
@@ -128,6 +133,8 @@ if (!(await loadChromium())) { console.log('skip: the local renderer is not inst
     assert.ok(found.length<=32 && found.filter(c=>c.text==='Cycle time').length===0,'inner controls do not replace a complete scene')
     // A brand reel is authored scene animation, with safe copy and deterministic scrubbing.
     const raw={concept:'Connected ideas',motif:'nodes',palette:['#101319','#aaff77','#fff8ee'],scenes:SCENES.map((type,i)=>({type,text:i===1?'Build <script>':'Build together',beats:2,tone:'dark'}))}
+    const named=normalizeReel(raw,{brand:'Figma',concept:'Paper &amp; Ink',seconds:20,art:'editorial'})
+    assert.equal(named.concept,'Paper & Ink');assert.equal(named.scenes[0].text,'Figma');assert.equal(named.scenes.at(-1).text,'Figma','a collection title never replaces its brand cards')
     const wordless=normalizeReel({...raw,scenes:raw.scenes.map(s=>({...s,text:s.type==='echo'?'':s.text}))},{brand:'Example',seconds:6})
     assert.equal(wordless.scenes.find((_,i)=>raw.scenes[i].type==='echo').type,'grid','a wordless type beat becomes visible geometry rather than an empty frame')
     const reelPlan=normalizeReel(raw,{brand:'Example',domain:'example.com',seconds:6})
@@ -141,6 +148,12 @@ if (!(await loadChromium())) { console.log('skip: the local renderer is not inst
     await page.setContent(compositionDocument(made.project))
     await page.evaluate(()=>window.__composition.ready())
     const sample=async t=>{await page.evaluate(t=>window.__composition.seek(t),t);await page.waitForTimeout(40);return page.screenshot()}
+    // Art direction has to reach the composition, including portable fonts and new geometry.
+    for(const art of Object.keys(ART)){
+      const styled=reelProject(createProject(art),normalizeReel(raw,{brand:'Figma',seconds:20,art}))
+      assert.ok(styled.project.motions.every(m=>m.css.includes('data:font/woff2;base64,')),'display fonts travel with every authored scene')
+      assert.notEqual(artStyles(art),artStyles('missing'),'each valid direction has a real material and type treatment')
+    }
     const early=await sample(40),late=await sample(240),again=await sample(40)
     assert.notDeepEqual(early,late,'graphic scenes visibly animate inside a shot')
     assert.deepEqual(early,again,'scrubbing a graphic scene returns to the same pixels')

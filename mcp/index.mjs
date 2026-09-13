@@ -207,10 +207,12 @@ const TOOLS = [
       mode:{type:'string',enum:['graphic','hybrid'],description:'Use hybrid to mix real website captures with authored kinetic graphics. Graphic makes authored graphics only.'},
       url:{type:'string',description:'Website to capture automatically for hybrid mode when projectId is omitted.'},
       brand:{type:'string',minLength:1,maxLength:24,description:'Company or product name.'},
+      concept:{type:'string',maxLength:45,description:'Optional title for this creative direction. Keep brand as the actual company name; use concept to name variations in a collection.'},
       domain:{type:'string',description:'Brand domain for the closing card, without protocol.'},
       projectId:{type:'string',description:'Optional existing film in this studio; hybrid mode uses its actual captured visuals; graphic mode uses names as context. It is not modified.'},
       direction:{type:'string',description:'The full creative brief: concept, metaphors, typography, rhythm, reference observations. Give each brand a distinct idea.'},
       seconds:{type:'number',minimum:6,maximum:30,description:'6 to 30 seconds, 12 by default.'},
+      art:{type:'string',enum:['studio','editorial','playful','chrome','technical','print'],description:'Visual direction with bundled display typography and material treatment. Studio is sculptural, editorial is serif-led, playful is elastic, chrome is luminous, technical is precise, print is bold and optical.'},
       music:{type:'string',enum:['glass','liquid','paper','monolith','elastic','voltage','current','branch','prism','conversation'],description:'Musical identity: glass minimal electronica, liquid swung garage, paper intimate keys, monolith cinematic sub, elastic electro funk, voltage acid breaks, current dub techno, branch digital counterpoint, prism melodic electronica, conversation warm broken soul. The director chooses when omitted.'},
       palette:{type:'array',minItems:3,maxItems:3,items:{type:'string',pattern:'^#[0-9a-fA-F]{6}$'},description:'Three six-digit hex colors in dark, accent, paper order. Optional; the director chooses when omitted.'},
       dir:{type:'string',description:'Absolute output folder for the MP4 and storyboard.'}
@@ -449,11 +451,11 @@ async function film({ url, dir, language, theme, captureMode, seconds, fps, soun
     + `Only call open if the person asks to launch the editor or player.` }
 }
 
-async function reel({brand,domain,projectId,url,mode='graphic',direction,seconds=12,palette,music,dir},progress=()=>{}) {
+async function reel({brand,domain,projectId,url,mode='graphic',direction,seconds=12,palette,music,art,concept,dir},progress=()=>{}) {
   const at=STUDIO_AT()
   if(!(await answering(at))&&!(await spawnStudio({url:domain?'https://'+domain:undefined,dir,at})))throw new Error('Cannot make a reel: the studio could not start. Next: open the studio and retry.')
   const {kineticReel}=await import(pathToFileURL(path.join(ROOT,'tools/editor/kinetic.mjs')).href)
-  const result=await kineticReel({at,brand,domain,projectId,url,mode,direction,seconds,palette,music,onStep:progress})
+  const result=await kineticReel({at,brand,domain,projectId,url,mode,direction,seconds,palette,music,art,concept,onStep:progress})
   const file=await keepFile(result,dir),review=await reviewResult(result,file,progress)
   const sourceSheet=result.sourceSheet?file.replace(/\.mp4$/,'-sources.jpg'):null
   if(sourceSheet)await writeFile(sourceSheet,Buffer.from(result.sourceSheet.data,'base64'))

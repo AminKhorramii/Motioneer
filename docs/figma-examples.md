@@ -1,0 +1,27 @@
+# Figma motion studies
+
+Six 20-second hybrid film directions for Motioneer. Keep `brand` as Figma and use `concept` for the creative title. Published website imagery is imported at native resolution; internal layers remain flattened. Each art direction embeds its display typeface.
+
+## Vector Ballet
+
+> Create a 20-second Figma film with reel, mode hybrid, url https://www.figma.com, brand Figma, domain figma.com, concept Vector Ballet, art studio, music glass. Palette: #181428, #ff845d, #f7eddd. Vector paths become choreography. Thin bezier curves and their control handles unfurl into sculptural compositions, then snap into bold typography. Use bezier as the dominant motif with selected bloom accents; avoid generic block grids. A warm tangerine accent against aubergine and pale peach. Words: Shape, Bend, Flow, Create. Use the real cursor/vector editing artwork, type on a path, brush controls, and Weave. Open with a decisive Figma mark, build through intimate details to a generous final reveal. Asymmetric poster and specimen layouts. Quiet elegance with fast precise cuts. Interleave four or five readable source reveals with authored graphics. Review the storyboard.
+
+## Paper & Ink
+
+> Create a 20-second Figma film with reel, mode hybrid, url https://www.figma.com, brand Figma, domain figma.com, concept Paper & Ink, art editorial, music paper. Palette: #191817, #df412d, #f3eee2. An art-book film for a design tool. High contrast serif typography at dramatic scale, extremely fine rules, abundant negative space, cream paper, ink black and a restrained vermilion accent. Contour and bezier linework; use poster, specimen, type and split layouts with deliberate editorial holds. Avoid grids, block mosaics and radial rays. Words: An idea, Takes shape, Make a mark. Use Figma brush artwork, texture controls, Brand Vision presentation and type-on-path imagery. Frame these as design work and tools, not a fictional dashboard. Music is intimate felt-like keys and woody percussion. Interleave four or five readable source reveals with authored graphics. Review the storyboard.
+
+## Electric Playground
+
+> Create a 20-second Figma film with reel, mode hybrid, url https://www.figma.com, brand Figma, domain figma.com, concept Electric Playground, art playful, music elastic. Palette: #321643, #ff603d, #f2ddff. A mischievous kinetic design playground. Oversized rounded display letters, cropped elastic shape families, circles colliding with corners and curving vectors. Mostly blocks and bezier motifs, with moments of bloom. Punchy coral, rich plum and lilac. Words: Play, Bend the rules, Make it yours. Real vector editor, brush controls, icon variants and type-on-path sources. Alternate oversized authored forms with clean product splits. Fast, joyful, expertly composed, avoiding generic startup demo pacing. Interleave four or five readable source reveals with authored graphics. Review the storyboard.
+
+## Liquid Canvas
+
+> Create a 20-second Figma film with reel, mode hybrid, url https://www.figma.com, brand Figma, domain figma.com, concept Liquid Canvas, art chrome, music liquid. Palette: #10151d, #8baded, #e8edf4. A luxurious material study. Luminous gradient petals, optical contour ellipses, fine typography, icy reflective highlights over graphite. Use bloom and contour as the main motifs; no flat block grids or stock node diagrams. Large calm fields interrupted by very fast macro zoom cuts. Words: Beyond the frame, In motion, Figma. Feature the real Figma Weave output, butterfly bitmap controls, texture settings and vector artwork in precise quiet frames. Do not pretend the captured bitmap is moving internally. Smooth, tactile, spatial and cinematic. Interleave four or five readable source reveals with authored graphics. Review the storyboard.
+
+## Night Shift
+
+> Create a 20-second Figma film with reel, mode hybrid, url https://www.figma.com, brand Figma, domain figma.com, concept Night Shift, art technical, music voltage. Palette: #081327, #d5fa63, #e9f0fb. Design after dark. Deep navy, electric citron and icy white. Spatial wireframe perspective grids, fine alignment rules, bezier handles and tunnel depth. Technical typography with dramatic editorial scale. Precision becomes speed. Words: One point, Infinite paths, Build. Use actual Figma vector editor, Weave node interface, component kit and bitmap controls. Lead with perspective and bezier motifs; avoid a generic falling block film. Energetic clipped acid-electro rhythm with a clearly resolved final Figma card. Interleave four or five readable source reveals with authored graphics. Review the storyboard.
+
+## Color Studies
+
+> Create a 20-second Figma film with reel, mode hybrid, url https://www.figma.com, brand Figma, domain figma.com, concept Color Studies, art print, music conversation. Palette: #501435, #ef64bf, #fff1d9. An experimental color-and-type film. Bold compressed poster typography, rotating optical contour lines, hard crop cuts, overlapping ribbon-like color fields, large tactile compositions. Berry, hot pink and warm cream. Words: Color speaks, Type moves, Ideas connect. Use contour, ribbons and bezier motifs; no node diagrams or stock geometric block grid. Showcase actual type-on-path art, brush controls, pink icon family and Brand Vision source. Give each product frame a distinct relationship to the surrounding print composition. Warm syncopated call-and-response music. Interleave four or five readable source reveals with authored graphics. Review the storyboard.
