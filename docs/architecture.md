@@ -35,6 +35,8 @@ tools/editor/
   survey.mjs           page discovery and capture preparation: complete product scenes, representative candidates, and their contact sheet
   review.mjs           a storyboard decoded from the delivered MP4, returned to the agent for visual review
   kinetic.mjs          the reel planner: a brand metaphor becomes beat-timed authored scenes, a new editable project, percussion and a verified render
+  media-source.mjs     discovers published product-video posters, including hidden carousel slides, for a fresh hybrid capture project
+  hybrid.mjs           source capture snapshots and contact sheets, product reveal/detail/split choreography with traceable source IDs
   kinetic-scenes.mjs   graphic scene vocabulary: typography, orbital systems, ribbons, nodes, stacks and portals using the shared composition runtime
   soundtrack.mjs       original synthesized music fitted to the cut, stored as editable project audio
   proof.mjs            a rendered film measured off its frames: cuts, shot length, blank frames

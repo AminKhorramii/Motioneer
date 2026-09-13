@@ -123,6 +123,7 @@ const noProject = await callTool('revise', {})
 ok('revise without a project says what it cannot do and what to do next', noProject.isError && /^Cannot revise/.test(noProject.text) && /Next:/.test(noProject.text), noProject.text)
 ok('revise takes drop and order, since a reaction to a film is a change to its shots',
   !!tools.find((t) => t.name === 'revise')?.inputSchema?.properties?.drop && !!tools.find((t) => t.name === 'revise')?.inputSchema?.properties?.order)
+ok('hybrid reels accept existing captures or a website URL',tools.find(t=>t.name==='reel')?.inputSchema?.properties?.mode?.enum.includes('hybrid') && tools.find(t=>t.name==='reel')?.inputSchema?.properties?.url)
 ok('artistic briefs have an authored reel tool with explicit creative direction',tools.find(t=>t.name==='reel')?.inputSchema?.properties?.direction && /use reel/.test(hello.result.instructions))
 ok('film offers 60 fps and revision can change motion without recapturing',
   tools.find(t=>t.name==='film')?.inputSchema?.properties?.fps?.enum.includes(60)

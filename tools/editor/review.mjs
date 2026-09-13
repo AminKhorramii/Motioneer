@@ -8,8 +8,12 @@ export async function reviewFilm(file, {shots = [], seconds = 20} = {}) {
   if (!ffmpeg || !chromium) throw new Error('The local renderer is unavailable for the storyboard.')
   // Read each shot late enough to judge its content. A fixed 700 ms sample caught deliberate
   // entrances halfway through and made sound captures look permanently cropped to the agent.
-  const points = [{at:Math.min(.9,seconds/4),label:'Opening'}, ...shots.map(s=>({at:s.at + Math.max(0,Math.min(s.seconds-.1,s.seconds*.75)),label:`${s.shot}. ${s.elements.join(' + ')}`})),{at:Math.max(0,seconds-.5),label:'Closing'}]
-  const chosen = points.length <= 12 ? points : Array.from({length:12},(_,i)=>points[Math.round(i*(points.length-1)/11)])
+  const shotPoints=shots.map(s=>({at:s.at + Math.max(0,Math.min(s.seconds-.1,s.seconds*.75)),label:`${s.shot}. ${s.elements.join(' + ')}`}))
+  // Reels already include their opening and closing. Show every authored scene so a product
+  // reveal cannot disappear from the agent's review because a uniform sampler skipped it.
+  const complete=shots.length&&shots[0].at===0&&Math.abs(shots.at(-1).at+shots.at(-1).seconds-seconds)<.1
+  const points=complete?shotPoints:[{at:Math.min(.9,seconds/4),label:'Opening'},...shotPoints,{at:Math.max(0,seconds-.5),label:'Closing'}]
+  const chosen=points.length<=20?points:Array.from({length:20},(_,i)=>points[Math.round(i*(points.length-1)/19)])
   const tiles = []
   for (const point of chosen) {
     const data = await new Promise((resolve,reject)=>{

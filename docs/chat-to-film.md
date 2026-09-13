@@ -22,10 +22,27 @@ the completed plan to a busy-renderer error. Cancelling an export reports prompt
 > rendered storyboard before delivery.
 
 Pass `brand`, `domain`, `direction`, optional `seconds`, optional `palette` (three six-digit hex
-colors: dark, accent, paper), and an absolute output `dir`. An optional `projectId` grounds the
-planner in the names of existing captures without changing that project. These are authored
-illustrative brand graphics, not captured product interfaces or official brand campaign assets.
-Use `film` when the person wants to show the actual website or product UI.
+colors: dark, accent, paper), and an absolute output `dir`.
+
+For a film combining actual website elements with authored graphics, use `mode: "hybrid"`.
+Pass an existing captured `projectId`, or a `url` to capture automatically first. URL capture
+looks for published product-video posters, including hidden carousel slides, and falls back to
+the normal capture flow when fewer than two are available. Uniformly empty captures are refused. The director
+sees a contact sheet of the captures and chooses product reveals, detail crops and split layouts
+between graphic bursts. These scenes hold longer than the graphic beats. The result includes
+capture IDs, source names, warnings and a source contact sheet next to the rendered storyboard.
+The source project stays unchanged. Captured content is rendered to portable pixels to preserve
+its appearance; internal UI layers are flattened, while its graphic framing and motion remain
+editable scene clips. Existing capture imperfections can remain visible, so review the sheet.
+
+> Make a 16-second hybrid film for Linear from https://linear.app. Mix real captured product
+> panels with violet orbital graphics and oversized Focus / Align / Ship typography. Use reel
+> with mode hybrid. Give product reveals room to read, with quick graphic bursts between them.
+
+See [ten hybrid film prompts](hybrid-examples.md) for brand-specific directions.
+
+`mode: "graphic"` remains the default and makes authored illustrative brand graphics only.
+An optional `projectId` supplies name context in that mode. Use `film` for a capture-led edit.
 
 The choreography vocabulary includes impact type, typographic echoes, orbital linework, modular
 grids, ribbons, node diagrams, spatial tunnels, splits, card stacks, bursts and a brand/domain

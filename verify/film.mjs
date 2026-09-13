@@ -20,13 +20,37 @@ import { componentBrief, briefStyles } from '../shared/component-brief.mjs'
 import { reviewFilm } from '../tools/editor/review.mjs'
 import { withSoundtrack, scoreStyle, scoreWav } from '../tools/editor/soundtrack.mjs'
 import { loadChromium } from '../tools/editor/render.mjs'
-import {normalizeReel,reelProject} from '../tools/editor/kinetic.mjs'
+import {normalizeReel,reelProject,kineticReel} from '../tools/editor/kinetic.mjs'
+import {websiteMedia} from '../tools/editor/media-source.mjs'
+import {captureInventory} from '../tools/editor/hybrid.mjs'
 import {SCENES} from '../tools/editor/kinetic-scenes.mjs'
 import { proveFilm } from '../tools/editor/proof.mjs'
 import { firstCut, createProject, compositionDocument } from '../dist-core/core.js'
 
 const root = path.dirname(fileURLToPath(new URL('.', import.meta.url)))
 if (!(await loadChromium())) { console.log('skip: the local renderer is not installed, so the film path cannot be exercised here'); process.exit(0) }
+
+// Product carousel posters remain real source assets even when their slides are hidden.
+{
+  let saved
+  const source=createServer(async(req,res)=>{
+    if(req.url==='/a.svg'||req.url==='/b.svg'){res.setHeader('content-type','image/svg+xml');return res.end(`<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400"><rect width="640" height="400" fill="white"/><rect x="70" y="60" width="500" height="280" fill="${req.url==='/a.svg'?'#8855dd':'#228866'}"/><text x="120" y="210" font-size="50" fill="white">Product preview</text></svg>`)}
+    if(req.method==='POST'){res.setHeader('content-type','application/json');return res.end(JSON.stringify(createProject('poster fixture')))}
+    if(req.method==='PUT'){let body='';for await(const c of req)body+=c;saved=JSON.parse(body);res.setHeader('content-type','application/json');return res.end(JSON.stringify(saved))}
+    res.setHeader('content-type','text/html');res.end('<video poster="/a.svg"></video><video style="display:none" poster="/b.svg"></video><video poster="/customer-story.svg"></video>')
+  })
+  await new Promise(r=>source.listen(0,'127.0.0.1',r));const origin=`http://127.0.0.1:${source.address().port}`
+  try{
+    const id=await websiteMedia({at:origin,url:origin})
+    assert.equal(id,saved.id);assert.equal(saved.subjects.length,2,'hidden product previews are discovered while customer stories are excluded')
+    assert.ok(saved.subjects.every(s=>s.html.includes('data:image/png;base64,')&&s.warnings[0].includes(origin)),'source pixels and original media URLs survive the import')
+    const inventory=await captureInventory(saved,{at:origin})
+    assert.equal(inventory.captures.length,2,'imported product previews survive composition snapshotting')
+    const blank={...createProject('blank'),subjects:[{id:'blank',name:'Empty white card',html:'<div style="background:white;width:640px;height:400px"></div>',css:'',w:640,h:400,warnings:[]} ]}
+    await assert.rejects(()=>captureInventory(blank,{at:origin}),/render empty/,'a uniformly empty source card cannot become a hybrid product shot')
+    console.log('ok: hidden website product posters retain their source pixels, and empty captures are rejected')
+  }finally{await new Promise(r=>source.close(r))}
+}
 
 // Concurrent prompts keep their saved creative work while the shared export slot is busy.
 {
@@ -405,6 +429,20 @@ try {
   assert.equal(localized.colours.background,'#101319','requested dark appearance survives the locale redirect')
   await assert.rejects(()=>inspectSite({at,url:siteAt+'/missing'}),/page-not-found/,'an error page is refused before generating a film')
   console.log('ok: locale selection follows existing links and page-not-found screens cannot become films')
+  // Hybrid delivery must carry actual source pixels, while leaving the source edit untouched.
+  const beforeHybrid=await(await fetch(`${at}/__motioneer/projects/${result.projectId}`)).json()
+  const hybridRaw={concept:'Work comes alive',motif:'nodes',palette:['#101319','#88ddaa','#fff8ee'],scenes:SCENES.map((type,i)=>({type:[2,5,8].includes(i)?['product','product-detail','product-split'][[2,5,8].indexOf(i)]:type,text:'Build',capture:i===5?1:0,beats:2,tone:'dark'}))}
+  const hybrid=await kineticReel({at,brand:'Example',domain:'example.com',projectId:result.projectId,mode:'hybrid',seconds:6,plan:hybridRaw})
+  const blended=await(await fetch(`${at}/__motioneer/projects/${hybrid.projectId}`)).json()
+  assert.notEqual(hybrid.projectId,result.projectId,'blending creates a separate edit')
+  assert.deepEqual(await(await fetch(`${at}/__motioneer/projects/${result.projectId}`)).json(),beforeHybrid,'snapshotting source content does not mutate the original film')
+  assert.equal(hybrid.shotList.filter(s=>s.captureId).length,3,'actual captures occupy multiple shots among the graphics')
+  assert.equal(new Set(hybrid.shotList.filter(s=>s.captureId).map(s=>s.captureId)).size,2,'the product montage uses distinct source captures')
+  assert.ok(blended.subjects.filter(s=>s.html.includes('class="product-scene"')).every(s=>s.html.includes('data:image/png;base64,')),'the portable film carries the source pixels, not temporary asset URLs')
+  assert.ok(hybrid.sourceSheet.data && hybrid.captures.length>=2,'the agent can inspect provenance alongside the result')
+  assert.equal(hybrid.proof.cuts,hybrid.shotList.length-1,'graphic and product scenes both appear in the exported cut')
+  await assert.rejects(()=>kineticReel({at,brand:'Example',mode:'hybrid'}),/source project or website URL/)
+  console.log('ok: hybrid film exports source pixels and graphics together, returns provenance, and preserves the source')
   console.log('film verification passed')
 } catch (e) {
   console.error(log.slice(-3000)); throw e
