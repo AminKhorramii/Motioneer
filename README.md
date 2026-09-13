@@ -1,73 +1,79 @@
 # Motioneer
 
-**Motion for components you already have.**
+**Prompt a product film. Refine it in your local studio.**
 
 [![npm](https://img.shields.io/npm/v/motioneer?logo=npm&color=cb3837)](https://www.npmjs.com/package/motioneer)
 [![MCP](https://img.shields.io/badge/MCP-server-111?logo=claude&logoColor=D97757)](https://modelcontextprotocol.io)
 [![Node](https://img.shields.io/node/v/motioneer?logo=nodedotjs&logoColor=fff&color=5FA04E)](package.json)
 [![License](https://img.shields.io/npm/l/motioneer?color=blue)](LICENSE)
 
-Point it at your running app, click an element, and get several motions for it at once, playing
-side by side on one timeline. Keep the one you like as a stylesheet that ships in your product.
+Motioneer gives your agent a motion studio: capture real website elements, direct branded motion,
+compose an original score, export an MP4, and return an editable film. Native detail reveals use the
+site’s DOM/SVG, typography and colors. Embedded screenshots remain flattened.
 
-Generating one animation is solved. What nobody gives you is *many at once, live, on the same
-clock*, which is the only way choosing between them is real.
+## Start with your agent
 
-## Prompt a landing-page film
+Use Node 20 or newer and Claude Code signed in on your machine. In your project directory:
 
-In Claude Code with the Motioneer MCP server connected:
-
-> Make a 20-second snappy launch film from notion.so. Use the native detail film standard: actual source elements, macro details that reveal the full component, source typography and colors, a distinctive action score, and a clean brand ending. Review the exported motion and give me the video and editor links.
-
-This uses `reel` with `mode: "native"`. It retains source DOM/SVG, validates detail anchors, and keeps the result editable. Embedded screenshots stay flattened; unavailable native sources produce an explicit limitation. See the [prompt-to-film workflow](docs/chat-to-film.md) and [example prompts](docs/native-examples.md).
-
-## Open it
-
-Nothing to install. If you have [Node](https://nodejs.org) 20 or newer, one line opens it:
-
-```
-npx motioneer
+```sh
+npx -y motioneer setup --claude
 ```
 
-That opens on the seven components it ships with, so there is something to animate before you have
-pointed it at anything. To open it on your own app instead, give it the address your dev server is
-already running on:
+Setup downloads Chromium and FFmpeg once into a shared local cache, checks that the browser works,
+and adds Motioneer to the project’s `.mcp.json`. It preserves other MCP entries and refuses to
+replace a different existing Motioneer configuration. No API key is needed when using your signed-in
+Claude Code CLI.
 
-```
-npx motioneer localhost:3000
-npx motioneer ~/app/src/ui --css ~/app/globals.css    a folder, with your stylesheet
-```
+Restart Claude Code in this project and approve its Motioneer MCP server when prompted. Then ask:
 
-Installed once, it is just `motioneer`:
+> Make a 20-second snappy launch film from notion.so. Use real source elements, detail-to-interface
+> reveals, the site’s fonts and colors, powerful warehouse techno, and a clean brand ending.
+> Review the exported motion and return the video and editor links.
 
-```
-npm install -g motioneer
-motioneer localhost:3000
-```
+The agent starts the studio, captures, directs, scores and renders. The first film also installs the
+renderer automatically if needed. The result includes a local MP4, a transition storyboard, a source
+sheet and an editor link. Projects and earlier takes stay local; the model receives the prompt and
+source material needed to direct the film through your configured provider.
 
-Everything after that happens in the browser tab it opens. Nothing is uploaded: the proxy, the
-picker and the film all run on your machine.
+See [example prompts](docs/native-examples.md) and the [prompt-to-film workflow](docs/chat-to-film.md).
 
-**One thing it needs.** Every motion is written by a model, so it wants either
-[Claude Code](https://claude.com/claude-code) on your PATH or an api key, and it says which is
-missing on the way up. Settings in the studio takes a key for Anthropic, OpenAI or anything speaking
-their shapes, and remembers it.
+## Other MCP clients
 
-### Or give it to your agent
+Print the configuration for the current workspace and add its `motioneer` entry to your client:
 
-The same studio, opened for you when you ask:
-
-> open the motion studio on localhost:3000
-
-```
-claude mcp add --scope user motioneer -- npx -y -p motioneer motioneer-mcp
+```sh
+npx -y motioneer mcp-config
 ```
 
-The agent side also has `motion`, which writes a sheet for markup you hand it without opening
-anything. Choosing between several at once is the part that wants eyes, so that stays in the room.
+The entry pins the installed package version and workspace. The server also runs directly with
+`npx -y motioneer mcp`; the existing `motioneer-mcp` binary remains available. See the
+[setup guide](docs/setup.md) for headless environments and separate studio ports.
 
-With no arguments, **type an address into the sidebar**: `localhost:3000`, `stripe.com`, anything
-reachable. The five most recent stay in the rail with their favicons.
+## Check your setup
+
+```sh
+npx -y motioneer doctor
+npx -y motioneer doctor --json
+```
+
+Doctor checks packaged files, workspace access, model configuration and an actual browser launch.
+It makes no model request or downloads. Authentication is checked on the first model request.
+JSON output contains no credentials and exits with status 1 when setup is incomplete.
+
+Claude Code is the default model provider. Without it, set `ANTHROPIC_API_KEY`, or open the studio’s
+Settings to configure another provider. Keys are never written into the generated MCP entry.
+
+## Open the studio yourself
+
+```sh
+npx -y motioneer
+npx -y motioneer localhost:3000
+npx -y motioneer ~/app/src/ui --css ~/app/globals.css
+```
+
+The studio opens on included examples or your running app. Capture components, compare motions,
+edit films and export from the browser. Use `--no-open` for a headless process or `--dir` to choose
+where `.studio` projects and settings are stored.
 
 ## What it does
 

@@ -1,5 +1,6 @@
 /** Renderer tools are pinned and installed in a private cache; no dependency on a developer's PATH. */
 import { spawn } from 'node:child_process'
+import {installLock,withInstallLock} from './render-install.mjs'
 import { mkdir, readFile, writeFile, readdir, rm } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
@@ -11,13 +12,13 @@ const VERSIONS = { playwright: '1.62.1', 'ffmpeg-static': '5.2.0' }
 /** The one place that knows where the renderer's browser lives, so the autofilm driver borrows it rather than adding a second copy of playwright. Returns null when the renderer is not installed yet. */
 export async function loadFfmpeg() {
   const ff = path.join(CACHE, 'node_modules/ffmpeg-static/index.js')
-  if (!existsSync(ff)) return null
+  if (existsSync(installLock(CACHE)) || !existsSync(ff)) return null
   const { default: ffmpeg } = await import(pathToFileURL(ff).href)
   return ffmpeg && existsSync(ffmpeg) ? ffmpeg : null
 }
 export async function loadChromium() {
   const mod = path.join(CACHE, 'node_modules/playwright/index.mjs')
-  if (!existsSync(mod)) return null
+  if (existsSync(installLock(CACHE)) || !existsSync(mod)) return null
   process.env.PLAYWRIGHT_BROWSERS_PATH = path.join(CACHE, 'browsers')
   const { chromium } = await import(pathToFileURL(mod).href)
   if (!existsSync(chromium.executablePath())) return null
@@ -30,7 +31,8 @@ function command(bin,args,{signal,env}={}) {
 }
 export function renderer(store) {
   const jobs = new Map(); let setup = { state:'idle', message:'Install the local renderer once to export faithful films.' }, installing=null
-  const tools = async () => {
+  const tools = async (duringInstall=false) => {
+    if(!duringInstall&&existsSync(installLock(CACHE)))return null
     const mod=path.join(CACHE,'node_modules/playwright/index.mjs'), ff=path.join(CACHE,'node_modules/ffmpeg-static/index.js')
     if (!existsSync(mod)||!existsSync(ff)) return null
     process.env.PLAYWRIGHT_BROWSERS_PATH=path.join(CACHE,'browsers')
@@ -38,16 +40,20 @@ export function renderer(store) {
     if (!existsSync(chromium.executablePath()) || !ffmpeg || !existsSync(ffmpeg)) return null
     return {chromium,ffmpeg}
   }
-  async function status() { const found=await tools().catch(()=>null);return found?{state:'ready',message:'Local renderer ready'}:setup }
+  async function status() { if(installing)return setup;if(existsSync(installLock(CACHE)))return {state:'installing',message:'Another process is preparing the shared renderer.'};const found=await tools().catch(()=>null);return found?{state:'ready',message:'Local renderer ready'}:setup }
   function install() {
     if (installing) return setup
     setup={state:'installing',message:'Downloading Chromium and the video encoder. This only happens once.'}
-    installing=(async()=>{ await mkdir(CACHE,{recursive:true});await writeFile(path.join(CACHE,'package.json'),JSON.stringify({private:true,dependencies:VERSIONS}));
+    installing=withInstallLock(CACHE,async()=>{
+      setup={state:'installing',message:'Installing the video encoder and browser driver.'}
+      await writeFile(path.join(CACHE,'package.json'),JSON.stringify({private:true,dependencies:VERSIONS}));
       await command(process.platform==='win32'?'npm.cmd':'npm',['install','--prefix',CACHE,'--no-audit','--no-fund']);
+      setup={state:'installing',message:'Downloading Chromium for source capture and film rendering.'}
       await command(process.execPath,[path.join(CACHE,'node_modules/playwright/cli.js'),'install','chromium','--no-shell'],{env:{PLAYWRIGHT_BROWSERS_PATH:path.join(CACHE,'browsers')}})
-      if (!await tools()) throw new Error('Renderer tools are incomplete. Retry setup.');setup={state:'ready',message:'Local renderer ready'}
-    })().catch(e=>{setup={state:'error',message:e.message}}).finally(()=>{installing=null});return setup
+      if (!await tools(true)) throw new Error('Renderer tools are incomplete. Retry setup.');
+    }).then(()=>{setup={state:'ready',message:'Local renderer ready'}}).catch(e=>{setup={state:'error',message:e.message}}).finally(()=>{installing=null});return setup
   }
+
   const publicJob = ({ controller, ...job }) => job
   async function run(job,p,origin) {
     const dir=path.join(store.directory(p.id),'renders',job.id), frames=path.join(dir,'frames');let browser

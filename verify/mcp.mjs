@@ -100,7 +100,7 @@ console.log('\n  what it offers')
 const list = await rpc('tools/list', {})
 const tools = list.result?.tools ?? []
 const names = tools.map((t) => t.name).sort()
-ok('eight tools, including independent music revision', names.join(',') === 'film,inspect,motion,open,reel,rescore,revise,studio', names.join(','))
+ok('nine tools, including readiness and independent music revision', names.join(',') === 'doctor,film,inspect,motion,open,reel,rescore,revise,studio', names.join(','))
 ok('every one has a description an agent can act on',
   tools.every((t) => (t.description ?? '').length > 80))
 ok('every one has an object schema', tools.every((t) => t.inputSchema?.type === 'object'))

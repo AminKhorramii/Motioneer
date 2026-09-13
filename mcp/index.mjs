@@ -32,6 +32,10 @@ import path from 'node:path'
  */
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 // the one version this package has, told to clients instead of a number nobody bumps
+if(process.env.MOTIONEER_WORKSPACE){
+  if(!path.isAbsolute(process.env.MOTIONEER_WORKSPACE))throw Error('Cannot start MCP: MOTIONEER_WORKSPACE must be an absolute directory. Next: rerun npx motioneer setup --claude in the project.')
+  process.chdir(process.env.MOTIONEER_WORKSPACE)
+}
 const VERSION = await readFile(path.join(ROOT, 'package.json'), 'utf8')
   .then((raw) => JSON.parse(raw).version)
   .catch(() => '0.0.0')
@@ -58,7 +62,7 @@ const fail = (id, text) => send({ jsonrpc: '2.0', id, result: { isError: true, c
  * The ending is deliberate. A file path in a wall of text is a dead end, so every finished film
  * closes with three choices the person can act on, and the open tool is what acts on them.
  */
-const INSTRUCTIONS = `Motioneer makes motion for a person's own product. Choose by what they want to hold at the end:
+const INSTRUCTIONS = `Motioneer makes motion for a person's own product. On setup trouble, call doctor for structured readiness. Film and reel install their renderer automatically on first use; no manual setup tool call is needed. Choose by what they want to hold at the end:
 - film: they want a faithful component demo or a capture-led edit that preserves the page composition. For an artistic landing-page promo, launch film or branded motion video use reel with mode native instead. One call does everything and returns an MP4 path. Always pass dir as the absolute path of their project so the file lands beside their work. Pace is the cut: "fast", "quick", "punchy" or "lots of cuts" means pace "fast", which is many one second shots of many elements, about 12 seconds and eight elements unless they say otherwise; "demo" or "showcase" means pace "brisk" and about 20; "calm", "slow" or "elegant" means pace "calm" with look "subtle". "Lots of elements", "everything on the page" or "a lot of motions" means count 10 to 12. Fast and brisk films use look "expressive" unless they ask otherwise.
 - studio: they want to pick elements and compare motions by hand, or say "studio". It returns as soon as the room is open; do not wait or retry, tell them where it is.
 - motion: they want CSS for markup they already have, with nothing to look at first.
@@ -76,7 +80,7 @@ How people say it, and what to call:
 - "animate this component", with markup pasted: motion.
 - "make it slower", "too long, ten seconds", "drop the footer shot", "put the hero last", "call it Ship Faster": revise with the projectId and only the fields that change. "drop" takes shot numbers from the reply or words from an element's name; "order" takes shot numbers.
 - "add the pricing cards": film again with the same url, pick naming them, and the same pace and seconds.
-- "cinematic", "polished launch film", or "state of the art": film with pace brisk, seconds 24, fps 60, count 8, and the person's creative direction. Prefer complete product interfaces and a coherent story over isolated controls.
+- "cinematic", "polished launch film", or "state of the art": reel with mode native, seconds 20 unless specified, the source url, brand and full direction. Prefer real source details and a coherent product story.
 - "make the cards glide more slowly": revise with motionDirection carrying the note and motionElements naming the cards from the last reply. This preserves the cut and creates new motion versions.
 
 When a tool fails its message starts with "Cannot" and ends with "Next:". Relay the reason and the next step as given, and do not invent a different cause. Retry only when the next step says to.
@@ -100,6 +104,7 @@ Call open only when the person explicitly asks to open something or selects that
 A site that needs a sign in cannot be proxied; if capture finds nothing, say so and point them to the bookmarklet in the studio rather than retrying.`
 
 const TOOLS = [
+  {name:'doctor',description:'Check this workspace’s model configuration, packaged files and local renderer without generating a film or downloading anything. Returns structured readiness and concrete next steps; authentication is checked on the first model request.',inputSchema:{type:'object',properties:{dir:{type:'string',description:'Absolute workspace directory. Defaults to the connected project.'}}}},
   {
     name: 'studio',
     description:
@@ -319,14 +324,14 @@ const answering = async (at) => {
 }
 
 /** Start a studio aimed at url/dir and wait until it actually answers. Returns whether it is up. */
-async function spawnStudio({ url, dir, at }) {
+async function spawnStudio({ url, dir, at, headless=true }) {
   if (await answering(at)) return true
   const args = [path.join(ROOT, 'tools', 'studio.mjs')]
   if (url) args.push('--app', String(url))
   else if (dir) args.push(String(dir))
   // process.execPath rather than the word node: an agent launched from a desktop icon carries a
   // login shell's PATH, which on any machine using nvm or fnm has no node on it at all
-  const child = spawn(process.execPath, args, { stdio: 'ignore', detached: true, cwd: dir || ROOT })
+  const child = spawn(process.execPath, args, { stdio: 'ignore', detached: true, cwd: dir || process.cwd(), env:{...process.env,...(headless?{MOTIONEER_NO_OPEN:'1'}:{})} })
   const started = await new Promise((done) => {
     child.on('error', () => done(false))
     child.on('spawn', () => { child.unref(); done(true) })
@@ -346,10 +351,10 @@ async function studio({ url, dir }) {
       + 'opening another, and if they want it pointed somewhere else there is an address bar in '
       + 'the top left of it.'
   }
-  const up = await spawnStudio({ url, dir, at })
+  const up = await spawnStudio({ url, dir, at, headless:false })
   if (!up) {
     return `The studio was started but has not answered at ${at} within ten seconds, or could not `
-      + 'be started at all. Ask them to run `npm run studio` themselves.'
+      + 'be started at all. Ask them to run `npx motioneer` themselves.'
   }
   return `The motion studio is open at ${at}.${url ? ` It is aimed at ${url}.` : ''} Tell them `
     + 'to pick one or more elements and press Give it motion, and that several motions come '
@@ -403,8 +408,9 @@ async function open({ target, path: file }) {
 async function inspect({ url, dir, language, theme }) {
   if (!url) throw new Error('Cannot inspect: inspect needs a url. Next: pass the running site or dev server.')
   const at = STUDIO_AT()
-  if (!(await spawnStudio({ url, dir, at }))) throw new Error(`Cannot inspect: no studio would open at ${at}. Next: run \`npm run studio\` and ask again.`)
+  if (!(await spawnStudio({ url, dir, at }))) throw new Error(`Cannot inspect: no studio would open at ${at}. Next: run \`npx motioneer\` and ask again.`)
   const { inspectSite, describe } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'autofilm.mjs')).href)
+  const {prepareRenderer}=await import('../tools/environment.mjs');await prepareRenderer(at)
   const seen = await inspectSite({ at, url, language, theme })
   const lines = seen.candidates.map(describe)
   const text = `${seen.title || seen.source} has ${seen.candidates.length} things worth filming:\n${lines.join('\n')}\n\n`
@@ -418,19 +424,9 @@ async function film({ url, dir, language, theme, captureMode, seconds, fps, soun
   if (!url) throw new Error('film needs a url, a running site or dev server like http://localhost:3000.')
   const at = STUDIO_AT()
   const up = await spawnStudio({ url, dir, at })
-  if (!up) throw new Error(`Could not open a studio at ${at}. Run \`npm run studio\` and try again.`)
+  if (!up) throw new Error(`Could not open a studio at ${at}. Run \`npx motioneer\` and try again.`)
 
-  // the renderer is required to make the file; install it and wait rather than reporting a film that did not render
-  let ready = await (await fetch(`${at}/__motioneer/renderer`)).json()
-  if (ready.state !== 'ready') {
-    await fetch(`${at}/__motioneer/renderer`, { method: 'POST' })
-    for (let n = 0; n < 240 && ready.state !== 'ready'; n++) {
-      await new Promise((r) => setTimeout(r, 2500))
-      ready = await (await fetch(`${at}/__motioneer/renderer`)).json()
-      if (ready.state === 'error') throw new Error(`The renderer could not be set up: ${ready.message}`)
-    }
-    if (ready.state !== 'ready') throw new Error('The renderer is still installing. Give it a minute and ask again.')
-  }
+  const {prepareRenderer}=await import('../tools/environment.mjs');await prepareRenderer(at,progress)
 
   const { autofilm } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'autofilm.mjs')).href)
   const steps = []
@@ -458,6 +454,7 @@ async function film({ url, dir, language, theme, captureMode, seconds, fps, soun
 async function reel({brand,domain,projectId,url,mode='graphic',direction,seconds=12,palette,music,art,concept,bpm,brandMode='site',referenceUrls=[],dir},progress=()=>{}) {
   const at=STUDIO_AT()
   if(!(await answering(at))&&!(await spawnStudio({url:domain?'https://'+domain:undefined,dir,at})))throw new Error('Cannot make a reel: the studio could not start. Next: open the studio and retry.')
+  const {prepareRenderer}=await import('../tools/environment.mjs');await prepareRenderer(at,progress)
   const {kineticReel}=await import(pathToFileURL(path.join(ROOT,'tools/editor/kinetic.mjs')).href)
   const result=await kineticReel({at,brand,domain,projectId,url,mode,direction,seconds,palette,music,art,concept,bpm,brandMode,referenceUrls,onStep:progress})
   const file=await keepFile(result,dir),review=await reviewResult(result,file,progress)
@@ -469,6 +466,7 @@ async function reel({brand,domain,projectId,url,mode='graphic',direction,seconds
 async function rescore(args,progress=()=>{}){
   const at=STUDIO_AT()
   if(!(await answering(at)))throw new Error('Cannot rescore: the studio is not running. Next: open the original studio first.')
+  const {prepareRenderer}=await import('../tools/environment.mjs');await prepareRenderer(at,progress)
   const {rescoreFilm}=await import(pathToFileURL(path.join(ROOT,'tools/editor/rescore.mjs')).href)
   const result=await rescoreFilm({...args,at,onStep:progress})
   const file=await keepFile(result,args.dir),review=await reviewResult(result,file,progress),audio=file.replace(/\.mp4$/,'-score.wav')
@@ -522,6 +520,7 @@ async function revise({ projectId, dir, pace, seconds, opening, closing, drop, o
   if (!projectId) throw new Error('Cannot revise: revise needs the projectId a film returned. Next: pass it, or film first.')
   const at = STUDIO_AT()
   if (!(await answering(at))) throw new Error(`Cannot revise: the studio at ${at} is not open any more, so the project is not reachable. Next: film again.`)
+  const {prepareRenderer}=await import('../tools/environment.mjs');await prepareRenderer(at,progress)
   const { revise: reviseFilm } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'autofilm.mjs')).href)
   const steps = []
   const result = await reviseFilm({ at, projectId: String(projectId), pace, seconds, opening, closing, drop, order, motionDirection, motionElements, fps, soundtrack, background, ink, onStep: (m) => {steps.push(m);progress(m)} })
@@ -690,6 +689,7 @@ async function call(name, args, id, meta) {
   let step=0
   const progress=message=>{if(typeof meta?.progressToken==='string'||typeof meta?.progressToken==='number')send({jsonrpc:'2.0',method:'notifications/progress',params:{progressToken:meta.progressToken,progress:step++,message}})}
   if(name==='film'||name==='revise'||name==='reel')progress('Preparing the film workspace.')
+  if(name==='doctor'){const {diagnose}=await import('../tools/environment.mjs');const report=await diagnose(args||{});return ok(id,{structured:report,text:report.ready?'Motioneer is configured and its renderer works. Model authentication is checked on the first request.':report.checks.filter(c=>!c.ok).map(c=>c.message+' '+(c.next||'')).join('\n')})}
   if (name === 'studio') return ok(id, await studio(args ?? {}))
   if (name === 'motion') return ok(id, await motion(args ?? {}))
   if (name === 'rescore') return ok(id, await rescore(args ?? {},progress))
