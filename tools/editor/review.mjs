@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process'
 import { writeFile } from 'node:fs/promises'
 import { loadChromium, loadFfmpeg } from './render.mjs'
 
-export async function reviewFilm(file, {shots = [], seconds = 20} = {}) {
+export async function reviewFilm(file, {shots = [], seconds = 20, maxSamples = 20} = {}) {
   const ffmpeg = await loadFfmpeg(), chromium = await loadChromium()
   if (!ffmpeg || !chromium) throw new Error('The local renderer is unavailable for the storyboard.')
   // Read each shot late enough to judge its content. A fixed 700 ms sample caught deliberate
@@ -13,7 +13,7 @@ export async function reviewFilm(file, {shots = [], seconds = 20} = {}) {
   // reveal cannot disappear from the agent's review because a uniform sampler skipped it.
   const complete=shots.length&&shots[0].at===0&&Math.abs(shots.at(-1).at+shots.at(-1).seconds-seconds)<.1
   const points=complete?shotPoints:[{at:Math.min(.9,seconds/4),label:'Opening'},...shotPoints,{at:Math.max(0,seconds-.5),label:'Closing'}]
-  const chosen=points.length<=20?points:Array.from({length:20},(_,i)=>points[Math.round(i*(points.length-1)/19)])
+  const chosen=points.length<=maxSamples?points:Array.from({length:maxSamples},(_,i)=>points[Math.round(i*(points.length-1)/(maxSamples-1))])
   const tiles = []
   for (const point of chosen) {
     const data = await new Promise((resolve,reject)=>{

@@ -13,6 +13,14 @@ side by side on one timeline. Keep the one you like as a stylesheet that ships i
 Generating one animation is solved. What nobody gives you is *many at once, live, on the same
 clock*, which is the only way choosing between them is real.
 
+## Prompt a landing-page film
+
+In Claude Code with the Motioneer MCP server connected:
+
+> Make a 20-second snappy launch film from notion.so. Use the native detail film standard: actual source elements, macro details that reveal the full component, source typography and colors, a distinctive action score, and a clean brand ending. Review the exported motion and give me the video and editor links.
+
+This uses `reel` with `mode: "native"`. It retains source DOM/SVG, validates detail anchors, and keeps the result editable. Embedded screenshots stay flattened; unavailable native sources produce an explicit limitation. See the [prompt-to-film workflow](docs/chat-to-film.md) and [example prompts](docs/native-examples.md).
+
 ## Open it
 
 Nothing to install. If you have [Node](https://nodejs.org) 20 or newer, one line opens it:

@@ -128,6 +128,7 @@ ok('reels can read bounded product documentation',tools.find(t=>t.name==='reel')
 ok('reels default to source brand identity with an explicit expressive option',tools.find(t=>t.name==='reel')?.inputSchema?.properties?.brandMode?.enum.join(',')==='site,expressive')
 ok('reels expose a shared tempo for music and visual cuts',tools.find(t=>t.name==='reel')?.inputSchema?.properties?.bpm?.maximum===180)
 ok('reels expose six reusable art directions',tools.find(t=>t.name==='reel')?.inputSchema?.properties?.art?.enum.length===6 && tools.find(t=>t.name==='reel')?.inputSchema?.properties?.concept)
+ok('native detail films are discoverable through MCP',tools.find(t=>t.name==='reel')?.inputSchema?.properties?.mode?.enum.includes('native') && /mode native/.test(hello.result.instructions))
 ok('hybrid reels accept existing captures or a website URL',tools.find(t=>t.name==='reel')?.inputSchema?.properties?.mode?.enum.includes('hybrid') && tools.find(t=>t.name==='reel')?.inputSchema?.properties?.url)
 ok('artistic briefs have an authored reel tool with explicit creative direction',tools.find(t=>t.name==='reel')?.inputSchema?.properties?.direction && /use reel/.test(hello.result.instructions))
 ok('film offers 60 fps and revision can change motion without recapturing',

@@ -6,6 +6,20 @@ a route or a tool, so this page is the map an agent follows today and the two ga
 need a person's hand. It is written for whoever drives the tool from a conversation, whether that
 is Claude Code through the MCP server or a script through the HTTP routes.
 
+## The native detail film standard
+
+For polished landing-page promos, ask for `reel` with `mode: "native"`, the source `url`, `brand`, full creative `direction`, an absolute `dir`, and usually `seconds: 20`. Claude Code uses the same MCP tool and configured model as the example films. The mode discovers real source components, retains their HTML/SVG and embedded imagery, gives the director a source sheet with named anchors, and measures each selected detail before constructing its camera reveal.
+
+The production bar requires 10–12 scenes, at least three native reveals from two distinct components, valid measured anchors, no more than two conceptual mechanism diagrams, readable capture holds, shared music/action timing and a closing card with only the brand on dark for at least six beats. Raw captures stay in the project library. Neighboring source elements assemble while a detail expands into the full component; SVG anchors use the actual source paths. The director chooses the object, composition, sequence and musical phrase. Invalid plans get up to two correction passes before any film project is built. Failed render checks return an error with the saved take’s editor link for repair; they never report a successful native delivery.
+
+The tool returns a storyboard that samples the detail, movement and settled view, not just the final state of each scene. Review those exported frames before delivery. Structural validation catches missing sources, invalid plans and render failures; it cannot certify taste or promise that every model plan matches an art-directed reference. Re-prompt a weak result with concrete notes while preserving the previous take.
+
+Some sites publish product imagery as raster screenshots or video. Embedded screenshots remain flat, even inside a native card; source text and SVG may still animate independently. Navigation arrows, testimonial sections, video/canvas containers, unresolved image placeholders, unreadable isolated captures and empty anchors are excluded. Physical keyboard demos that depend on 3D scroll/lighting state are skipped in favor of actual command interfaces. Hidden carousel cards can be brought into view for capture. If fewer than two usable components survive isolation, the tool refuses native mode and explains how to use a more suitable product page or honestly labeled hybrid mode. It never silently claims screenshot internals are native layers.
+
+> Make a 20-second launch film from notion.so using Motioneer’s native detail film standard. Capture real site elements, turn meaningful details into full-component reveals, preserve the source font and colors, and give the film a dry, distinctive action score. Alternate quick graphic gestures with readable product holds. Finish with only Notion on dark. Review the motion and return the local video and editor links.
+
+See [three native-film prompts](native-examples.md) and [motion direction](motion-direction.md).
+
 ## Artistic brand films
 
 For kinetic typography and graphic identity films, use the `reel` MCP tool. It plans an original

@@ -18,7 +18,7 @@ For Linear, useful subjects include an issue status glyph resolving into its row
 
 ## Retaining real source layers
 
-The default reel path still uses flattened product screenshots alongside authored graphics. A curated capture path now retains selected homepage components as DOM/SVG through `captureLayers` in `tools/editor/layer-capture.mjs`:
+Hybrid reels use flattened product screenshots alongside authored graphics. The `reel` tool’s `mode: "native"` discovers and retains suitable homepage components and supplies measured detail anchors to its director. Curated capture is also available through `captureLayers` in `tools/editor/layer-capture.mjs`:
 
 ```js
 const capture = await captureLayers(page, {

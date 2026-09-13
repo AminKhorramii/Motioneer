@@ -8,15 +8,17 @@ export async function captureLayers(page,{selector,name,layers={},fontCSS=''}){
   if(root.matches('script,style,iframe,object,embed,link,meta,base,canvas'))throw new Error('Cannot capture layers: select a visible DOM/SVG component.')
   const clone=root.cloneNode(true),from=[root,...root.querySelectorAll('*')],to=[clone,...clone.querySelectorAll('*')],css=[],fonts=new Set(),assets=new Set(),targets=[]
   if(from.length>1500)throw new Error('Cannot capture layers: select a smaller product component. Next: capture its individual panels.')
+  const collect=style=>{for(const m of style.matchAll(/url\(["']?(https?:[^"')]+)["']?\)/g))assets.add(m[1])}
   const styleText=(style)=>[...style].filter(k=>!k.startsWith('--')&&!/^animation|^transition/.test(k)).map(k=>k+':'+style.getPropertyValue(k)).join(';')
   for(let i=0;i<from.length;i++){
-   const source=from[i],copy=to[i],style=getComputedStyle(source);copy.setAttribute('style',styleText(style));copy.setAttribute('data-capture-node',String(i));fonts.add(style.fontFamily)
+   const source=from[i],copy=to[i],style=getComputedStyle(source);copy.setAttribute('style',styleText(style));copy.setAttribute('data-capture-node',String(i));fonts.add(style.fontFamily);collect(styleText(style))
    for(const pseudo of ['::before','::after']){const s=getComputedStyle(source,pseudo);if(s.content&&s.content!=='none'&&s.content!=='normal')css.push(`${i===0?`[data-capture-root="${token}"]`:`[data-capture-root="${token}"] [data-capture-node="${i}"]`}${pseudo}{${styleText(s)}}`)}
    if(copy.tagName==='IMG'){copy.setAttribute('src',source.currentSrc||source.src);copy.removeAttribute('srcset');copy.removeAttribute('loading')}
+   if(copy.tagName.toLowerCase()==='image'){const href=source.href?.baseVal;if(href){copy.setAttribute('href',new URL(href,location.href).href);copy.removeAttribute('xlink:href');if(/^https?:/.test(copy.getAttribute('href')))assets.add(copy.getAttribute('href'))}}
    if(copy.tagName==='INPUT')copy.setAttribute('value',source.value)
    if(copy.tagName==='TEXTAREA')copy.textContent=source.value
    for(const a of [...copy.attributes])if(/^on/i.test(a.name)||/^(?:javascript|vbscript):/i.test(a.value.trim())||['action','formaction','autoplay'].includes(a.name))copy.removeAttribute(a.name)
-   if(copy.hasAttribute('href')&&!copy.getAttribute('href').startsWith('#'))copy.removeAttribute('href')
+   if(copy.tagName.toLowerCase()!=='image'&&copy.hasAttribute('href')&&!copy.getAttribute('href').startsWith('#'))copy.removeAttribute('href')
   }
   for(const [key,selector]of Object.entries(layers)){
    if(!/^[a-z][a-z0-9-]*$/.test(key))throw new Error('Cannot capture layers: use simple layer names. Next: use letters, numbers and hyphens.')
@@ -28,7 +30,7 @@ export async function captureLayers(page,{selector,name,layers={},fontCSS=''}){
   clone.setAttribute('data-capture-root',token)
   const box=root.getBoundingClientRect();Object.assign(clone.style,{position:'relative',left:'auto',right:'auto',top:'auto',bottom:'auto',margin:'0',transform:'none',translate:'none',rotate:'none',scale:'none',width:box.width+'px',height:box.height+'px',boxSizing:'border-box'})
   let html=clone.outerHTML,text=html+'\n'+css.join('\n')
-  for(const img of clone.querySelectorAll('img[src]'))if(/^https?:/.test(img.src))assets.add(img.src)
+  for(const img of [clone,...clone.querySelectorAll('img[src]')].filter(e=>e.tagName==='IMG'))if(/^https?:/.test(img.src))assets.add(img.src)
   for(const match of text.matchAll(/url\(["']?(https?:[^"')]+)["']?\)/g))assets.add(match[1])
   return {name,html,css:css.join('\n'),w:box.width,h:box.height,layers:targets,fonts:[...fonts],assets:[...assets],source:location.href}
  },{name,layers,token})
