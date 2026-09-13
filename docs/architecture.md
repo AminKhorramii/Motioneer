@@ -38,6 +38,8 @@ tools/editor/
   media-source.mjs     discovers published product-video posters, including hidden carousel slides, for a fresh hybrid capture project
   hybrid.mjs           source capture snapshots and contact sheets, product reveal/detail/split choreography with traceable source IDs
   kinetic-scenes.mjs   graphic scene vocabulary: typography, orbital systems, ribbons, nodes, stacks and portals using the shared composition runtime
+  music.mjs            ten instrumental identities, melodic phrases, grooves and stereo synthesis tied to scene cuts
+  rescore.mjs          a music-only take that copies assets and preserves the complete visual edit
   soundtrack.mjs       original synthesized music fitted to the cut, stored as editable project audio
   proof.mjs            a rendered film measured off its frames: cuts, shot length, blank frames
 

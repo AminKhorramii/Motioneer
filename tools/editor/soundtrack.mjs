@@ -1,10 +1,15 @@
 /** An original, deterministic score tied to the cut. Kept as ordinary editable audio. */
+import {resolve} from '../../shared/arrange.mjs'
+import {musicWav,musicPlan} from './music.mjs'
 import { newTrack } from '../../dist-core/core.js'
-export const SOUNDTRACKS=['none','ambient','pulse','playful','percussive']
+export const SOUNDTRACKS=['none','ambient','pulse','playful','percussive','signature']
 const prefix='Motioneer score: '
-export const scoreStyle=project=>project.assets.find(a=>project.tracks.some(t=>t.kind==='audio'&&t.assetId===a.id)&&a.name.startsWith(prefix))?.name.slice(prefix.length).replace(/\.wav$/,'')
+const scoreName=project=>project.assets.find(a=>project.tracks.some(t=>t.kind==='audio'&&t.assetId===a.id)&&a.name.startsWith(prefix))?.name.slice(prefix.length).replace(/\.wav$/,'')
+export const scoreStyle=project=>scoreName(project)?.startsWith('signature-')?'signature':scoreName(project)
+export const scoreMusic=project=>scoreName(project)?.startsWith('signature-')?scoreName(project).slice(10):undefined
 
-export function scoreWav({seconds,style='pulse',seed='film',cuts=[],bpm=160}) {
+export function scoreWav({seconds,style='pulse',seed='film',cuts=[],bpm=160,music}) {
+  if(style==='signature')return musicWav({seconds,seed,cuts,bpm,music})
   const sr=24000,N=Math.ceil(seconds*sr),L=new Float32Array(N),R=new Float32Array(N),pi=Math.PI
   let state=[...seed].reduce((a,c)=>(a*31+c.charCodeAt(0))>>>0,73)
   const key=state%5,noise=()=>{state=(1664525*state+1013904223)>>>0;return state/2147483648-1},midi=n=>440*2**((n-69)/12)
@@ -35,15 +40,18 @@ export function scoreWav({seconds,style='pulse',seed='film',cuts=[],bpm=160}) {
   return {data,waveform}
 }
 
-export async function withSoundtrack(project,{at,style,bpm,onStep=()=>{}}) {
-  if(!SOUNDTRACKS.includes(style))throw new Error('Cannot score: choose none, ambient, pulse, playful, or percussive. Next: pass a supported soundtrack.')
+export async function withSoundtrack(project,{at,style,bpm,music,onStep=()=>{}}) {
+  if(!SOUNDTRACKS.includes(style))throw new Error('Cannot score: choose none, ambient, pulse, playful, percussive, or signature. Next: pass a supported soundtrack.')
   const generated=new Set(project.assets.filter(a=>a.name.startsWith(prefix)).map(a=>a.id))
   const tracks=project.tracks.filter(t=>t.kind!=='audio'||!generated.has(t.assetId))
   if(style==='none')return {...project,tracks}
-  onStep(`Scoring the cut with an original ${style} soundtrack.`)
-  const seconds=project.settings.duration/1000,cuts=[...new Set(tracks.filter(t=>t.kind==='component'&&!t.hidden).map(t=>t.start/1000))]
-  const {data,waveform}=scoreWav({seconds,style,seed:project.source||project.name,cuts,bpm})
-  const name=prefix+style+'.wav',response=await fetch(`${at}/__motioneer/projects/${project.id}/assets?name=${encodeURIComponent(name)}`,{method:'POST',headers:{'content-type':'audio/wav'},body:data}),asset=await response.json()
+  const identity=style==='signature'?musicPlan(music||{profile:scoreMusic(project)},project.source||project.name):null
+  onStep(`Scoring the cut with original ${identity?.label||style} music.`)
+  const from=identity?project.settings.from:0,to=identity?project.settings.to:project.settings.duration,seconds=(to-from)/1000
+  const starts=resolve({cars:tracks.map(t=>({key:t.id,at:t.start,after:t.after,motion:{ms:t.duration}}))}).at
+  const cuts=[...new Set(tracks.flatMap((t,i)=>t.kind!=='audio'&&!t.hidden?[(starts[i]-from)/1000]:[]))]
+  const {data,waveform}=scoreWav({seconds,style,seed:project.source||project.name,cuts,bpm,music:identity})
+  const name=prefix+(identity?'signature-'+identity.profile:style)+'.wav',response=await fetch(`${at}/__motioneer/projects/${project.id}/assets?name=${encodeURIComponent(name)}`,{method:'POST',headers:{'content-type':'audio/wav'},body:data}),asset=await response.json()
   if(!response.ok||asset.error)throw new Error(`Cannot score: ${asset.error||'audio import failed'}. Next: retry the soundtrack.`)
-  return {...project,assets:[...project.assets,{...asset,duration:project.settings.duration,waveform}],tracks:[...tracks,{...newTrack('audio',name),assetId:asset.id,duration:project.settings.duration,volume:.8,fadeIn:100,fadeOut:300}]}
+  return {...project,assets:[...project.assets,{...asset,duration:to-from,waveform}],tracks:[...tracks,{...newTrack('audio',name,from),assetId:asset.id,duration:to-from,volume:.8,fadeIn:100,fadeOut:300}]}
 }

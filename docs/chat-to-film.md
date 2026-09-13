@@ -22,7 +22,7 @@ the completed plan to a busy-renderer error. Cancelling an export reports prompt
 > rendered storyboard before delivery.
 
 Pass `brand`, `domain`, `direction`, optional `seconds`, optional `palette` (three six-digit hex
-colors: dark, accent, paper), and an absolute output `dir`.
+colors: dark, accent, paper), and an absolute output `dir`. Reels support 6–30 seconds, including 20-second films.
 
 For a film combining actual website elements with authored graphics, use `mode: "hybrid"`.
 Pass an existing captured `projectId`, or a `url` to capture automatically first. URL capture
@@ -385,3 +385,40 @@ nothing to choose from, and `inspect` will say so; the studio's picker still wor
 - `tools/studio.mjs` also serves `/__motioneer/ask`, the one route that puts a question to the
   configured model, so judgement works with any provider.
 - `src/editor/project.ts` is the project document, and the only schema an agent needs.
+
+## A musical identity for each film
+
+Reels now compose original 48 kHz stereo instrumental scores with profile-specific harmony,
+instruments, bass lines and drum patterns. The director chooses a melodic phrase and music
+profile as part of the visual plan; `music` can request one explicitly. The arrangement builds,
+leaves space, returns with energy and resolves on the closing scene. These are synthesized
+scores, not licensed tracks or recordings of live instruments.
+
+| Profile | Musical direction |
+| --- | --- |
+| glass | Precise glass arpeggios and minimal electronic percussion |
+| liquid | Swung garage, electric keys and syncopated bass |
+| paper | Felt-like keys, plucked wood and intimate brushed percussion |
+| monolith | Cinematic sub pulses, metallic resonances and open space |
+| elastic | Bouncy electro funk and mallet melodies |
+| voltage | Acid bass, broken electro drums and short fills |
+| current | Dub-techno chord stabs and dotted echoes |
+| branch | Digital counterpoint and melodic breaks |
+| prism | Wide pads, rising plucks and a spacious finish |
+| conversation | Warm broken soul with answering melodies |
+
+See [ten music directions](music-examples.md) for reusable brand briefs.
+
+For a music-only revision, use `rescore` with the existing `projectId`, optional `music`,
+`direction`, the original reel `bpm`, and output `dir`. It creates an independent project,
+copies source assets and preserves the visual tracks, camera, film settings and source project.
+It replaces only generated audio; imported audio remains. The result includes the new MP4,
+the editable stereo WAV, a storyboard and musical metadata. An exported subrange gets a score
+for that range; linked visual timing determines its cut accents.
+
+> Keep this Linear film exactly as it is visually. Use rescore with music glass. Compose a
+> precise, luminous motif with soft sub pulses and microscopic percussion. Let the product
+> holds breathe and resolve on the final brand card. Keep the original BPM.
+
+> Make a 20-second hybrid film for Framer, with music prism: velvet pads, climbing plucks and
+> a beautiful final bloom. Build a complete musical phrase and leave room to read the product.

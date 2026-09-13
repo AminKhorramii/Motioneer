@@ -80,7 +80,7 @@ How people say it, and what to call:
 
 When a tool fails its message starts with "Cannot" and ends with "Next:". Relay the reason and the next step as given, and do not invent a different cause. Retry only when the next step says to.
 
-For super-snappy, artistic brand films, kinetic typography, motion-identity references, or crazy creative launch videos, use reel. Ground the brief in a distinct brand metaphor and pass the full direction. Reel authors graphic scenes with typography, diagrams and a matched percussion track; it is a different creative mode from filming captured interfaces. For a mix of real website elements and artistic graphics use mode hybrid with a captured projectId or url. Hybrid renders real capture pixels, while its diagrams are illustrative. Name the source fidelity plainly. Use a new reel call for creative revisions, preserving the previous project.
+For super-snappy, artistic brand films, kinetic typography, motion-identity references, or crazy creative launch videos, use reel. Ground the brief in a distinct brand metaphor and pass the full direction. Reel authors graphic scenes with typography, diagrams and a coordinated instrumental score; it is a different creative mode from filming captured interfaces. For a mix of real website elements and artistic graphics use mode hybrid with a captured projectId or url. Hybrid renders real capture pixels, while its diagrams are illustrative. Name the source fidelity plainly. Use a new reel call for visual revisions, preserving the previous project. For music-only changes use rescore: it creates a new take with the same visual edit. Reel supports 6–30 seconds, including 20-second films. Choose a distinct music profile for each brand and carry musical direction through the brief.
 
 While film runs it can take a minute or two: it opens the site, captures, writes motions, cuts and renders. Say that once, then wait for the result rather than polling or calling it again.
 
@@ -202,7 +202,7 @@ const TOOLS = [
   },
   {
     name: 'reel',
-    description: 'Create an art-directed kinetic brand film with original animated graphics, huge typography, diagrams, spatial motifs, fast cuts and a beat-matched percussion score. Prefer this for artistic, snappy launch films and brand identity reels. Hybrid mode combines actual website captures with authored graphics; pass projectId or url. Graphic mode uses illustrative graphics only. A new editable project preserves the original film.',
+    description: 'Create an art-directed kinetic brand film with original animated graphics, huge typography, diagrams, spatial motifs, fast cuts and a beat-matched original instrumental score. Prefer this for artistic, snappy launch films and brand identity reels. Hybrid mode combines actual website captures with authored graphics; pass projectId or url. Graphic mode uses illustrative graphics only. A new editable project preserves the original film.',
     inputSchema: {type:'object',properties:{
       mode:{type:'string',enum:['graphic','hybrid'],description:'Use hybrid to mix real website captures with authored kinetic graphics. Graphic makes authored graphics only.'},
       url:{type:'string',description:'Website to capture automatically for hybrid mode when projectId is omitted.'},
@@ -211,9 +211,21 @@ const TOOLS = [
       projectId:{type:'string',description:'Optional existing film in this studio; hybrid mode uses its actual captured visuals; graphic mode uses names as context. It is not modified.'},
       direction:{type:'string',description:'The full creative brief: concept, metaphors, typography, rhythm, reference observations. Give each brand a distinct idea.'},
       seconds:{type:'number',minimum:6,maximum:30,description:'6 to 30 seconds, 12 by default.'},
+      music:{type:'string',enum:['glass','liquid','paper','monolith','elastic','voltage','current','branch','prism','conversation'],description:'Musical identity: glass minimal electronica, liquid swung garage, paper intimate keys, monolith cinematic sub, elastic electro funk, voltage acid breaks, current dub techno, branch digital counterpoint, prism melodic electronica, conversation warm broken soul. The director chooses when omitted.'},
       palette:{type:'array',minItems:3,maxItems:3,items:{type:'string',pattern:'^#[0-9a-fA-F]{6}$'},description:'Three six-digit hex colors in dark, accent, paper order. Optional; the director chooses when omitted.'},
       dir:{type:'string',description:'Absolute output folder for the MP4 and storyboard.'}
     },required:['brand']}
+  },
+  {
+    name:'rescore',
+    description:'Change only the music of an existing film or reel. Creates a new independent editable take, preserving visuals, timing, camera and the original project. Composes an original instrumental score and returns MP4, WAV and storyboard. Use for a new musical identity without rebuilding the visuals.',
+    inputSchema:{type:'object',properties:{
+      projectId:{type:'string',description:'Existing film or reel projectId.'},
+      music:{type:'string',enum:['glass','liquid','paper','monolith','elastic','voltage','current','branch','prism','conversation'],description:'Musical identity. Choose a different orchestration and groove for each brand.'},
+      direction:{type:'string',description:'Musical brief: instrumentation, groove, feeling and melodic character. The composer writes a phrase for this direction.'},
+      bpm:{type:'number',minimum:40,maximum:400,description:'Use the original reel BPM to keep music on its edit grid. Inferred from clip lengths when omitted.'},
+      dir:{type:'string',description:'Absolute output directory for MP4, WAV and storyboard.'}
+    },required:['projectId']}
   },
   {
     name: 'inspect',
@@ -437,15 +449,27 @@ async function film({ url, dir, language, theme, captureMode, seconds, fps, soun
     + `Only call open if the person asks to launch the editor or player.` }
 }
 
-async function reel({brand,domain,projectId,url,mode='graphic',direction,seconds=12,palette,dir},progress=()=>{}) {
+async function reel({brand,domain,projectId,url,mode='graphic',direction,seconds=12,palette,music,dir},progress=()=>{}) {
   const at=STUDIO_AT()
   if(!(await answering(at))&&!(await spawnStudio({url:domain?'https://'+domain:undefined,dir,at})))throw new Error('Cannot make a reel: the studio could not start. Next: open the studio and retry.')
   const {kineticReel}=await import(pathToFileURL(path.join(ROOT,'tools/editor/kinetic.mjs')).href)
-  const result=await kineticReel({at,brand,domain,projectId,url,mode,direction,seconds,palette,onStep:progress})
+  const result=await kineticReel({at,brand,domain,projectId,url,mode,direction,seconds,palette,music,onStep:progress})
   const file=await keepFile(result,dir),review=await reviewResult(result,file,progress)
   const sourceSheet=result.sourceSheet?file.replace(/\.mp4$/,'-sources.jpg'):null
   if(sourceSheet)await writeFile(sourceSheet,Buffer.from(result.sourceSheet.data,'base64'))
-  return {structured:{projectId:result.projectId,studio:at,file,seconds,fps:60,style:mode==='hybrid'?'hybrid':'kinetic',soundtrack:'percussive',bpm:result.bpm,concept:result.plan.concept,plan:result.plan,shots:result.shotList,sourceProjectId:result.sourceProjectId,artifacts:{video:file,storyboard:result.storyboard||null,sources:sourceSheet},reviewError:result.reviewError||null,verdict:result.proof,captures:result.captures,limitation:result.limitation},images:review?[review]:[],text:`Created ${brand}: ${result.plan.concept}. ${result.shotList.length} authored graphic scenes in ${seconds} seconds, 60 fps, with original percussion. Video: ${file}. Review the storyboard for typography and composition. The original film is preserved. For a new creative direction use reel again; generic revise rebuilds a capture-style cut and is not appropriate for these authored scenes. ${result.limitation}`}
+  return {structured:{projectId:result.projectId,studio:at,file,seconds,fps:60,style:mode==='hybrid'?'hybrid':'kinetic',soundtrack:result.soundtrack,music:result.music,bpm:result.bpm,concept:result.plan.concept,plan:result.plan,shots:result.shotList,sourceProjectId:result.sourceProjectId,artifacts:{video:file,storyboard:result.storyboard||null,sources:sourceSheet},reviewError:result.reviewError||null,verdict:result.proof,captures:result.captures,limitation:result.limitation},images:review?[review]:[],text:`Created ${brand}: ${result.plan.concept}. ${result.shotList.length} authored graphic scenes in ${seconds} seconds, 60 fps, with original ${result.music.label} music. Video: ${file}. Review the storyboard for typography and composition. The original film is preserved. For music-only changes use rescore. For a new visual direction use reel again; generic revise rebuilds a capture-style cut and is not appropriate for these authored scenes. ${result.limitation}`}
+}
+
+async function rescore(args,progress=()=>{}){
+  const at=STUDIO_AT()
+  if(!(await answering(at)))throw new Error('Cannot rescore: the studio is not running. Next: open the original studio first.')
+  const {rescoreFilm}=await import(pathToFileURL(path.join(ROOT,'tools/editor/rescore.mjs')).href)
+  const result=await rescoreFilm({...args,at,onStep:progress})
+  const file=await keepFile(result,args.dir),review=await reviewResult(result,file,progress),audio=file.replace(/\.mp4$/,'-score.wav')
+  const response=await fetch(result.audioUrl)
+  if(!response.ok)throw new Error('Cannot deliver the score: its audio file is unavailable. Next: export the saved take from the studio.')
+  await writeFile(audio,Buffer.from(await response.arrayBuffer()))
+  return {structured:{projectId:result.projectId,sourceProjectId:result.sourceProjectId,studio:at,file,seconds:result.seconds,fps:result.fps,soundtrack:result.soundtrack,music:result.music,bpm:result.bpm,shots:result.shotList,verdict:result.proof,artifacts:{video:file,audio,storyboard:result.storyboard||null}},images:review?[review]:[],text:`Created a new ${result.music.label} musical take. ${result.music.description} The visual edit and original project are preserved. MP4: ${file}. Original synthesized stereo score: ${audio}.`}
 }
 
 /** The rendered file, moved from where the driver measured it to where the person works. */
@@ -662,6 +686,7 @@ async function call(name, args, id, meta) {
   if(name==='film'||name==='revise'||name==='reel')progress('Preparing the film workspace.')
   if (name === 'studio') return ok(id, await studio(args ?? {}))
   if (name === 'motion') return ok(id, await motion(args ?? {}))
+  if (name === 'rescore') return ok(id, await rescore(args ?? {},progress))
   if (name === 'reel') return ok(id, await reel(args ?? {},progress))
   if (name === 'film') return ok(id, await film(args ?? {},progress))
   if (name === 'inspect') return ok(id, await inspect(args ?? {}))

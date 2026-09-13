@@ -18,6 +18,8 @@ import { autofilm, inspectSite, renderProject, revise as reviseFilm } from '../t
 import { candidates, reveal } from '../tools/editor/survey.mjs'
 import { componentBrief, briefStyles } from '../shared/component-brief.mjs'
 import { reviewFilm } from '../tools/editor/review.mjs'
+import {MUSIC,musicWav} from '../tools/editor/music.mjs'
+import {rescoreFilm} from '../tools/editor/rescore.mjs'
 import { withSoundtrack, scoreStyle, scoreWav } from '../tools/editor/soundtrack.mjs'
 import { loadChromium } from '../tools/editor/render.mjs'
 import {normalizeReel,reelProject,kineticReel} from '../tools/editor/kinetic.mjs'
@@ -29,6 +31,36 @@ import { firstCut, createProject, compositionDocument } from '../dist-core/core.
 
 const root = path.dirname(fileURLToPath(new URL('.', import.meta.url)))
 if (!(await loadChromium())) { console.log('skip: the local renderer is not installed, so the film path cannot be exercised here'); process.exit(0) }
+
+// Musical identities must sound different with the same notes, and a 20-second score must resolve.
+{
+  const scores=Object.keys(MUSIC).map(profile=>musicWav({seconds:4,seed:'same phrase',bpm:120,cuts:[1,2,3.3],music:{profile,root:45,motif:[0,2,4,1]}}))
+  for(const score of scores){
+    assert.equal(score.data.readUInt32LE(24),48000,'signature scores use 48 kHz stereo audio')
+    assert.ok(score.analysis.peak<=.861&&score.analysis.rms>.03,'the score is audible and has peak headroom')
+    assert.equal(score.data.readInt16LE(44),0,'the entrance starts without a discontinuity')
+    assert.ok(Math.abs(score.data.readInt16LE(score.data.length-4))<10,'the cadence tail reaches silence')
+  }
+  for(let i=0;i<scores.length;i++)for(let j=0;j<i;j++)assert.notDeepEqual(scores[i].data,scores[j].data,'different orchestration changes the actual audio')
+  assert.deepEqual(scores[0].data,musicWav({seconds:4,seed:'same phrase',bpm:120,cuts:[1,2,3.3],music:{profile:'glass',root:45,motif:[0,2,4,1]}}).data,'a saved phrase renders deterministically')
+  const extended=musicWav({seconds:20,seed:'twenty',bpm:120,cuts:[2,4,8,12,18],music:{profile:'prism'}})
+  assert.equal(extended.data.length,44+20*48000*4,'twenty seconds includes the whole final tail')
+  assert.equal(extended.events.at(-1).at,18,'the cadence lands on the closing scene')
+  assert.ok(extended.waveform.slice(108).some(v=>v>.1),'the longer score has a composed ending rather than silent padding')
+  let delivered
+  const upload=createServer(async(req,res)=>{const chunks=[];for await(const c of req)chunks.push(c);delivered=Buffer.concat(chunks);res.setHeader('content-type','application/json');res.end(JSON.stringify({id:'score',name:new URL(req.url,'http://local').searchParams.get('name'),kind:'audio',mime:'audio/wav'}))})
+  await new Promise(r=>upload.listen(0,'127.0.0.1',r))
+  try{
+    const p=createProject('range');p.settings={...p.settings,duration:8000,from:2000,to:7000};p.source='range'
+    p.tracks=[{id:'a',kind:'component',start:0,duration:4000},{id:'b',kind:'component',start:0,duration:3000,after:{key:'a',mode:'after',gap:0}}]
+    const take=await withSoundtrack(p,{at:`http://127.0.0.1:${upload.address().port}`,style:'signature',bpm:120,music:{profile:'glass'}})
+    assert.equal(take.tracks.at(-1).start,2000);assert.equal(take.tracks.at(-1).duration,5000)
+    assert.equal(delivered.length,44+5*48000*4,'an exported subrange receives exactly its own audio duration')
+    const expected=musicWav({seconds:5,seed:'range',bpm:120,cuts:[-2,2],music:{profile:'glass'}})
+    assert.deepEqual(delivered,expected.data,'musical accents follow resolved linked timing inside the export range')
+  }finally{await new Promise(r=>upload.close(r))}
+  console.log('ok: ten musical identities render distinct, deterministic stereo scores with a complete 20-second cadence')
+}
 
 // Product carousel posters remain real source assets even when their slides are hidden.
 {
@@ -100,6 +132,8 @@ if (!(await loadChromium())) { console.log('skip: the local renderer is not inst
     assert.equal(wordless.scenes.find((_,i)=>raw.scenes[i].type==='echo').type,'grid','a wordless type beat becomes visible geometry rather than an empty frame')
     const reelPlan=normalizeReel(raw,{brand:'Example',domain:'example.com',seconds:6})
     const made=reelProject(createProject('fixture'),reelPlan)
+    const longer=reelProject(createProject('twenty'),normalizeReel(raw,{brand:'Example',seconds:20,music:'prism'}))
+    assert.equal(longer.project.tracks.at(-1).start+longer.project.tracks.at(-1).duration,20000,'twenty-second reels preserve a complete closing scene')
     assert.equal(made.project.settings.fps,60);assert.equal(made.shots.length,SCENES.length)
     assert.equal(made.project.tracks.at(-1).start+made.project.tracks.at(-1).duration,6000,'authored scenes fill the requested duration exactly')
     assert.throws(()=>normalizeReel(raw,{brand:'Example',seconds:6,palette:['red']}),/three hex colors/)
@@ -443,6 +477,18 @@ try {
   assert.equal(hybrid.proof.cuts,hybrid.shotList.length-1,'graphic and product scenes both appear in the exported cut')
   await assert.rejects(()=>kineticReel({at,brand:'Example',mode:'hybrid'}),/source project or website URL/)
   console.log('ok: hybrid film exports source pixels and graphics together, returns provenance, and preserves the source')
+  const rescored=await rescoreFilm({at,projectId:hybrid.projectId,music:'liquid',bpm:hybrid.bpm})
+  const take=await(await fetch(`${at}/__motioneer/projects/${rescored.projectId}`)).json()
+  assert.notEqual(take.id,blended.id,'a music audition is a new project')
+  assert.deepEqual(take.tracks.filter(t=>t.kind!=='audio'),blended.tracks.filter(t=>t.kind!=='audio'),'rescoring preserves the visual edit exactly')
+  assert.deepEqual(take.camera,blended.camera);assert.deepEqual(take.settings,blended.settings)
+  assert.deepEqual(await(await fetch(`${at}/__motioneer/projects/${blended.id}`)).json(),blended,'the previous musical take remains unchanged')
+  assert.equal(take.tracks.filter(t=>t.kind==='audio').length,1,'the new score replaces the old generated audio')
+  assert.equal(scoreStyle(take),'signature')
+  assert.equal(rescored.music.profile,'liquid')
+  assert.equal(rescored.proof.cuts,hybrid.proof.cuts,'all visual cuts survive the new music export')
+  for(const asset of take.assets)assert.ok((await fetch(`${at}/__motioneer/projects/${take.id}/assets/${asset.id}`)).ok,'the new take owns readable copies of its audio assets')
+  console.log('ok: music-only revision preserves the complete visual edit, copies assets, and exports an independent musical take')
   console.log('film verification passed')
 } catch (e) {
   console.error(log.slice(-3000)); throw e
