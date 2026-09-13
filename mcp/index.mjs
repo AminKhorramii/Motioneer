@@ -80,7 +80,7 @@ How people say it, and what to call:
 
 When a tool fails its message starts with "Cannot" and ends with "Next:". Relay the reason and the next step as given, and do not invent a different cause. Retry only when the next step says to.
 
-For super-snappy, artistic brand films, kinetic typography, motion-identity references, or crazy creative launch videos, use reel. Ground the brief in a distinct brand metaphor and pass the full direction. Reel authors graphic scenes with typography, diagrams and a coordinated instrumental score; it is a different creative mode from filming captured interfaces. For a mix of real website elements and artistic graphics use mode hybrid with a captured projectId or url. Hybrid renders real capture pixels, while its diagrams are illustrative. Name the source fidelity plainly. Use a new reel call for visual revisions, preserving the previous project. For music-only changes use rescore: it creates a new take with the same visual edit. Reel supports 6–30 seconds, including 20-second films. Choose a distinct music profile for each brand and carry musical direction through the brief. For deep fast techno use hypnosis, warehouse, submerge, acidline, fracture or alloy, and set bpm (144–162 works well).
+For super-snappy, artistic brand films, kinetic typography, motion-identity references, or crazy creative launch videos, use reel. Ground the brief in a distinct brand metaphor and pass the full direction. Reel authors graphic scenes with typography, diagrams and a coordinated instrumental score; it is a different creative mode from filming captured interfaces. For a mix of real website elements and artistic graphics use mode hybrid with a captured projectId or url. Hybrid renders real capture pixels, while its diagrams are illustrative. Name the source fidelity plainly. Use a new reel call for visual revisions, preserving the previous project. For music-only changes use rescore: it creates a new take with the same visual edit. Reel supports 6–30 seconds, including 20-second films. Preserve brand identity by default: supply the source url or domain, keep brandMode site, and let the source font and palette guide the film. Use brandMode expressive only for an explicitly requested visual departure. Art changes composition and material while site typography remains. Choose a distinct music profile for each brand and carry musical direction through the brief. For deep fast techno use hypnosis, warehouse, submerge, acidline, fracture or alloy, and set bpm (144–162 works well).
 
 While film runs it can take a minute or two: it opens the site, captures, writes motions, cuts and renders. Say that once, then wait for the result rather than polling or calling it again.
 
@@ -212,6 +212,7 @@ const TOOLS = [
       projectId:{type:'string',description:'Optional existing film in this studio; hybrid mode uses its actual captured visuals; graphic mode uses names as context. It is not modified.'},
       direction:{type:'string',description:'The full creative brief: concept, metaphors, typography, rhythm, reference observations. Give each brand a distinct idea.'},
       seconds:{type:'number',minimum:6,maximum:30,description:'6 to 30 seconds, 12 by default.'},
+      brandMode:{type:'string',enum:['site','expressive'],description:'Site by default: inspect the source website and embed its actual font, using its observed palette unless palette is explicitly supplied. Expressive intentionally uses the art preset typography and freely directed colors.'},
       bpm:{type:'number',minimum:80,maximum:180,description:'Optional target tempo shared by music and cuts. Fits whole beats to the exact film length; actual BPM is returned. Deep fast techno usually uses 144 to 162.'},
       art:{type:'string',enum:['studio','editorial','playful','chrome','technical','print'],description:'Visual direction with bundled display typography and material treatment. Studio is sculptural, editorial is serif-led, playful is elastic, chrome is luminous, technical is precise, print is bold and optical.'},
       music:{type:'string',enum:['glass','liquid','paper','monolith','elastic','voltage','current','branch','prism','conversation','hypnosis','warehouse','submerge','acidline','fracture','alloy'],description:'Musical identity: glass minimal electronica, liquid swung garage, paper intimate keys, monolith cinematic sub, elastic electro funk, voltage acid breaks, current dub techno, branch digital counterpoint, prism melodic electronica, conversation warm broken soul. For deep fast techno use hypnosis (rolling), warehouse (industrial), submerge (dub), acidline (acid), fracture (broken), or alloy (metallic). The director chooses when omitted.'},
@@ -452,15 +453,15 @@ async function film({ url, dir, language, theme, captureMode, seconds, fps, soun
     + `Only call open if the person asks to launch the editor or player.` }
 }
 
-async function reel({brand,domain,projectId,url,mode='graphic',direction,seconds=12,palette,music,art,concept,bpm,dir},progress=()=>{}) {
+async function reel({brand,domain,projectId,url,mode='graphic',direction,seconds=12,palette,music,art,concept,bpm,brandMode='site',dir},progress=()=>{}) {
   const at=STUDIO_AT()
   if(!(await answering(at))&&!(await spawnStudio({url:domain?'https://'+domain:undefined,dir,at})))throw new Error('Cannot make a reel: the studio could not start. Next: open the studio and retry.')
   const {kineticReel}=await import(pathToFileURL(path.join(ROOT,'tools/editor/kinetic.mjs')).href)
-  const result=await kineticReel({at,brand,domain,projectId,url,mode,direction,seconds,palette,music,art,concept,bpm,onStep:progress})
+  const result=await kineticReel({at,brand,domain,projectId,url,mode,direction,seconds,palette,music,art,concept,bpm,brandMode,onStep:progress})
   const file=await keepFile(result,dir),review=await reviewResult(result,file,progress)
   const sourceSheet=result.sourceSheet?file.replace(/\.mp4$/,'-sources.jpg'):null
   if(sourceSheet)await writeFile(sourceSheet,Buffer.from(result.sourceSheet.data,'base64'))
-  return {structured:{projectId:result.projectId,studio:at,file,seconds,fps:60,style:mode==='hybrid'?'hybrid':'kinetic',soundtrack:result.soundtrack,music:result.music,bpm:result.bpm,concept:result.plan.concept,plan:result.plan,shots:result.shotList,sourceProjectId:result.sourceProjectId,artifacts:{video:file,storyboard:result.storyboard||null,sources:sourceSheet},reviewError:result.reviewError||null,verdict:result.proof,captures:result.captures,limitation:result.limitation},images:review?[review]:[],text:`Created ${brand}: ${result.plan.concept}. ${result.shotList.length} authored graphic scenes in ${seconds} seconds, 60 fps, with original ${result.music.label} music. Video: ${file}. Review the storyboard for typography and composition. The original film is preserved. For music-only changes use rescore. For a new visual direction use reel again; generic revise rebuilds a capture-style cut and is not appropriate for these authored scenes. ${result.limitation}`}
+  return {structured:{projectId:result.projectId,editor:`${at}/__motioneer/editor/?project=${encodeURIComponent(result.projectId)}&view=film`,studio:at,file,seconds,fps:60,style:mode==='hybrid'?'hybrid':'kinetic',soundtrack:result.soundtrack,music:result.music,bpm:result.bpm,concept:result.plan.concept,plan:result.plan,shots:result.shotList,sourceProjectId:result.sourceProjectId,artifacts:{video:file,storyboard:result.storyboard||null,sources:sourceSheet},reviewError:result.reviewError||null,verdict:result.proof,captures:result.captures,limitation:result.limitation},images:review?[review]:[],text:`Created ${brand}: ${result.plan.concept}. ${result.shotList.length} authored graphic scenes in ${seconds} seconds, 60 fps, with original ${result.music.label} music. Video: ${file}. Review the storyboard for typography and composition. The original film is preserved. For music-only changes use rescore. For a new visual direction use reel again; generic revise rebuilds a capture-style cut and is not appropriate for these authored scenes. ${result.limitation}`}
 }
 
 async function rescore(args,progress=()=>{}){
@@ -472,7 +473,7 @@ async function rescore(args,progress=()=>{}){
   const response=await fetch(result.audioUrl)
   if(!response.ok)throw new Error('Cannot deliver the score: its audio file is unavailable. Next: export the saved take from the studio.')
   await writeFile(audio,Buffer.from(await response.arrayBuffer()))
-  return {structured:{projectId:result.projectId,sourceProjectId:result.sourceProjectId,studio:at,file,seconds:result.seconds,fps:result.fps,soundtrack:result.soundtrack,music:result.music,bpm:result.bpm,shots:result.shotList,verdict:result.proof,artifacts:{video:file,audio,storyboard:result.storyboard||null}},images:review?[review]:[],text:`Created a new ${result.music.label} musical take. ${result.music.description} The visual edit and original project are preserved. MP4: ${file}. Original synthesized stereo score: ${audio}.`}
+  return {structured:{projectId:result.projectId,editor:`${at}/__motioneer/editor/?project=${encodeURIComponent(result.projectId)}&view=film`,sourceProjectId:result.sourceProjectId,studio:at,file,seconds:result.seconds,fps:result.fps,soundtrack:result.soundtrack,music:result.music,bpm:result.bpm,shots:result.shotList,verdict:result.proof,artifacts:{video:file,audio,storyboard:result.storyboard||null}},images:review?[review]:[],text:`Created a new ${result.music.label} musical take. ${result.music.description} The visual edit and original project are preserved. MP4: ${file}. Original synthesized stereo score: ${audio}.`}
 }
 
 /** The rendered file, moved from where the driver measured it to where the person works. */
@@ -497,7 +498,7 @@ async function reviewResult(result,file,progress) {
 /** The same facts as fields: what an agent reasons about between one film and the next. */
 function shape(result, file, pace) {
   return {
-    projectId: result.projectId, studio: result.at, file, source: result.source, seconds: Math.round(result.seconds), fps: result.fps, soundtrack: result.soundtrack, pace,
+    projectId: result.projectId, editor: `${result.at}/__motioneer/editor/?project=${encodeURIComponent(result.projectId)}&view=film`, studio: result.at, file, source: result.source, seconds: Math.round(result.seconds), fps: result.fps, soundtrack: result.soundtrack, pace,
     titles: { opening: result.opening || '', closing: result.closing || '' }, background: result.background,
     shots: (result.shotList || []).map((s) => ({ shot: s.shot, at: s.at, seconds: s.seconds, elements: s.elements, layout: s.layout })),
     elements: result.elements || [],

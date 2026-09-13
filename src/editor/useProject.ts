@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from './api'
 import type { Project, Asset } from './project'
+function rememberProject(id:string){localStorage.setItem('motioneer-project',id);const url=new URL(location.href);url.searchParams.set('project',id);window.history.replaceState(null,'',url)}
 export function useProject() {
   const [project, setProject] = useState<Project | null>(null), [status, setStatus] = useState('Opening projects'), [error,setError] = useState('')
   const [history,setHistory] = useState({past:0,ahead:0}), [projects,setProjects] = useState<{id:string;name:string}[]>([])
@@ -17,9 +18,9 @@ export function useProject() {
     await pending.current
     if(dirty.current) await flushNow()
   },[])
-  const open=useCallback(async(id:string)=>{await flush();if(dirty.current)throw new Error('Resolve the unsaved changes before opening another project.');const p=await api<Project>(`projects/${id}`);revision.current=p.revision;blocked.current=false;publish(p);past.current=[];ahead.current=[];setHistory({past:0,ahead:0});setError('');setStatus('Saved locally');localStorage.setItem('motioneer-project',id)},[flush,publish])
-  const create=useCallback(async()=>{await flush();if(dirty.current)throw new Error('Resolve unsaved changes first.');const p=await api<Project>('projects',{name:'Untitled film'});revision.current=p.revision;publish(p);past.current=[];ahead.current=[];setHistory({past:0,ahead:0});setStatus('Saved locally');localStorage.setItem('motioneer-project',p.id);await refresh()},[flush,publish,refresh])
-  useEffect(()=>{let live=true;void(async()=>{try{const list=await refresh();if(!live)return;const last=localStorage.getItem('motioneer-project');if(list.length)await open(list.find(p=>p.id===last)?.id||list[0].id);else await create()}catch(e){setError((e as Error).message)}})();return()=>{live=false}},[refresh,open,create])
+  const open=useCallback(async(id:string)=>{await flush();if(dirty.current)throw new Error('Resolve the unsaved changes before opening another project.');const p=await api<Project>(`projects/${id}`);revision.current=p.revision;blocked.current=false;publish(p);past.current=[];ahead.current=[];setHistory({past:0,ahead:0});setError('');setStatus('Saved locally');rememberProject(id)},[flush,publish])
+  const create=useCallback(async()=>{await flush();if(dirty.current)throw new Error('Resolve unsaved changes first.');const p=await api<Project>('projects',{name:'Untitled film'});revision.current=p.revision;publish(p);past.current=[];ahead.current=[];setHistory({past:0,ahead:0});setStatus('Saved locally');rememberProject(p.id);await refresh()},[flush,publish,refresh])
+  useEffect(()=>{let live=true;void(async()=>{try{const list=await refresh();if(!live)return;const linked=new URLSearchParams(location.search).get('project');if(linked){if(!list.some(p=>p.id===linked))throw new Error('The linked film was not found in this studio. Open its gallery on the studio that created it.');await open(linked);return}const last=localStorage.getItem('motioneer-project');if(list.length)await open(list.find(p=>p.id===last)?.id||list[0].id);else await create()}catch(e){setError((e as Error).message)}})();return()=>{live=false}},[refresh,open,create])
   const end=useCallback((cancel=false)=>{
     const tx=transaction.current;transaction.current=null
     if(!tx?.recorded)return

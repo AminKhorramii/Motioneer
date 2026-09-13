@@ -456,3 +456,23 @@ its existing behavior: tempo changes music while preserving the visual edit.
 > An eclipse disc and restrained typography become a study of alignment. Interleave real Linear
 > issue, planning and code-review captures with graphic scale changes. Deep kick, rolling sub,
 > very few high notes. Keep source imagery readable and review the storyboard before delivery.
+
+## Keep the brand recognizable
+
+`reel` now defaults to `brandMode: "site"`. Supply the website `url`, a `domain`, or a captured
+project with a source URL. The director receives the observed website palette and heading
+font; the composition embeds that published font so preview and export do not depend on
+a live font server. Art presets still change layout, geometry and material, while the source
+family, weight and style take priority. An explicit `palette` overrides the observed colors.
+Use `brandMode: "expressive"` when the person intentionally wants a different visual identity.
+
+Brand metadata reports the source URL, family, weight, palette, font URLs and observation time.
+Colors come from site CSS first. When color lives in imagery, accents can come from rendered
+site artwork; `accentSource` distinguishes that from CSS. These observations are not a claim
+to have read an official brand manual. If a published font cannot be captured, the tool asks
+for an accessible source or an explicit expressive choice instead of claiming a font match.
+
+Film, reel, rescore and revision results include an `editor` URL. Gallery items can link directly
+to `/__motioneer/editor/?project=<id>&view=film`. The requested project takes precedence over
+the last opened project, and a missing ID shows an error rather than silently opening another
+film. Selecting a different project or workspace updates the URL.

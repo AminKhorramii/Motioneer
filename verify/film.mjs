@@ -9,7 +9,7 @@
  */
 import { createServer } from 'node:http'
 import { spawn } from 'node:child_process'
-import { mkdtemp, mkdir, writeFile, stat } from 'node:fs/promises'
+import { mkdtemp, mkdir, writeFile, readFile, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import assert from 'node:assert'
 import path from 'node:path'
@@ -18,6 +18,7 @@ import { autofilm, inspectSite, renderProject, revise as reviseFilm } from '../t
 import { candidates, reveal } from '../tools/editor/survey.mjs'
 import { componentBrief, briefStyles } from '../shared/component-brief.mjs'
 import { reviewFilm } from '../tools/editor/review.mjs'
+import {websiteBrand,publicBrand} from '../tools/editor/brand.mjs'
 import {ART,artStyles} from '../tools/editor/art-direction.mjs'
 import {MUSIC,musicWav} from '../tools/editor/music.mjs'
 import {rescoreFilm} from '../tools/editor/rescore.mjs'
@@ -70,6 +71,8 @@ if (!(await loadChromium())) { console.log('skip: the local renderer is not inst
 {
   let saved
   const source=createServer(async(req,res)=>{
+    if(req.url==='/brand-font.woff2'){res.setHeader('content-type','font/woff2');return res.end(await readFile(new URL('../tools/editor/fonts/syne.woff2',import.meta.url)))}
+    if(req.url==='/brand'){res.setHeader('content-type','text/html');return res.end(`<style>@font-face{font-family:SourceBrand;src:url('/brand-font.woff2');font-weight:100 900}:root{--color-accent:#7788ff}body{background:#0b0b0f;color:#f6f6fa;font-family:SourceBrand}h1{font-weight:530}</style><h1>Source typography</h1>`)}
     if(req.url==='/a.svg'||req.url==='/b.svg'){res.setHeader('content-type','image/svg+xml');return res.end(`<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400"><rect width="640" height="400" fill="white"/><rect x="70" y="60" width="500" height="280" fill="${req.url==='/a.svg'?'#8855dd':'#228866'}"/><text x="120" y="210" font-size="50" fill="white">Product preview</text></svg>`)}
     if(req.method==='POST'){res.setHeader('content-type','application/json');return res.end(JSON.stringify(createProject('poster fixture')))}
     if(req.method==='PUT'){let body='';for await(const c of req)body+=c;saved=JSON.parse(body);res.setHeader('content-type','application/json');return res.end(JSON.stringify(saved))}
@@ -88,6 +91,13 @@ if (!(await loadChromium())) { console.log('skip: the local renderer is not inst
     const imageProject=await websiteMedia({at:origin,url:origin+'/images'})
     assert.equal(imageProject,saved.id);assert.equal(saved.subjects.length,2)
     assert.deepEqual(saved.subjects.map(s=>s.name),['Vector editing canvas','Brush controls'],'published images retain semantic names and skip portraits')
+    const identity=await websiteBrand({url:origin+'/brand'})
+    assert.equal(identity.family,'SourceBrand');assert.equal(identity.weight,'530');assert.deepEqual(identity.palette,['#0b0b0f','#7788ff','#f6f6fa']);assert.ok(identity.css.includes('data:font/woff2;base64,'));assert.ok(!('css' in publicBrand(identity)),'font payload stays out of agent-facing brand metadata')
+    const rawBrand={palette:['#111111','#ff8844','#eeeeee'],motif:'orbit',scenes:SCENES.map(type=>({type,text:'Source',beats:2}))}
+    const matched=normalizeReel(rawBrand,{brand:'Source',brandStyle:identity,art:'editorial'})
+    assert.deepEqual(matched.palette,identity.palette,'source palette wins over invented director colors')
+    assert.deepEqual(normalizeReel(rawBrand,{brand:'Source',brandStyle:identity,palette:rawBrand.palette}).palette,rawBrand.palette,'an explicit palette remains an intentional override')
+    const branded=reelProject(createProject('Brand'),matched);assert.ok(branded.project.motions.every(m=>m.css.includes(identity.css)),'source typography wins over art presets in the composition')
     console.log('ok: hidden website product posters retain their source pixels, and empty captures are rejected')
   }finally{await new Promise(r=>source.close(r))}
 }
@@ -491,7 +501,7 @@ try {
   // Hybrid delivery must carry actual source pixels, while leaving the source edit untouched.
   const beforeHybrid=await(await fetch(`${at}/__motioneer/projects/${result.projectId}`)).json()
   const hybridRaw={concept:'Work comes alive',motif:'nodes',palette:['#101319','#88ddaa','#fff8ee'],scenes:SCENES.map((type,i)=>({type:[2,5,8].includes(i)?['product','product-detail','product-split'][[2,5,8].indexOf(i)]:type,text:'Build',capture:i===5?1:0,beats:2,tone:'dark'}))}
-  const hybrid=await kineticReel({at,brand:'Example',domain:'example.com',projectId:result.projectId,mode:'hybrid',seconds:6,plan:hybridRaw})
+  const hybrid=await kineticReel({at,brand:'Example',domain:'example.com',projectId:result.projectId,mode:'hybrid',seconds:6,brandMode:'expressive',plan:hybridRaw})
   const blended=await(await fetch(`${at}/__motioneer/projects/${hybrid.projectId}`)).json()
   assert.notEqual(hybrid.projectId,result.projectId,'blending creates a separate edit')
   assert.deepEqual(await(await fetch(`${at}/__motioneer/projects/${result.projectId}`)).json(),beforeHybrid,'snapshotting source content does not mutate the original film')

@@ -10,7 +10,8 @@ import { ExportPanel } from './ExportPanel'
 import { Settings } from './Settings'
 import { Icon } from './icons'
 export function App() {
-  const state=useProject(),{project,edit}=state,[mode,setMode]=useState<'motion'|'film'>('motion'),[selection,setSelection]=useState<string[]>([]),[time,setTime]=useState(0),[playing,setPlaying]=useState(false),[exporting,setExporting]=useState(false),[settings,setSettings]=useState(false),[toast,setToast]=useState(''),[projectMenu,setProjectMenu]=useState(false)
+  const state=useProject(),{project,edit}=state,[mode,setMode]=useState<'motion'|'film'>(()=>new URLSearchParams(location.search).get('view')==='film'?'film':'motion'),[selection,setSelection]=useState<string[]>([]),[time,setTime]=useState(0),[playing,setPlaying]=useState(false),[exporting,setExporting]=useState(false),[settings,setSettings]=useState(false),[toast,setToast]=useState(''),[projectMenu,setProjectMenu]=useState(false)
+  useEffect(()=>{const url=new URL(location.href);url.searchParams.set('view',mode);window.history.replaceState(null,'',url)},[mode])
   const noticeTimer=useRef<ReturnType<typeof setTimeout>|null>(null)
   const notify=useCallback((message:string)=>{setToast(message);if(noticeTimer.current)clearTimeout(noticeTimer.current);noticeTimer.current=setTimeout(()=>setToast(''),7000)},[])
   const exports=useExportJobs(project?.id)

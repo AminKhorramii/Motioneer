@@ -37,6 +37,7 @@ tools/editor/
   kinetic.mjs          the reel planner: a brand metaphor becomes beat-timed authored scenes, a new editable project, percussion and a verified render
   media-source.mjs     discovers published product-video posters, including hidden carousel slides, for a fresh hybrid capture project
   hybrid.mjs           source capture snapshots and contact sheets, product reveal/detail/split choreography with traceable source IDs
+  brand.mjs            observed website colors and source font capture, embedded into authored compositions
   art-direction.mjs    six reusable typography and material directions, with bundled portable display fonts
   kinetic-scenes.mjs   graphic scene vocabulary: typography, orbital systems, ribbons, nodes, stacks and portals using the shared composition runtime
   music.mjs            sixteen instrumental identities, melodic phrases, grooves and stereo synthesis tied to scene cuts
