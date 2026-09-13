@@ -2,6 +2,13 @@
 import {createProject,newTrack,compositionDocument} from '../../dist-core/core.js'
 import {loadChromium} from './render.mjs'
 export const PRODUCT_SCENES=['product','product-detail','product-split']
+/** Allocate the bounded contact sheet across sources before visibility sorting can crowd docs out. */
+export function balanceCaptureSources(primary,references=[],limit=12){
+ const projects=[primary,...references.filter(p=>p.id!==primary.id)],groups=projects.map(p=>p.subjects.filter(s=>s.w>=200&&s.h>=150&&!p.motions.some(m=>m.subjectId===s.id&&m.scope==='data-kinetic'))),subjects=[],seen=new Set()
+ for(let round=0;subjects.length<limit&&groups.some(g=>round<g.length);round++)for(const group of groups){const s=group[round];if(s&&!seen.has(s.id)&&subjects.length<limit){subjects.push(s);seen.add(s.id)}}
+ return {...primary,subjects}
+}
+
 export async function captureInventory(source,{at,onStep=()=>{}}){
  const used=new Set(source.tracks.filter(t=>t.kind==='component'&&!t.hidden).map(t=>t.subjectId))
  const subjects=source.subjects.filter(s=>s.w>=200&&s.h>=150&&!source.motions.some(m=>m.subjectId===s.id&&m.scope==='data-kinetic')).sort((a,b)=>Number(used.has(b.id))-Number(used.has(a.id))).slice(0,12)

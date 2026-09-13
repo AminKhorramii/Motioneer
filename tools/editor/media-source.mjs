@@ -1,21 +1,33 @@
 /** Discover published product media at native resolution, including hidden carousel posters. */
 import {createProject,newTrack} from '../../dist-core/core.js'
 import {loadChromium} from './render.mjs'
+import {discoverProductPanels,discoverProductImages} from './dom-media.mjs'
 export async function websiteMedia({at,url,minimum=2,onStep=()=>{}}){
  const browser=await(await loadChromium()).launch({channel:'chromium'})
  try{
-  const page=await browser.newPage({viewport:{width:1440,height:1000}})
+  const page=await browser.newPage({viewport:{width:1440,height:1000},deviceScaleFactor:2})
   onStep('Looking for product visuals published on the website.')
-  await page.goto(url,{waitUntil:'domcontentloaded',timeout:45000});await page.waitForTimeout(1800)
+  const navigation=await page.goto(url,{waitUntil:'domcontentloaded',timeout:45000});if(!navigation?.ok())throw new Error('Cannot read website product visuals: the page did not load. Next: retry with a working website URL.')
+  await page.waitForTimeout(1800)
+  for(let y=0;y<10000;y+=800){await page.evaluate(y=>scrollTo(0,y),y);await page.waitForTimeout(120)}
+  await page.evaluate(()=>Promise.race([document.fonts.ready,new Promise(resolve=>setTimeout(resolve,5000))]))
+  const subjects=[]
+  for(const panel of await page.evaluate(discoverProductPanels)){
+   try{
+    const element=page.locator(panel.selector)
+    await element.evaluate(e=>e.scrollIntoView({block:'center',behavior:'instant'}));await page.waitForTimeout(1600)
+    const pixels=await element.screenshot({type:'png',timeout:10000})
+    subjects.push({id:crypto.randomUUID(),name:panel.name,html:`<img src="data:image/png;base64,${pixels.toString('base64')}" style="display:block;width:100%;height:auto">`,css:'',w:pixels.readUInt32BE(16),h:pixels.readUInt32BE(20),warnings:[`Source rendered DOM product panel on ${page.url()}. Captured pixels; internal HTML and SVG layers are flattened.`]})
+   }catch{onStep('A rendered product panel could not be captured; continuing with the available visuals.')}
+  }
   const source=page.url(),posters=await page.evaluate(()=>[...new Set([...document.querySelectorAll('video[poster]')].map(v=>v.poster))].filter(p=>/^https?:/.test(p)&&!/customer|testimonial/i.test(p)).slice(0,10))
   let media=posters.map(url=>({url,kind:'video poster'}))
   if(media.length<2){
-   for(let y=0;y<10000;y+=1000){await page.evaluate(y=>scrollTo(0,y),y);await page.waitForTimeout(120)}
-   const images=await page.evaluate(()=>[...document.images].filter(i=>i.naturalWidth>=500&&i.naturalHeight>=300&&i.getBoundingClientRect().width>=200&&!/headshot|testimonial|customer|portrait|logo/i.test(i.alt+' '+i.currentSrc)).map(i=>({url:i.currentSrc,name:i.alt.trim().slice(0,150),kind:'image'})))
+   const images=await page.evaluate(discoverProductImages)
    media=[...media,...images].filter((v,i,a)=>/^https?:/.test(v.url)&&a.findIndex(n=>n.url===v.url)===i).slice(0,12)
   }
-  const subjects=[]
   for(const item of media){
+   if(subjects.length>=12)break
    const poster=item.url
    try{
     const r=await page.request.get(poster,{timeout:15000});if(!r.ok())continue

@@ -503,3 +503,19 @@ recordings or an external music model. Existing musical profiles remain availabl
 > music postmark. Show an envelope becoming a record, then a configured reply. Match each
 > diagram to the adjacent actual inbox or workflow screenshot. Dry paper percussion,
 > answering taps, and a deliberate pause before the reply. Return the film and editor link.
+
+
+The landing page remains the primary visual source when `referenceUrls` are supplied. Its
+published product frames and components are captured first; documentation adds supporting
+screenshots. Discovery recognizes rendered HTML/SVG product panels as well as native images
+and video posters. It scrolls the page to settle reveals, captures panels at 2× resolution,
+keeps the complete illustration instead of duplicating nested rows, and rejects decorative
+backgrounds. These captures retain the page’s pixels, not editable internal DOM layers.
+A bounded contact sheet allocates room across sources so a large page cannot
+crowd the others out. `captures[].sourceKind` identifies landing, reference or supplied-project
+material, and `sourceUrl` records its origin. Keep actual page imagery in the cut, paired with
+accurately named product details and conceptual graphics. Exclude video title slides and
+unrelated browser/OS troubleshooting screens when product footage is available.
+
+See [motion direction](motion-direction.md) for the detail → construction → alignment →
+complete-interface approach, including the current limits of flattened captures.

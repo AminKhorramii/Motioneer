@@ -1,3 +1,4 @@
+import {balanceCaptureSources} from '../tools/editor/hybrid.mjs'
 import {createServer} from 'node:http'
 import {productReferences} from '../tools/editor/product-reference.mjs'
 import assert from 'node:assert/strict'
@@ -12,6 +13,13 @@ const chromium=await loadChromium();if(!chromium){console.log('skip: the local r
 const server=createServer((req,res)=>{res.setHeader('content-type','text/html');if(req.url==='/missing'){res.statusCode=404;return res.end('Missing')}res.end('<title>Product docs</title><main><h1>Inbox</h1><p>Received mail becomes a record.</p></main>')})
 await new Promise(r=>server.listen(0,'127.0.0.1',r))
 try{const url=`http://127.0.0.1:${server.address().port}`;const refs=await productReferences([url]);assert.equal(refs[0].title,'Product docs');assert.match(refs[0].text,/Received mail becomes a record/);await assert.rejects(productReferences([url+'/missing']),/Cannot read product reference/);await assert.rejects(productReferences(['file:\/\/tmp\/test']),/HTTP documentation/)}finally{await new Promise(r=>server.close(r))}
+const primary=createProject('Landing'),reference=createProject('Docs')
+primary.subjects=Array.from({length:20},(_,i)=>({id:'landing-'+i,w:1200,h:800,name:'Landing '+i}))
+reference.subjects=Array.from({length:20},(_,i)=>({id:'docs-'+i,w:1200,h:800,name:'Docs '+i}))
+const before=JSON.stringify([primary,reference]),balanced=balanceCaptureSources(primary,[reference])
+assert.equal(balanced.subjects.length,12);assert.equal(balanced.subjects.filter(s=>s.id.startsWith('landing-')).length,6);assert.equal(balanced.subjects.filter(s=>s.id.startsWith('docs-')).length,6)
+assert.equal(JSON.stringify([primary,reference]),before,'building a contact sheet never mutates the source projects')
+assert.equal(balanceCaptureSources(primary,[primary]).subjects.length,12,'repeated source projects do not duplicate entries')
 const raw={concept:'Cause and effect',motif:'workflow',palette:['#000000','#e066d9','#ffffff'],scenes:[{type:'impact',text:'Example'},...MECHANISMS.map(motif=>({type:'mechanism',motif,text:'Make it work',labels:['Input','Process','Output','Done'],beats:4})),{type:'type',text:'Ready'},{type:'poster',text:'Run'},{type:'resolve',text:'Example'}]}
 const plan=normalizeReel(raw,{brand:'Example',seconds:20}),made=reelProject(createProject('Mechanisms'),plan)
 assert.equal(made.cues.length,24)
