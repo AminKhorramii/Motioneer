@@ -16,8 +16,21 @@ Apply these principles to product films:
 
 For Linear, useful subjects include an issue status glyph resolving into its row, filter chips organizing a view, a request linking to an issue, or a pull-request connection resolving into the full issue detail. Keep Linear's own typography and colors throughout.
 
-## Current capabilities and the next step
+## Retaining real source layers
 
-The current reel path supports real captured pixels, conceptual product mechanisms, timed action cues and independent editable clips. Its product screenshots are flattened. It cannot independently draw the genuine internal icon paths, reflow screenshot labels or reconstruct native interface geometry from those pixels.
+The default reel path still uses flattened product screenshots alongside authored graphics. A curated capture path now retains selected homepage components as DOM/SVG through `captureLayers` in `tools/editor/layer-capture.mjs`:
 
-A faithful construction treatment needs selected source elements retained as DOM/SVG layers, an explicit hierarchy of details and a continuous camera sequence. Use existing clips for honest detail crops and conceptual illustrations; do not claim that a diagram reconstructs the captured interface. Treat this reference as direction for that richer representation, not a promise that a prompt reproduces the same choreography today.
+```js
+const capture = await captureLayers(page, {
+  selector: '.composer',
+  name: 'Message composer',
+  layers: { copy: '.message', send: 'button.send', glyph: 'button.send svg path' },
+  fontCSS: embeddedBrandFontCSS,
+})
+```
+
+Inspect the live component first and pass its actual selectors. The returned HTML preserves source text, SVG geometry, computed styles, pseudo-elements and embedded images. Named descendants receive `data-motion-layer` and `data-motion-index` attributes for authored keyframes. Add the capture as an ordinary subject and the animation as a motion; the existing editor and renderer seek those animations normally. Supply embedded font CSS to keep the source typography offline.
+
+“Voice into Work” uses this path for Linear’s actual message, composer, conversation and issue card. Its Send icon draws at macro scale before the camera reveals the composer. Those internal elements animate individually; two documentation views remain flattened captures. Preserve that distinction in source sheets and prompts.
+
+This is selected DOM capture, not automatic reconstruction from pixels or automatic choreography from any URL. Source scripts, canvas contents and shadow roots are not retained. Choose small, stable components (at most 1,500 nodes), inspect the isolated result, and verify inner-element animation at multiple playhead times. Keep the source capture separate from authored shot subjects so it stays reusable. Measure the same glyph in both camera views to maintain continuity; use the project's actual resolved cut times when reviewing an edited take.
