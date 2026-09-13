@@ -493,7 +493,9 @@ product, fabricated metrics, or presenting illustrative diagrams as real UI.
 For dry, rhythmic sound rather than an ambient backing track, select `keystroke`, `relay`,
 `tabulator`, `postmark`, `handshake`, or `release`. Each uses different instruments, patterns,
 phrase lengths and a short ending. Mechanism action times also produce synchronized sound
-cues; `plan.audioCues` makes those timings reviewable. Music is synthesized locally and saved
+cues; `plan.audioCues` makes those timings reviewable. Hybrid films with documentation
+references require at least two timed `mechanism` scenes; static diagrams do not count
+as timed actions. Music is synthesized locally and saved
 as an ordinary editable stereo WAV. It is original procedural composition, not licensed
 recordings or an external music model. Existing musical profiles remain available.
 

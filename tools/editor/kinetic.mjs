@@ -11,7 +11,7 @@ import {websiteMedia} from './media-source.mjs'
 import {PRODUCT_SCENES,captureInventory,productDocument,balanceCaptureSources} from './hybrid.mjs'
 import {autofilm,renderProject,proveRender} from './autofilm.mjs'
 const clean=(v,max=60)=>String(v??'').replace(/&(amp|quot|apos|lt|gt);/g,(_,n)=>({amp:'&',quot:'"',apos:"'",lt:'<',gt:'>'}[n])).replace(/[\x00-\x1f]/g,' ').trim().slice(0,max)
-export function normalizeReel(raw,{brand,domain,seconds=12,palette,captures=[],music,art,concept,bpm,brandStyle}={}){
+export function normalizeReel(raw,{brand,domain,seconds=12,palette,captures=[],music,art,concept,bpm,brandStyle,minimumMechanisms=0}={}){
  if(!brand?.trim())throw new Error('Cannot make a reel: a brand name is needed. Next: name the company.')
  if(!Number.isFinite(seconds)||seconds<6||seconds>30)throw new Error('Cannot make a reel: choose 6 to 30 seconds. Next: pass a short duration.')
  if(bpm!==undefined&&(!Number.isFinite(bpm)||bpm<80||bpm>180))throw new Error('Cannot direct: tempo must be 80 to 180 BPM. Next: choose a supported tempo.')
@@ -28,6 +28,7 @@ export function normalizeReel(raw,{brand,domain,seconds=12,palette,captures=[],m
  scenes[0]={...scenes[0],type:'impact',text:brand};scenes[scenes.length-1]={...scenes.at(-1),type:'resolve',text:brand,beats:4}
  if(new Set(scenes.map(s=>s.type)).size<5)throw new Error('Cannot make a reel: the plan repeats too few visual ideas. Next: include at least five scene types.')
  if(captures.length&&scenes.filter(s=>PRODUCT_SCENES.includes(s.type)).length<3)throw new Error('Cannot blend the film: the plan needs at least three actual capture scenes. Next: retry with more product reveals.')
+ if(scenes.filter(s=>s.type==='mechanism').length<minimumMechanisms)throw new Error('Cannot direct the product actions: too few timed mechanism scenes. Next: retry the plan with at least '+minimumMechanisms+' scenes whose type is mechanism, not diagram or specimen.')
  // Fit whole beats to the exact duration, preserving readable captures and the final hold.
  if(bpm!==undefined){
   const target=Math.round(seconds*bpm/60),minimum=scenes.map((s,i)=>PRODUCT_SCENES.includes(s.type)||i===scenes.length-1?4:s.type==='mechanism'?3:1)
@@ -87,7 +88,7 @@ export async function kineticReel({at,brand,domain,projectId,url,mode='graphic',
  const mechanismPrompt='\nPRODUCT CHOREOGRAPHY: Make graphics explain a documented product action adjacent to its real screenshot. Use at least four mechanism scenes when product evidence is supplied. type mechanism with motif workflow (trigger/condition/action/result), records (import/fields/records/save), inbox (arrive/read/route/reply), publish (draft/preview/check/publish), checkout (choose/checkout/payment/receipt), integration (request/connect/transform/use). Supply four short accurate labels. These are conceptual diagrams, never fake product UI. Give mechanisms 3–4 beats to show cause and effect. Carry that motif and its labels into the following capture so the frames are visually related. Limit unrelated abstract ornament. For dry action-led sound choose keystroke, relay, tabulator, postmark, handshake or release. These have no ambient pads, and each mechanism action receives a synchronized sound. Choose one suited to the particular product story.'
  const reply=provided?{json:provided}:await fetch(`${at}/__motioneer/ask`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({system:'You are a motion design director. Deliver a precise, original graphic film plan as JSON.',prompt:prompt+hybridPrompt+musicPrompt+artPrompt+mechanismPrompt+evidencePrompt,json:true,images:inventory.sheet?[inventory.sheet]:[]})}).then(r=>r.json())
  if(!reply.json)throw new Error(`Cannot direct the reel: ${reply.error||'no plan returned'}. Next: retry the brief.`)
- const plan=normalizeReel(reply.json,{brand,domain,seconds,palette,captures:inventory.captures,music,art,concept,bpm,brandStyle})
+ const plan=normalizeReel(reply.json,{brand,domain,seconds,palette,captures:inventory.captures,music,art,concept,bpm,brandStyle,minimumMechanisms:mode==='hybrid'&&references.length?2:0})
  const fresh=await fetch(`${at}/__motioneer/projects`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:`${brand} kinetic`})}).then(r=>r.json())
  if(!fresh.id)throw new Error('Cannot save the reel: no project was created. Next: retry.')
  fresh.source=url||source?.source||(domain?'https://'+domain:'')

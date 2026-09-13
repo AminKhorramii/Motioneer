@@ -23,6 +23,9 @@ assert.equal(balanceCaptureSources(primary,[primary]).subjects.length,12,'repeat
 const raw={concept:'Cause and effect',motif:'workflow',palette:['#000000','#e066d9','#ffffff'],scenes:[{type:'impact',text:'Example'},...MECHANISMS.map(motif=>({type:'mechanism',motif,text:'Make it work',labels:['Input','Process','Output','Done'],beats:4})),{type:'type',text:'Ready'},{type:'poster',text:'Run'},{type:'resolve',text:'Example'}]}
 const plan=normalizeReel(raw,{brand:'Example',seconds:20}),made=reelProject(createProject('Mechanisms'),plan)
 assert.equal(made.cues.length,24)
+const mostlyStatic={...raw,scenes:raw.scenes.map((s,i)=>s.type==='mechanism'&&i>1?{...s,type:'diagram'}:s)}
+assert.throws(()=>normalizeReel(mostlyStatic,{brand:'Example',minimumMechanisms:2}),/too few timed mechanism scenes/)
+assert.doesNotThrow(()=>normalizeReel(raw,{brand:'Example',minimumMechanisms:2}))
 for(let i=0;i<6;i++)for(let n=0;n<4;n++)assert.equal(made.cues[i*4+n].at,made.shots[i+1].at+made.shots[i+1].seconds*ACTION_PHASES[n])
 const hashes=new Set()
 for(const profile of Object.keys(ACTION_MUSIC)){
