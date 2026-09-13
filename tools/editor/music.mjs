@@ -1,4 +1,5 @@
 /** Musical identities: different harmony, orchestration and grooves, not just new random seeds. */
+import {ACTION_MUSIC,actionWav} from './action-score.mjs'
 import {TECHNO,technoWav} from './techno.mjs'
 export const MUSIC={
  glass:{label:'Glass circuits',description:'Precise minimal electronica: glass arpeggios, soft sub, tight micro percussion.',voice:'glass',scale:[0,2,3,7,10],chords:[[0,7,14,15],[8,15,19,22],[3,10,14,19],[10,17,22,26]],kick:[0,6,8,14],snare:[4,12],hat:[2,4,7,10,12,15],bass:[0,7,0,10],swing:0},
@@ -11,6 +12,7 @@ export const MUSIC={
  branch:{label:'Branch counterpoint',description:'Melodic digital breaks: soft chip tones trade a counter-melody over crisp drums and a moving bass line.',voice:'chip',scale:[0,2,3,5,7,10],chords:[[0,7,15,19],[8,15,19,22],[3,10,14,17],[10,17,22,26]],kick:[0,7,8,14],snare:[4,12],hat:[0,2,6,8,10,14,15],bass:[0,7,3,10],swing:.02},
  prism:{label:'Prism afterglow',description:'Luminous melodic electronica: wide soft pads, rising plucks, pulsing bass and a spacious final bloom.',voice:'prism',scale:[0,2,4,7,9,11],chords:[[0,7,11,18],[7,14,18,21],[9,16,19,23],[5,12,16,23]],kick:[0,4,8,12],snare:[4,12],hat:[2,6,10,14],bass:[0,7,9,5],swing:0},
  conversation:{label:'Call and response',description:'Warm playful broken soul: rounded plucks, electric chords, claps and answering melodies with a human swing.',voice:'pluck',scale:[0,2,4,7,9],chords:[[0,7,9,16],[5,12,16,19],[2,9,12,16],[7,14,17,21]],kick:[0,5,10],snare:[4,12],hat:[2,3,6,10,11,14],bass:[0,4,7,9],swing:.16},
+ ...ACTION_MUSIC,
  ...TECHNO
 }
 const hash=s=>[...String(s)].reduce((n,c)=>(Math.imul(n,31)+c.charCodeAt(0))>>>0,73)
@@ -21,9 +23,10 @@ export function musicPlan(raw={},seed='film'){
  return {profile,root,motif,label:MUSIC[profile].label,description:MUSIC[profile].description}
 }
 
-export function musicWav({seconds,seed='film',bpm=128,cuts=[],music={}}){
+export function musicWav({seconds,seed='film',bpm=128,cuts=[],cues:actionCues=[],music={}}){
  if(!Number.isFinite(seconds)||seconds<=0||seconds>120)throw new Error('Cannot score: length must be between 0 and 120 seconds. Next: choose a valid film length.')
  const plan=musicPlan(music,seed)
+ if(ACTION_MUSIC[plan.profile])return actionWav({seconds,seed,bpm:Number.isFinite(bpm)&&bpm>=40&&bpm<=400?bpm:140,cuts,cues:actionCues,plan})
  if(TECHNO[plan.profile])return technoWav({seconds,seed,bpm:Number.isFinite(bpm)&&bpm>=40&&bpm<=400?bpm:150,cuts,plan})
  const p=MUSIC[plan.profile],sr=48000,N=Math.ceil(seconds*sr),L=new Float32Array(N),R=new Float32Array(N),sendL=new Float32Array(N),sendR=new Float32Array(N),tau=Math.PI*2
  let rng=hash(seed+plan.profile);const noise=()=>{rng=(Math.imul(rng,1664525)+1013904223)>>>0;return rng/2147483648-1}

@@ -11,7 +11,7 @@
     "mcp": "node mcp/index.mjs",
     "prepublishOnly": "npm run build",
     "studio": "node --watch tools/studio.mjs",
-    "verify:all": "npm run build && node verify/cli.mjs && node verify/model.mjs && node verify/guard.mjs && node verify/studio-capture.mjs --rail && node verify/mp4.mjs && node verify/mcp.mjs",
+    "verify:all": "npm run build && node verify/cli.mjs && node verify/model.mjs && node verify/guard.mjs && node verify/studio-capture.mjs --rail && node verify/mp4.mjs && node verify/product-motion.mjs && node verify/mcp.mjs",
     "verify:capture": "node verify/studio-capture.mjs",
     "verify:rail": "node verify/studio-capture.mjs --rail",
     "verify:editor": "node verify/film-editing.mjs && node verify/editor.mjs",

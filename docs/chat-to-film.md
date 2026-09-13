@@ -476,3 +476,30 @@ Film, reel, rescore and revision results include an `editor` URL. Gallery items 
 to `/__motioneer/editor/?project=<id>&view=film`. The requested project takes precedence over
 the last opened project, and a missing ID shows an error rather than silently opening another
 film. Selecting a different project or workspace updates the URL.
+
+## Product stories and action scores
+
+For a hero-only site, pass up to three `referenceUrls` pointing to relevant documentation.
+Keep `url` as the brand homepage: its typography and colors still guide the film. The tool
+reads the reference pages for product facts and imports their published screenshots at source
+resolution. Source projects remain intact. Returned `plan.references` records the pages used.
+
+A `mechanism` scene explains a product action using `workflow`, `records`, `inbox`, `publish`,
+`checkout`, or `integration` geometry. Four short labels describe its ordered actions. These
+are explicitly marked concept illustrations. Pair a mechanism with a screenshot of the same
+operation; use the same motif across both shots. Avoid decorative geometry unrelated to the
+product, fabricated metrics, or presenting illustrative diagrams as real UI.
+
+For dry, rhythmic sound rather than an ambient backing track, select `keystroke`, `relay`,
+`tabulator`, `postmark`, `handshake`, or `release`. Each uses different instruments, patterns,
+phrase lengths and a short ending. Mechanism action times also produce synchronized sound
+cues; `plan.audioCues` makes those timings reviewable. Music is synthesized locally and saved
+as an ordinary editable stereo WAV. It is original procedural composition, not licensed
+recordings or an external music model. Existing musical profiles remain available.
+
+> Make a 20-second Biscuit film about an email becoming a workflow. Use reel, mode hybrid,
+> url https://biscuit.so, referenceUrls https://docs.biscuit.so/receiving-emails and
+> https://docs.biscuit.so/workflows, brand Biscuit, domain biscuit.so, brandMode site,
+> music postmark. Show an envelope becoming a record, then a configured reply. Match each
+> diagram to the adjacent actual inbox or workflow screenshot. Dry paper percussion,
+> answering taps, and a deliberate pause before the reply. Return the film and editor link.

@@ -64,7 +64,7 @@ if (!(await loadChromium())) { console.log('skip: the local renderer is not inst
     const expected=musicWav({seconds:5,seed:'range',bpm:120,cuts:[-2,2],music:{profile:'glass'}})
     assert.deepEqual(delivered,expected.data,'musical accents follow resolved linked timing inside the export range')
   }finally{await new Promise(r=>upload.close(r))}
-  console.log('ok: sixteen musical identities render distinct, deterministic stereo scores with a complete 20-second cadence')
+  console.log('ok: twenty-two musical identities render distinct, deterministic stereo scores with a complete 20-second cadence')
 }
 
 // Product carousel posters remain real source assets even when their slides are hidden.

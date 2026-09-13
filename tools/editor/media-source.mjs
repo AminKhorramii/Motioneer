@@ -1,7 +1,7 @@
 /** Discover published product media at native resolution, including hidden carousel posters. */
 import {createProject,newTrack} from '../../dist-core/core.js'
 import {loadChromium} from './render.mjs'
-export async function websiteMedia({at,url,onStep=()=>{}}){
+export async function websiteMedia({at,url,minimum=2,onStep=()=>{}}){
  const browser=await(await loadChromium()).launch({channel:'chromium'})
  try{
   const page=await browser.newPage({viewport:{width:1440,height:1000}})
@@ -27,7 +27,7 @@ export async function websiteMedia({at,url,onStep=()=>{}}){
     subjects.push({id:crypto.randomUUID(),name,html:`<img src="${image.data}" style="display:block;width:100%;height:auto">`,css:'',w:image.w,h:image.h,warnings:[`Source ${item.kind} published on ${source}: ${poster}. Captured pixels; internal layers are flattened.`]})
    }catch(e){onStep('A website preview could not be read; continuing with the available visuals.')}
   }
-  if(subjects.length<2)return null
+  if(subjects.length<minimum)return null
   const fresh=await fetch(at+'/__motioneer/projects',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:new URL(source).hostname+' product previews'})}).then(r=>r.json())
   if(!fresh.id)throw new Error('Cannot save website previews: the studio did not create a project. Next: retry.')
   const p={...createProject(fresh.name),id:fresh.id,revision:fresh.revision,source,subjects,settings:{...fresh.settings,duration:subjects.length*2000,from:0,to:subjects.length*2000},tracks:subjects.map((s,i)=>({...newTrack('component',s.name,i*2000),subjectId:s.id,duration:2000,x:5,y:5,width:90,height:90}))}
