@@ -27,7 +27,7 @@ export function musicWav({seconds,seed='film',bpm=128,cuts=[],cues:actionCues=[]
  if(!Number.isFinite(seconds)||seconds<=0||seconds>120)throw new Error('Cannot score: length must be between 0 and 120 seconds. Next: choose a valid film length.')
  const plan=musicPlan(music,seed)
  if(ACTION_MUSIC[plan.profile])return actionWav({seconds,seed,bpm:Number.isFinite(bpm)&&bpm>=40&&bpm<=400?bpm:140,cuts,cues:actionCues,plan})
- if(TECHNO[plan.profile])return technoWav({seconds,seed,bpm:Number.isFinite(bpm)&&bpm>=40&&bpm<=400?bpm:150,cuts,plan})
+ if(TECHNO[plan.profile])return technoWav({seconds,seed,bpm:Number.isFinite(bpm)&&bpm>=40&&bpm<=400?bpm:150,cuts,cues:actionCues,plan})
  const p=MUSIC[plan.profile],sr=48000,N=Math.ceil(seconds*sr),L=new Float32Array(N),R=new Float32Array(N),sendL=new Float32Array(N),sendR=new Float32Array(N),tau=Math.PI*2
  let rng=hash(seed+plan.profile);const noise=()=>{rng=(Math.imul(rng,1664525)+1013904223)>>>0;return rng/2147483648-1}
  const midi=n=>440*2**((n-69)/12),beat=60/(Number.isFinite(bpm)&&bpm>=40&&bpm<=400?bpm:128),step=beat/4

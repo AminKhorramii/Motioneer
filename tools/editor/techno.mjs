@@ -8,7 +8,7 @@ export const TECHNO={
  alloy:{label:'Metallic ritual',description:'Fast percussive techno: heavy straight kicks, five-step metallic resonators, low toms and shifting stereo machine rhythm.',voice:'metal',scale:[0,1,5,7,11],kick:[0,4,8,12],bass:[2,6,9,14],phrase:5,drive:1.5,rumble:.14,delay:.5,swing:0}
 }
 const hash=s=>[...String(s)].reduce((n,c)=>(Math.imul(n,31)+c.charCodeAt(0))>>>0,73)
-export function technoWav({seconds,seed,bpm,cuts,plan}){
+export function technoWav({seconds,seed,bpm,cuts,cues:actionCues=[],plan}){
  const p=TECHNO[plan.profile],sr=48000,N=Math.ceil(seconds*sr),tau=Math.PI*2,beat=60/bpm,step=beat/4
  const L=new Float32Array(N),R=new Float32Array(N),wetL=new Float32Array(N),wetR=new Float32Array(N),drums=new Float32Array(N),kicks=[]
  const cues=[...new Set(cuts.filter(t=>Number.isFinite(t)&&t>0&&t<seconds))].sort((a,b)=>a-b)
@@ -70,6 +70,14 @@ export function technoWav({seconds,seed,bpm,cuts,plan}){
   }
   if(p.voice==='metal'&&s%7===0)tone(at,plan.root,beat,.14,'metal',s%2?.3:-.3)
   if(lift&&slot===15){hat(at+step*.5,.042,false,-.5);if(p.voice==='industrial')clap(at+step*.5,.10)}
+ }
+ // Native draw, expansion and settle events receive distinct dry accents on the same clock.
+ for(const cue of actionCues.filter(c=>Number.isFinite(c.at)&&c.at>=0&&c.at<end)){
+  const phase=Math.max(0,Math.min(2,Math.trunc(cue.phase)||0)),pan=phase===0?-.35:phase===1?.35:0
+  if(phase===0)tone(cue.at,plan.root+24,.10,.11,'metal',pan)
+  else if(phase===1){let low=0;add(cue.at-.045,.13,(t,u)=>{low+=.16*(noise()-low);return low*Math.sin(Math.PI*u)**2},.27,pan,.08);tone(cue.at,plan.root+7,.18,.14,'pulse',pan)}
+  else {tone(cue.at,plan.root-12,.22,.20,'pulse');clap(cue.at,.17)}
+  events.push({at:cue.at,kind:'action',phase})
  }
  // Only a few filtered reverse swells articulate the cut, leaving the main rhythm intact.
  for(const [i,c] of cues.entries())if(i%4===2){let low=0;add(c-.16,.19,(t,u)=>{low+=.07*(noise()-low);return low*Math.sin(Math.PI*u)**2},.22,i%2?.45:-.45,.55)}

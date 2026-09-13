@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import {createServer} from 'node:http'
-import {nativeInventory,discoverNativeComponents} from '../tools/editor/native-reel.mjs'
+import {nativeInventory,nativeRevealMs,discoverNativeComponents} from '../tools/editor/native-reel.mjs'
 import {normalizeReel,reelProject,requireNativeProof} from '../tools/editor/kinetic.mjs'
 import {createProject,compositionDocument} from '../dist-core/core.js'
 import {loadChromium} from '../tools/editor/render.mjs'
@@ -19,7 +19,14 @@ try{
  const plan=normalizeReel(raw,options),made=reelProject(createProject('Fixture'),plan,inventory.captures)
  assert.equal(made.project.subjects.length,raw.scenes.length+2,'raw native captures remain in the library')
  assert.equal(made.cues.length,13,'three native action cues per reveal plus mechanism actions')
+ assert.equal(nativeRevealMs(2500,144),120000/144,'reveals follow two musical beats')
+ assert.equal(made.cues[2].at,made.shots[1].at+nativeRevealMs(made.shots[1].seconds*1000,made.bpm)/1000*.85,'settle accent uses the actual clipping completion time')
  const page=await b.newPage({viewport:{width:1920,height:1080}});await page.route('**/*',r=>r.abort());await page.setContent(compositionDocument(made.project));await page.evaluate(()=>window.__composition.ready())
+ for(const [i,s]of plan.scenes.entries())if(s.type.startsWith('native-')){
+  await page.evaluate(t=>window.__composition.seek(t),made.shots[i].at*1000+20)
+  const bounds=await page.locator('iframe').nth(i).evaluate((f,index)=>{const r=f.contentDocument.querySelector('[data-motion-layer="detail"][data-motion-index="'+index+'"]').getBoundingClientRect();return{left:r.left,right:r.right,top:r.top,bottom:r.bottom}},s.anchor)
+  assert.ok(bounds.left>=95&&bounds.right<=1825&&bounds.top>=0&&bounds.bottom<=1080,'macro anchors remain inside the composition')
+ }
  const shot=made.shots[1],samples=[]
  for(const offset of[100,shot.seconds*1000-100]){await page.evaluate(t=>window.__composition.seek(t),shot.at*1000+offset);samples.push(await page.locator('iframe').nth(1).evaluate(f=>{const d=f.contentDocument,w=d.defaultView,path=d.querySelector('[data-motion-layer="detail"] path');return{clip:w.getComputedStyle(d.querySelector('.native-window')).clipPath,stroke:w.getComputedStyle(path).stroke,fillOpacity:w.getComputedStyle(path).fillOpacity,title:d.querySelector('h1').textContent}}))}
  assert.notEqual(samples[0].clip,samples[1].clip);assert.notEqual(samples[0].stroke,'rgba(0, 0, 0, 0)');assert.equal(samples[0].fillOpacity,'0');assert.equal(samples[1].fillOpacity,'1');assert.equal(samples[1].stroke,'rgb(0, 0, 0)','stroke-only source icons remain visible after drawing');assert.equal(samples[1].clip,'inset(0px)')

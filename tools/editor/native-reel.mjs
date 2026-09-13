@@ -2,6 +2,7 @@
 import {loadChromium} from './render.mjs'
 import {captureLayers} from './layer-capture.mjs'
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
+export const nativeRevealMs=(ms,bpm)=>Math.min(1200,ms*.58,Number.isFinite(bpm)&&bpm>0?120000/bpm:1200)
 export const NATIVE_SCENES=['native-reveal','native-detail']
 
 /** Runs in the source page; semantic cards and real multi-control panels, never nav or testimonials. */
@@ -98,10 +99,11 @@ export function nativeDocument(scene,plan,capture){
  const [dark,accent,paper]=plan.palette,light=plan.brandStyle?.theme==='light',background=light?paper:dark,ink=light?dark:paper
  const tall=capture.w/capture.h<.85
  const box=tall?{x:860,y:140,w:880,h:840}:{x:160,y:275,w:1600,h:680},fit=Math.min(box.w/capture.w,box.h/capture.h),left=box.x+(box.w-capture.w*fit)/2,top=box.y+(box.h-capture.h*fit)/2
- const macro=Math.min(34,Math.max(fit*2.4,Math.min(780/a.w,390/a.h))),cx=scene.entry==='left'?680:scene.entry==='right'?1210:960,cy=520
+ const cx=scene.entry==='left'?680:scene.entry==='right'?1210:960,cy=520
+ const macro=Math.min(34,2*Math.min(cx-96,1824-cx)/a.w,800/a.h,Math.max(fit*2.4,Math.min(780/a.w,390/a.h)))
  const x=cx-left-(a.x+a.w/2)*macro,y=cy-top-(a.y+a.h/2)*macro,pad=a.kind==='svg'?2:3
  const inset=`${Math.max(0,a.y-pad)}px ${Math.max(0,capture.w-a.x-a.w-pad)}px ${Math.max(0,capture.h-a.y-a.h-pad)}px ${Math.max(0,a.x-pad)}px`
- const reveal=Math.min(1200,scene.ms*.58),anchor=a.selector
+ const reveal=nativeRevealMs(scene.ms,scene.bpm),anchor=a.selector
  let html=capture.html
  // A real SVG anchor is drawn using its retained path geometry, not a replacement symbol.
  if(a.kind==='svg')html=html.replace(/<path\b([^>]*)>/g,(_,attrs)=>{

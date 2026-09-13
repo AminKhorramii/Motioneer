@@ -6,6 +6,7 @@ import {createHash} from 'node:crypto'
 import {createProject,compositionDocument} from '../dist-core/core.js'
 import {reelProject,normalizeReel} from '../tools/editor/kinetic.mjs'
 import {MECHANISMS,ACTION_PHASES} from '../tools/editor/product-graphics.mjs'
+import {TECHNO} from '../tools/editor/techno.mjs'
 import {ACTION_MUSIC} from '../tools/editor/action-score.mjs'
 import {musicWav} from '../tools/editor/music.mjs'
 import {loadChromium} from '../tools/editor/render.mjs'
@@ -28,7 +29,7 @@ assert.throws(()=>normalizeReel(mostlyStatic,{brand:'Example',minimumMechanisms:
 assert.doesNotThrow(()=>normalizeReel(raw,{brand:'Example',minimumMechanisms:2}))
 for(let i=0;i<6;i++)for(let n=0;n<4;n++)assert.equal(made.cues[i*4+n].at,made.shots[i+1].at+made.shots[i+1].seconds*ACTION_PHASES[n])
 const hashes=new Set()
-for(const profile of Object.keys(ACTION_MUSIC)){
+for(const profile of Object.keys({...ACTION_MUSIC,...TECHNO})){
  const args={seconds:4,seed:'same',bpm:144,cuts:[0,1,2,3.5],cues:[{at:1.23,phase:2,mechanism:'workflow'}],music:{profile,root:44,motif:[0,2,4,1]}},score=musicWav(args)
  assert.equal(score.data.length,44+4*48000*4);assert.ok(score.analysis.peak<=.89&&score.analysis.rms>.01)
  assert.deepEqual(score.data,musicWav(args).data)
@@ -36,11 +37,11 @@ for(const profile of Object.keys(ACTION_MUSIC)){
  assert.ok(score.events.some(e=>e.kind==='action'&&e.at===1.23))
  hashes.add(createHash('sha256').update(score.data).digest('hex'))
 }
-assert.equal(hashes.size,6,'different instruments and grooves create six different scores')
+assert.equal(hashes.size,12,'action and techno profiles have distinct scores')
 const b=await chromium.launch({channel:'chromium'})
 try{const page=await b.newPage({viewport:{width:1920,height:1080}});await page.setContent(compositionDocument(made.project));await page.evaluate(()=>window.__composition.ready());for(let i=0;i<6;i++){
  const shot=made.shots[i+1];await page.evaluate(t=>window.__composition.seek(t),(shot.at+shot.seconds*.96)*1000)
  // Inspect the rendered subject iframe, including its paused CSS animations.
  const states=await page.locator('iframe').nth(i+1).evaluate(f=>{const d=f.contentDocument;return [...d.querySelectorAll('.mechanism-step')].map(e=>({opacity:+d.defaultView.getComputedStyle(e).opacity,kind:e.closest('[data-mechanism]')?.getAttribute('data-mechanism')}))})
  const active=states.filter(s=>s.kind===MECHANISMS[i]);assert.ok(active.length>=4&&active.every(s=>s.opacity>.9),MECHANISMS[i]+' completes all actions before the final hold')
- }console.log('Product mechanisms render in the shared composition; all 24 action times and six distinct deterministic stereo scores verified.')}finally{await b.close()}
+ }console.log('Product mechanisms render in the shared composition; all 24 action times and twelve distinct deterministic stereo scores verified.')}finally{await b.close()}
