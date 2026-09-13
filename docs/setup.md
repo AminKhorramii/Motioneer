@@ -55,7 +55,11 @@ npx -y motioneer --dir /path/to/project --port 4322 --no-open
 
 The generated MCP entry retains that port. Set `MOTIONEER_PORT` for a manually configured client.
 On a shared server, use separate working directories and renderer caches where accounts should
-not share data. Motioneer’s local studio is intended for a trusted local environment.
+not share data. Motioneer's local studio binds to `127.0.0.1` and rejects foreign Host and Origin
+headers. The bookmarklet has a write-only capture exception. Do not expose the studio through a
+public tunnel or reverse proxy: it has no user authentication, and proxied pages execute in the
+studio origin. Capture sites you trust. `MOTIONEER_PUBLIC` restricts proxy destinations; it does
+not make the editor safe to host publicly.
 
 ## Troubleshooting
 

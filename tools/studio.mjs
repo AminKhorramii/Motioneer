@@ -27,7 +27,7 @@ import { loadChromium } from './editor/render.mjs'
 import { createServer } from 'node:http'
 import net from 'node:net'
 import { randomUUID } from 'node:crypto'
-import { readFileSync, writeFileSync, existsSync, statSync, readdirSync, mkdirSync, rmSync } from 'node:fs'
+import { readFileSync, writeFileSync, chmodSync, existsSync, statSync, readdirSync, mkdirSync, rmSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -39,6 +39,7 @@ import { PROVIDERS, write as askProvider, check as checkProvider, publicly, miss
   from '../shared/model.mjs'
 import { streamText } from '../shared/providers.mjs'
 import { listenNear, movedFrom } from '../shared/port.mjs'
+import { localRequest } from '../shared/local-http.mjs'
 import {
   MOTION_SYSTEM, dealMotions, dealErrands, grabJson, safeStyle, unmoved, brittle, janky, scopeOf, retimed,
   tempo, unstill, leaks, grounded, namespaced, typefaces, faceList, unfaced,
@@ -1424,7 +1425,10 @@ let MODEL = (() => {
   catch { return fromEnv() }
 })()
 const saveModel = () => {
-  try { writeFileSync(MODEL_AT, JSON.stringify(MODEL, null, 2)) }
+  try {
+    writeFileSync(MODEL_AT, JSON.stringify(MODEL, null, 2), { mode: 0o600 })
+    chmodSync(MODEL_AT, 0o600)
+  }
   catch (e) { console.log(`  could not keep the model choice: ${e.message}`) }
 }
 
@@ -2509,8 +2513,15 @@ const editor = editorRoutes({
 })
 
 const server = createServer(async (req, res) => {
-  const url = new URL(req.url, 'http://x')
+  let url
+  try { url = new URL(req.url, 'http://x') } catch {
+    res.writeHead(400); return res.end('Invalid request URL')
+  }
   try {
+    if (!localRequest(req, url.pathname)) {
+      res.writeHead(403, { 'content-type': 'application/json' })
+      return res.end(JSON.stringify({ error: 'Open the studio from its localhost address.' }))
+    }
     if (await editor(req, res, url)) return
     if (url.pathname === '/__motioneer/legacy') { res.writeHead(200, { 'content-type': 'text/html' }); return res.end(PAGE()) }
     /**
@@ -3030,6 +3041,7 @@ anywhere on the studio. Nothing is installed and nothing leaves this machine.</p
 if (TARGET) {
   const at = new URL(TARGET)
   server.on('upgrade', (req, socket, head) => {
+    if (!localRequest(req, '/')) return socket.destroy()
     const up = net.connect(Number(at.port || 80), at.hostname, () => {
       const lines = [`${req.method} ${req.url} HTTP/1.1`]
       for (let i = 0; i < req.rawHeaders.length; i += 2) {
@@ -3047,7 +3059,7 @@ if (TARGET) {
 
 // a studio pointed at a folder and another pointed at a running app is a reasonable pair to want
 // open at once, so a busy port moves along rather than ending the process
-const live = await listenNear(server, PORT).catch((e) => {
+const live = await listenNear(server, PORT, '127.0.0.1').catch((e) => {
   console.log(`\n  cannot listen: ${e.message}\n`)
   process.exit(1)
 })

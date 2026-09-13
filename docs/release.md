@@ -5,6 +5,7 @@ continue serving an earlier release until the candidate is explicitly published.
 
 ```sh
 npm ci
+npm audit
 npm run verify:all
 npm run verify:package
 npm pack

@@ -13,6 +13,7 @@ dist-core/
 # what the studio writes while it runs: the tailwind cache, the recent addresses, the chosen
 # service, and the session it puts back when it restarts under you
 .studio/
+.context/
 
 motioneer-*.tgz
 
@@ -21,3 +22,4 @@ dist-editor/
 # films the film tool saves beside the work; a render is output, not source
 motioneer-film-*.mp4
 motioneer-film-*-storyboard.jpg
+motioneer-film-*-sources.jpg
