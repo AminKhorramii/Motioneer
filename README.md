@@ -11,6 +11,8 @@ Motioneer gives your agent a motion studio: capture real website elements, direc
 compose an original score, export an MP4, and return an editable film. Native detail reveals use the
 site’s DOM/SVG, typography and colors. Embedded screenshots remain flattened.
 
+![Motioneer film editor showing the Notion Pressure study, with its asset library, canvas, inspector and timeline](docs/images/film-editor.png)
+
 ## Start with your agent
 
 Use Node 20 or newer and Claude Code signed in on your machine. In your project directory:
