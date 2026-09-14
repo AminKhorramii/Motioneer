@@ -432,6 +432,21 @@ It replaces only generated audio; imported audio remains. The result includes th
 the editable stereo WAV, a storyboard and musical metadata. An exported subrange gets a score
 for that range; linked visual timing determines its cut accents.
 
+For a finished soundtrack, pass an absolute local `audioFile` instead of `music` or
+`direction`. Motioneer validates the file before creating a take, decodes it to a 48 kHz
+stereo WAV, and trims from its beginning to the export duration. It keeps the supplied
+tempo and gain; short files are refused rather than looped, stretched or silently padded.
+Use `replaceAudioTrackIds` to name an existing imported score to replace. Generated scores
+are replaced automatically; other imported audio, such as voiceover and effects, stays.
+The original project remains unchanged. The result identifies the soundtrack as imported.
+
+> Keep this Figma film visually identical. Use rescore with audioFile
+> /absolute/path/to/finished-techno.wav and replaceAudioTrackIds containing the current
+> imported music track ID. Keep voiceover and effects. Deliver the new take and editor link.
+
+The built-in profiles synthesize music procedurally. A custom score with recorded drums
+still needs a supplied audio file; a style prompt alone does not recreate that production.
+
 > Keep this Linear film exactly as it is visually. Use rescore with music glass. Compose a
 > precise, luminous motif with soft sub pulses and microscopic percussion. Let the product
 > holds breathe and resolve on the final brand card. Keep the original BPM.

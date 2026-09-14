@@ -46,6 +46,7 @@ tools/editor/
   music.mjs            twenty-two instrumental identities, melodic phrases, grooves and stereo synthesis tied to scene cuts
   techno.mjs           six deep techno arrangements with dedicated percussion, resonant bass, filtered echoes and kick ducking
   rescore.mjs          a music-only take that copies assets and preserves the complete visual edit
+  score-file.mjs       validates and decodes a finished local soundtrack for an independent rescore take
   soundtrack.mjs       original synthesized music fitted to the cut, stored as editable project audio
   proof.mjs            a rendered film measured off its frames: cuts, shot length, blank frames
 

@@ -124,6 +124,7 @@ ok('revise without a project says what it cannot do and what to do next', noProj
 ok('revise takes drop and order, since a reaction to a film is a change to its shots',
   !!tools.find((t) => t.name === 'revise')?.inputSchema?.properties?.drop && !!tools.find((t) => t.name === 'revise')?.inputSchema?.properties?.order)
 ok('reels can direct twenty-two musical identities and rescore an existing edit',tools.find(t=>t.name==='reel')?.inputSchema?.properties?.music?.enum.length===22 && tools.find(t=>t.name==='rescore')?.inputSchema?.properties?.direction)
+ok('rescore accepts a finished soundtrack and explicit imported-track replacement',tools.find(t=>t.name==='rescore')?.inputSchema?.properties?.audioFile?.type==='string' && tools.find(t=>t.name==='rescore')?.inputSchema?.properties?.replaceAudioTrackIds?.items?.type==='string' && /procedural synthesis/.test(hello.result.instructions))
 ok('reels can read bounded product documentation',tools.find(t=>t.name==='reel')?.inputSchema?.properties?.referenceUrls?.maxItems===3)
 ok('reels default to source brand identity with an explicit expressive option',tools.find(t=>t.name==='reel')?.inputSchema?.properties?.brandMode?.enum.join(',')==='site,expressive')
 ok('reels expose a shared tempo for music and visual cuts',tools.find(t=>t.name==='reel')?.inputSchema?.properties?.bpm?.maximum===180)
