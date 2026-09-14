@@ -33,7 +33,7 @@ import path from 'node:path'
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 // the one version this package has, told to clients instead of a number nobody bumps
 if(process.env.MOTIONEER_WORKSPACE){
-  if(!path.isAbsolute(process.env.MOTIONEER_WORKSPACE))throw Error('Cannot start MCP: MOTIONEER_WORKSPACE must be an absolute directory. Next: rerun npx motioneer setup --claude in the project.')
+  if(!path.isAbsolute(process.env.MOTIONEER_WORKSPACE))throw Error('Cannot start MCP: MOTIONEER_WORKSPACE must be an absolute directory. Next: rerun npx motioneer setup --claude or setup --codex in the project.')
   process.chdir(process.env.MOTIONEER_WORKSPACE)
 }
 const VERSION = await readFile(path.join(ROOT, 'package.json'), 'utf8')
@@ -549,7 +549,11 @@ async function motion(args) {
   if (!html.trim()) throw new Error('motion needs the component markup, so the keyframes can name its parts.')
   const want = Math.max(1, Math.min(6, Number(args?.options) || 3))
   const core = await import(pathToFileURL(path.join(ROOT, 'dist-core', 'core.js')).href)
-  const { runClaude } = await import(pathToFileURL(path.join(ROOT, 'shared', 'cli.mjs')).href)
+  const { write: complete } = await import('../shared/model.mjs')
+  const { defaultModel } = await import('../tools/environment.mjs')
+  let config=defaultModel()
+  try{config={...config,...JSON.parse(await readFile('.studio/model.json','utf8'))}}
+  catch(e){if(e.code!=='ENOENT')throw Error('Cannot read saved model settings. Next: repair .studio/model.json or choose a provider in studio Settings.')}
   const brief = core.motionBrief(args)
   const motions = Array.from({ length: want }, (_, i) => brief.intensity === 'range' ? ['subtle','expressive','bold'][i % 3] : brief.intensity)
   // the markup is what the selectors have to name, so it goes over whole rather than summarised
@@ -608,13 +612,13 @@ async function motion(args) {
      * verdict where there was only a hiccup. The second attempt is allowed to think, since the
      * first was probably running under the fast dial, and thinking is the thing that was skipped.
      */
-    let reply = await runClaude(core.MOTION_SYSTEM, prompt).catch(() => null)
+    let reply = await complete(core.MOTION_SYSTEM, prompt, config).catch(() => null)
     let raw = reply ? core.grabJson(typeof reply === 'string' ? reply : reply.text ?? '') : null
     if (!raw) {
-      reply = await runClaude(core.MOTION_SYSTEM, prompt, { thinking: undefined }).catch(() => null)
+      reply = await complete(core.MOTION_SYSTEM, prompt, config, { thinking: undefined }).catch(() => null)
       raw = reply ? core.grabJson(typeof reply === 'string' ? reply : reply.text ?? '') : null
     }
-    const judged = raw ? core.judgeMotion(raw, undefined, false) : { why: 'No usable CSS came back.' }
+    const judged = raw ? core.judgeMotion(raw, undefined, false) : { why: reply?.error || 'No usable CSS came back.' }
     if (!judged.css) return { m, css: '', scope: '', note: '', faults: [judged.why] }
     return { m, css: judged.css, scope: judged.scope, note: judged.note, faults: [] }
 
@@ -726,6 +730,7 @@ if (process.stdin.isTTY) {
   console.log('    npx motioneer localhost:3000     open it on your own app\n')
   console.log('  To give it to an agent instead:\n')
   console.log('    claude mcp add --scope user motioneer -- npx -y -p motioneer motioneer-mcp\n')
+  console.log('    npx motioneer setup --codex     connect a trusted Codex project\n')
   process.exit(0)
 }
 

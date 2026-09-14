@@ -10,7 +10,7 @@
     "build": "tsc -b && vite build --ssr src/core.ts --outDir dist-core && vite build --config tools/editor/vite.config.mjs",
     "mcp": "node mcp/index.mjs",
     "studio": "node --watch tools/studio.mjs",
-    "verify:all": "npm run build && node verify/security.mjs && node verify/launch.mjs && node verify/cli.mjs && node verify/model.mjs && node verify/guard.mjs && node verify/studio-capture.mjs --rail && node verify/mp4.mjs && node verify/website-media.mjs && node verify/layer-capture.mjs && node verify/native-reel.mjs && node verify/product-motion.mjs && node verify/mcp.mjs",
+    "verify:all": "npm run build && node verify/security.mjs && node verify/launch.mjs && node verify/cli.mjs && node verify/model.mjs && node verify/codex.mjs && node verify/guard.mjs && node verify/studio-capture.mjs --rail && node verify/mp4.mjs && node verify/website-media.mjs && node verify/layer-capture.mjs && node verify/native-reel.mjs && node verify/product-motion.mjs && node verify/mcp.mjs",
     "verify:capture": "node verify/studio-capture.mjs",
     "verify:rail": "node verify/studio-capture.mjs --rail",
     "verify:editor": "node verify/film-editing.mjs && node verify/editor.mjs",

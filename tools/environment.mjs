@@ -1,14 +1,25 @@
 /** First-run diagnostics shared by the terminal and MCP. Never returns model credentials. */
-import {access,readFile,writeFile,rename,rm,realpath} from 'node:fs/promises'
+import {access,readFile,writeFile,rename,rm,realpath,mkdir,link,lstat} from 'node:fs/promises'
 import {constants} from 'node:fs'
 import path from 'node:path'
 import {fileURLToPath} from 'node:url'
 import {randomUUID} from 'node:crypto'
 import {hasClaude} from '../shared/cli.mjs'
+import {hasCodex} from '../shared/codex.mjs'
 import {missing,resolve} from '../shared/model.mjs'
 import {renderer,loadChromium} from './editor/render.mjs'
 const root=fileURLToPath(new URL('../',import.meta.url))
 export const packageInfo=()=>readFile(path.join(root,'package.json'),'utf8').then(JSON.parse)
+/** Client choice and completion provider are separate; an explicit setup choice wins. */
+export function defaultModel(){
+ const model=process.env.MOTIONEER_STUDIO_MODEL||'',preferred=process.env.MOTIONEER_PROVIDER
+ if(['claude-cli','codex-cli'].includes(preferred))return{provider:preferred,model}
+ if(hasClaude())return{provider:'claude-cli',model}
+ if(hasCodex())return{provider:'codex-cli',model}
+ if(process.env.ANTHROPIC_API_KEY)return{provider:'anthropic',key:process.env.ANTHROPIC_API_KEY,model}
+ if(process.env.OPENAI_API_KEY)return{provider:'openai',key:process.env.OPENAI_API_KEY,model}
+ return{provider:'claude-cli',model}
+}
 export async function workspace(dir=process.cwd()){
  const absolute=path.resolve(dir)
  try{await access(absolute,constants.R_OK|constants.W_OK)}catch{throw Error(`Cannot use workspace ${absolute}. Next: choose an existing writable directory with --dir.`)}
@@ -23,10 +34,10 @@ export async function diagnose({dir=process.cwd(),checkBrowser=true}={}){
  const assets=['dist-core/core.js','dist-editor/index.html','tools/editor/fonts/syne.woff2','examples/components']
  const absent=[];for(const f of assets)try{await access(path.join(root,f))}catch{absent.push(f)}
  checks.push({id:'package',ok:!absent.length,message:absent.length?'Missing packaged files: '+absent.join(', '):'Studio, renderer code, examples and fonts are packaged.',next:'Reinstall the package, or run npm run build in a source checkout.'})
- const cli=hasClaude();let config=cli?{provider:'claude-cli'}:process.env.ANTHROPIC_API_KEY?{provider:'anthropic',key:process.env.ANTHROPIC_API_KEY}:{provider:'claude-cli'},invalid=false
+ let config=defaultModel(),invalid=false
  try{config={...config,...JSON.parse(await readFile(path.join(work,'.studio/model.json'),'utf8'))}}catch(e){if(e.code!=='ENOENT')invalid=true}
- const model=resolve(config),faults=missing(config),configured=!invalid&&(model.provider==='claude-cli'?cli:!faults.length)
- checks.push({id:'model',ok:configured,provider:model.provider,message:invalid?'The saved model configuration is unreadable.':configured?`${model.label} configured; authentication is checked on the first model request.`:model.provider==='claude-cli'?'Claude Code was not found on PATH.':'Model configuration needs '+faults.join(', '),next:'Sign in to Claude Code, set ANTHROPIC_API_KEY, or choose a provider in studio Settings.'})
+ const model=resolve(config),faults=missing(config),cli=model.provider==='codex-cli'?hasCodex():hasClaude(),configured=!invalid&&(model.shape==='cli'?cli:!faults.length)
+ checks.push({id:'model',ok:configured,provider:model.provider,message:invalid?'The saved model configuration is unreadable.':configured?`${model.label} configured; authentication is checked on the first model request.`:model.shape==='cli'?`${model.label} was not found on PATH.`:'Model configuration needs '+faults.join(', '),next:'Sign in to Claude Code or Codex, set ANTHROPIC_API_KEY or OPENAI_API_KEY, or choose a provider in studio Settings.'})
  const kit=renderer(),status=await kit.status();let ready=status.state==='ready',message=status.message
  if(ready&&checkBrowser){
   for(let attempt=0;attempt<2;attempt++){let browser
@@ -70,4 +81,23 @@ export async function connectClaude(dir){
  config.mcpServers={...config.mcpServers,motioneer:entry};const temp=file+'.'+randomUUID()+'.tmp'
  try{await writeFile(temp,JSON.stringify(config,null,2)+'\n',{mode:0o600,flag:'wx'});await rename(temp,file)}finally{await rm(temp,{force:true})}
  return{file,changed:true}
+}
+/** JSON basic strings also escape TOML strings, including Windows paths and control characters. */
+export async function codexConfig(dir){
+ const entry=(await mcpConfig(dir)).mcpServers.motioneer
+ return `[mcp_servers.motioneer]\ncommand = ${JSON.stringify(entry.command)}\nargs = ${JSON.stringify(entry.args)}\nstartup_timeout_sec = 30\ntool_timeout_sec = 1200\n\n[mcp_servers.motioneer.env]\n`+
+  Object.entries({...entry.env,MOTIONEER_PROVIDER:'codex-cli'}).map(([k,v])=>`${k} = ${JSON.stringify(v)}`).join('\n')+'\n'
+}
+/** Never reinterpret a user's TOML with a partial parser, or change their global setup. */
+export async function connectCodex(dir){
+ const folder=path.join(await workspace(dir),'.codex'),file=path.join(folder,'config.toml'),config=await codexConfig(dir)
+ await mkdir(folder,{recursive:true})
+ if((await lstat(folder)).isSymbolicLink())throw Error('Cannot install into a symlinked .codex directory. Next: use npx motioneer mcp-config --codex and review the destination yourself.')
+ const temp=file+'.'+randomUUID()+'.tmp'
+ try{
+  await writeFile(temp,config,{mode:0o600,flag:'wx'})
+  try{await link(temp,file);return{file,changed:true}}
+  catch(e){if(e.code!=='EEXIST')throw e;if(await readFile(file,'utf8')===config)return{file,changed:false}
+   throw Error('Cannot replace existing .codex/config.toml automatically. Next: run npx motioneer mcp-config --codex and merge the motioneer tables into your existing config, keeping tool_timeout_sec = 1200.')}
+ }finally{await rm(temp,{force:true})}
 }

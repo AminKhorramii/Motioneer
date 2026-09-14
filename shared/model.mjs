@@ -38,6 +38,16 @@ export const PROVIDERS = [
     note: 'Uses the claude command already signed in here, so there is no key to paste.',
   },
   {
+    id: 'codex-cli',
+    label: 'Codex, on this machine',
+    shape: 'cli',
+    needs: [],
+    browser: false,
+    local: true,
+    models: [],
+    note: 'Uses your signed-in Codex CLI. Leave the model empty to use the Codex default.',
+  },
+  {
     id: 'anthropic',
     label: 'Anthropic',
     shape: 'anthropic',
@@ -155,6 +165,10 @@ export async function write(system, user, config = {}, opts = {}) {
   if (gap.length) return { error: `${at.label} needs ${gap.join(' and ')}` }
 
   if (at.shape === 'cli') {
+    if(at.provider==='codex-cli'){
+      try{const {runCodex}=await import('./codex.mjs');return await runCodex(system,user,{...opts,model:at.model||undefined})}
+      catch{return{error:'The Codex command requires a local shell. Choose an API provider in hosted environments.'}}
+    }
     /**
      * Loaded here rather than at the top of the file.
      *

@@ -9,7 +9,7 @@ import {createServer} from 'node:http'
 import {withInstallLock} from '../tools/editor/render-install.mjs'
 import {connectClaude,mcpConfig,prepareRenderer} from '../tools/environment.mjs'
 const dir=await realpath(await mkdtemp(path.join(tmpdir(),'motioneer launch '))),cli=fileURLToPath(new URL('../tools/cli.mjs',import.meta.url))
-const run=args=>spawnSync(process.execPath,[cli,...args],{cwd:dir,encoding:'utf8',env:{...process.env,PATH:'',ANTHROPIC_API_KEY:'',MOTIONEER_RENDER_CACHE:path.join(dir,'missing-renderer')}})
+const run=args=>spawnSync(process.execPath,[cli,...args],{cwd:dir,encoding:'utf8',env:{...process.env,PATH:'',ANTHROPIC_API_KEY:'',OPENAI_API_KEY:'',MOTIONEER_PROVIDER:'',MOTIONEER_RENDER_CACHE:path.join(dir,'missing-renderer')}})
 try{
  assert.match(run(['--help']).stdout,/setup --claude/);assert.equal(run(['--version']).status,0);assert.deepEqual(await readdir(dir),[],'help and version do not create studio state')
  const doctor=run(['doctor','--json']);assert.equal(doctor.status,1);const report=JSON.parse(doctor.stdout);assert.equal(report.ready,false);assert.equal(report.checks.find(c=>c.id==='model').ok,false);assert.equal(report.checks.find(c=>c.id==='renderer').ok,false);assert.deepEqual(await readdir(dir),[],'doctor is read-only')

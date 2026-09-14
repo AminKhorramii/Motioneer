@@ -32,6 +32,7 @@ import { spawn } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { hasClaude } from '../shared/cli.mjs'
+import { defaultModel } from './environment.mjs'
 import { componentBrief, briefStyles } from '../shared/component-brief.mjs'
 import { isLocal, allowed } from '../shared/guard.mjs'
 import { page } from '../shared/page.mjs'
@@ -143,7 +144,7 @@ const KIND = /\.(tsx|jsx|vue|svelte|astro|html|htm)$/i
  * could have been said before any waiting happened.
  */
 const CAN_CLI = hasClaude()
-const CAN_WRITE = CAN_CLI || !!process.env.ANTHROPIC_API_KEY || existsSync('.studio/model.json')
+const CAN_WRITE = CAN_CLI || defaultModel().provider !== 'claude-cli' || existsSync('.studio/model.json')
 
 const work = '.studio'
 mkdirSync(work, { recursive: true })
@@ -1415,11 +1416,7 @@ const MODEL_AT = path.join(work, 'model.json')
  * The key is still picked up when there is no command to run, so a machine without one is not left
  * with nothing.
  */
-const fromEnv = () => (CAN_CLI
-  ? { provider: 'claude-cli', model: process.env.MOTIONEER_STUDIO_MODEL || '' }
-  : (process.env.ANTHROPIC_API_KEY
-    ? { provider: 'anthropic', key: process.env.ANTHROPIC_API_KEY, model: process.env.MOTIONEER_STUDIO_MODEL || '' }
-    : { provider: 'claude-cli', model: process.env.MOTIONEER_STUDIO_MODEL || '' }))
+const fromEnv = defaultModel
 let MODEL = (() => {
   try { return { ...fromEnv(), ...JSON.parse(readFileSync(MODEL_AT, 'utf8')) } }
   catch { return fromEnv() }

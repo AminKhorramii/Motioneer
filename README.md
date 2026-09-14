@@ -37,6 +37,27 @@ source material needed to direct the film through your configured provider.
 
 See [example prompts](docs/native-examples.md) and the [prompt-to-film workflow](docs/chat-to-film.md).
 
+## Codex and ChatGPT
+
+With the current Codex CLI installed and signed in, run this in your project:
+
+```sh
+npx -y motioneer setup --codex
+```
+
+Open the trusted project in Codex, restart the client, and check `/mcp`. Use the same film prompt
+above. Setup creates `.codex/config.toml` with the workspace and a 20-minute film-tool timeout.
+If that file already has your own settings, setup preserves it and prints instructions for merging
+`npx -y motioneer mcp-config --codex`. Global Codex configuration stays untouched.
+
+The Codex connection selects your signed-in Codex CLI to generate motions. Existing saved studio
+provider settings take precedence; choose **Codex, on this machine** in Settings to change them.
+No API key is needed for this CLI path. It uses Codex's default model unless you choose one.
+
+ChatGPT desktop clients using the same local Codex host can share this MCP configuration.
+ChatGPT web requires a remote MCP app; Motioneer's local stdio server does not connect directly
+to the web client. A hosted ChatGPT connector is not included. See [setup details](docs/setup.md#codex-and-chatgpt).
+
 ## Other MCP clients
 
 Print the configuration for the current workspace and add its `motioneer` entry to your client:
@@ -60,8 +81,9 @@ Doctor checks packaged files, workspace access, model configuration and an actua
 It makes no model request or downloads. Authentication is checked on the first model request.
 JSON output contains no credentials and exits with status 1 when setup is incomplete.
 
-Claude Code is the default model provider. Without it, set `ANTHROPIC_API_KEY`, or open the studio’s
-Settings to configure another provider. Keys are never written into the generated MCP entry.
+Motioneer detects Claude Code, then Codex, then `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`.
+The Codex setup explicitly selects Codex; saved studio Settings take precedence. You can choose
+another provider there. Keys are never written into the generated MCP entry.
 
 ## Open the studio yourself
 

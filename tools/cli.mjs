@@ -6,15 +6,17 @@ const pkg=JSON.parse(await readFile(new URL('../package.json',import.meta.url),'
 const help=`Motioneer ${pkg.version} — motion films from your product, through your agent.
 
   npx motioneer setup --claude     Install the renderer and connect this Claude Code project
+  npx motioneer setup --codex      Install the renderer and connect this Codex project
   npx motioneer doctor             Check the model, renderer and workspace
   npx motioneer doctor --json      Machine-readable readiness; exit 1 if setup is incomplete
   npx motioneer mcp                Run the MCP server over stdio
   npx motioneer mcp-config         Print configuration for an MCP client
+  npx motioneer mcp-config --codex  Print Codex TOML for an existing configuration
   npx motioneer [url|folder]       Open the local studio
 
 Options: --dir <workspace>  --no-open  --port <1024–65535>  --help  --version
-Setup also accepts --json. Without --claude, it leaves agent configuration unchanged.
-Requires Node 20+ and signed-in Claude Code or a configured model provider.
+Setup also accepts --json. Without --claude or --codex, agent configuration stays unchanged.
+Requires Node 20+ and signed-in Claude Code, Codex, or a configured API provider.
 `
 try{
  if(Number(process.versions.node.split('.')[0])<20)throw Error('Cannot start Motioneer: Node 20 or newer is required. Next: upgrade Node and retry.')
@@ -26,15 +28,16 @@ try{
  const command=args[0]
  if(command==='mcp'){if(args.length!==1)throw Error('Cannot start MCP with these arguments. Next: use npx motioneer mcp.');await import('../mcp/index.mjs')}
  else if(['doctor','setup','mcp-config'].includes(command)){
-  if(args.slice(1).some(a=>!['--json',...(command==='setup'?['--claude']:[])].includes(a)))throw Error('Cannot read these options. Next: run npx motioneer --help.')
-  const {diagnose,installRenderer,connectClaude,mcpConfig}=await import('./environment.mjs')
-  if(command==='mcp-config')console.log(JSON.stringify(await mcpConfig(process.cwd()),null,2))
+  if(args.slice(1).some(a=>!['--json',...(command==='setup'?['--claude','--codex']:command==='mcp-config'?['--codex']:[])].includes(a)))throw Error('Cannot read these options. Next: run npx motioneer --help.')
+  if(args.includes('--claude')&&args.includes('--codex'))throw Error('Choose one client per setup command: --claude or --codex. Run setup again to connect the other client.')
+  const {diagnose,installRenderer,connectClaude,connectCodex,mcpConfig,codexConfig}=await import('./environment.mjs')
+  if(command==='mcp-config'){const config=args.includes('--codex')?await codexConfig(process.cwd()):await mcpConfig(process.cwd());console.log(typeof config==='string'&&!args.includes('--json')?config:JSON.stringify(config,null,2))}
   else{
    let connection
-   if(command==='setup'){await installRenderer(m=>console.error(m));if(args.includes('--claude'))connection=await connectClaude(process.cwd())}
+   if(command==='setup'){await installRenderer(m=>console.error(m));if(args.includes('--claude'))connection=await connectClaude(process.cwd());if(args.includes('--codex')){connection=await connectCodex(process.cwd());process.env.MOTIONEER_PROVIDER='codex-cli'}}
    const report=await diagnose();if(connection)report.connection=connection
    if(args.includes('--json'))console.log(JSON.stringify(report,null,2))
-   else{console.log(`Motioneer ${report.version}\n`);for(const c of report.checks)console.log(`${c.ok?'✓':'!'} ${c.id}: ${c.message}${c.next?'\n  '+c.next:''}`);if(connection)console.log(`\nConnected: ${connection.file}\nRestart Claude Code in this project and approve the Motioneer MCP server when prompted.`);if(report.ready)console.log('\nTry: “Make a 20-second snappy launch film from notion.so. Return video and editor links.”')}
+   else{console.log(`Motioneer ${report.version}\n`);for(const c of report.checks)console.log(`${c.ok?'✓':'!'} ${c.id}: ${c.message}${c.next?'\n  '+c.next:''}`);if(connection)console.log(`\nConnected: ${connection.file}\n${args.includes('--codex')?'Open this trusted project in Codex, restart the client, and check /mcp for Motioneer.':'Restart Claude Code in this project and approve the Motioneer MCP server when prompted.'}`);if(report.ready)console.log('\nTry: “Make a 20-second snappy launch film from notion.so. Return video and editor links.”')}
    process.exitCode=report.ready?0:1
   }
  }else{
