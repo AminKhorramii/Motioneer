@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import {SOURCE_LAYOUTS,SOURCE_MOTIONS,sourceDocument,sourceArrivalMs,captureArrivalMs,sourceDirectionReport} from '../tools/editor/source-choreography.mjs'
+import {SOURCE_LAYOUTS,SOURCE_MOTIONS,sourceDocument,sourceArrivalMs,captureArrivalMs,sourceDirectionReport,renderedSourceMotion} from '../tools/editor/source-choreography.mjs'
 import {normalizeReel,reelProject,prepareReelSource} from '../tools/editor/kinetic.mjs'
 import {createProject,compositionDocument} from '../dist-core/core.js'
 import {loadChromium} from '../tools/editor/render.mjs'
@@ -18,6 +18,9 @@ assert.equal(sourceDirectionReport(plan.scenes,captures).sourceShots,3)
 assert.equal(made.project.settings.duration,18000)
 assert.equal(made.shots.at(-1).at+made.shots.at(-1).seconds,18)
 assert.equal(made.cues.length,9)
+assert.match(made.shots[1].renderedMotion,/Eight raster bands/)
+assert.match(renderedSourceMotion({type:'product',choreography:'macro',action:'A cursor draws retained paths'}),/internal controls stay flat/,'renderer facts cannot inherit invented director behavior')
+assert.match(renderedSourceMotion({type:'native-reveal',choreography:'shuttle'}),/retained component travels sideways/)
 assert.equal(captureArrivalMs({type:'native-reveal'},1800,150),800,'legacy native plans retain their macro clock')
 for(const key of ['layout','choreography'])assert.throws(()=>normalizeReel({...raw,scenes:raw.scenes.map((s,i)=>i===1?{...s,[key]:'invented'}:s)},{brand:'Example',captures}),/Cannot stage the source/)
 for(const [i,shot]of made.shots.entries())if(shot.captureId){

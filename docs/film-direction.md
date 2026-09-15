@@ -29,7 +29,10 @@ beats sparingly and end with the brand alone on dark.
 
 Plan a relationship between neighboring shots: a shared shape, position, subject or
 direction. The `action` and `handoff` fields record these notes. They do not implement
-new behavior. A connecting line that becomes a cursor, a brush that paints a letter,
+new behavior. Each source shot returns `renderedMotion`, a description derived from
+the renderer choices. Use that for delivery claims; it takes precedence over director
+prose, which can still describe effects the renderer cannot perform. A connecting line
+that becomes a cursor, a brush that paints a letter,
 or an object traveling between scenes requires additional authored motion. Do not
 describe those effects as delivered without inspecting them in the export.
 
