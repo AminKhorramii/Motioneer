@@ -34,6 +34,7 @@ tools/editor/
   autofilm.mjs         the headless driver behind film, inspect and revise: the plan it asks the model for with a contact sheet, the repair round the proof drives, and the cut read back for a revision
   survey.mjs           page discovery and capture preparation: complete product scenes, representative candidates, and their contact sheet
   review.mjs           a storyboard decoded from the delivered MP4, returned to the agent for visual review
+  source-choreography.mjs shared source staging, arrival timing, directing guidance and advisory review report
   kinetic.mjs          the reel planner: a brand metaphor becomes beat-timed authored scenes, a new editable project, percussion and a verified render
   media-source.mjs     discovers published product-video posters, including hidden carousel slides, for a fresh hybrid capture project
   hybrid.mjs           source capture snapshots and contact sheets, product reveal/detail/split choreography with traceable source IDs

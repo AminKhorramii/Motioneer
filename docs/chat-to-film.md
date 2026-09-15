@@ -553,3 +553,22 @@ unrelated browser/OS troubleshooting screens when product footage is available.
 
 See [motion direction](motion-direction.md) for the detail → construction → alignment →
 complete-interface approach, including the current limits of flattened captures.
+
+## Direction learned from source-film iterations
+
+For launch films, `reel` now defaults to `mode: "auto"` and 18 seconds. A supplied
+project uses hybrid captures. A source URL first tries retained native components;
+insufficient native detail anchors trigger a reported switch to raster source capture.
+An explicit native request still refuses insufficient sources. Without a URL, domain
+or project the reel is illustrative. Source availability does not establish relevance:
+inspect the contact sheet, and prefer meaningful artwork over weak native anchors.
+
+Source scenes accept `layout` (wide, left, right) and `choreography` (macro, assemble,
+shuttle). New plans receive shape-aware defaults when these are omitted. Their stored
+CSS keeps existing films unchanged. Source arrival, action cues and review sampling
+share timing. Both hybrid and native films finish with the brand alone on dark.
+
+`quality` reports source share, distinct staging, fidelity and advisory warnings.
+It always requires visual review and never certifies artistic merit. Action and handoff
+notes are intentions, not executable effects. See [film direction](film-direction.md)
+for the directing and review process, including the remaining gap to bespoke films.

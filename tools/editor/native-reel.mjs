@@ -1,8 +1,9 @@
 /** Retained website layers and measured detail-to-interface choreography for the reel driver. */
 import {loadChromium} from './render.mjs'
+import {sourceDocument,sourceStage,sourceFont,nativeRevealMs} from './source-choreography.mjs'
 import {captureLayers} from './layer-capture.mjs'
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
-export const nativeRevealMs=(ms,bpm)=>Math.min(1200,ms*.58,Number.isFinite(bpm)&&bpm>0?120000/bpm:1200)
+export {nativeRevealMs} from './source-choreography.mjs'
 export const NATIVE_SCENES=['native-reveal','native-detail']
 
 /** Runs in the source page; semantic cards and real multi-control panels, never nav or testimonials. */
@@ -94,11 +95,11 @@ export async function nativeInventory({url,brandStyle,onStep=()=>{}}){
 }
 
 export function nativeDocument(scene,plan,capture){
+ if(scene.choreography&&scene.choreography!=='macro')return sourceDocument(scene,plan,capture,{native:true})
  const a=capture.anchors.find(a=>a.index===scene.anchor)
  if(!a)throw new Error('Cannot choreograph native reveal: the selected anchor is missing. Next: choose an anchor from the source inventory.')
  const [dark,accent,paper]=plan.palette,light=plan.brandStyle?.theme==='light',background=light?paper:dark,ink=light?dark:paper
- const tall=capture.w/capture.h<.85
- const box=tall?{x:860,y:140,w:880,h:840}:{x:160,y:275,w:1600,h:680},fit=Math.min(box.w/capture.w,box.h/capture.h),left=box.x+(box.w-capture.w*fit)/2,top=box.y+(box.h-capture.h*fit)/2
+ const stage=sourceStage(capture,scene.layout),{fit,x:left,y:top}=stage
  const cx=scene.entry==='left'?680:scene.entry==='right'?1210:960,cy=520
  const macro=Math.min(34,2*Math.min(cx-96,1824-cx)/a.w,800/a.h,Math.max(fit*2.4,Math.min(780/a.w,390/a.h)))
  const x=cx-left-(a.x+a.w/2)*macro,y=cy-top-(a.y+a.h/2)*macro,pad=a.kind==='svg'?2:3
@@ -111,7 +112,7 @@ export function nativeDocument(scene,plan,capture){
   const vars=';--mn-stroke:'+property('stroke','none')+';--mn-width:'+property('stroke-width','1px')+';--mn-dash:'+property('stroke-dasharray','none')+';--mn-opacity:'+property('fill-opacity','1')
   return '<path '+attrs.replace(/pathLength="[^"]*"/g,'').replace(/style="[^"]*"/,'')+' pathLength="1" style="'+style+vars+'">'
  })
- const css=capture.css+`\n.native-scene{position:relative;width:1920px;height:1080px;background:${background};color:${ink};overflow:hidden;font-family:'Motioneer Source',sans-serif}.native-scene h1{position:absolute;left:110px;top:${tall?370:95}px;margin:0;font-size:${tall?118:100}px;font-weight:${plan.brandStyle?.weight||500};line-height:1;letter-spacing:-.055em;max-width:${tall?700:1700}px;animation:native-title .25s ${reveal*.58}ms both}.native-camera{position:absolute;left:${left}px;top:${top}px;transform-origin:0 0;animation:native-camera ${reveal}ms cubic-bezier(.65,0,.2,1) both}.native-window{width:${capture.w}px;height:${capture.h}px;animation:native-window ${reveal}ms cubic-bezier(.65,0,.2,1) both}.native-scene [data-motion-layer="parts"]{animation:native-part .3s ${reveal*.6}ms both}.native-scene [data-motion-layer="parts"][data-motion-index="1"]{animation-delay:${reveal*.68}ms}.native-scene [data-motion-layer="parts"][data-motion-index="2"]{animation-delay:${reveal*.74}ms}.native-scene ${anchor}{position:relative;z-index:1}.native-scene ${anchor} path{animation:native-draw ${Math.min(420,reveal*.4)}ms both}
+ const css=capture.css+`\n.native-scene{position:relative;width:1920px;height:1080px;background:${background};color:${ink};overflow:hidden;font-family:${sourceFont(plan)};font-style:${plan.brandStyle?.style||'normal'}}.native-scene h1{position:absolute;left:${stage.titleX}px;top:${stage.titleY}px;margin:0;font-size:${stage.titleSize}px;font-weight:${plan.brandStyle?.weight||500};line-height:1;overflow-wrap:anywhere;letter-spacing:-.055em;max-width:${stage.titleWidth}px;animation:native-title .25s ${reveal*.58}ms both}.native-camera{position:absolute;left:${left}px;top:${top}px;transform-origin:0 0;animation:native-camera ${reveal}ms cubic-bezier(.65,0,.2,1) both}.native-window{width:${capture.w}px;height:${capture.h}px;animation:native-window ${reveal}ms cubic-bezier(.65,0,.2,1) both}.native-scene [data-motion-layer="parts"]{animation:native-part .3s ${reveal*.6}ms both}.native-scene [data-motion-layer="parts"][data-motion-index="1"]{animation-delay:${reveal*.68}ms}.native-scene [data-motion-layer="parts"][data-motion-index="2"]{animation-delay:${reveal*.74}ms}.native-scene ${anchor}{position:relative;z-index:1}.native-scene ${anchor} path{animation:native-draw ${Math.min(420,reveal*.4)}ms both}
 @keyframes native-camera{0%,13%{transform:translate(${x}px,${y}px) scale(${macro})}100%{transform:translate(0,0) scale(${fit})}}
 @keyframes native-window{0%,13%{clip-path:inset(${inset} round 2px)}85%,100%{clip-path:inset(0)}}
 @keyframes native-draw{0%{stroke:${ink};stroke-width:.12;stroke-dasharray:1;stroke-dashoffset:.75;fill-opacity:0}45%{stroke:${ink};stroke-width:.12;stroke-dasharray:1;stroke-dashoffset:0;fill-opacity:0}100%{stroke:var(--mn-stroke);stroke-width:var(--mn-width);stroke-dasharray:var(--mn-dash);stroke-dashoffset:0;fill-opacity:var(--mn-opacity)}}
@@ -120,4 +121,4 @@ export function nativeDocument(scene,plan,capture){
  return{html:`<div class="native-scene"><div class="native-camera"><div class="native-window">${html}</div></div><h1>${esc(scene.text)}</h1></div>`,css}
 }
 
-export function nativeFinish(plan){return{html:`<div class="native-finish"><h1>${esc(plan.brand)}</h1></div>`,css:`.native-finish{width:1920px;height:1080px;display:grid;place-items:center;background:${plan.palette[0]};color:${plan.palette[2]};font-family:'Motioneer Source',sans-serif}.native-finish h1{margin:0;font-size:180px;font-weight:${plan.brandStyle?.weight||500};letter-spacing:-.055em}`}}
+export function nativeFinish(plan){return{html:`<div class="native-finish"><h1>${esc(plan.brand)}</h1></div>`,css:`.native-finish{width:1920px;height:1080px;display:grid;place-items:center;background:${plan.palette[0]};color:${plan.palette[2]};font-family:${sourceFont(plan)};font-style:${plan.brandStyle?.style||'normal'}}.native-finish h1{margin:0;font-size:180px;font-weight:${plan.brandStyle?.weight||500};letter-spacing:-.055em}`}}

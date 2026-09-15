@@ -1,5 +1,6 @@
 /** Faithful source pixels inside authored choreography, with traceable capture IDs. */
 import {createProject,newTrack,compositionDocument} from '../../dist-core/core.js'
+import {sourceDocument} from './source-choreography.mjs'
 import {loadChromium} from './render.mjs'
 export const PRODUCT_SCENES=['product','product-detail','product-split']
 /** Allocate the bounded contact sheet across sources before visibility sorting can crowd docs out. */
@@ -39,6 +40,7 @@ export async function captureInventory(source,{at,onStep=()=>{}}){
 }
 const esc=s=>String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
 export function productDocument(scene,plan,capture,graphic){
+ if(scene.choreography)return sourceDocument(scene,plan,capture)
  const split=scene.type==='product-split'||capture.w/capture.h<.95,detail=scene.type==='product-detail'
  const [dark,accent,paper]=plan.palette,ink=scene.tone==='dark'?paper:dark
  // Fit a complete capture before a deliberate detail crop. Narrow cards stay recognizable.
