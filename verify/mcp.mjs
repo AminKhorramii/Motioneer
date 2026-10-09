@@ -213,6 +213,29 @@ ok('a video that exists is opened by path', !video.isError && video.text.include
 const folder = await callTool('open', { target: 'folder', path: clip })
 ok('and its folder is the directory, not the file', !folder.isError && folder.text.includes(path.dirname(clip)) && !folder.text.endsWith('film.mp4.'), folder.text.slice(0, 70))
 
+/* ── one request never waits on another, and a cancelled one stays quiet ─────────────────────── */
+console.log('\n  one request does not wait on another')
+const ping = await rpc('ping', {})
+ok('a ping is answered', !!ping.result && !ping.error)
+const nobody = await rpc('resources/list', {})
+ok('a method it does not serve is said to be one, rather than answered with nothing', nobody.error?.code === -32601, JSON.stringify(nobody.error))
+const { createServer } = await import('node:http')
+const slow = createServer((req, res) => setTimeout(() => { res.writeHead(200, { 'content-type': 'text/html' }); res.end('<!doctype html><title>Slow</title><h1>A slow page</h1><section><h2>One</h2><p>The first card on it</p></section><section><h2>Two</h2><p>The second card on it</p></section>') }, 1500))
+await new Promise((r) => slow.listen(0, '127.0.0.1', r))
+const arrived = []
+const raw = (method, params) => { const id = ++n; mcp.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`); return id }
+const watch = (id) => new Promise((done) => waiting.set(id, (m) => { arrived.push(id); done(m) }))
+const slowId = raw('tools/call', { name: 'look', arguments: { url: `http://127.0.0.1:${slow.address().port}/` } })
+watch(slowId)
+const doctorId = raw('tools/call', { name: 'doctor', arguments: {} })
+await watch(doctorId)
+ok('doctor answers while a look is still running', arrived[0] === doctorId && !arrived.includes(slowId))
+mcp.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/cancelled', params: { requestId: slowId, reason: 'verify' } })}\n`)
+const afterId = raw('tools/call', { name: 'look', arguments: {} })
+const queued = await Promise.race([watch(afterId), new Promise((r) => setTimeout(() => r(null), 90000))])
+ok('a cancelled call sends no reply, and the next long call answers once it has stopped', !!queued && !arrived.includes(slowId), JSON.stringify(arrived))
+slow.close()
+
 /**
  * What the published package actually gives somebody, which is not the same as what the repo does.
  *

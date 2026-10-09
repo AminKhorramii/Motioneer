@@ -77,7 +77,7 @@ export async function renderProject(at, id, onStep = () => {}) {
     const job = jobs.find((j) => j.id === start.id)
     if (!job) continue
     const percent = job.total ? Math.floor(10 * job.done / job.total) * 10 : 0
-    if (percent > reported) {reported=percent;onStep(`Exporting ${percent} percent.`)}
+    if (percent > reported) {reported=percent;try{onStep(`Exporting ${percent} percent.`)}catch(e){await fetch(`${at}/__motioneer/projects/${id}/renders/${start.id}`,{method:'DELETE'}).catch(()=>{});throw e}}
     if (job.state === 'error') throw new Error(`Cannot render: ${job.message || 'the render failed'}. Next: open the studio and export from there to see the frame it stopped on.`)
     if (job.state === 'cancelled') throw new Error('Cannot render: the export was cancelled. Next: export the saved project when ready.')
     if (job.state === 'complete') return { jobId: job.id, url: `${at}${job.url}` }

@@ -541,26 +541,34 @@ async function projectsTool({ projectId, limit }) {
     next: [{ tool: 'look', args: { projectId: p.id }, why: 'render it and see its frames' }, { tool: 'change', args: { projectId: p.id, ...(authored ? { motion: { direction: '<change>', trackIds: ['<trackId>'] } } : { cut: { drop: ['<shot number>'] } }) }, why: 'make a new take of it' }] }
 }
 
-async function call(name, args, id, meta) {
+/**
+ * One call, answered once. A cancelled call stops at its next stage, since every stage reports
+ * progress and progress refuses to continue, and it sends no reply: the client has stopped waiting.
+ */
+async function call(name, args, id, meta, job = { cancelled: false }) {
   let step=0
-  const progress=message=>{if(typeof meta?.progressToken==='string'||typeof meta?.progressToken==='number')send({jsonrpc:'2.0',method:'notifications/progress',params:{progressToken:meta.progressToken,progress:step++,message}})}
+  const progress=message=>{
+    if(job.cancelled)throw cannot('finish: the call was cancelled.','nothing; the person stopped it.')
+    if(typeof meta?.progressToken==='string'||typeof meta?.progressToken==='number')send({jsonrpc:'2.0',method:'notifications/progress',params:{progressToken:meta.progressToken,progress:step++,message}})
+  }
+  const answerOnce = (reply) => { if (!job.cancelled) answer(id, reply) }
   const a = args ?? {}
   if (['film', 'change', 'look', 'reel', 'revise', 'refine', 'rescore', 'review', 'inspect'].includes(name)) progress('Preparing the film workspace.')
-  if (name === 'doctor') { const { diagnose } = await import('../tools/environment.mjs'); const report = await diagnose(a); return answer(id, { structured: report, summary: report.ready ? 'Motioneer is configured and its renderer works. Model authentication is checked on the first model request.' : report.checks.filter((c) => !c.ok).map((c) => c.message + ' ' + (c.next || '')).join(' ') }) }
-  if (name === 'film') return answer(id, await filmTool(a, progress))
-  if (name === 'change') return answer(id, await changeTool(a, progress))
-  if (name === 'look') return answer(id, await lookTool(a, progress))
-  if (name === 'projects') return answer(id, await projectsTool(a))
-  if (name === 'motion') return answer(id, await motion(a))
-  if (name === 'studio') return answer(id, await studio(a))
-  if (name === 'open') return answer(id, await open(a))
+  if (name === 'doctor') { const { diagnose } = await import('../tools/environment.mjs'); const report = await diagnose(a); return answerOnce({ structured: report, summary: report.ready ? 'Motioneer is configured and its renderer works. Model authentication is checked on the first model request.' : report.checks.filter((c) => !c.ok).map((c) => c.message + ' ' + (c.next || '')).join(' ') }) }
+  if (name === 'film') return answerOnce(await filmTool(a, progress))
+  if (name === 'change') return answerOnce(await changeTool(a, progress))
+  if (name === 'look') return answerOnce(await lookTool(a, progress))
+  if (name === 'projects') return answerOnce(await projectsTool(a))
+  if (name === 'motion') return answerOnce(await motion(a))
+  if (name === 'studio') return answerOnce(await studio(a))
+  if (name === 'open') return answerOnce(await open(a))
   // the names the surface used to have, each onto the tool that does its job now
-  if (name === 'reel') return answer(id, await filmTool({ ...a, mode: a.mode || 'auto', url: a.url || (a.domain ? `https://${a.domain}` : undefined) }, progress))
-  if (name === 'inspect') return answer(id, await inspect(a))
-  if (name === 'review') return answer(id, await reviewTool({ projectId: a.projectId, critique: true }, progress))
-  if (name === 'revise') return answer(id, await changeTool({ projectId: a.projectId, dir: a.dir, cut: Object.fromEntries(Object.entries({ pace: a.pace, seconds: a.seconds, opening: a.opening, closing: a.closing, drop: a.drop, order: a.order, fps: a.fps, soundtrack: a.soundtrack, background: a.background, ink: a.ink }).filter(([, v]) => v !== undefined)), ...(a.motionDirection ? { motion: { direction: a.motionDirection, elements: a.motionElements } } : {}) }, progress))
-  if (name === 'refine') return answer(id, await changeTool({ projectId: a.projectId, dir: a.dir, motion: { direction: a.direction, trackIds: a.trackIds, lockedTrackIds: a.lockedTrackIds, reviewPasses: a.reviewPasses } }, progress))
-  if (name === 'rescore') return answer(id, await changeTool({ projectId: a.projectId, dir: a.dir, music: { identity: a.music, direction: a.direction, bpm: a.bpm, audioFile: a.audioFile, replaceAudioTrackIds: a.replaceAudioTrackIds } }, progress))
+  if (name === 'reel') return answerOnce(await filmTool({ ...a, mode: a.mode || 'auto', url: a.url || (a.domain ? `https://${a.domain}` : undefined) }, progress))
+  if (name === 'inspect') return answerOnce(await inspect(a))
+  if (name === 'review') return answerOnce(await reviewTool({ projectId: a.projectId, critique: true }, progress))
+  if (name === 'revise') return answerOnce(await changeTool({ projectId: a.projectId, dir: a.dir, cut: Object.fromEntries(Object.entries({ pace: a.pace, seconds: a.seconds, opening: a.opening, closing: a.closing, drop: a.drop, order: a.order, fps: a.fps, soundtrack: a.soundtrack, background: a.background, ink: a.ink }).filter(([, v]) => v !== undefined)), ...(a.motionDirection ? { motion: { direction: a.motionDirection, elements: a.motionElements } } : {}) }, progress))
+  if (name === 'refine') return answerOnce(await changeTool({ projectId: a.projectId, dir: a.dir, motion: { direction: a.direction, trackIds: a.trackIds, lockedTrackIds: a.lockedTrackIds, reviewPasses: a.reviewPasses } }, progress))
+  if (name === 'rescore') return answerOnce(await changeTool({ projectId: a.projectId, dir: a.dir, music: { identity: a.music, direction: a.direction, bpm: a.bpm, audioFile: a.audioFile, replaceAudioTrackIds: a.replaceAudioTrackIds } }, progress))
   /**
    * A name nobody serves is answered rather than ignored.
    *
@@ -592,8 +600,19 @@ if (process.stdin.isTTY) {
   process.exit(0)
 }
 
+/**
+ * Every request is handled on its own rather than in the order its lines arrived.
+ *
+ * The loop used to await each call before reading the next line, so a doctor or projects call sent
+ * while a film rendered waited minutes for it. Calls that drive the studio's one proxy target and
+ * one render slot still run one after another, because two films at once raced on the proxy;
+ * everything else answers at once.
+ */
+const LONG = new Set(['film', 'change', 'look', 'reel', 'revise', 'refine', 'rescore', 'review', 'inspect'])
+const running = new Map()
+let queue = Promise.resolve()
 let buffer = ''
-process.stdin.on('data', async (chunk) => {
+process.stdin.on('data', (chunk) => {
   buffer += chunk
   const lines = buffer.split('\n')
   buffer = lines.pop() ?? ''
@@ -619,11 +638,21 @@ process.stdin.on('data', async (chunk) => {
     } else if (msg.method === 'tools/list') {
       send({ jsonrpc: '2.0', id: msg.id, result: { tools: TOOLS } })
     } else if (msg.method === 'tools/call') {
-      await call(msg.params?.name, msg.params?.arguments, msg.id, msg.params?._meta).catch((e) =>
-        fail(msg.id, e, { projectId: e?.projectId }),
-      )
-    } else if (msg.id !== undefined) {
+      const job = { cancelled: false }
+      running.set(msg.id, job)
+      const run = () => call(msg.params?.name, msg.params?.arguments, msg.id, msg.params?._meta, job)
+        .catch((e) => { if (!job.cancelled) fail(msg.id, e, { projectId: e?.projectId }) })
+        .finally(() => running.delete(msg.id))
+      if (LONG.has(msg.params?.name)) queue = queue.then(run, run)
+      else run()
+    } else if (msg.method === 'notifications/cancelled') {
+      const job = running.get(msg.params?.requestId)
+      if (job) job.cancelled = true
+    } else if (msg.method === 'ping') {
       send({ jsonrpc: '2.0', id: msg.id, result: {} })
+    } else if (msg.id !== undefined) {
+      // a method nobody serves is said to be one, so a client does not take silence or {} as an answer
+      send({ jsonrpc: '2.0', id: msg.id, error: { code: -32601, message: `Motioneer does not serve ${msg.method}.` } })
     }
   }
 })
