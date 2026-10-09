@@ -100,7 +100,7 @@ console.log('\n  what it offers')
 const list = await rpc('tools/list', {})
 const tools = list.result?.tools ?? []
 const names = tools.map((t) => t.name).sort()
-ok('nine tools, including readiness and independent music revision', names.join(',') === 'doctor,film,inspect,motion,open,reel,rescore,revise,studio', names.join(','))
+ok('eleven tools, including sampled review and scoped refinement', names.join(',') === 'doctor,film,inspect,motion,open,reel,refine,rescore,review,revise,studio', names.join(','))
 ok('every one has a description an agent can act on',
   tools.every((t) => (t.description ?? '').length > 80))
 ok('every one has an object schema', tools.every((t) => t.inputSchema?.type === 'object'))
@@ -125,6 +125,7 @@ ok('revise takes drop and order, since a reaction to a film is a change to its s
   !!tools.find((t) => t.name === 'revise')?.inputSchema?.properties?.drop && !!tools.find((t) => t.name === 'revise')?.inputSchema?.properties?.order)
 ok('reels can direct twenty-two musical identities and rescore an existing edit',tools.find(t=>t.name==='reel')?.inputSchema?.properties?.music?.enum.length===22 && tools.find(t=>t.name==='rescore')?.inputSchema?.properties?.direction)
 ok('rescore accepts a finished soundtrack and explicit imported-track replacement',tools.find(t=>t.name==='rescore')?.inputSchema?.properties?.audioFile?.type==='string' && tools.find(t=>t.name==='rescore')?.inputSchema?.properties?.replaceAudioTrackIds?.items?.type==='string' && /procedural synthesis/.test(hello.result.instructions))
+ok('agent tools expose scoped refinement, sampled review and recorded kits',tools.find(t=>t.name==='refine')?.inputSchema?.properties?.trackIds?.maxItems===12 && tools.find(t=>t.name==='review') && tools.find(t=>t.name==='reel')?.inputSchema?.properties?.reviewPasses?.maximum===2 && tools.find(t=>t.name==='reel')?.inputSchema?.properties?.soundKit?.type==='string')
 ok('reels can read bounded product documentation',tools.find(t=>t.name==='reel')?.inputSchema?.properties?.referenceUrls?.maxItems===3)
 ok('reels default to source brand identity with an explicit expressive option',tools.find(t=>t.name==='reel')?.inputSchema?.properties?.brandMode?.enum.join(',')==='site,expressive')
 ok('reels expose a shared tempo for music and visual cuts',tools.find(t=>t.name==='reel')?.inputSchema?.properties?.bpm?.maximum===180)

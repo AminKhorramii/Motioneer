@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "description": "Held-out product prompts for source fidelity, choreography, review and three scoped revisions. Human preference remains unrated until people compare the exports.",
+  "cases": [
+    {"id":"stripe","brand":"Stripe","url":"https://stripe.com","direction":"Explain a payment becoming a working business. Precise native product detail, strong typographic rhythm, grounded claims."},
+    {"id":"supabase","brand":"Supabase","url":"https://supabase.com","direction":"Make data feel tangible: a useful source detail becomes a complete developer workflow. Preserve source green."},
+    {"id":"sentry","brand":"Sentry","url":"https://sentry.io","direction":"Show the journey from noticing a problem to understanding it. Product-relevant graphics and careful source continuity."},
+    {"id":"posthog","brand":"PostHog","url":"https://posthog.com","direction":"An expressive product film about understanding what users do. Preserve the site's own playful identity."},
+    {"id":"resend","brand":"Resend","url":"https://resend.com","direction":"A restrained technical film about sending email. One precise product story, strong close detail and a quiet ending."},
+    {"id":"clerk","brand":"Clerk","url":"https://clerk.com","direction":"Make the sign-in flow feel deliberate and welcoming. Use real product elements and purposeful micro motion."},
+    {"id":"neon","brand":"Neon","url":"https://neon.com","direction":"A technically precise database film. Retained product controls, distinctive brand colors and connected geometry."},
+    {"id":"turso","brand":"Turso","url":"https://turso.tech","direction":"A confident developer product film. Build its story from observed product evidence and expressive source details."},
+    {"id":"liveblocks","brand":"Liveblocks","url":"https://liveblocks.io","direction":"Show collaboration through real source elements. Let independently movable details assemble into a shared interface."},
+    {"id":"tldraw","brand":"tldraw","url":"https://tldraw.com","direction":"A playful canvas film. Retain actual vectors where accessible and honestly label raster content. Simple expressive finish."},
+    {"id":"excalidraw","brand":"Excalidraw","url":"https://excalidraw.com","direction":"Make rough ideas become a clear diagram. Preserve the hand-drawn character, with careful snappy choreography."},
+    {"id":"readme","brand":"ReadMe","url":"https://readme.com","direction":"Turn technical documentation into an inviting product story. Keep typography and visual identity source-led."},
+    {"id":"mintlify","brand":"Mintlify","url":"https://mintlify.com","direction":"An editorial developer film about useful documentation. Strong source scale changes and deliberate readable holds."},
+    {"id":"dub","brand":"Dub","url":"https://dub.co","direction":"A clean growth-product film with real source UI. Avoid invented metrics; make product relationships visually clear."},
+    {"id":"cal","brand":"Cal.com","url":"https://cal.com","direction":"Show scheduling through the source's own interface. Time and availability become precise, connected motion."},
+    {"id":"loops","brand":"Loops","url":"https://loops.so","direction":"A distinct email-product launch film. Actual product detail, warm source typography and sharp rhythmic accents."},
+    {"id":"inngest","brand":"Inngest","url":"https://inngest.com","direction":"A developer film about reliable workflows. Explain a documented action through source detail and measured continuity."},
+    {"id":"trigger","brand":"Trigger.dev","url":"https://trigger.dev","direction":"Make background work understandable through retained source components and a tightly directed technical story."},
+    {"id":"convex","brand":"Convex","url":"https://convex.dev","direction":"A product film about connected application data. Use actual source examples, without invented behavior."},
+    {"id":"railway","brand":"Railway","url":"https://railway.com","direction":"A launch film about an idea reaching deployment. Technical detail, varied scale and confident source identity."}
+  ],
+  "revisions": [
+    "Sharpen this scene's arrival and easing. Preserve its settled content and the film timing.",
+    "Make this scene quieter by reducing incidental movement. Keep its principal action and source legibility.",
+    "Polish the selected scene's exit. Preserve its content, brand typography, timing and every other scene."
+  ]
+}

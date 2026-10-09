@@ -25,7 +25,7 @@ assert.equal(captureArrivalMs({type:'native-reveal'},1800,150),800,'legacy nativ
 for(const key of ['layout','choreography'])assert.throws(()=>normalizeReel({...raw,scenes:raw.scenes.map((s,i)=>i===1?{...s,[key]:'invented'}:s)},{brand:'Example',captures}),/Cannot stage the source/)
 for(const [i,shot]of made.shots.entries())if(shot.captureId){
  const cue=made.cues.filter(c=>c.at>=shot.at&&c.at<shot.at+shot.seconds).at(-1)
- assert.equal(cue.at,shot.at+captureArrivalMs(plan.scenes[i],shot.seconds*1000,made.bpm)/1000*.85)
+ assert.equal(cue.at,shot.at+captureArrivalMs(plan.scenes[i],shot.seconds*1000,made.bpm)/1000)
  assert.ok(captureArrivalMs(plan.scenes[i],shot.seconds*1000,made.bpm)<shot.seconds*1000*.6,'complete sources have time to read')
 }
 const report=sourceDirectionReport(Array.from({length:3},()=>({captureId:'wide',layout:'wide',choreography:'macro',beats:4})),captures)

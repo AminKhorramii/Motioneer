@@ -33,7 +33,10 @@ new behavior. Each source shot returns `renderedMotion`, a description derived f
 the renderer choices. Use that for delivery claims; it takes precedence over director
 prose, which can still describe effects the renderer cannot perform. A connecting line
 that becomes a cursor, a brush that paints a letter,
-or an object traveling between scenes requires additional authored motion. Do not
+or a transformed object requires additional authored motion. A separate `carry` declaration
+can move the same retained text/SVG anchor between two native source scenes, with at
+most one graphic beat between them. Its overlay follows measured endpoints and hides
+the source copies while traveling. This does not morph unrelated objects. Do not
 describe those effects as delivered without inspecting them in the export.
 
 ## Score the action
@@ -41,7 +44,10 @@ describe those effects as delivered without inspecting them in the export.
 Choose a sonic character for the specific story. Built-in profiles synthesize an
 original procedural score with cuts and source arrival cues on the same clock. They
 do not reproduce the recorded-drum production of the custom Figma soundtrack.
-For that level of production, create or obtain an appropriate finished score and use
+For recorded percussion, pass a local `soundKit` manifest to `reel`. It arranges your
+kick, snare, hat and accent recordings against the shared event clock, with synthesized
+bass. Provenance is supplied by the kit owner, not independently verified. For a
+finished musical composition, create or obtain an appropriate score and use
 `rescore` with `audioFile`. Keep voiceover and effects; name imported music tracks to
 replace explicitly. Listen through the whole film, including the final release.
 
@@ -61,3 +67,11 @@ The returned `quality` report counts sources and staging and flags repetition. I
 advisory. A structurally valid export is not artistic approval. If a review fails or
 cannot be performed, say so. The current finite choreography vocabulary improves the
 starting point; it does not guarantee the custom Figma film's quality for most prompts.
+
+
+Use `refine` with exact track IDs for focused CSS adjustments. Select all connected
+carry tracks and their endpoints together. Lock approved tracks. Each result is an
+independent take; the original markup, fonts, timing, camera and audio bytes survive.
+A refined animation may change its internal event times, so old clock metadata becomes
+stale and is excluded from automatic rescoring. Inspect carried-object alignment again.
+See [agentic film tools](agentic-films.md) for the bounded review process and benchmark.

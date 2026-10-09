@@ -1,4 +1,5 @@
 /** A new musical take preserves the complete visual edit and leaves the source project alone. */
+import {visualClock,currentEvents} from './film-events.mjs'
 import {resolve} from '../../shared/arrange.mjs'
 import {MUSIC,musicPlan} from './music.mjs'
 import {withSoundtrack} from './soundtrack.mjs'
@@ -41,6 +42,7 @@ export async function createRescoreTake({at,projectId,music,direction='',bpm,aud
   serialized=serialized.replaceAll(asset.id,imported.id)
  }
  copied=JSON.parse(serialized.replaceAll(`/__motioneer/projects/${projectId}/assets/`,`/__motioneer/projects/${fresh.id}/assets/`))
+ if(currentEvents(source).status==='renderer-clock')copied.direction.clock=visualClock(copied)
  copied.tracks=copied.tracks.filter(t=>!replaceAudioTrackIds.includes(t.id))
  let project
  if(importedScore){

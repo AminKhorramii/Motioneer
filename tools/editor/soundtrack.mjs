@@ -1,3 +1,5 @@
+import {currentEvents,eventCues} from './film-events.mjs'
+import {readSoundKit,sampledScore} from './sampled-score.mjs'
 /** An original, deterministic score tied to the cut. Kept as ordinary editable audio. */
 import {resolve} from '../../shared/arrange.mjs'
 import {musicWav,musicPlan} from './music.mjs'
@@ -40,18 +42,23 @@ export function scoreWav({seconds,style='pulse',seed='film',cuts=[],cues=[],bpm=
   return {data,waveform}
 }
 
-export async function withSoundtrack(project,{at,style,bpm,music,cues=[],onStep=()=>{}}) {
+export async function withSoundtrack(project,{at,style,bpm,music,cues,soundKit,onStep=()=>{}}) {
   if(!SOUNDTRACKS.includes(style))throw new Error('Cannot score: choose none, ambient, pulse, playful, percussive, or signature. Next: pass a supported soundtrack.')
   const generated=new Set(project.assets.filter(a=>a.name.startsWith(prefix)).map(a=>a.id))
   const tracks=project.tracks.filter(t=>t.kind!=='audio'||!generated.has(t.assetId))
+  if(project.direction){const {score,...direction}=project.direction;project={...project,direction}}
   if(style==='none')return {...project,tracks}
   const identity=style==='signature'?musicPlan(music||{profile:scoreMusic(project)},project.source||project.name):null
-  onStep(`Scoring the cut with original ${identity?.label||style} music.`)
+  onStep(soundKit?'Arranging recorded percussion on the film clock.':`Scoring the cut with original ${identity?.label||style} music.`)
   const from=identity?project.settings.from:0,to=identity?project.settings.to:project.settings.duration,seconds=(to-from)/1000
   const starts=resolve({cars:tracks.map(t=>({key:t.id,at:t.start,after:t.after,motion:{ms:t.duration}}))}).at
-  const cuts=[...new Set(tracks.flatMap((t,i)=>t.kind!=='audio'&&!t.hidden?[(starts[i]-from)/1000]:[]))]
-  const {data,waveform}=scoreWav({seconds,style,seed:project.source||project.name,cuts,cues,bpm,music:identity})
-  const name=prefix+(identity?'signature-'+identity.profile:style)+'.wav',response=await fetch(`${at}/__motioneer/projects/${project.id}/assets?name=${encodeURIComponent(name)}`,{method:'POST',headers:{'content-type':'audio/wav'},body:data}),asset=await response.json()
+  const overlays=new Set((project.direction?.transitions||[]).map(t=>t.trackId))
+  const cuts=[...new Set(tracks.flatMap((t,i)=>t.kind!=='audio'&&!t.hidden&&!overlays.has(t.id)?[(starts[i]-from)/1000]:[]))].filter(t=>t>=0&&t<seconds).sort((a,b)=>a-b)
+  cues??=eventCues(currentEvents(project).events).map(c=>({...c,at:c.at-from/1000})).filter(c=>c.at>=0&&c.at<seconds)
+  const scored=soundKit?sampledScore({seconds,seed:project.source+' '+project.name,cuts,cues,bpm,kit:await readSoundKit(soundKit)}):scoreWav({seconds,style,seed:project.source||project.name,cuts,cues,bpm,music:identity})
+  const {data,waveform}=scored
+  if(soundKit&&project.direction)project={...project,direction:{...project.direction,score:{kind:'recorded-kit',name:scored.name,provenance:scored.provenance}}}
+  const name=prefix+(soundKit?'sampled':identity?'signature-'+identity.profile:style)+'.wav',response=await fetch(`${at}/__motioneer/projects/${project.id}/assets?name=${encodeURIComponent(name)}`,{method:'POST',headers:{'content-type':'audio/wav'},body:data}),asset=await response.json()
   if(!response.ok||asset.error)throw new Error(`Cannot score: ${asset.error||'audio import failed'}. Next: retry the soundtrack.`)
   return {...project,assets:[...project.assets,{...asset,duration:to-from,waveform}],tracks:[...tracks,{...newTrack('audio',name,from),assetId:asset.id,duration:to-from,volume:.8,fadeIn:100,fadeOut:300}]}
 }

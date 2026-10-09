@@ -80,7 +80,7 @@ export async function nativeInventory({url,brandStyle,onStep=()=>{}}){
     await preview.setViewportSize({width:Math.ceil(c.w),height:Math.ceil(c.h)})
     await preview.setContent(`<style>html,body{margin:0;background:${brandStyle?.theme==='light'?brandStyle.palette[2]:brandStyle?.palette[0]||'#111'}}${c.css}</style>${c.html}`)
     await preview.evaluate(async()=>{await document.fonts.ready;await Promise.all([...document.images].map(i=>i.decode().catch(()=>{})))})
-    const anchors=await preview.locator('[data-motion-layer="detail"]').evaluateAll(els=>els.map((e,index)=>{const r=e.getBoundingClientRect();return{index,selector:`[data-motion-layer="detail"][data-motion-index="${index}"]`,x:r.x,y:r.y,w:r.width,h:r.height,kind:e.tagName.toLowerCase()==='svg'?'svg':'text',text:(e.getAttribute('data-native-context')||e.textContent||e.getAttribute('placeholder')||e.getAttribute('aria-label')||'source icon').trim().slice(0,65)}}).filter(a=>a.x>=0&&a.y>=0&&a.w>0&&a.h>0))
+    const anchors=await preview.locator('[data-motion-layer="detail"]').evaluateAll(els=>els.map((e,index)=>{const r=e.getBoundingClientRect();return{index,selector:`[data-motion-layer="detail"][data-motion-index="${index}"]`,x:r.x,y:r.y,w:r.width,h:r.height,kind:e.tagName.toLowerCase()==='svg'?'svg':'text',html:e.outerHTML,text:(e.getAttribute('data-native-context')||e.textContent||e.getAttribute('placeholder')||e.getAttribute('aria-label')||'source icon').trim().slice(0,65)}}).filter(a=>a.x>=0&&a.y>=0&&a.w>0&&a.h>0))
     if(!anchors.length)throw Error('anchors did not survive isolation')
     const data='data:image/png;base64,'+(await preview.screenshot()).toString('base64')
     const visibility=await preview.evaluate(async data=>{const im=new Image();im.src=data;await im.decode();const c=document.createElement('canvas');c.width=c.height=100;const g=c.getContext('2d');g.drawImage(im,0,0,100,100);const p=g.getImageData(0,0,100,100).data;let variance=0;for(let ch=0;ch<3;ch++){let sum=0,sq=0,n=0;for(let i=ch;i<p.length;i+=4){sum+=p[i];sq+=p[i]*p[i];n++}variance+=sq/n-(sum/n)**2}return{variance:variance/3}},data)
@@ -117,7 +117,8 @@ export function nativeDocument(scene,plan,capture){
 @keyframes native-window{0%,13%{clip-path:inset(${inset} round 2px)}85%,100%{clip-path:inset(0)}}
 @keyframes native-draw{0%{stroke:${ink};stroke-width:.12;stroke-dasharray:1;stroke-dashoffset:.75;fill-opacity:0}45%{stroke:${ink};stroke-width:.12;stroke-dasharray:1;stroke-dashoffset:0;fill-opacity:0}100%{stroke:var(--mn-stroke);stroke-width:var(--mn-width);stroke-dasharray:var(--mn-dash);stroke-dashoffset:0;fill-opacity:var(--mn-opacity)}}
 @keyframes native-part{from{opacity:0;translate:0 10px}to{opacity:1;translate:0 0}}
-@keyframes native-title{from{opacity:0;translate:0 18px}to{opacity:1;translate:0 0}}`
+@keyframes native-title{from{opacity:0;translate:0 18px}to{opacity:1;translate:0 0}}
+@media(prefers-reduced-motion:reduce){.native-scene *{animation:none!important}.native-camera{transform:scale(${fit})}.native-window{clip-path:none}}`
  return{html:`<div class="native-scene"><div class="native-camera"><div class="native-window">${html}</div></div><h1>${esc(scene.text)}</h1></div>`,css}
 }
 

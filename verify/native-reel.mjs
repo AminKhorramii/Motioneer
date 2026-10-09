@@ -20,7 +20,7 @@ try{
  assert.equal(made.project.subjects.length,raw.scenes.length+2,'raw native captures remain in the library')
  assert.equal(made.cues.length,13,'three native action cues per reveal plus mechanism actions')
  assert.equal(nativeRevealMs(2500,144),120000/144,'reveals follow two musical beats')
- assert.equal(made.cues[2].at,made.shots[1].at+nativeRevealMs(made.shots[1].seconds*1000,made.bpm)/1000*.85,'settle accent uses the actual clipping completion time')
+ assert.equal(made.cues[2].at,made.shots[1].at+nativeRevealMs(made.shots[1].seconds*1000,made.bpm)/1000,'settle accent uses the actual clipping completion time')
  const page=await b.newPage({viewport:{width:1920,height:1080}});await page.route('**/*',r=>r.abort());await page.setContent(compositionDocument(made.project));await page.evaluate(()=>window.__composition.ready())
  for(const [i,s]of plan.scenes.entries())if(s.type.startsWith('native-')){
   await page.evaluate(t=>window.__composition.seek(t),made.shots[i].at*1000+20)

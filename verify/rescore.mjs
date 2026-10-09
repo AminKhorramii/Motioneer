@@ -9,6 +9,7 @@ import {createRescoreTake} from '../tools/editor/rescore.mjs'
 import {readScoreFile} from '../tools/editor/score-file.mjs'
 import {scoreWav} from '../tools/editor/soundtrack.mjs'
 import {loadFfmpeg} from '../tools/editor/render.mjs'
+import {visualClock,currentEvents} from '../tools/editor/film-events.mjs'
 import {newTrack} from '../dist-core/core.js'
 
 if(!await loadFfmpeg()){console.log('skip: soundtrack file checks need the local renderer');process.exit(0)}
@@ -37,6 +38,7 @@ try{
  const title={...newTrack('title','Opening',0),duration:4000,text:'Keep this'},linked={...newTrack('title','Linked',0),duration:500,after:{key:title.id,mode:'after',gap:-2500}}
  const music={...newTrack('audio','Imported music',0),assetId:score.id,duration:4000},speech={...newTrack('audio','Voiceover',0),assetId:voice.id,duration:4000,volume:.4,sourceStart:25},automatic={...newTrack('audio','Generated',0),assetId:generated.id,duration:4000}
  source.tracks=[title,linked,music,speech,automatic];source.settings={...source.settings,duration:4000,from:1000,to:3000}
+ source.direction={version:1,scenes:[],transitions:[],events:[{id:'source:action',trackId:title.id,at:2.1,kind:'action',phase:1,mechanism:'integration'}],clock:visualClock(source)}
  source=await store.save(source)
  const original=JSON.stringify(source),count=(await store.list()).length
  await assert.rejects(createRescoreTake({at,projectId:source.id,audioFile:file,music:'glass'}),/choose audioFile/)
@@ -62,6 +64,9 @@ try{
  assert.deepEqual((await store.asset(p.id,t.assetId)).data,decoded.data,'the editable score matches the trimmed master')
  assert.equal(JSON.stringify(await store.read(source.id)),original,'the source project is untouched')
  const again=await createRescoreTake({at,projectId:p.id,music:'glass',replaceAudioTrackIds:[t.id],bpm:150})
+ assert.equal(currentEvents(again.project).status,'renderer-clock')
+ const expectedScore=scoreWav({seconds:2,style:'signature',seed:again.project.source||again.project.name,cuts:[.5],cues:[{...source.direction.events[0],at:1.1}],bpm:150,music:again.identity})
+ assert.deepEqual((await store.asset(again.project.id,again.project.tracks.at(-1).assetId)).data,expectedScore.data,'rescoring retains renderer events and offsets them into the export range')
  assert.equal(again.soundtrack,'signature');assert.equal(again.identity.profile,'glass')
  assert.equal(again.project.tracks.filter(t=>t.kind==='audio').length,2,'synthesized revisions can replace an imported score too')
  assert.deepEqual(again.project.tracks.filter(t=>t.kind!=='audio'),p.tracks.filter(t=>t.kind!=='audio'))

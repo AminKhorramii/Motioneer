@@ -37,7 +37,25 @@ renderer automatically if needed. The result includes a local MP4, a transition 
 sheet and an editor link. Projects and earlier takes stay local; the model receives the prompt and
 source material needed to direct the film through your configured provider.
 
+Focused follow-ups can refine selected motion tracks into a new take while preserving the source
+film and audio. The agent can review sampled exported frames and report unresolved issues.
+See [review, refinement and recorded sound kits](docs/agentic-films.md).
+
 See [example prompts](docs/native-examples.md) and the [prompt-to-film workflow](docs/chat-to-film.md).
+
+## Claude Desktop
+
+On macOS or Windows with Node 20+, connect Desktop with one command:
+
+```sh
+npx -y motioneer setup --claude-desktop
+```
+
+Fully quit and reopen Claude Desktop, then ask for a film. Setup prepares the renderer,
+creates a persistent `~/Motioneer` workspace, and safely adds the MCP connection with a
+backup of any existing config. Other servers stay intact. Use `--dir` for another folder.
+A signed-in Claude Code/Codex CLI or a provider configured in Motioneer's Settings is
+still required for generation. See [Desktop setup](docs/setup.md#claude-desktop).
 
 ## Codex and ChatGPT
 

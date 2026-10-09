@@ -16,9 +16,51 @@ version-pinned entry into `.mcp.json`, preserving other servers. A conflicting M
 invalid JSON is reported for review rather than overwritten. Restart Claude Code and accept the
 project’s MCP server when prompted. No editor interaction is needed to make the first film.
 
-`setup` without `--claude` or `--codex` only prepares the renderer. `setup --json` reports readiness as JSON;
+`setup` without a client flag only prepares the renderer. `setup --json` reports readiness as JSON;
 installation progress goes to stderr. A configured provider can still need authentication; setup
 never spends a model request to test credentials.
+
+## Claude Desktop
+
+On macOS or Windows, with Claude Desktop and Node 20+ installed:
+
+```sh
+npx -y motioneer setup --claude-desktop
+```
+
+This creates `~/Motioneer` for local projects, prepares Chromium/FFmpeg, and adds the
+Motioneer server to Claude Desktop's configuration. Fully quit and reopen Desktop after
+setup, then ask it to make a film. No JSON editing is needed for a new connection.
+Use `--dir /absolute/existing/folder` to choose another workspace, or `--port 4322` if
+you need a separate studio. Desktop setup does not modify a Claude Code `.mcp.json`.
+
+The installer preserves other servers and preferences, saves a private backup before
+changing an existing config, and does nothing when the connection already matches. It can refresh the executable
+search path of an otherwise matching connection after you install a CLI.
+It refuses malformed configs or a conflicting Motioneer entry. `--json` reports the
+config path, whether it changed, the backup path when applicable, and readiness checks.
+It never closes Desktop or interrupts an active conversation.
+
+Desktop launches Node and npm by absolute paths and receives the terminal's executable
+search path, so signed-in Claude Code or Codex can be found outside a login shell. The
+npm command pins the Motioneer version used during setup; it does not depend on keeping
+a temporary `npx` package directory. If you replace your Node installation or want to
+change an existing connection, print the proposed configuration for comparison:
+
+```sh
+npx -y motioneer mcp-config --claude-desktop
+```
+
+A generation provider is still required. A Claude Desktop conversation does not provide
+Motioneer's backend model access. Use signed-in Claude Code/Codex, or configure an API
+provider in Motioneer's Settings. Terminal API keys are not copied into Desktop's JSON;
+setup reports incomplete readiness when those keys are the only available credentials.
+For provider configuration, run `npx motioneer --dir ~/Motioneer` to open that studio.
+
+The config locations are `~/Library/Application Support/Claude/claude_desktop_config.json`
+on macOS and `%APPDATA%\Claude\claude_desktop_config.json` on Windows. If connection fails,
+check Desktop's Developer settings and rerun `npx motioneer doctor --dir ~/Motioneer`.
+The CLI checks command availability; authentication is tested on the first generation.
 
 ## Other clients and automation
 

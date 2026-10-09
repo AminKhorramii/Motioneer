@@ -57,7 +57,7 @@ editable scene clips. Existing capture imperfections can remain visible, so revi
 
 See [ten hybrid film prompts](hybrid-examples.md) for brand-specific directions.
 
-`mode: "graphic"` remains the default and makes authored illustrative brand graphics only.
+`mode: "graphic"` makes authored illustrative brand graphics only. The default `auto` mode prefers source captures when available.
 An optional `projectId` supplies name context in that mode. Use `film` for a capture-led edit.
 
 The choreography vocabulary includes impact type, typographic echoes, orbital linework, modular
@@ -67,7 +67,7 @@ studio's configured provider, including Claude CLI, so ordinary prompts use the 
 path as the example renders. Results vary with the model's creative plan.
 
 Review the storyboard and sample motion within shots. Numeric proof catches missing cuts and
-blank frames, not artistic quality. For another creative direction call `reel` again, preserving
+blank frames, not artistic quality. For a focused motion adjustment use `refine` with exact track IDs. For another creative direction call `reel` again, preserving
 the previous version. Do not use generic `revise` to recut a reel: that operation builds a
 capture-style sequence, so the tool refuses authored reels before changing them. See [kinetic reel prompts](kinetic-examples.md).
 
@@ -570,5 +570,18 @@ share timing. Both hybrid and native films finish with the brand alone on dark.
 
 `quality` reports source share, distinct staging, fidelity and advisory warnings.
 It always requires visual review and never certifies artistic merit. Action and handoff
-notes are intentions, not executable effects. See [film direction](film-direction.md)
+notes are intentions. The separate `carry` schema implements a retained-object transfer. See [film direction](film-direction.md)
 for the directing and review process, including the remaining gap to bespoke films.
+
+
+## Grounded direction and scoped refinement
+
+`reel` returns a product brief with source evidence IDs, editable capture capabilities,
+stable scene/track IDs, shared visual/sound events, and a sampled-frame review. `review`
+inspects a saved export without changing the film. `refine` creates an independent take
+with additive CSS changes on explicitly selected tracks; original motions and audio
+remain available. A local recorded sound kit can be passed to `reel` through `soundKit`.
+
+See [agentic film tools](agentic-films.md) for schemas, terminal commands, review limits,
+recorded kit setup and the 20-product benchmark. These checks establish technical and
+preservation guarantees; they do not certify the artistic quality of a prompt.
