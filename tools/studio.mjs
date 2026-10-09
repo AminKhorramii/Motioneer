@@ -27,7 +27,7 @@ import { loadChromium } from './editor/render.mjs'
 import { createServer } from 'node:http'
 import net from 'node:net'
 import { randomUUID } from 'node:crypto'
-import { readFileSync, writeFileSync, chmodSync, existsSync, statSync, readdirSync, mkdirSync, rmSync } from 'node:fs'
+import { readFileSync, writeFileSync, chmodSync, existsSync, statSync, readdirSync, mkdirSync, rmSync, realpathSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -147,6 +147,10 @@ const CAN_CLI = hasClaude()
 const CAN_WRITE = CAN_CLI || defaultModel().provider !== 'claude-cli' || existsSync('.studio/model.json')
 
 const work = '.studio'
+// what one /ask call may carry: a reel plan with documentation evidence and its repair feedback fits
+const ASK_SYSTEM = 20_000, ASK_PROMPT = 160_000
+// declared before the server so the health route can never read it before its line has run; the port is added once listening
+const OWNER = { port: 0, pid: process.pid, workspace: realpathSync(process.cwd()), nonce: randomUUID(), startedAt: Date.now() }
 mkdirSync(work, { recursive: true })
 
 const HAS_FOLDER = !!ROOT && existsSync(ROOT)
@@ -2824,6 +2828,8 @@ anywhere on the studio. Nothing is installed and nothing leaves this machine.</p
       req.on('close', () => { clearInterval(beat); streams.delete(res) })
       return
     }
+    // which workspace this studio serves, so an agent never talks to a studio belonging to another one
+    if (url.pathname === '/__motioneer/health' && req.method === 'GET') return json(res, OWNER)
     if (url.pathname === '/__motioneer/model' && req.method === 'GET') {
       return json(res, { providers: PROVIDERS, current: publicly(MODEL), canCli: CAN_CLI })
     }
@@ -2840,12 +2846,20 @@ anywhere on the studio. Nothing is installed and nothing leaves this machine.</p
     if (url.pathname === '/__motioneer/ask' && req.method === 'POST') {
       // room for a few pictures: a contact sheet of a page is a jpeg of a few hundred kilobytes
       const body = JSON.parse(await new Promise((ok) => { let b = ''; req.on('data', (d) => { b += d; if (b.length > 12_000_000) req.destroy() }); req.on('end', () => ok(b || '{}')) }))
-      const system = String(body.system || 'Answer plainly.').slice(0, 4000), prompt = String(body.prompt || '').slice(0, 40_000)
+      /**
+       * Refused whole rather than cut. A reel's plan with its documentation evidence passed forty
+       * thousand characters, and the cut fell on the anchor list and on the repair feedback at the
+       * end, so the model planned blind and was told nothing. Callers budget their parts; a prompt
+       * that still overflows says so.
+       */
+      const system = String(body.system || 'Answer plainly.'), prompt = String(body.prompt || '')
       if (!prompt.trim()) return json(res, { error: 'ask needs a prompt' }, 400)
+      if (system.length > ASK_SYSTEM || prompt.length > ASK_PROMPT) { res.writeHead(413, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ error: `Cannot ask: the request is ${system.length + prompt.length} characters and one model call here takes ${ASK_SYSTEM + ASK_PROMPT}. Next: send fewer or smaller parts.` })) }
+      const maxTokens = Math.max(256, Math.min(16000, Number(body.maxTokens) || 2000))
       const images = Array.isArray(body.images) ? body.images.filter((i) => i && typeof i.data === 'string' && i.data.length < 6_000_000).slice(0, 4).map((i) => ({ mime: /^image\/(jpeg|png|webp)$/.test(i.mime) ? i.mime : 'image/jpeg', data: i.data })) : []
       let last = 'no reply'
       for (let n = 0; n < 2; n++) {
-        const reply = await askProvider(system, prompt, MODEL, { callMs: CALL_MS, thinking: THINK, env: CLEAN_ENV, maxTokens: 2000, images })
+        const reply = await askProvider(system, prompt, MODEL, { callMs: CALL_MS, thinking: THINK, env: CLEAN_ENV, maxTokens, images })
           .catch((e) => ({ error: String(e && e.message ? e.message : e).slice(0, 200) }))
         if (reply && reply.error) { last = reply.error; continue }
         const text = typeof reply === 'string' ? reply : (reply && reply.text) || ''
@@ -3056,10 +3070,24 @@ if (TARGET) {
 
 // a studio pointed at a folder and another pointed at a running app is a reasonable pair to want
 // open at once, so a busy port moves along rather than ending the process
-const live = await listenNear(server, PORT, '127.0.0.1').catch((e) => {
+/**
+ * A studio an agent starts holds the port it was given. Moving along is right for a person reading
+ * the terminal and wrong for the agent that started it: it kept polling 4321 while the studio
+ * answered on 4322, which is what Astro's default dev port did to every film on such a machine. The
+ * agent chooses the port, so a busy one is a clean failure it can act on.
+ */
+const live = await listenNear(server, PORT, '127.0.0.1', process.env.MOTIONEER_STRICT_PORT ? 1 : 20).catch((e) => {
   console.log(`\n  cannot listen: ${e.message}\n`)
   process.exit(1)
 })
+/**
+ * Who this studio is, written where an agent for the same workspace looks first. The nonce is what
+ * tells this studio from a later one that happens to reuse the port.
+ */
+OWNER.port = live
+const OWNER_AT = path.join(work, 'studio.json')
+try { mkdirSync(work, { recursive: true }); writeFileSync(OWNER_AT, JSON.stringify(OWNER)) } catch { /* a read only workspace still serves */ }
+const disown = () => { try { if (JSON.parse(readFileSync(OWNER_AT, 'utf8')).nonce === OWNER.nonce) rmSync(OWNER_AT) } catch { /* already gone */ } }
 /**
  * Letting go quickly when the watcher asks.
  *
@@ -3069,6 +3097,7 @@ const live = await listenNear(server, PORT, '127.0.0.1').catch((e) => {
  * graceful drain: the session is already on disk, so the sockets can go immediately.
  */
 const letGo = () => {
+  disown()
   for (const r of streams) { try { r.end() } catch { /* already gone */ } }
   streams.clear()
   try { server.closeAllConnections?.() } catch { /* an older node without it */ }

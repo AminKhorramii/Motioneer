@@ -16,6 +16,8 @@
  */
 
 import {FILM_TOOLS,runFilmTool} from './film-tools.mjs'
+import { ok, fail, send, cannot } from './reply.mjs'
+import { ensureStudio, runningStudio, workspace } from './studio-process.mjs'
 import { spawn } from 'node:child_process'
 import { readFile, writeFile, stat, mkdir } from 'node:fs/promises'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -41,18 +43,7 @@ const VERSION = await readFile(path.join(ROOT, 'package.json'), 'utf8')
   .then((raw) => JSON.parse(raw).version)
   .catch(() => '0.0.0')
 
-const send = (msg) => process.stdout.write(JSON.stringify(msg) + '\n')
-/**
- * A reply is words first, then pictures, then a structured copy of the same facts. The words are
- * for the person, the structure is for the agent: a film's shots, each element's fate and the
- * verdict as fields rather than as a paragraph to parse, so the next step can be reasoned about.
- */
-const ok = (id, reply) => {
-  const r = typeof reply === 'string' ? { text: reply } : reply
-  const content = [{ type: 'text', text: r.text }, ...(r.images || []).filter((i) => i && i.data).map((i) => ({ type: 'image', data: i.data, mimeType: i.mime || 'image/jpeg' }))]
-  send({ jsonrpc: '2.0', id, result: { content, ...(r.structured ? { structuredContent: r.structured } : {}) } })
-}
-const fail = (id, text) => send({ jsonrpc: '2.0', id, result: { isError: true, content: [{ type: 'text', text }] } })
+
 
 
 /**
@@ -315,57 +306,31 @@ const TOOLS = [
 /**
  * Open the motion studio, or say that one is already open.
  *
- * A second studio does not replace the first, it finds the port busy and roams to 4322, which is
- * right for a person reading the terminal and wrong for an agent that has just told somebody to
- * look at 4321. So this asks first.
- *
- * It waits for the server to actually answer rather than reporting success on spawn. A studio that
- * failed to start looks exactly like one that started, right up until the person opens the address
- * and finds nothing there, and by then the agent has already said it worked.
+ * A second studio for the same workspace would only compete with the first for its projects, so
+ * this asks first. It waits for the studio to actually answer rather than reporting success on
+ * spawn: a studio that failed to start looks exactly like one that started, right up until the
+ * person opens the address and finds nothing there.
  */
-const STUDIO_AT = () => `http://localhost:${Number(process.env.MOTIONEER_PORT || 4321)}`
-const answering = async (at) => {
-  try { return (await fetch(`${at}/__motioneer/model`, { signal: AbortSignal.timeout(700) })).ok }
-  catch { return false }
-}
-
-/** Start a studio aimed at url/dir and wait until it actually answers. Returns whether it is up. */
-async function spawnStudio({ url, dir, at, headless=true }) {
-  if (await answering(at)) return true
-  const args = [path.join(ROOT, 'tools', 'studio.mjs')]
-  if (url) args.push('--app', String(url))
-  else if (dir) args.push(String(dir))
-  // process.execPath rather than the word node: an agent launched from a desktop icon carries a
-  // login shell's PATH, which on any machine using nvm or fnm has no node on it at all
-  const child = spawn(process.execPath, args, { stdio: 'ignore', detached: true, cwd: dir || process.cwd(), env:{...process.env,...(headless?{MOTIONEER_NO_OPEN:'1'}:{})} })
-  const started = await new Promise((done) => {
-    child.on('error', () => done(false))
-    child.on('spawn', () => { child.unref(); done(true) })
-  })
-  if (!started) return false
-  for (let n = 0; n < 40; n++) {
-    if (await answering(at)) return true
-    await new Promise((r) => setTimeout(r, 250))
-  }
-  return false
-}
-
 async function studio({ url, dir }) {
-  const at = STUDIO_AT()
-  if (await answering(at)) {
-    return `A motion studio is already open at ${at}. Tell them to use that one rather than `
+  const running = await runningStudio()
+  if (running) {
+    return `A motion studio is already open at ${running}. Tell them to use that one rather than `
       + 'opening another, and if they want it pointed somewhere else there is an address bar in '
       + 'the top left of it.'
   }
-  const up = await spawnStudio({ url, dir, at, headless:false })
-  if (!up) {
-    return `The studio was started but has not answered at ${at} within ten seconds, or could not `
-      + 'be started at all. Ask them to run `npx motioneer` themselves.'
-  }
+  const at = await ensureStudio({ url, folder: dir, headless: false })
+  if (!at) throw cannot('open the studio: it did not answer within fifteen seconds.', 'ask them to run `npx motioneer` themselves.')
   return `The motion studio is open at ${at}.${url ? ` It is aimed at ${url}.` : ''} Tell them `
-    + 'to pick one or more elements and press Give it motion, and that several motions come '
-    + 'back to compare on one timeline. Choosing takes minutes, so do not wait on it: they can '
-    + 'save what they like from the studio itself.'
+    + 'to pick one or more elements and explore motion, and that several motions come back to '
+    + 'compare on one timeline. Choosing takes minutes, so do not wait on it: they can keep what '
+    + 'they like from the studio itself.'
+}
+
+/** This workspace's studio for a tool that needs one, started headless when none is running. */
+async function studioFor(what, { url } = {}) {
+  const at = await ensureStudio({ url })
+  if (!at) throw cannot(`${what}: no studio would start for this workspace.`, 'run npx motioneer doctor, then ask again.')
+  return at
 }
 
 /**
@@ -389,17 +354,16 @@ async function studio({ url, dir }) {
  * without windows appearing on the machine that runs them.
  */
 async function open({ target, path: file }) {
-  const at = STUDIO_AT()
   let what, where
   if (target === 'editor') {
-    if (!(await answering(at))) throw new Error(`No studio is open at ${at}. Run film or studio first.`)
+    const at = await studioFor('open the editor')
     what = 'the editor'; where = `${at}/__motioneer/editor/`
   } else if (target === 'video' || target === 'folder') {
-    if (!file || !path.isAbsolute(String(file))) throw new Error(`open ${target} needs the absolute path of the video.`)
-    const there = await readFile(file).then(() => true, () => false)
-    if (!there) throw new Error(`There is no file at ${file}.`)
+    if (!file || !path.isAbsolute(String(file))) throw cannot(`open the ${target}: it needs the absolute path of the video.`, 'pass the path a film reply returned.')
+    const there = await stat(file).then(() => true, () => false)
+    if (!there) throw cannot(`open the ${target}: there is no file at ${file}.`, 'pass the path a film reply returned.')
     what = target === 'video' ? 'the video' : 'its folder'; where = target === 'video' ? String(file) : path.dirname(String(file))
-  } else throw new Error('open needs a target of editor, video or folder.')
+  } else throw cannot('open that: open needs a target of editor, video or folder.', 'choose one of those targets.')
   if (process.env.MOTIONEER_NO_OPEN) return `Would open ${what} at ${where}.`
   const cmd = process.platform === 'darwin' ? ['open', [where]] : process.platform === 'win32' ? ['cmd', ['/c', 'start', '', where]] : ['xdg-open', [where]]
   const child = spawn(cmd[0], cmd[1], { stdio: 'ignore', detached: true })
@@ -412,9 +376,8 @@ async function open({ target, path: file }) {
  * person can point at what they want filmed before a minute of rendering is spent.
  */
 async function inspect({ url, dir, language, theme }) {
-  if (!url) throw new Error('Cannot inspect: inspect needs a url. Next: pass the running site or dev server.')
-  const at = STUDIO_AT()
-  if (!(await spawnStudio({ url, dir, at }))) throw new Error(`Cannot inspect: no studio would open at ${at}. Next: run \`npx motioneer\` and ask again.`)
+  if (!url) throw cannot('inspect: inspect needs a url.', 'pass the running site or dev server.')
+  const at = await studioFor('inspect', { url })
   const { inspectSite, describe } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'autofilm.mjs')).href)
   const {prepareRenderer}=await import('../tools/environment.mjs');await prepareRenderer(at)
   const seen = await inspectSite({ at, url, language, theme })
@@ -427,20 +390,18 @@ async function inspect({ url, dir, language, theme }) {
 }
 
 async function film({ url, dir, language, theme, captureMode, seconds, fps, soundtrack, background, ink, look, count, pick, pace, direction }, progress = () => {}) {
-  if (!url) throw new Error('film needs a url, a running site or dev server like http://localhost:3000.')
-  const at = STUDIO_AT()
-  const up = await spawnStudio({ url, dir, at })
-  if (!up) throw new Error(`Could not open a studio at ${at}. Run \`npx motioneer\` and try again.`)
+  if (!url) throw cannot('film: film needs a url.', 'pass a running site or dev server like http://localhost:3000.')
+  const at = await studioFor('film', { url })
 
   const {prepareRenderer}=await import('../tools/environment.mjs');await prepareRenderer(at,progress)
 
   const { autofilm } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'autofilm.mjs')).href)
-  const steps = []
+  const steps = [], made = {}
   const wantPace = ['calm', 'brisk', 'fast'].includes(pace) ? pace : 'brisk'
   const wantSeconds = Number(seconds) || (wantPace === 'fast' ? 12 : 20)
   // a fast film wants many elements; a calm one a few. the cap is what a render can carry in a few minutes
   const max = Math.max(1, Math.min(12, Number(count) || (wantPace === 'fast' ? 8 : wantPace === 'brisk' ? 5 : 3)))
-  const result = await autofilm({ at, url, language, theme, captureMode, background, ink, pick: String(pick || '').slice(0, 600), direction: String(direction || '').slice(0, 1400), seconds: wantSeconds, fps: fps ?? 60, soundtrack: soundtrack ?? (wantPace === 'calm' ? 'ambient' : 'pulse'), look: look || (wantPace === 'calm' ? 'subtle' : 'expressive'), pace: wantPace, max, onStep: (m) => {steps.push(m);progress(m)} })
+  const result = await autofilm({ at, url, language, theme, captureMode, background, ink, pick: String(pick || '').slice(0, 600), direction: String(direction || '').slice(0, 1400), seconds: wantSeconds, fps: fps ?? 60, soundtrack: soundtrack ?? (wantPace === 'calm' ? 'ambient' : 'pulse'), look: look || (wantPace === 'calm' ? 'subtle' : 'expressive'), pace: wantPace, max, onStep: (m) => {steps.push(m);progress(m)}, onProject: (id) => { made.projectId = id } }).catch((e) => { e.projectId = made.projectId; throw e })
   const file = await keepFile(result, dir)
   const review = await reviewResult(result,file,progress)
   const buf = { length: (await stat(file)).size }
@@ -458,11 +419,10 @@ async function film({ url, dir, language, theme, captureMode, seconds, fps, soun
 }
 
 async function reel({brand,domain,projectId,url,mode='auto',direction,seconds=18,palette,music,art,concept,bpm,brandMode='site',referenceUrls=[],soundKit,reviewPasses=1,dir},progress=()=>{}) {
-  const at=STUDIO_AT()
-  if(!(await answering(at))&&!(await spawnStudio({url:domain?'https://'+domain:undefined,dir,at})))throw new Error('Cannot make a reel: the studio could not start. Next: open the studio and retry.')
+  const at=await studioFor('make a reel',{url:url||(domain?'https://'+domain:undefined)}),made={}
   const {prepareRenderer}=await import('../tools/environment.mjs');await prepareRenderer(at,progress)
   const {kineticReel}=await import(pathToFileURL(path.join(ROOT,'tools/editor/kinetic.mjs')).href)
-  const result=await kineticReel({at,brand,domain,projectId,url,mode,direction,seconds,palette,music,art,concept,bpm,brandMode,referenceUrls,soundKit,reviewPasses,onStep:progress})
+  const result=await kineticReel({at,brand,domain,projectId,url,mode,direction,seconds,palette,music,art,concept,bpm,brandMode,referenceUrls,soundKit,reviewPasses,onStep:progress,onProject:id=>{made.projectId=id}}).catch(e=>{e.projectId=made.projectId;throw e})
   const file=await keepFile(result,dir),review=await reviewResult(result,file,progress)
   const sourceSheet=result.sourceSheet?file.replace(/\.mp4$/,'-sources.jpg'):null
   if(sourceSheet)await writeFile(sourceSheet,Buffer.from(result.sourceSheet.data,'base64'))
@@ -470,8 +430,7 @@ async function reel({brand,domain,projectId,url,mode='auto',direction,seconds=18
 }
 
 async function rescore(args,progress=()=>{}){
-  const at=STUDIO_AT()
-  if(!(await answering(at)))throw new Error('Cannot rescore: the studio is not running. Next: open the original studio first.')
+  const at=await studioFor('rescore')
   const {prepareRenderer}=await import('../tools/environment.mjs');await prepareRenderer(at,progress)
   const {rescoreFilm}=await import(pathToFileURL(path.join(ROOT,'tools/editor/rescore.mjs')).href)
   const result=await rescoreFilm({...args,at,onStep:progress})
@@ -526,8 +485,7 @@ function shape(result, file, pace) {
  */
 async function revise({ projectId, dir, pace, seconds, opening, closing, drop, order, motionDirection, motionElements, fps, soundtrack, background, ink }, progress = () => {}) {
   if (!projectId) throw new Error('Cannot revise: revise needs the projectId a film returned. Next: pass it, or film first.')
-  const at = STUDIO_AT()
-  if (!(await answering(at))) throw new Error(`Cannot revise: the studio at ${at} is not open any more, so the project is not reachable. Next: film again.`)
+  const at = await studioFor('revise')
   const {prepareRenderer}=await import('../tools/environment.mjs');await prepareRenderer(at,progress)
   const { revise: reviseFilm } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'autofilm.mjs')).href)
   const steps = []
@@ -554,13 +512,13 @@ async function revise({ projectId, dir, pace, seconds, opening, closing, drop, o
  */
 async function motion(args) {
   const html = String(args?.html ?? '')
-  if (!html.trim()) throw new Error('motion needs the component markup, so the keyframes can name its parts.')
+  if (!html.trim()) throw cannot('write motion: motion needs the component markup, so the keyframes can name its parts.', 'send the component markup as html.')
   const want = Math.max(1, Math.min(6, Number(args?.options) || 3))
   const core = await import(pathToFileURL(path.join(ROOT, 'dist-core', 'core.js')).href)
   const { write: complete } = await import('../shared/model.mjs')
   const { defaultModel } = await import('../tools/environment.mjs')
   let config=defaultModel()
-  try{config={...config,...JSON.parse(await readFile('.studio/model.json','utf8'))}}
+  try{config={...config,...JSON.parse(await readFile(path.join(await workspace(),'.studio','model.json'),'utf8'))}}
   catch(e){if(e.code!=='ENOENT')throw Error('Cannot read saved model settings. Next: repair .studio/model.json or choose a provider in studio Settings.')}
   const brief = core.motionBrief(args)
   const motions = Array.from({ length: want }, (_, i) => brief.intensity === 'range' ? ['subtle','expressive','bold'][i % 3] : brief.intensity)
@@ -707,7 +665,7 @@ async function call(name, args, id, meta) {
   if (name === 'rescore') return ok(id, await rescore(args ?? {},progress))
   if (name === 'reel') return ok(id, await reel(args ?? {},progress))
   if (name === 'review'||name === 'refine') {
-    const at=STUDIO_AT();if(!(await answering(at)))throw Error('Open the original Motioneer studio before reviewing or refining a saved film.');
+    const at=await studioFor(name==='refine'?'refine':'review');
     const {prepareRenderer}=await import('../tools/environment.mjs');await prepareRenderer(at,progress);
     const result=await runFilmTool(name,args??{},{at,onStep:progress}),file=await keepFile(result,args?.dir),image=await reviewResult(result,file,progress);
     return ok(id,{structured:{...result,review:publicReview(result.review),file,editor:`${at}/__motioneer/editor/?project=${result.projectId}&view=film`,artifacts:{video:file,storyboard:result.storyboard||null}},images:image?[image]:[],text:`${name==='refine'?(result.unchanged?'No motion changes were made; the source take is retained.':'Saved the scoped refinement as an independent take.'):'Rendered the saved film for sampled review.'} Video: ${file}. Review status: ${result.review.status}. Unresolved observations: ${result.review.issues?.length??'unknown'}. ${result.review.error||result.limitation}`})
@@ -724,8 +682,7 @@ async function call(name, args, id, meta) {
    * it waits until whatever timeout it happens to have. Naming the tools that do exist also covers
    * the usual cause, which is a model reaching for a tool it read about somewhere else.
    */
-  return fail(id, `There is no tool called ${name}. This server offers `
-    + `${TOOLS.map((t) => t.name).join(' and ')}.`)
+  return fail(id, cannot(`call ${name}: there is no tool by that name.`, `use one of ${TOOLS.map((t) => t.name).join(', ')}.`))
 }
 
 /**
@@ -776,7 +733,7 @@ process.stdin.on('data', async (chunk) => {
       send({ jsonrpc: '2.0', id: msg.id, result: { tools: TOOLS } })
     } else if (msg.method === 'tools/call') {
       await call(msg.params?.name, msg.params?.arguments, msg.id, msg.params?._meta).catch((e) =>
-        fail(msg.id, String(e instanceof Error ? e.message : e).slice(0, 300)),
+        fail(msg.id, e, { projectId: e?.projectId }),
       )
     } else if (msg.id !== undefined) {
       send({ jsonrpc: '2.0', id: msg.id, result: {} })

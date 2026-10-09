@@ -15,7 +15,7 @@
  */
 
 import { spawn, spawnSync } from 'node:child_process'
-import { mkdtempSync, readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, realpathSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -161,6 +161,8 @@ ok('empty markup is refused', nothing.isError, nothing.text.slice(0, 60))
 ok('and the refusal says what was missing', /markup/i.test(nothing.text))
 const nowhere = await callTool('open', { target: 'video', path: '/nowhere/at/all.mp4' })
 ok('open refuses a file that is not there rather than launching anything', nowhere.isError && /no file/i.test(nowhere.text), nowhere.text.slice(0, 60))
+const nowhereRaw = await rpc('tools/call', { name: 'open', arguments: { target: 'video', path: '/nowhere/at/all.mp4' } })
+ok('and the structured copy carries the same refusal, since that copy is all some agents read', /^Cannot .*Next:/.test(nowhereRaw.result?.structuredContent?.error || ''), nowhereRaw.result?.structuredContent?.error?.slice(0, 60))
 const badTarget = await callTool('open', { target: 'desk' })
 ok('and a target it does not know', badTarget.isError, badTarget.text.slice(0, 60))
 const unknown = await rpc('tools/call', { name: 'nosuchtool', arguments: {} })
@@ -179,6 +181,30 @@ ok('and something is really serving there', answering)
 const second = await callTool('studio', {})
 ok('a second call does not open a second studio', /already open/i.test(second.text),
   second.text.slice(0, 56))
+
+/**
+ * A studio belongs to a workspace. It says which in .studio/studio.json and at its health route,
+ * and an agent for another workspace starts its own rather than filing projects into this one.
+ */
+const owner = JSON.parse(readFileSync(path.join(realpathSync(process.cwd()), '.studio', 'studio.json'), 'utf8'))
+const healthy = await fetch(`http://127.0.0.1:${PORT}/__motioneer/health`).then((r) => r.json()).catch(() => ({}))
+ok('the studio records which workspace it serves, and says the same when asked', owner.port === PORT && healthy.nonce === owner.nonce && healthy.workspace === owner.workspace, owner.workspace)
+const tooLong = await fetch(`http://127.0.0.1:${PORT}/__motioneer/ask`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt: 'x'.repeat(200_000) }) })
+const tooLongSaid = await tooLong.json().catch(() => ({}))
+ok('a prompt too long for one model call is refused whole, with the next step, rather than cut', tooLong.status === 413 && /^Cannot ask/.test(tooLongSaid.error || '') && /Next:/.test(tooLongSaid.error || ''), tooLongSaid.error?.slice(0, 60))
+const elsewhere = realpathSync(mkdtempSync(path.join(tmpdir(), 'motioneer-elsewhere-')))
+const other = spawn('node', ['mcp/index.mjs'], { stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, MOTIONEER_PORT: String(PORT), MOTIONEER_WORKSPACE: elsewhere, MOTIONEER_NO_OPEN: '1' } })
+const otherSaid = await new Promise((done) => {
+  let out = ''
+  other.stdout.on('data', (d) => { out += d; const line = out.split('\n').find((l) => l.includes('"id":7')); if (line) done(JSON.parse(line).result?.content?.[0]?.text || '') })
+  other.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 7, method: 'tools/call', params: { name: 'studio', arguments: {} } }) + '\n')
+  setTimeout(() => done(out), 20000)
+})
+let theirs = null
+try { theirs = JSON.parse(readFileSync(path.join(elsewhere, '.studio', 'studio.json'), 'utf8')) } catch { /* it never started */ }
+ok('an agent for another workspace starts its own studio on the next port instead of reusing this one', !/already open/i.test(otherSaid) && theirs?.workspace === elsewhere && theirs?.port !== PORT && otherSaid.includes(String(theirs?.port)), otherSaid.slice(0, 70))
+try { process.kill(theirs?.pid, 'SIGKILL') } catch { /* gone */ }
+try { other.kill('SIGKILL') } catch { /* gone */ }
 
 /* ── open, which is how a finished film's three choices get acted on ─────────────────────────── */
 console.log('\n  opening what was made')

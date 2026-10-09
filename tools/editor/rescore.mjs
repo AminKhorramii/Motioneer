@@ -1,11 +1,11 @@
 /** A new musical take preserves the complete visual edit and leaves the source project alone. */
-import {visualClock,currentEvents} from './film-events.mjs'
 import {resolve} from '../../shared/arrange.mjs'
 import {MUSIC,musicPlan} from './music.mjs'
 import {withSoundtrack} from './soundtrack.mjs'
-import {renderProject,proveRender} from './autofilm.mjs'
+import {renderProject,proveRender,paceOf} from './autofilm.mjs'
 import {newTrack} from '../../dist-core/core.js'
 import {readScoreFile} from './score-file.mjs'
+import {forkProject} from './refinement.mjs'
 export async function createRescoreTake({at,projectId,music,direction='',bpm,audioFile,replaceAudioTrackIds=[],onStep=()=>{}}){
  if(!projectId)throw new Error('Cannot rescore: a source film is needed. Next: pass its projectId.')
  if(audioFile!==undefined&&(music||direction))throw new Error('Cannot rescore: audioFile cannot be combined with a synthesized music direction. Next: choose audioFile or music and direction.')
@@ -30,19 +30,8 @@ export async function createRescoreTake({at,projectId,music,direction='',bpm,aud
   raw={...reply.json,...(music?{profile:music}:{})}
  }
  const identity=importedScore?{profile:'imported',label:importedScore.name.replace(/\.wav$/i,''),description:'A supplied soundtrack, trimmed to the export range without looping, stretching or changing its gain.'}:musicPlan(raw,source.name+' '+direction)
- const fresh=await fetch(at+'/__motioneer/projects',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:source.name+' / '+identity.label})}).then(r=>r.json())
- if(!fresh.id)throw new Error('Cannot rescore: a new take could not be created. Next: retry.')
- let copied={...source,id:fresh.id,revision:fresh.revision,name:fresh.name},serialized=JSON.stringify(copied)
- // Copy asset bytes as well as references so the new take can be opened independently.
- for(const asset of source.assets){
-  const bytes=await fetch(`${at}/__motioneer/projects/${projectId}/assets/${asset.id}`)
-  if(!bytes.ok)throw new Error('Cannot rescore: a source asset is unavailable. Next: restore the missing asset in the source film.')
-  const imported=await fetch(`${at}/__motioneer/projects/${fresh.id}/assets?name=${encodeURIComponent(asset.name)}`,{method:'POST',headers:{'content-type':bytes.headers.get('content-type')||'application/octet-stream'},body:Buffer.from(await bytes.arrayBuffer())}).then(r=>r.json())
-  if(!imported.id)throw new Error('Cannot rescore: an asset could not be copied. Next: retry.')
-  serialized=serialized.replaceAll(asset.id,imported.id)
- }
- copied=JSON.parse(serialized.replaceAll(`/__motioneer/projects/${projectId}/assets/`,`/__motioneer/projects/${fresh.id}/assets/`))
- if(currentEvents(source).status==='renderer-clock')copied.direction.clock=visualClock(copied)
+ // a take of its own whose asset bytes are linked by the studio, so it opens without the source
+ let copied=await forkProject(at,source,source.name+' / '+identity.label,{tool:'rescore',request:importedScore?importedScore.name:[music,direction].filter(Boolean).join(': ')})
  copied.tracks=copied.tracks.filter(t=>!replaceAudioTrackIds.includes(t.id))
  let project
  if(importedScore){
@@ -62,7 +51,7 @@ export async function rescoreFilm(options){
  const from=source.settings.from,to=source.settings.to,seconds=(to-from)/1000
  onStep('Rendering the same visual edit with its new music.')
  const rendered=await renderProject(at,project.id,onStep),cuts=[...new Set(visual.map(t=>t.start-from).filter(t=>t>0&&t<to-from))]
- const proved=await proveRender(rendered.url,{pace:'fast',seconds,cuts})
+ const proved=await proveRender(rendered.url,{pace:paceOf(project),seconds,cuts})
  const asset=project.assets.at(-1)
  return {projectId:project.id,sourceProjectId:source.id,at,seconds,fps:project.settings.fps,soundtrack,music:identity,bpm:tempo,file:proved.file,url:rendered.url,proof:proved.proof,audioUrl:`${at}/__motioneer/projects/${project.id}/assets/${asset.id}`,shotList:visual.map((t,i)=>({shot:i+1,at:(Math.max(from,t.start)-from)/1000,seconds:(Math.min(to,t.start+t.duration)-Math.max(from,t.start))/1000,elements:[t.name]}))}
 }

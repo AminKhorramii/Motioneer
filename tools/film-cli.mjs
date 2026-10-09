@@ -3,7 +3,9 @@ import {mkdir,copyFile,writeFile} from 'node:fs/promises'
 export async function filmCommand(command,args){
  const flags=new Map(),boolean=new Set(['--json','--dry-run']),allowed=new Set(command==='benchmark'?['--manifest','--out','--at','--limit','--json','--dry-run']:['--project','--out','--at','--json',...(command==='refine'?['--tracks','--direction','--lock','--review-passes']:[])])
  for(let i=0;i<args.length;i++){const key=args[i];if(!allowed.has(key)||flags.has(key))throw Error('Unknown or repeated film option: '+key);if(boolean.has(key))flags.set(key,true);else{const value=args[++i];if(!value||value.startsWith('--'))throw Error('Missing value for '+key);flags.set(key,value)}}
- const at=flags.get('--at')||'http://localhost:4321',onStep=m=>console.error(m)
+ // this workspace's studio, started when there is none, rather than whatever answers on 4321
+ const at=flags.get('--at')||(flags.has('--dry-run')?'http://127.0.0.1:4321':await (await import('../mcp/studio-process.mjs')).ensureStudio()),onStep=m=>console.error(m)
+ if(!at)throw Error('Cannot start a studio for this workspace. Next: run npx motioneer doctor, or pass --at with a running studio.')
  if(!flags.has('--dry-run')){const {prepareRenderer}=await import('./environment.mjs');await prepareRenderer(at,onStep)}
  let result
  if(command==='benchmark'){const {runBenchmark}=await import('./editor/benchmark.mjs');result=await runBenchmark({manifest:flags.get('--manifest')?path.resolve(flags.get('--manifest')):undefined,out:flags.get('--out')?path.resolve(flags.get('--out')):undefined,at,limit:flags.has('--limit')?Number(flags.get('--limit')):undefined,dryRun:Boolean(flags.get('--dry-run')),onStep})}

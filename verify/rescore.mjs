@@ -21,6 +21,7 @@ const server=createServer(async(req,res)=>{
   const bytes=Buffer.concat(chunks),json=()=>JSON.parse(bytes.toString())
   let result
   if(!id)result=req.method==='POST'?await store.create(json().name):await store.list()
+  else if(parts[3]==='fork')result=await store.fork(id,json())
   else if(parts[3]==='assets'){
    if(req.method==='POST')result=await store.importAsset(id,url.searchParams.get('name'),req.headers['content-type'],bytes)
    else {const a=await store.asset(id,parts[4]);res.setHeader('content-type',a.mime);return res.end(a.data)}

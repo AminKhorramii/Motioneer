@@ -155,3 +155,15 @@ export async function proveFilm({ file, pace = 'calm', seconds, cuts: planned })
 export const proofLine = (r) => r.ok
   ? `Verified from the frames: ${r.cuts}${r.planned ? ` of ${r.planned} planned` : ''} cuts in ${r.seconds} seconds, shots of ${(r.avgShotMs / 1000).toFixed(1)}s on average, each element arriving over about ${(r.arriveMs / 1000).toFixed(1)}s, nothing blank.`
   : `Checked the frames: ${r.notes.join('; ')}.`
+
+/**
+ * What kind of fault each note names, without the numbers in it.
+ *
+ * A repair was accepted only when its film proved clean, so a take that already ran a second long
+ * rejected every repair for that second, whatever the repair fixed. Comparing kinds lets a repair
+ * through when it adds no fault the take did not already have.
+ */
+const KINDS = [['missing-cuts', /planned cuts did not show/], ['few-cuts', /^only \d+ cuts/], ['slow-shots', /^shots average/], ['blank', /frames are blank/], ['pops', /pop in/], ['late', /still empty a third of a second in/], ['length', /^it runs/], ['unmeasured', /could not be measured|fewer than two frames/]]
+export const noteKinds = (proof) => proof?.ok === false && !proof.notes?.length ? ['unmeasured'] : [...new Set((proof?.notes || []).map((n) => KINDS.find(([, re]) => re.test(n))?.[0] || n))]
+/** the kinds of fault that `after` has and `before` did not */
+export const regressed = (before, after) => { const had = new Set(noteKinds(before)); return noteKinds(after).filter((k) => !had.has(k)) }

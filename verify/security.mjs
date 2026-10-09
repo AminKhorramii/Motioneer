@@ -54,7 +54,8 @@ try {
   assert.equal(localRequest({ socket: { localPort: Number(port) }, method: 'GET', headers: { host: `localhost:${port}`, origin: 'https://foreign.example' } }, '/socket'), false)
   assert.equal(localRequest({ socket: { localPort: Number(port) }, method: 'POST', headers: { host: `foreign.example:${port}` } }, '/__motioneer/picked'), false)
   const source = await readFile(studio, 'utf8')
-  assert.match(source, /listenNear\(server, PORT, '127\.0\.0\.1'\)/)
+  // loopback only, whether the port is held strictly for an agent or roams for a person
+  assert.match(source, /listenNear\(server, PORT, '127\.0\.0\.1'[,)]/)
   for (const address of Object.values(networkInterfaces()).flat().filter(a => a && !a.internal && a.family === 'IPv4')) {
     await assert.rejects(fetch(`http://${address.address}:${port}/__motioneer/projects`, { signal: AbortSignal.timeout(500) }), 'studio is unreachable through a LAN interface')
   }

@@ -8,7 +8,9 @@ export type Track = { id: string; kind: 'component' | 'title' | 'image' | 'audio
 export type Asset = { id: string; name: string; kind: 'image' | 'audio'; mime: string; duration?: number; waveform?: number[]; width?: number; height?: number }
 export type Arrangement = { id: string; name: string; tracks: Track[]; camera: Move[]; settings?: Project['settings'] }
 export type FilmDirection = { version: 1; clock?: string; brief?: unknown; scenes: { sceneId: string; trackId: string; at: number; seconds: number; elements: string[] }[]; events: { id: string; trackId?: string; at: number; kind: string; phase?: number }[]; transitions: { id: string; from: string; to: string; trackId: string }[] }
-export type Project = { version: 1; direction?: FilmDirection; id: string; revision: number; name: string; updatedAt: number; source: string; subjects: Subject[]; motions: Motion[]; tracks: Track[]; camera: Move[]; assets: Asset[]; arrangements: Arrangement[]; settings: { width: number; height: number; fps: number; duration: number; background: string; from: number; to: number }; brief: Brief }
+/** What a film was asked to be and where it came from, kept so a later change reads it instead of guessing it back from geometry. */
+export type FilmMeta = { pace?: 'calm' | 'brisk' | 'fast'; scenes?: { ids: string[]; layout?: string; hold?: string }[]; origin?: { tool: string; sourceProjectId: string; request?: string; at: number } }
+export type Project = { version: 1; direction?: FilmDirection; film?: FilmMeta; id: string; revision: number; name: string; updatedAt: number; source: string; subjects: Subject[]; motions: Motion[]; tracks: Track[]; camera: Move[]; assets: Asset[]; arrangements: Arrangement[]; settings: { width: number; height: number; fps: number; duration: number; background: string; from: number; to: number }; brief: Brief }
 export const uid = () => crypto.randomUUID()
 export const defaultBrief: Brief = { purpose: 'entrance', intensity: 'range', duration: 1000, direction: '' }
 export function createProject(name = 'Untitled film'): Project {
@@ -120,6 +122,7 @@ export function validateProject(raw: unknown): Project {
   if (!s || !finite(s.duration, 100, 120000) || !finite(s.width, 100, 3840) || !finite(s.height, 100, 3840) || ![30, 60].includes(s.fps) || !finite(s.from, 0, s.duration) || !finite(s.to, s.from + 1, s.duration) || !/^#[0-9a-f]{6}$/i.test(s.background)) throw new Error('The film settings are invalid. Films can be up to two minutes long.')
   }
   checkSettings(p.settings)
+  if (p.film !== undefined && (!p.film || typeof p.film !== 'object' || Array.isArray(p.film) || (p.film.pace !== undefined && !['calm', 'brisk', 'fast'].includes(p.film.pace)) || (p.film.scenes !== undefined && (!Array.isArray(p.film.scenes) || p.film.scenes.some((sc) => !sc || !Array.isArray(sc.ids)))) || JSON.stringify(p.film).length > 50000)) throw new Error('Invalid film metadata.')
   if(p.direction && (p.direction.version !== 1 || !Array.isArray(p.direction.scenes) || !Array.isArray(p.direction.events) || !Array.isArray(p.direction.transitions) || JSON.stringify(p.direction).length > 250000)) throw new Error('Invalid film direction metadata.')
   const ids = (items: { id: string }[]) => { const set = new Set<string>(); for (const v of items) { if (!v || !/^[a-zA-Z0-9_-]{1,100}$/.test(v.id) || set.has(v.id)) throw new Error('Project items must have unique identifiers.'); set.add(v.id) } return set }
   const subjects = ids(p.subjects), motions = ids(p.motions), assets = ids(p.assets); ids(p.tracks)

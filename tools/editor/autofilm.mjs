@@ -107,9 +107,32 @@ export function shotList(cut) {
   })
 }
 
-/** The shape of a cut read back from its tracks, so a revision keeps what the plan decided. */
-function scenesOf(project) {
+/**
+ * The pace a film was cut at. A film says so itself; one made before it did is read off its shot
+ * lengths, and an authored reel is cut on the beat, so its proof is always a fast one.
+ */
+export function paceOf(project) {
+  if (['calm', 'brisk', 'fast'].includes(project?.film?.pace)) return project.film.pace
+  if (project?.direction) return 'fast'
   const shots = shotList(project)
+  if (!shots.length) return 'brisk'
+  const avg = shots.reduce((a, s) => a + s.seconds, 0) / shots.length
+  return avg < 1.8 ? 'fast' : avg < 3.4 ? 'brisk' : 'calm'
+}
+
+/**
+ * The scenes a cut was made from, one per shot in the order the reply numbers them, with the
+ * layout and hold the plan chose. A cut cycles a short plan to fill its length, so shot 5 can be
+ * scene 1 again; keeping one entry per shot is what lets "drop 5" mean the fifth shot.
+ */
+function keptScenes(cut, scenes) {
+  return shotList(cut).map((s, i) => ({ ids: s.ids, layout: scenes[i % scenes.length]?.layout, hold: scenes[i % scenes.length]?.hold }))
+}
+
+/** The shape of a cut: as the film kept it when it did, otherwise read back from its tracks. */
+function scenesOf(project) {
+  const kept = project.film?.scenes || [], shots = shotList(project)
+  if (kept.length === shots.length && kept.every((sc, i) => sc.ids.join() === shots[i].ids.join())) return kept.map(({ ids, layout, hold }) => ({ ids, layout, hold }))
   const median = [...shots.map((s) => s.seconds)].sort((a, b) => a - b)[Math.floor(shots.length / 2)] || 1
   return shots.map((s) => ({ ids: s.ids, layout: s.layout, hold: s.seconds > median * 1.3 ? 'long' : s.seconds < median * 0.8 ? 'short' : 'normal' }))
 }
@@ -175,7 +198,7 @@ async function capture(page, frame, cand, about, pixels) {
  * @param max       cap on how many elements to capture
  * @param onStep    (message) => void  progress, surfaced to the agent's caller
  */
-export async function autofilm({ at, url, language = 'en', theme, background, ink, captureMode = 'dom', pick = '', direction = '', plan = planFilm, prove = proveRender, seconds = 20, fps = 30, soundtrack = 'none', look = 'subtle', pace = 'brisk', max = 3, onStep = () => {} }) {
+export async function autofilm({ at, url, language = 'en', theme, background, ink, captureMode = 'dom', pick = '', direction = '', plan = planFilm, prove = proveRender, seconds = 20, fps = 30, soundtrack = 'none', look = 'subtle', pace = 'brisk', max = 3, onStep = () => {}, onProject = () => {} }) {
   if (![30,60].includes(fps)) throw new Error('Cannot film: frame rate must be 30 or 60. Next: choose one of those frame rates.')
   validColour(background,'background');validColour(ink,'ink')
   if(!['dom','pixels'].includes(captureMode))throw new Error('Cannot film: captureMode must be dom or pixels. Next: choose dom for layered motion or pixels for faithful flat captures.')
@@ -189,6 +212,7 @@ export async function autofilm({ at, url, language = 'en', theme, background, in
   try {
     onStep('Opening the editor on the site.')
     const projectId = await freshProject(at, `Film of ${source.replace(/^https?:\/\//, '').replace(/\/$/, '')}`)
+    onProject(projectId)
     const opened=await openPage(browser,at,source,projectId,language,theme),{page,frame,title,colours}=opened;source=opened.source
     // a block page answers 200 and reads as a page of headings: replit.com's was filmed and verified
     if (/attention required|just a moment|access denied|been blocked|verify you are human|are you a robot|security check/i.test(title || '')) throw new Error(`Cannot open ${source}: that site is behind a bot check, which a proxy cannot pass. Nothing here can fix that. Next: open the studio and pick from your own browser with the bookmarklet.`)
@@ -457,6 +481,7 @@ export async function autofilm({ at, url, language = 'en', theme, background, in
       let cut = titleScale(firstCut(project, { pace, seconds, opening: chosen.opening, closing: chosen.closing, background: background ?? colours.background, ink, scenes }))
       cut.settings.fps = fps
       cut.source = source
+      cut.film = { ...cut.film, pace, scenes: keptScenes(cut, scenes) }
       if(soundtrack!=='none')cut=await withSoundtrack(cut,{at,style:soundtrack,onStep})
       const components = cut.tracks.filter((t) => t.kind === 'component').length
       if (!components) throw new Error('Cannot cut: no kept motion was saved, so there was nothing to place. Next: try again; if it repeats, open the studio and keep a motion by hand.')
@@ -537,8 +562,7 @@ export async function revise({ at, projectId, pace, seconds, opening, closing, d
   if (project.tracks.some(t => t.kind === 'component' && project.motions.some(m => m.id === t.motionId && m.scope === 'data-kinetic'))) throw new Error('Cannot revise: this is an authored graphic reel and capture recutting would replace its scene design. Next: use reel with a new direction, or edit its clips in the studio; the saved reel is unchanged.')
   const was = shotList(project)
   if (!was.length) throw new Error('Cannot revise: this project has no shots yet. Next: film first, then revise the result.')
-  const avg = was.reduce((a, s) => a + s.seconds, 0) / was.length
-  const wasPace = avg < 1.8 ? 'fast' : avg < 3.4 ? 'brisk' : 'calm'
+  const wasPace = paceOf(project)
   const titles = project.tracks.filter((t) => t.kind === 'title').sort((a, b) => a.start - b.start)
   const want = { pace: ['calm', 'brisk', 'fast'].includes(pace) ? pace : wasPace, seconds: Number(seconds) || Math.round(project.settings.duration / 1000), opening: opening != null ? String(opening).slice(0, 60) : titles[0]?.text || '', closing: closing != null ? String(closing).slice(0, 60) : titles[titles.length - 1]?.text || '', background: background ?? project.settings.background, ink:ink??(background===undefined?titles[0]?.color:undefined) }
   let scenes = scenesOf(project).map((scene,i)=>({...scene,number:i+1}))
@@ -590,6 +614,7 @@ export async function revise({ at, projectId, pace, seconds, opening, closing, d
   // audio, camera, and linked timing even though none of them was part of the request.
   const recut = pace != null || seconds != null || opening != null || closing != null || drop.length || order.length
   let cut = recut ? titleScale(firstCut(project, { ...want, scenes })) : project
+  if (recut) cut.film = { ...project.film, pace: want.pace, scenes: keptScenes(cut, scenes) }
   if(background!==undefined)cut={...cut,settings:{...cut.settings,background}}
   if(ink!==undefined||background!==undefined)cut={...cut,tracks:cut.tracks.map(t=>t.kind==='title'?{...t,color:ink??contrastInk(background)}:t)}
   if(recut)cut.tracks.push(...project.tracks.filter(t=>t.kind==='audio'))

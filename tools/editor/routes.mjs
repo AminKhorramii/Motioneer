@@ -41,6 +41,7 @@ export function editorRoutes(hooks) {
         if(req.method==='PUT'){const data=await jsonBody(req);if(data.id!==id)return send({error:'Project identifier does not match.'},400);return send(await store.save(data))}
         if(req.method==='DELETE'){await store.remove(id);return send({ok:true})}
       }
+      if(parts[3]==='fork'&&req.method==='POST')return send(await store.fork(id,await jsonBody(req)),201)
       if(parts[3]==='assets') {
         if(req.method==='POST')return send(await store.importAsset(id,url.searchParams.get('name') || 'Asset',req.headers['content-type']?.split(';')[0],await body(req,100*1024*1024)),201)
         const asset=await store.asset(id,parts[4]);return send(asset.data,200,asset.mime)
