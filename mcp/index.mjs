@@ -1,22 +1,23 @@
 #!/usr/bin/env node
 /**
- * Motioneer as a tool an agent can call.
+ * Motioneer as a tool an agent can call: the protocol and the work.
  *
- * Three tools, one flow each. `studio` opens the room on a running site or a folder so the person
- * can pick elements and compare motions for them by hand. `motion` takes markup the agent already
- * has and hands back stylesheets that passed the gates, for when nobody needs to look first.
- * `film` runs the whole thing headless, from a url to a rendered mp4, choosing what to film with
- * the model and leaving the studio open afterwards for the edit.
+ * What an agent is shown, the card and the eight tools, lives in tools.mjs. How a reply and a
+ * failure are written lives in reply.mjs, and which studio a call talks to in studio-process.mjs.
+ * The names the surface used to have still answer here, each mapped onto the tool that now does
+ * its job, so an older prompt or doc keeps working.
  *
  * Opening the studio returns as soon as it answers, because a person choosing takes longer than
- * any sensible tool timeout, and an agent told that failed will open a second one. Filming waits,
- * because a file is what was asked for and there is nothing to hand back until it exists.
+ * any sensible tool timeout. Filming waits, because a file is what was asked for and there is
+ * nothing to hand back until it exists.
  *
  * JSON-RPC over stdio, spoken directly, so this stays dependency free like the rest.
  */
 
-import {FILM_TOOLS,runFilmTool} from './film-tools.mjs'
-import { ok, fail, send, cannot } from './reply.mjs'
+import { runFilmTool, projectShots } from './film-tools.mjs'
+import { INSTRUCTIONS, TOOLS } from './tools.mjs'
+import { fail, send, cannot, answer } from './reply.mjs'
+import { isLocal } from '../shared/guard.mjs'
 import { ensureStudio, runningStudio, workspace } from './studio-process.mjs'
 import { spawn } from 'node:child_process'
 import { readFile, writeFile, stat, mkdir } from 'node:fs/promises'
@@ -46,262 +47,6 @@ const VERSION = await readFile(path.join(ROOT, 'package.json'), 'utf8')
 
 
 
-/**
- * What the agent is told at connect time, which is where a server's etiquette lives.
- *
- * Tool descriptions say what each tool does; this says how to behave around them: which one to
- * reach for from what a person says, what to tell them while a film renders, and how a job ends.
- * The ending is deliberate. A file path in a wall of text is a dead end, so every finished film
- * closes with three choices the person can act on, and the open tool is what acts on them.
- */
-const INSTRUCTIONS = `Motioneer makes motion for a person's own product. On setup trouble, call doctor for structured readiness. Film and reel install their renderer automatically on first use; no manual setup tool call is needed. Choose by what they want to hold at the end:
-- film: they want a faithful component demo or a capture-led edit that preserves the page composition. For an artistic landing-page promo, launch film or branded motion video use reel with mode auto instead. One call does everything and returns an MP4 path. Always pass dir as the absolute path of their project so the file lands beside their work. Pace is the cut: "fast", "quick", "punchy" or "lots of cuts" means pace "fast", which is many one second shots of many elements, about 12 seconds and eight elements unless they say otherwise; "demo" or "showcase" means pace "brisk" and about 20; "calm", "slow" or "elegant" means pace "calm" with look "subtle". "Lots of elements", "everything on the page" or "a lot of motions" means count 10 to 12. Fast and brisk films use look "expressive" unless they ask otherwise.
-- studio: they want to pick elements and compare motions by hand, or say "studio". It returns as soon as the room is open; do not wait or retry, tell them where it is.
-- motion: they want CSS for markup they already have, with nothing to look at first.
-- inspect: they want to see or choose what gets filmed first, or ask what is on a page. It returns the list and a contact sheet image of the elements, each tile numbered; look at it, describe or show what is there, then follow with film and pick.
-- revise: they react to a film with a change: slower, faster, shorter, longer, different titles, drop a shot or an element, another order. Pass the projectId the film returned; the captures and motions are kept and only the cut and render are redone, in about half a minute. Only filming again with pick adds elements that were never filmed.
-- open: after a film, or whenever they ask to see the editor or a file.
-
-How people say it, and what to call:
-- "make me a snappy video of my site", "motion film of linear.app", "a launch film for notion.so": reel with mode auto, source url, brand, direction, 18 seconds unless specified, and dir.
-- "demo of localhost:3000", "film these pricing cards": film with the url and dir.
-- "film the pricing cards", "just the hero": film with pick set to those words. If you are not sure what is on the page, inspect first and offer the list.
-- a long or detailed request, with tone, rhythm, mood or how things should move: pass the whole of it in direction, word for word, and the elements it names in pick. Do not summarise it; the plan and every motion read it.
-- "what could you film on this page": inspect, then relay the list in plain words and ask which they want.
-- "open the studio on my app", "let me pick": studio with the url.
-- "animate this component", with markup pasted: motion.
-- "make it slower", "too long, ten seconds", "drop the footer shot", "put the hero last", "call it Ship Faster": revise with the projectId and only the fields that change. "drop" takes shot numbers from the reply or words from an element's name; "order" takes shot numbers.
-- "add the pricing cards": film again with the same url, pick naming them, and the same pace and seconds.
-- "cinematic", "polished launch film", or "state of the art": reel with mode auto, seconds 18 unless specified, the source url, brand and full direction. Prefer real source details and a coherent product story.
-- "make the cards glide more slowly": for a reel, use refine with the exact trackIds and direction. For a capture-led film, use revise with motionDirection and motionElements. Both preserve the cut and create new motion versions.
-
-When a tool fails its message starts with "Cannot" and ends with "Next:". Relay the reason and the next step as given, and do not invent a different cause. Retry only when the next step says to.
-
-For super-snappy, artistic brand films, kinetic typography, motion-identity references, or crazy creative launch videos, use reel. Ground the brief in a distinct brand metaphor and pass the full direction. Reel authors graphic scenes with typography, diagrams and a coordinated instrumental score; it is a different creative mode from filming captured interfaces. For a source-based brand film, supply its real landing url and default to mode auto, usually 18 seconds. Auto retains meaningful DOM/SVG components where available and reports a switch to honest raster captures when they are not. For explicitly requested native fidelity use mode native: it retains real DOM/SVG, measures the chosen detail, assembles neighboring layers, synchronizes sound cues and ends on the brand alone. It refuses insufficient sources or plans instead of silently substituting generic graphics. Review source sheets AND exported motion; proof checks structure, not artistic merit. Use source layout wide/left/right and choreography macro/assemble/shuttle to vary staging. Describe only motion the selected choreography can render. Action and handoff fields are planning notes, not executable effects. Use each source shot's renderedMotion field as the renderer-derived account of what moves; it takes precedence over director prose. Never claim a raster cursor or control moves independently. Prefer strong relevant source artwork over weak native anchors; after inspecting the source sheet, switch to hybrid when it tells the product story better. Follow docs/film-direction.md when setting the brief or reviewing a take. Avoid repeating the same capture-box reveal, permanent decorative backdrops, generic UI, and brand-irrelevant effects. The Figma studies demonstrate a process, not a universal red/techno/ribbon template. Inspect arrival, action and settled frames. Report quality warnings; do not call a film artistically approved merely because verdict.ok is true. When native capture is unavailable, explain the limitation and use a relevant accessible product page or honestly labeled hybrid. For a mix of flattened website elements and artistic graphics use mode hybrid with a captured projectId or url. Hybrid renders real capture pixels, while its diagrams are illustrative. Name the source fidelity plainly. Use refine for scoped motion revisions, selecting stable track IDs from reel or review. It preserves film timing, source markup, fonts, camera, unselected tracks and audio; locked tracks are protected. Use a new reel call only for an entirely new visual direction. Reel now returns grounded product evidence, capture capabilities, event IDs and executable carry transitions. Reel reviews sampled export frames and can attempt at most two focused repair passes; standalone review is read-only. Event status reports whether saved motion clocks still match the current visual edit; disclose unavailable reviews and unresolved observations. Sound kits can supply recorded percussion with provenance; built-in profiles remain synthesized. For music-only changes use rescore: it creates a new take with the same visual edit. For a finished custom soundtrack pass audioFile and explicitly list any imported score tracks to replace in replaceAudioTrackIds. Preserve voiceover and effects. Built-in music profiles are procedural synthesis; they do not reproduce a custom sampled score automatically. Reel supports 6–30 seconds, including 20-second films. Preserve brand identity by default: supply the source url or domain, keep brandMode site, and let the source font and palette guide the film. Use brandMode expressive only for an explicitly requested visual departure. Art changes composition and material while site typography remains. Use the landing page as the primary visual source: its product images, components, typography and colors should carry the film. Keep url pointed at that page. When more product detail is needed, pass relevant documentation pages through referenceUrls; they supplement the landing captures. Use at least two timed mechanism scenes in hybrid films with referenceUrls. Explain actual product actions and carry those shapes into adjoining captures. For unique dry sound, use keystroke, relay, tabulator, postmark, handshake or release; action sounds follow the mechanism choreography. Choose a distinct music profile for each brand and carry musical direction through the brief. For deep fast techno use hypnosis, warehouse, submerge, acidline, fracture or alloy, and set bpm (144–162 works well).
-
-While film runs it can take a minute or two: it opens the site, captures, writes motions, cuts and renders. Say that once, then wait for the result rather than polling or calling it again.
-
-Pass theme dark or light when the creative brief specifies that appearance; this sets the source browser preference, not a recoloring of captured interfaces. Set background and ink when the brief requests a particular stage/title palette; the page preference alone does not set the film canvas. Keep the full creative prompt in direction and honor its requested duration. Pass language as the request's two-letter language code; the tool follows locale links actually present on the page. Do not guess /en or other paths after a locale mismatch.
-
-Films default to 60 fps with an original, editable synthesized soundtrack (ambient for calm, pulse otherwise). Use playful for a light, colorful brief. Honor requests for silence with soundtrack none. Do not promise commercial stock music or a composed-to-order song.
-
-Film and revise also return a storyboard decoded from the final MP4. Look at it before calling the result finished: inspect legibility, framing, repetition and missing content. If a shot is visibly weak, make up to two focused revision passes before delivery: remove irrelevant shots, adjust the cut, or refine a named motion. If essential content is absent, inspect and film again with an explicit pick. When source references look correct but the DOM render loses images, fonts or canvas content, use captureMode pixels to preserve the selected visuals and disclose that motion then moves flattened images. Review the new storyboard after each pass. Do not silently accept a film of tiny labels or near-identical shots as a polished showcase. The numeric verdict checks cuts and blank frames, not artistic quality. Name any remaining limitation plainly. Coverage reports whether the requested captures actually reached the final cut; never describe partial coverage as complete. Use the returned artifact paths to hand over the video and storyboard. If your client supports MCP progress, pass a progressToken to receive the live stages.
-
-Film and revise return the same facts twice: as words, and as structured content with the projectId, the file, every shot numbered with its elements and layout, each element's fate (filmed, rendered empty, no motion with the reason, not captured), the verdict and the repairs it made to itself. Reason from the fields: name a weak shot by number when offering a change, and pass the projectId to revise. When film returns it includes a line measured from the rendered frames, "Verified" or "Checked": how many cuts, how long the shots are, whether anything is blank. Repeat that line, it is the proof the film is what they asked for. If it says the film came out slower than asked, say so plainly and offer to film again with count 6 rather than claiming it is fast. Then relay what it filmed and where the file is in one or two sentences, and offer exactly these three choices, as selectable options if you can present options, otherwise as a short list:
-1. Open the editor, to change the cut, swap a motion or add a title.
-2. Open the video.
-3. Continue chatting.
-Call open only when the person explicitly asks to open something or selects that option. Creating a video is not a request to launch a player. For the third, ask what they would like next, and offer one concrete revision you can see in the fields, like dropping a shot whose element is a bare heading, or a slower cut when the shots average under a second.
-
-A site that needs a sign in cannot be proxied; if capture finds nothing, say so and point them to the bookmarklet in the studio rather than retrying.`
-
-const TOOLS = [
-  ...FILM_TOOLS,
-  {name:'doctor',description:'Check this workspace’s model configuration, packaged files and local renderer without generating a film or downloading anything. Returns structured readiness and concrete next steps; authentication is checked on the first model request.',inputSchema:{type:'object',properties:{dir:{type:'string',description:'Absolute workspace directory. Defaults to the connected project.'}}}},
-  {
-    name: 'studio',
-    description:
-      'Open the motion studio, so the person can point at a running site or a component, pick '
-      + 'elements off it, and compare several motions for them on one timeline. Use this when '
-      + 'somebody wants motion for something they already have and would rather choose than '
-      + 'describe, or when they say the words motion studio. Prefer the motion tool instead when '
-      + 'they want the stylesheet written straight into their code without looking at it first. '
-      + 'This returns as soon as the studio is open, which is the normal outcome and not a '
-      + 'failure: picking and comparing takes minutes. If one is already open it says so rather '
-      + 'than starting a second, because a second would take the port and roam elsewhere.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        url: {
-          type: 'string',
-          description:
-            'A running site or dev server to aim it at, like http://localhost:3000. Its elements '
-            + 'become pickable. Leave it out to open on a folder of components instead.',
-        },
-        dir: {
-          type: 'string',
-          description:
-            'Absolute path of the project, so the studio opens on its components when no url is '
-            + 'given. Always pass it. This server runs as its own process and its working '
-            + 'directory is not necessarily the project you are in.',
-        },
-      },
-    },
-  },
-  {
-    name: 'motion',
-    description:
-      'Give a component you already have motion that is not a 300ms fade. Send the markup and get '
-      + 'back stylesheets to append: keyframes scoped to one data attribute you add to the root, '
-      + 'reaching the parts by structure so they survive a class edit, staggering them so the '
-      + 'parts so the thing assembles itself rather than sliding in whole. Each option takes its '
-      + 'timing from a real object, a split flap turning, paper leaving a printer, a stamp landing, '
-      + 'so several of them disagree rather than all easing the same way. Your markup is never '
-      + 'changed and never returned, everything is wrapped in prefers-reduced-motion, and options '
-      + 'that only move it as one piece, or that pin their selectors to utility classes, are '
-      + 'rejected before you see them.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        html: {
-          type: 'string',
-          description:
-            'The component markup as it stands, so the motion can reach its parts by structure. '
-            + 'Send the real thing rather than a summary.',
-        },
-        css: {
-          type: 'string',
-          description: 'Its stylesheet, if you have it. Optional, and it makes the timing fit better.',
-        },
-        purpose: { type: 'string', enum: ['entrance', 'emphasis', 'idle', 'interaction'], description: 'What this motion is for. Entrance by default.' },
-        intensity: { type: 'string', enum: ['range', 'subtle', 'expressive', 'bold'], description: 'Treatment intensity. Range compares three treatments.' },
-        duration: { type: 'number', description: 'Target duration in milliseconds, between 200 and 10000.' },
-        direction: { type: 'string', description: 'Specific creative direction for the motion.' },
-        options: {
-          type: 'number',
-          description: 'How many different motions to write. Three by default, six at most.',
-        },
-      },
-      required: ['html'],
-    },
-  },
-  {
-    name: 'film',
-    description:
-      'Make a short motion film of a running site with no clicks, and return the path to an MP4. '
-      + 'Use this when somebody wants a video, a demo reel or a motion film of a site or dev server '
-      + 'and is happy to let the tool choose what to film and edit it afterwards. It opens the site, '
-      + 'reads its elements, picks a few worth filming, writes one motion for each through the same '
-      + 'gates the studio uses, cuts them into a titled sequence and renders it locally. It needs the '
-      + 'local renderer, which it installs on first use, so the first run on a machine takes an extra '
-      + 'minute. It leaves the studio open so the person can change the cut. Prefer the studio tool '
-      + 'when they would rather pick and compare by hand, and the motion tool when they want CSS for '
-      + 'markup they already have rather than a video.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        url: { type: 'string', description: 'The running site or dev server to film, like http://localhost:3000.' },
-        dir: { type: 'string', description: 'Absolute project path. The MP4 is saved here; pass it so the file lands where the person is working.' },
-        captureMode: { type: 'string', enum: ['dom','pixels'], description: 'film only: dom preserves editable internal structure (default). pixels photographs each selected source element before generating motion, preserving fonts, canvas and images when DOM capture loses them; motion then moves a flat image.' },
-        theme: { type: 'string', enum: ['light','dark'], description: 'Preferred source-page color scheme. Pass dark or light when the brief requests it; sites that support system appearance will use that theme. Captured content keeps its source colors.' },
-        language: { type: 'string', description: 'Two-letter language code, en by default. If the site opens in another language, follows an existing locale link when available. Use the language of the request; never guess a locale URL.' },
-        seconds: { type: 'number', description: 'How long the film should be. About 20 by default.' },
-        fps: { type: 'number', enum: [30,60], description: 'Frames per second. 60 by default for smooth product movement; 30 for smaller exports.' },
-        background: { type: 'string', description: 'Optional six-digit hex stage background, such as #101319. Changes the film canvas, not captured source colors.' },
-        ink: { type: 'string', description: 'Optional six-digit hex title color. Without it, titles contrast with the stage background.' },
-        soundtrack: { type: 'string', enum: ['none','ambient','pulse','playful','percussive'], description: 'Original synthesized music fitted to the cut. Defaults to ambient for calm films and pulse otherwise. Use playful for a light rhythmic feel, none for silent output.' },
-        look: { type: 'string', enum: ['subtle', 'expressive', 'bold'], description: 'The single treatment written for each element. Subtle by default, which reads as fast and calm.' },
-        count: { type: 'number', description: 'How many elements to film, 1 to 12. Eight by default for a fast film, five for brisk, three for calm; when the page offers fewer, the ones found repeat across the shots.' },
-        pace: { type: 'string', enum: ['calm', 'brisk', 'fast'], description: 'How it is cut. fast is many short shots of about a second with short titles, brisk is a demo rhythm, calm is a few long shots. Brisk by default.' },
-        pick: { type: 'string', description: 'Which elements the person wants filmed, in their own words, like "the pricing cards and the hero". The model matches it against what is on the page. Leave it out to let the model choose.' },
-        direction: { type: 'string', description: 'The creative direction for the whole film, in the person\'s words, up to a paragraph: the tone, the rhythm, what to emphasise, how things should arrive, what the titles should feel like. It shapes the plan, the titles and every motion. Pass a detailed request through here whole rather than summarising it.' },
-      },
-      required: ['url'],
-    },
-  },
-  {
-    name: 'reel',
-    description: 'Create an art-directed kinetic brand film with original animated graphics, huge typography, diagrams, spatial motifs, fast cuts and a beat-matched original instrumental score. Prefer this for artistic, snappy launch films and brand identity reels. Auto mode chooses available site material. Native retains DOM/SVG with measured detail-to-interface reveals. Review source relevance before approving the cut. Hybrid mode combines actual website captures with authored graphics; pass projectId or url. Graphic mode uses illustrative graphics only. A new editable project preserves the original film.',
-    inputSchema: {type:'object',properties:{
-      mode:{type:'string',enum:['auto','graphic','hybrid','native'],default:'auto',description:'Auto by default: retain native components when available, otherwise capture honestly labeled source pixels. A supplied project uses its captures. Prefer native for polished source-element motion: real DOM/SVG details reveal their full component, with inner-layer animation, branded typography and a clean ending. Requires an accessible url with at least two usable components. Hybrid preserves flattened capture pixels; graphic uses authored graphics only.'},
-      url:{type:'string',description:'Brand landing page to capture; required for native mode unless a domain or source project provides its URL.'},
-      brand:{type:'string',minLength:1,maxLength:24,description:'Company or product name.'},
-      concept:{type:'string',maxLength:45,description:'Optional title for this creative direction. Keep brand as the actual company name; use concept to name variations in a collection.'},
-      domain:{type:'string',description:'Brand source domain, without protocol.'},
-      projectId:{type:'string',description:'Optional existing film in this studio; hybrid mode uses its actual captured visuals; graphic mode uses names as context. It is not modified.'},
-      direction:{type:'string',description:'The full creative brief: concept, metaphors, typography, rhythm, reference observations. Give each brand a distinct idea.'},
-      seconds:{type:'number',minimum:6,maximum:30,default:18,description:'6 to 30 seconds, 18 by default for a composed source film.'},
-      reviewPasses:{type:'integer',minimum:0,maximum:2,default:1,description:'Maximum automatic focused repair passes after review of sampled export frames. Zero still reviews. Reports unresolved issues and preserves rejected takes.'},
-      soundKit:{type:'string',description:'Optional absolute path to a local recorded sound kit JSON manifest with name, provenance and kick/snare/hat/accent WAV paths. Arranged on the shared film event timeline. No samples are downloaded.'},
-      referenceUrls:{type:'array',maxItems:3,items:{type:'string'},description:'Up to three documentation URLs relevant to this film. Read for product facts. Hybrid also imports published screenshots; native uses the reference text as evidence while retaining the landing-page DOM/SVG. Sources share the contact sheet fairly. Keep url as the main brand website.'},
-      brandMode:{type:'string',enum:['site','expressive'],description:'Site by default: inspect the source website and embed its actual font, using its observed palette unless palette is explicitly supplied. Expressive intentionally uses the art preset typography and freely directed colors.'},
-      bpm:{type:'number',minimum:80,maximum:180,description:'Optional target tempo shared by music and cuts. Fits whole beats to the exact film length; actual BPM is returned. Deep fast techno usually uses 144 to 162.'},
-      art:{type:'string',enum:['studio','editorial','playful','chrome','technical','print'],description:'Visual direction with bundled display typography and material treatment. Studio is sculptural, editorial is serif-led, playful is elastic, chrome is luminous, technical is precise, print is bold and optical.'},
-      music:{type:'string',enum:['glass','liquid','paper','monolith','elastic','voltage','current','branch','prism','conversation','hypnosis','warehouse','submerge','acidline','fracture','alloy','keystroke','relay','tabulator','postmark','handshake','release'],description:'Musical identity: glass minimal electronica, liquid swung garage, paper intimate keys, monolith cinematic sub, elastic electro funk, voltage acid breaks, current dub techno, branch digital counterpoint, prism melodic electronica, conversation warm broken soul. For dry action-led, non-ambient scores use keystroke (typing), relay (switching), tabulator (data), postmark (inbox), handshake (request/response), or release (launch). For deep fast techno use hypnosis (rolling), warehouse (industrial), submerge (dub), acidline (acid), fracture (broken), or alloy (metallic). The director chooses when omitted.'},
-      palette:{type:'array',minItems:3,maxItems:3,items:{type:'string',pattern:'^#[0-9a-fA-F]{6}$'},description:'Three six-digit hex colors in dark, accent, paper order. Optional; the director chooses when omitted.'},
-      dir:{type:'string',description:'Absolute output folder for the MP4 and storyboard.'}
-    },required:['brand']}
-  },
-  {
-    name:'rescore',
-    description:'Change only the music of an existing film or reel. Creates a new independent editable take, preserving visuals, timing, camera and the original project. Composes an instrumental score or imports a finished local soundtrack, and returns MP4, WAV and storyboard. Use for a new musical identity without rebuilding the visuals.',
-    inputSchema:{type:'object',properties:{
-      projectId:{type:'string',description:'Existing film or reel projectId.'},
-      audioFile:{type:'string',description:'Absolute path to a finished local soundtrack. Replaces generated music; use replaceAudioTrackIds to replace an imported score. Must cover the export duration. Trimmed from its beginning, never looped or stretched. Do not combine with music or direction.'},
-      replaceAudioTrackIds:{type:'array',items:{type:'string'},description:'Existing audio track IDs to replace in the new take, including an imported score. Other imported audio stays. Generated scores are replaced automatically.'},
-      music:{type:'string',enum:['glass','liquid','paper','monolith','elastic','voltage','current','branch','prism','conversation','hypnosis','warehouse','submerge','acidline','fracture','alloy','keystroke','relay','tabulator','postmark','handshake','release'],description:'Musical identity. Choose a different orchestration and groove for each brand.'},
-      direction:{type:'string',description:'Musical brief: instrumentation, groove, feeling and melodic character. The composer writes a phrase for this direction.'},
-      bpm:{type:'number',minimum:40,maximum:400,description:'Use the original reel BPM to keep music on its edit grid. Inferred from clip lengths for synthesized music. With audioFile this is metadata only; omitted BPM is unknown and the audio is never stretched.'},
-      dir:{type:'string',description:'Absolute output directory for MP4, WAV and storyboard.'}
-    },required:['projectId']}
-  },
-  {
-    name: 'inspect',
-    description:
-      'Look at a running site the way film would and list what on it is worth filming: each element '
-      + 'with its role, where it sits, its size, whether it carries an image, and its text. Use it '
-      + 'when the person wants to choose or discuss what gets filmed before spending a minute on a '
-      + 'render, or asks what Motioneer can see on a page. It opens the site in the studio and reads '
-      + 'it in a headless browser, so it takes a few seconds and needs the renderer like film does. '
-      + 'Follow it with film, passing pick in the person\'s words.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        url: { type: 'string', description: 'The running site or dev server to look at.' },
-        theme: { type: 'string', enum: ['light','dark'], description: 'Preferred source-page color scheme. Pass dark or light when the brief requests it; sites that support system appearance will use that theme. Captured content keeps its source colors.' },
-        language: { type: 'string', description: 'Two-letter preferred language, en by default. Follows a linked locale when available.' },
-        dir: { type: 'string', description: 'Absolute project path, so a studio opened for this lands on their project.' },
-      },
-      required: ['url'],
-    },
-  },
-  {
-    name: 'revise',
-    description:
-      'Change a film that film already made, without filming it again: a different pace or length, '
-      + 'new titles, shots dropped, elements taken out, or the shots in another order. The captures '
-      + 'and motions are kept, the film is cut and rendered again in about half a minute, measured '
-      + 'off its frames, and a new MP4 path comes back. Use it whenever the person reacts to a film '
-      + 'with a change: "slower", "shorter", "drop the footer", "put the hero last", "call it X". To '
-      + 'add elements that were not filmed, call film again with pick.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        projectId: { type: 'string', description: 'The projectId the last film reply carried.' },
-        dir: { type: 'string', description: 'Absolute project path, where the new MP4 is saved.' },
-        pace: { type: 'string', enum: ['calm', 'brisk', 'fast'], description: 'A new cut rhythm. Leave out to keep the current one.' },
-        seconds: { type: 'number', description: 'A new length. Leave out to keep the current one.' },
-        opening: { type: 'string', description: 'A new opening title, two to five words.' },
-        closing: { type: 'string', description: 'A new closing title.' },
-        drop: { type: 'array', items: { type: 'string' }, description: 'Shots or elements to remove: a shot number from the reply like "3", an exact subjectId, or words from an element\'s name like "footer" or "pricing".' },
-        order: { type: 'array', items: { type: 'number' }, description: 'Shot numbers in the order they should now come, first ones first; unnamed shots follow.' },
-        fps: { type: 'number', enum: [30,60], description: 'Change export frame rate without changing the edit.' },
-        background: { type: 'string', description: 'Optional six-digit hex stage background, such as #101319. Changes the film canvas, not captured source colors.' },
-        ink: { type: 'string', description: 'Optional six-digit hex title color. Without it, titles contrast with the stage background.' },
-        soundtrack: { type: 'string', enum: ['none','ambient','pulse','playful','percussive'], description: 'Add or replace the generated score; none removes only the generated score. Existing imported audio is preserved.' },
-        motionDirection: { type: 'string', description: 'How to change existing motions. Creates new versions while preserving placement, timing, camera, and audio unless a cut change is also requested.' },
-        motionElements: { type: 'array', items: { type: 'string' }, description: 'Subject IDs or words from element names whose motions should change. Leave out to refine all visible component elements. Requires motionDirection.' },
-      },
-      required: ['projectId'],
-    },
-  },
-  {
-    name: 'open',
-    description:
-      'Open something Motioneer made, on the person\'s machine: the editor in their browser, a '
-      + 'rendered video in their player, or the folder a file sits in. Use it after film when they '
-      + 'choose to open the editor or the video, or whenever they ask to see one. It launches the '
-      + 'system opener and returns at once.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        target: { type: 'string', enum: ['editor', 'video', 'folder'], description: 'What to open. editor is the studio in the browser; video and folder need path.' },
-        path: { type: 'string', description: 'Absolute path of the video, for video and folder.' },
-      },
-      required: ['target'],
-    },
-  },
-]
 
 /**
  * Open the motion studio, or say that one is already open.
@@ -314,16 +59,15 @@ const TOOLS = [
 async function studio({ url, dir }) {
   const running = await runningStudio()
   if (running) {
-    return `A motion studio is already open at ${running}. Tell them to use that one rather than `
-      + 'opening another, and if they want it pointed somewhere else there is an address bar in '
-      + 'the top left of it.'
+    return { summary: `A motion studio is already open at ${running}. Tell them to use that one rather than `
+      + 'opening another; the address bar at its top left points it somewhere else.', structured: { studio: running, alreadyOpen: true }, ids: { studio: running } }
   }
   const at = await ensureStudio({ url, folder: dir, headless: false })
   if (!at) throw cannot('open the studio: it did not answer within fifteen seconds.', 'ask them to run `npx motioneer` themselves.')
-  return `The motion studio is open at ${at}.${url ? ` It is aimed at ${url}.` : ''} Tell them `
+  return { summary: `The motion studio is open at ${at}.${url ? ` It is aimed at ${url}.` : ''} Tell them `
     + 'to pick one or more elements and explore motion, and that several motions come back to '
-    + 'compare on one timeline. Choosing takes minutes, so do not wait on it: they can keep what '
-    + 'they like from the studio itself.'
+    + 'compare on one timeline. Choosing takes minutes, so do not wait on it: they keep what they '
+    + 'like in the studio itself.', structured: { studio: at, url: url || null }, ids: { studio: at } }
 }
 
 /** This workspace's studio for a tool that needs one, started headless when none is running. */
@@ -353,22 +97,22 @@ async function studioFor(what, { url } = {}) {
  * reports instead of launching, the same switch the studio honours, so suites can drive this path
  * without windows appearing on the machine that runs them.
  */
-async function open({ target, path: file }) {
+async function open({ target, path: file, projectId }) {
   let what, where
   if (target === 'editor') {
     const at = await studioFor('open the editor')
-    what = 'the editor'; where = `${at}/__motioneer/editor/`
+    what = 'the editor'; where = `${at}/__motioneer/editor/${projectId ? `?project=${encodeURIComponent(projectId)}&view=film` : ''}`
   } else if (target === 'video' || target === 'folder') {
     if (!file || !path.isAbsolute(String(file))) throw cannot(`open the ${target}: it needs the absolute path of the video.`, 'pass the path a film reply returned.')
     const there = await stat(file).then(() => true, () => false)
     if (!there) throw cannot(`open the ${target}: there is no file at ${file}.`, 'pass the path a film reply returned.')
     what = target === 'video' ? 'the video' : 'its folder'; where = target === 'video' ? String(file) : path.dirname(String(file))
   } else throw cannot('open that: open needs a target of editor, video or folder.', 'choose one of those targets.')
-  if (process.env.MOTIONEER_NO_OPEN) return `Would open ${what} at ${where}.`
+  if (process.env.MOTIONEER_NO_OPEN) return { summary: `Would open ${what} at ${where}.`, structured: { opened: target, at: where } }
   const cmd = process.platform === 'darwin' ? ['open', [where]] : process.platform === 'win32' ? ['cmd', ['/c', 'start', '', where]] : ['xdg-open', [where]]
   const child = spawn(cmd[0], cmd[1], { stdio: 'ignore', detached: true })
   child.on('error', () => {}); child.unref()
-  return `Opened ${what} at ${where}.`
+  return { summary: `Opened ${what} at ${where}.`, structured: { opened: target, at: where } }
 }
 
 /**
@@ -382,11 +126,11 @@ async function inspect({ url, dir, language, theme }) {
   const {prepareRenderer}=await import('../tools/environment.mjs');await prepareRenderer(at)
   const seen = await inspectSite({ at, url, language, theme })
   const lines = seen.candidates.map(describe)
-  const text = `${seen.title || seen.source} has ${seen.candidates.length} things worth filming:\n${lines.join('\n')}\n\n`
-    + (seen.sheet ? `The image is a contact sheet of the first ${seen.sheet.tiles} of them, each tile labelled with its index, so you can see what each looks like and show or describe them to the person.\n` : '')
-    + `To film some of them, call film with the same url and pick set to what the person wants in their words, `
-    + `for example "the pricing cards and the hero", or the indices; the model matches pick against this list. Without pick it chooses the best on its own.`
-  return { text, images: seen.sheet ? [seen.sheet] : [], structured: { title: seen.title, source: seen.source, background: seen.colours?.background, elements: seen.candidates.map((c) => ({ index: c.i, role: c.role, section: c.section, width: c.w, height: c.h, image: !!c.image, text: c.text || '', alike: c.alike || 0 })) } }
+  const summary = `${seen.title || seen.source} has ${seen.candidates.length} things worth filming.`
+    + (seen.sheet ? ` The image is a contact sheet of the first ${seen.sheet.tiles}, each tile labelled with its index; describe or show them, and ask which the person wants.` : '')
+  return { summary, detail: lines.join('\n'), images: seen.sheet ? [seen.sheet] : [], ids: { source: seen.source },
+    structured: { title: seen.title, source: seen.source, background: seen.colours?.background, elements: seen.candidates.map((c) => ({ index: c.i, role: c.role, section: c.section, width: c.w, height: c.h, image: !!c.image, text: c.text || '', alike: c.alike || 0 })) },
+    next: [{ tool: 'film', args: { url, mode: 'capture', pick: "<the elements they chose, in their words>" }, why: 'film what they choose' }, { tool: 'film', args: { url, mode: 'auto' }, why: 'make a brand film of the whole site instead' }] }
 }
 
 async function film({ url, dir, language, theme, captureMode, seconds, fps, soundtrack, background, ink, look, count, pick, pace, direction }, progress = () => {}) {
@@ -402,20 +146,19 @@ async function film({ url, dir, language, theme, captureMode, seconds, fps, soun
   // a fast film wants many elements; a calm one a few. the cap is what a render can carry in a few minutes
   const max = Math.max(1, Math.min(12, Number(count) || (wantPace === 'fast' ? 8 : wantPace === 'brisk' ? 5 : 3)))
   const result = await autofilm({ at, url, language, theme, captureMode, background, ink, pick: String(pick || '').slice(0, 600), direction: String(direction || '').slice(0, 1400), seconds: wantSeconds, fps: fps ?? 60, soundtrack: soundtrack ?? (wantPace === 'calm' ? 'ambient' : 'pulse'), look: look || (wantPace === 'calm' ? 'subtle' : 'expressive'), pace: wantPace, max, onStep: (m) => {steps.push(m);progress(m)}, onProject: (id) => { made.projectId = id } }).catch((e) => { e.projectId = made.projectId; throw e })
-  const file = await keepFile(result, dir)
+  const file = await keepFile(result, dir, `${new URL(url).host}-${wantPace}`)
   const review = await reviewResult(result,file,progress)
   const buf = { length: (await stat(file)).size }
   const { proofLine } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'proof.mjs')).href)
   const verified = proofLine(result.proof)
-  const structured = shape(result, file, wantPace)
+  const structured = { ...shape(result, file, wantPace), found: Number(/Found (\d+) things/.exec(steps.join(' '))?.[1]) || null }
   const mended = result.repairs?.length ? ` It mended itself once before the final render: ${result.repairs.join('; ')}.` : ''
   const fates = result.elements.filter((e) => e.status !== 'filmed')
   const leftOut = fates.length ? ` Left out: ${fates.map((e) => `${e.name} (${e.status})`).join('; ')}.` : ''
-  return { structured, images: review ? [review] : [], text: `Filmed ${result.distinct} of ${result.elements.length} selected element${result.elements.length === 1 ? '' : 's'} from ${url}${result.product ? `, "${result.product}",` : ''} into a ${Math.round(result.seconds)} second ${wantPace} film`
-    + `${result.opening ? ` titled "${result.opening}"` : ''}, ${result.shots} shots of ${result.distinct} distinct element${result.distinct === 1 ? '' : 's'} in ${result.layouts} layout${result.layouts === 1 ? '' : 's'}, saved to ${file} (${(buf.length / 1e6).toFixed(1)} MB). ${verified} The studio is still open at ${at}. What it did: ${steps.join(' ')}\n\n`
-    + mended + leftOut + ` The shots are numbered in the structured result; revise with this projectId (${result.projectId}) changes the cut without filming again. `
-    + `Review the storyboard before delivery. If it has weak framing or repeated minor elements, use a focused revision or inspect and film again. Then hand over the video and storyboard with any remaining limitations. `
-    + `Only call open if the person asks to launch the editor or player.` }
+  return { structured, images: review ? [review] : [], ids: { projectId: result.projectId, video: file, storyboard: result.storyboard },
+    summary: `Filmed ${result.distinct} of ${result.elements.length} selected element${result.elements.length === 1 ? '' : 's'} from ${url}${result.product ? `, "${result.product}",` : ''} into a ${Math.round(result.seconds)} second ${wantPace} film`
+      + `${result.opening ? ` titled "${result.opening}"` : ''}: ${result.shots} shots of ${result.distinct} distinct element${result.distinct === 1 ? '' : 's'} in ${result.layouts} layout${result.layouts === 1 ? '' : 's'}, saved to ${file} (${(buf.length / 1e6).toFixed(1)} MB). ${verified}${mended}${leftOut}`,
+    next: filmNext(result.projectId, result.proof, false) }
 }
 
 async function reel({brand,domain,projectId,url,mode='auto',direction,seconds=18,palette,music,art,concept,bpm,brandMode='site',referenceUrls=[],soundKit,reviewPasses=1,dir},progress=()=>{}) {
@@ -423,10 +166,18 @@ async function reel({brand,domain,projectId,url,mode='auto',direction,seconds=18
   const {prepareRenderer}=await import('../tools/environment.mjs');await prepareRenderer(at,progress)
   const {kineticReel}=await import(pathToFileURL(path.join(ROOT,'tools/editor/kinetic.mjs')).href)
   const result=await kineticReel({at,brand,domain,projectId,url,mode,direction,seconds,palette,music,art,concept,bpm,brandMode,referenceUrls,soundKit,reviewPasses,onStep:progress,onProject:id=>{made.projectId=id}}).catch(e=>{e.projectId=made.projectId;throw e})
-  const file=await keepFile(result,dir),review=await reviewResult(result,file,progress)
+  const file=await keepFile(result,dir,`${brand}-${result.plan.concept||result.mode}`),review=await reviewResult(result,file,progress)
   const sourceSheet=result.sourceSheet?file.replace(/\.mp4$/,'-sources.jpg'):null
   if(sourceSheet)await writeFile(sourceSheet,Buffer.from(result.sourceSheet.data,'base64'))
-  return {structured:{projectId:result.projectId,editor:`${at}/__motioneer/editor/?project=${encodeURIComponent(result.projectId)}&view=film`,studio:at,file,seconds,fps:60,style:result.mode==='native'?'native':result.mode==='hybrid'?'hybrid':'kinetic',sourceSelection:result.sourceSelection,soundtrack:result.soundtrack,music:result.music,bpm:result.bpm,concept:result.plan.concept,plan:result.plan,shots:result.shotList,sourceProjectId:result.sourceProjectId,artifacts:{video:file,storyboard:result.storyboard||null,sources:sourceSheet},reviewError:result.reviewError||null,verdict:result.proof,quality:result.quality,review:publicReview(result.review),brief:result.brief,events:result.events,eventStatus:result.eventStatus,transitions:result.transitions,captureSkipped:result.captureSkipped||[],captures:result.captures,limitation:result.limitation},images:review?[review]:[],text:`Created ${brand}: ${result.plan.concept}. ${result.shotList.length} animated scenes in ${seconds} seconds, 60 fps, with original ${result.music.label} music. Video: ${file}. Review the storyboard for typography and composition. The original film is preserved. For music-only changes use rescore. For focused visual changes use refine with the returned track IDs. Generic revise rebuilds a capture-style cut and is not appropriate for these authored scenes. ${result.review?.status==='unavailable'?'Visual review unavailable: '+result.review.error:'Sampled-frame review '+result.review?.status+': '+(result.review?.issues?.length||0)+' unresolved observations; artistic quality is not certified.'} ${result.limitation}`}
+  const reviewed=result.review?.status==='unavailable'?'Visual review unavailable: '+result.review.error:'Sampled-frame review '+result.review?.status+': '+(result.review?.issues?.length||0)+' unresolved observations; artistic quality is not certified.'
+  const {proofLine}=await import(pathToFileURL(path.join(ROOT,'tools','editor','proof.mjs')).href)
+  return {images:review?[review]:[],ids:{projectId:result.projectId,video:file,storyboard:result.storyboard,sources:sourceSheet,trackIds:result.shotList.map(s=>s.trackId)},
+    structured:{projectId:result.projectId,editor:`${at}/__motioneer/editor/?project=${encodeURIComponent(result.projectId)}&view=film`,studio:at,file,seconds,fps:60,style:result.mode==='native'?'native':result.mode==='hybrid'?'hybrid':'kinetic',sourceSelection:result.sourceSelection,soundtrack:result.soundtrack,music:{profile:result.music?.profile,label:result.music?.label},bpm:result.bpm,concept:result.plan.concept,
+      shots:result.shotList.map(s=>({shot:s.shot,trackId:s.trackId,sceneId:s.sceneId,at:s.at,seconds:s.seconds,elements:s.elements,layout:s.layout,choreography:s.choreography,...(s.renderedMotion?{renderedMotion:s.renderedMotion}:{})})),
+      sourceProjectId:result.sourceProjectId,artifacts:{video:file,storyboard:result.storyboard||null,sources:sourceSheet},reviewError:result.reviewError||null,verdict:{ok:!!result.proof?.ok,notes:result.proof?.notes||[],cuts:result.proof?.cuts,arriveMs:result.proof?.arriveMs,blank:result.proof?.blank},quality:{warnings:result.quality?.warnings||[]},
+      review:result.review?{status:result.review.status,summary:result.review.summary,issues:result.review.issues||[],attempts:result.review.attempts||[],error:result.review.error}:null,eventStatus:result.eventStatus,transitions:(result.transitions||[]).length,captureSkipped:result.captureSkipped||[],limitation:result.limitation},
+    summary:`Created ${brand}: ${result.plan.concept}. ${result.shotList.length} scenes in ${seconds} seconds at 60 fps, with original ${result.music.label} music, saved to ${file}. ${proofLine(result.proof)} ${reviewed} ${result.limitation||''}`.trim(),
+    next:filmNext(result.projectId,result.proof,true,result.shotList)}
 }
 
 async function rescore(args,progress=()=>{}){
@@ -434,24 +185,41 @@ async function rescore(args,progress=()=>{}){
   const {prepareRenderer}=await import('../tools/environment.mjs');await prepareRenderer(at,progress)
   const {rescoreFilm}=await import(pathToFileURL(path.join(ROOT,'tools/editor/rescore.mjs')).href)
   const result=await rescoreFilm({...args,at,onStep:progress})
-  const file=await keepFile(result,args.dir),review=await reviewResult(result,file,progress),audio=file.replace(/\.mp4$/,'-score.wav')
+  const file=await keepFile(result,args.dir,`${result.music.label}-score`),review=await reviewResult(result,file,progress),audio=file.replace(/\.mp4$/,'-score.wav')
   const response=await fetch(result.audioUrl)
-  if(!response.ok)throw new Error('Cannot deliver the score: its audio file is unavailable. Next: export the saved take from the studio.')
+  if(!response.ok)throw cannot('deliver the score: its audio file is unavailable.','export the saved take from the studio.')
   await writeFile(audio,Buffer.from(await response.arrayBuffer()))
-  return {structured:{projectId:result.projectId,editor:`${at}/__motioneer/editor/?project=${encodeURIComponent(result.projectId)}&view=film`,sourceProjectId:result.sourceProjectId,studio:at,file,seconds:result.seconds,fps:result.fps,soundtrack:result.soundtrack,music:result.music,bpm:result.bpm,shots:result.shotList,verdict:result.proof,artifacts:{video:file,audio,storyboard:result.storyboard||null}},images:review?[review]:[],text:`Created a new ${result.music.label} musical take. ${result.music.description} The visual edit and original project are preserved. MP4: ${file}. ${result.soundtrack==='imported'?'Imported stereo soundtrack':'Original synthesized stereo score'}: ${audio}.`}
+  return {images:review?[review]:[],ids:{projectId:result.projectId,video:file,audio,storyboard:result.storyboard},
+    structured:{projectId:result.projectId,editor:`${at}/__motioneer/editor/?project=${encodeURIComponent(result.projectId)}&view=film`,sourceProjectId:result.sourceProjectId,studio:at,file,seconds:result.seconds,fps:result.fps,soundtrack:result.soundtrack,music:{profile:result.music?.profile,label:result.music?.label},bpm:result.bpm,shots:result.shotList,verdict:{ok:!!result.proof?.ok,notes:result.proof?.notes||[]},artifacts:{video:file,audio,storyboard:result.storyboard||null}},
+    summary:`Made a new take with ${result.soundtrack==='imported'?'the supplied soundtrack':`an original ${result.music.label} score`}: ${result.music.description} The visuals and the original film are unchanged. Video ${file}, audio ${audio}.`,
+    next:[{tool:'change',args:{projectId:result.projectId,music:{identity:'<another identity>'}},why:'try a different musical identity on the same edit'},{tool:'open',args:{target:'editor',projectId:result.projectId},why:'only if they ask to open the editor'}]}
 }
 
-/** The rendered file, moved from where the driver measured it to where the person works. */
-async function keepFile(result, dir) {
-  const outDir = dir && path.isAbsolute(dir) ? dir : process.cwd()
-  await mkdir(outDir,{recursive:true})
-  const file = path.join(outDir, `motioneer-film-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.mp4`)
+/**
+ * The rendered file, moved from where the driver measured it to where the person works.
+ *
+ * Into a motioneer folder rather than the project root, which had collected fifty timestamped files
+ * in one repository, under a name that says what the film is, and recorded beside the project so
+ * projects can say where every take was written.
+ */
+async function keepFile(result, dir, hint = 'film') {
+  const base = dir && path.isAbsolute(dir) ? dir : process.cwd(), outDir = path.join(base, 'motioneer')
+  await mkdir(outDir, { recursive: true })
+  await writeFile(path.join(outDir, '.gitignore'), '# Motioneer renders are output, not source. Delete this file to commit them.\n*\n', { flag: 'wx' }).catch(() => {})
+  const slug = String(hint).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 48) || 'film'
+  let n = 1
+  while (await stat(path.join(outDir, `${slug}-${n}.mp4`)).then(() => true, () => false)) n++
+  const file = path.join(outDir, `${slug}-${n}.mp4`)
   const buf = result.file ? await readFile(result.file).catch(() => null) : null
   await writeFile(file, buf || Buffer.from(await (await fetch(result.url)).arrayBuffer()))
+  if (result.projectId) {
+    const record = path.join(await workspace(), '.studio', 'projects', String(result.projectId), 'outputs.json')
+    const was = JSON.parse(await readFile(record, 'utf8').catch(() => '[]'))
+    await writeFile(record, JSON.stringify([...was, { file, at: Date.now() }].slice(-50))).catch(() => {})
+  }
   return file
 }
 
-function publicReview(review){if(!review)return null;const {storyboard,...rest}=review;return rest}
 async function reviewResult(result,file,progress) {
   progress('Inspecting frames from the finished video.')
   try {
@@ -475,7 +243,6 @@ function shape(result, file, pace) {
     reviewError: result.reviewError || null,
     verdict: { ok: !!result.proof?.ok, notes: result.proof?.notes || [], cuts: result.proof?.cuts, arriveMs: result.proof?.arriveMs, blank: result.proof?.blank },
     repairs: result.repairs || result.changes || [],
-    next: ['open the editor', 'open the video', 'revise: pace, seconds, titles, drop, order', 'film again with pick to add elements'],
   }
 }
 
@@ -483,18 +250,19 @@ function shape(result, file, pace) {
  * A film changed rather than remade. The studio that made it is still open with the project,
  * so this goes straight to the cut and the render, and comes back in the time a render takes.
  */
-async function revise({ projectId, dir, pace, seconds, opening, closing, drop, order, motionDirection, motionElements, fps, soundtrack, background, ink }, progress = () => {}) {
-  if (!projectId) throw new Error('Cannot revise: revise needs the projectId a film returned. Next: pass it, or film first.')
+async function revise({ projectId, dir, pace, seconds, opening, closing, drop, order, motionDirection, motionElements, fps, soundtrack, background, ink, sourceProjectId }, progress = () => {}) {
+  if (!projectId) throw cannot('revise: revise needs the projectId a film returned.', 'pass it, or film first.')
   const at = await studioFor('revise')
   const {prepareRenderer}=await import('../tools/environment.mjs');await prepareRenderer(at,progress)
   const { revise: reviseFilm } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'autofilm.mjs')).href)
   const steps = []
   const result = await reviseFilm({ at, projectId: String(projectId), pace, seconds, opening, closing, drop, order, motionDirection, motionElements, fps, soundtrack, background, ink, onStep: (m) => {steps.push(m);progress(m)} })
-  const file = await keepFile(result, dir)
+  const file = await keepFile(result, dir, `${new URL(result.source || 'http://film').host}-${result.pace}-take`)
   const review=await reviewResult(result,file,progress)
   const { proofLine } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'proof.mjs')).href)
-  return { structured: shape(result, file, result.pace), images: review ? [review] : [], text: `Revised the film: ${result.changes.join('; ') || 'cut again as it was'}. Now ${result.shots} shots of ${result.distinct} element${result.distinct === 1 ? '' : 's'} in ${Math.round(result.seconds)} seconds, ${result.pace}, saved to ${file}. ${proofLine(result.proof)} `
-    + `Offer the same three choices: open the editor, open the video, or continue chatting; the video is at "${file}".` }
+  return { structured: { ...shape(result, file, result.pace), ...(sourceProjectId ? { sourceProjectId } : {}) }, images: review ? [review] : [], ids: { projectId: result.projectId, video: file, storyboard: result.storyboard },
+    summary: `${sourceProjectId ? 'Made a new take' : 'Revised the film'}: ${result.changes.join('; ') || 'cut again as it was'}. Now ${result.shots} shots of ${result.distinct} element${result.distinct === 1 ? '' : 's'} in ${Math.round(result.seconds)} seconds, ${result.pace}, saved to ${file}. ${proofLine(result.proof)}`,
+    next: filmNext(result.projectId, result.proof, false) }
 }
 
 /**
@@ -638,42 +406,161 @@ async function motion(args) {
   const why = [...new Set(dropped.flatMap((d) => d.faults.map((f) => f.split('.')[0])))]
   // said out loud, because an option that was only read is a weaker claim than one that was watched
   const unwatched = kept.some((k) => k.unwatched)
-  return kept.map((k, i) =>
+  const options = kept.map((k) => ({ note: k.note || 'untitled', treatment: k.m, scope: k.scope, css: k.css, watched: !k.unwatched, distinct: k.distinct ?? null }))
+  return { structured: { options, dropped: dropped.length, droppedBecause: why },
+    summary: `${kept.length} motion${kept.length === 1 ? '' : 's'} for this component${dropped.length ? `, after ${dropped.length} written and dropped (${why.join('; ')})` : ''}. For each, put its scope attribute on the component's outermost element and append its css. ${unwatched ? 'They were checked by reading the css only, because no browser is installed here.' : 'Each was rendered on the component and watched for four seconds, so its selectors match and its movement is visible.'}`,
+    detail: kept.map((k, i) =>
     `## ${i + 1}. ${k.note || 'untitled'}\n\n`
-    + `Takes its timing from ${k.m}\n\n`
     + (k.scope ? `Put \`${k.scope}\` on the component's outermost element, then append:\n\n` : 'Append:\n\n')
     + `\`\`\`css\n${k.css}\n\`\`\``,
-  ).join('\n\n') + (dropped.length
-    ? `\n\n---\n\n${dropped.length} other option${dropped.length === 1 ? ' was' : 's were'} written and dropped: `
-      + `${why.join('; ')}.`
-    : '')
-    + (unwatched
-      ? '\n\nThese were checked by reading the css rather than by watching them, because no browser '
-        + 'is installed here. Selectors that match nothing, and movement that is over before anybody '
-        + 'sees it, both read as correct and are only visible when rendered.'
-      : '\n\nEach of these was rendered on your component and watched for four seconds, so the '
-        + 'selectors are known to match and the movement is known to be visible.')
+  ).join('\n\n'), next: [] }
+}
+
+/** What makes sense after a film or a take, filled in with its own projectId. */
+function filmNext(projectId, proof, authored, shots = []) {
+  const weak = proof?.notes?.length ? `fix what the verdict found: ${proof.notes[0]}` : 'drop a weak shot, named by its number'
+  return [
+    authored
+      ? { tool: 'change', args: { projectId, motion: { direction: '<what should move differently>', trackIds: [shots[1]?.trackId || '<trackId>'] } }, why: 'change how one scene moves; timing and music are kept' }
+      : { tool: 'change', args: { projectId, cut: { drop: ['<shot number>'] } }, why: weak },
+    authored
+      ? { tool: 'change', args: { projectId, music: { identity: '<identity>' } }, why: 'try another score on the same edit' }
+      : { tool: 'change', args: { projectId, motion: { direction: '<what should move differently>', elements: ['<shot number or element>'] } }, why: 'change how elements move; the cut and audio are kept' },
+    { tool: 'open', args: { target: 'editor', projectId }, why: 'only if they ask to open the editor' },
+  ]
+}
+
+const hostOf = (url) => { try { return new URL(/^[a-z]+:\/\//i.test(url) ? url : `http://${url}`).hostname } catch { return '' } }
+/** The product's name as an address spells it: linear.app is Linear. */
+const brandOf = (url) => { const h = hostOf(url).replace(/^www\./, ''); if (!h || isLocal(h)) return ''; const name = h.split('.').slice(-2)[0]; return name.charAt(0).toUpperCase() + name.slice(1) }
+
+/**
+ * One tool for every film. A demo of named elements, or anything on a dev server, is the capture
+ * film; a site's launch or brand film is authored; an idea with no site is graphic. The mode can be
+ * given, and is otherwise read from what was asked for.
+ */
+async function filmTool(args, progress) {
+  const a = { ...args }
+  const mode = a.mode || (a.pick || a.count || a.pace || a.treatment || (a.url && isLocal(hostOf(a.url))) ? 'capture' : a.url || a.projectId ? 'auto' : 'graphic')
+  if (!['auto', 'capture', 'native', 'hybrid', 'graphic'].includes(mode)) throw cannot(`film in mode ${mode}.`, 'choose auto, capture, native, hybrid or graphic.')
+  // the person's own words decide silence even when the call left the soundtrack out
+  if (a.soundtrack === undefined && /\b(silent|silence|no music|no sound|without (music|sound)|mute)\b/i.test(a.direction || '')) a.soundtrack = 'none'
+  if (mode === 'capture') return film({ ...a, look: a.treatment ?? a.look }, progress)
+  const brand = String(a.brand || brandOf(a.url || '') || '').slice(0, 24)
+  if (!brand) throw cannot('make an authored film without a name: there is no site to read one from.', 'pass brand, the product\'s name.')
+  return reel({ ...a, mode, brand }, progress)
+}
+
+/**
+ * Every change to a film, as a new take. A capture film is forked first and the fork recut, so a
+ * person who has the original open in the editor never finds it changed under them. An authored
+ * reel's scenes are designed together, so its motion is refined by track and its cut is left alone.
+ */
+async function changeTool({ projectId, dir, cut, motion: moving, music }, progress) {
+  if (!projectId) throw cannot('change a film without its projectId.', 'pass the projectId a film, change or projects reply carried, or call projects to find it.')
+  if (!cut && !moving && !music) throw cannot('change nothing: give cut, motion or music.', 'say what should change.')
+  if (music && music.identity === 'none' && !cut && !moving) return changeTool({ projectId, dir, cut: { soundtrack: 'none' } }, progress)
+  if (music && (cut || moving)) throw cannot('change the music in the same call as the cut or the motion.', 'change the cut or motion first, then the music of the take it returns.')
+  const at = await studioFor('change')
+  const project = await fetch(`${at}/__motioneer/projects/${encodeURIComponent(projectId)}`).then((r) => r.ok ? r.json() : null).catch(() => null)
+  if (!project || project.error || !Array.isArray(project.tracks)) throw cannot(`change ${projectId}: there is no such film in this workspace.`, 'call projects to find the film, or film again.')
+  if (music) return rescore({ projectId, dir, music: music.identity, direction: music.direction, bpm: music.bpm, audioFile: music.audioFile, replaceAudioTrackIds: music.replaceAudioTrackIds }, progress)
+  const authored = !!project.direction || project.motions.some((m) => m.scope === 'data-kinetic')
+  if (authored) {
+    if (cut) throw cannot('recut an authored reel: its scenes are designed together, so shots cannot be dropped or reordered.', 'change its motion with trackIds, or its music, or film again with a new direction.')
+    const shots = projectShots(project)
+    const trackIds = moving.trackIds?.length ? moving.trackIds : (moving.elements || []).flatMap((v) => /^\d+$/.test(String(v)) ? [shots[Number(v) - 1]?.trackId] : shots.filter((s) => s.elements.join(' ').toLowerCase().includes(String(v).toLowerCase())).map((s) => s.trackId)).filter(Boolean)
+    if (!trackIds.length) throw cannot('change a reel\'s motion without knowing which scenes.', 'pass trackIds from its shots, or shot numbers in elements.')
+    return refineTool({ projectId, dir, trackIds, lockedTrackIds: moving.lockedTrackIds || [], direction: moving.direction, reviewPasses: moving.reviewPasses ?? 0 }, progress)
+  }
+  const { forkProject } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'refinement.mjs')).href)
+  const { shotList } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'autofilm.mjs')).href)
+  const shots = shotList(project)
+  const elements = [...(moving?.elements || []).flatMap((v) => /^\d+$/.test(String(v)) && shots[Number(v) - 1] ? shots[Number(v) - 1].ids : [String(v)]), ...(moving?.trackIds || []).map((tid) => project.tracks.find((t) => t.id === tid)?.subjectId).filter(Boolean)]
+  progress('Making a new take, so the original stays as it is.')
+  const take = await forkProject(at, project, `${project.name} / Take`, { tool: 'change', request: JSON.stringify({ cut, motion: moving }).slice(0, 2000) })
+  return revise({ projectId: take.id, dir, ...(cut || {}), motionDirection: moving?.direction || '', motionElements: elements, sourceProjectId: projectId }, progress)
+}
+
+/** A reel's scoped motion refinement, as a take of its own. */
+async function refineTool(args, progress) {
+  const at = await studioFor('refine')
+  const { prepareRenderer } = await import('../tools/environment.mjs'); await prepareRenderer(at, progress)
+  const result = await runFilmTool('refine', args, { at, onStep: progress }), file = await keepFile(result, args.dir, 'refined-take'), image = await reviewResult(result, file, progress)
+  const { proofLine } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'proof.mjs')).href)
+  return { images: image ? [image] : [], ids: { projectId: result.projectId, video: file, storyboard: result.storyboard },
+    structured: { projectId: result.projectId, sourceProjectId: result.sourceProjectId, editor: `${at}/__motioneer/editor/?project=${result.projectId}&view=film`, file, seconds: result.seconds, changes: result.changes, unchanged: result.unchanged, shots: result.shotList, verdict: { ok: !!result.proof?.ok, notes: result.proof?.notes || [] }, review: { status: result.review?.status, issues: result.review?.issues || [], attempts: result.review?.attempts || [] }, eventStatus: result.eventStatus, artifacts: { video: file, storyboard: result.storyboard || null } },
+    summary: `${result.unchanged ? 'No motion changed, so the source take stands' : `Made a new take refining ${result.changes.length} track${result.changes.length === 1 ? '' : 's'}`}, saved to ${file}. ${proofLine(result.proof)} Review ${result.review?.status}: ${result.review?.issues?.length ?? 0} unresolved observations.`,
+    next: filmNext(result.projectId, result.proof, true, result.shotList) }
+}
+
+/** A saved film rendered and shown, never changed. */
+async function reviewTool({ projectId, critique = false }, progress) {
+  if (!projectId) throw cannot('look at a film without its projectId.', 'pass the projectId, or call projects to find it.')
+  const at = await studioFor('look at the film')
+  const { prepareRenderer } = await import('../tools/environment.mjs'); await prepareRenderer(at, progress)
+  const result = await runFilmTool('review', { projectId, critique }, { at, onStep: progress })
+  const image = await reviewResult(result, result.file, progress)
+  const { proofLine } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'proof.mjs')).href)
+  const issues = result.review?.issues || []
+  return { images: image ? [image] : [], ids: { projectId, render: result.file, storyboard: result.storyboard },
+    structured: { projectId, editor: `${at}/__motioneer/editor/?project=${projectId}&view=film`, seconds: result.seconds, shots: result.shotList, verdict: { ok: !!result.proof?.ok, notes: result.proof?.notes || [] }, review: { status: result.review?.status, summary: result.review?.summary, issues }, eventStatus: result.eventStatus, artifacts: { render: result.file, storyboard: result.storyboard || null } },
+    summary: `Rendered ${projectId} to look at it; nothing was changed. ${proofLine(result.proof)}${critique ? ` The model reviewed the sampled frames: ${issues.length} observation${issues.length === 1 ? '' : 's'}${result.review?.status === 'unavailable' ? `, because the review was unavailable: ${result.review.error}` : ''}.` : ''}`,
+    next: issues.slice(0, 3).map((i) => ({ tool: 'change', args: { projectId, motion: { direction: i.suggestion || i.detail, trackIds: [i.trackId] } }, why: i.detail })) }
+}
+
+/** Looking at a page or at a film, which is the same question asked before and after. */
+async function lookTool({ url, projectId, critique, theme, language }, progress) {
+  if (url && projectId) throw cannot('look at a page and a film in one call.', 'pass url or projectId.')
+  if (url) return inspect({ url, language, theme })
+  if (!projectId) throw cannot('look at nothing: look needs a url or a projectId.', 'pass the running site to see what is on it, or a film\'s projectId to see its frames.')
+  return reviewTool({ projectId, critique: critique === true }, progress)
+}
+
+/** The films and takes this workspace already has, read from disk with no studio needed. */
+async function projectsTool({ projectId, limit }) {
+  const root = path.join(await workspace(), '.studio', 'projects')
+  const { projectStore } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'projects.mjs')).href)
+  const store = projectStore(root)
+  if (!projectId) {
+    const all = await store.list(), shown = all.slice(0, Math.max(1, Math.min(100, Number(limit) || 20)))
+    return { summary: all.length ? `${all.length} film${all.length === 1 ? '' : 's'} and takes in this workspace; the newest ${shown.length} are listed, newest first.` : 'There are no films in this workspace yet.',
+      detail: shown.map((p) => `${p.id}  ${p.name}  ${p.kind}${p.pace ? ', ' + p.pace : ''}, ${p.seconds}s, ${p.shots} shots${p.origin ? `, a ${p.origin.tool} take of ${p.origin.sourceProjectId}` : ''}`).join('\n'),
+      structured: { workspace: path.dirname(path.dirname(root)), total: all.length, projects: shown.map((p) => ({ ...p, updatedAt: new Date(p.updatedAt).toISOString() })) },
+      next: shown[0] ? [{ tool: 'projects', args: { projectId: shown[0].id }, why: 'see one film\'s shots, track IDs and files' }] : [{ tool: 'film', args: { url: '<their site>' }, why: 'make the first one' }] }
+  }
+  const p = await store.read(String(projectId)).catch(() => null)
+  if (!p) throw cannot(`find project ${projectId} in this workspace.`, 'call projects without a projectId to list what is here.')
+  const { shotList } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'autofilm.mjs')).href)
+  const authored = !!p.direction || p.motions.some((m) => m.scope === 'data-kinetic')
+  const shots = authored ? projectShots(p) : shotList(p).map((s) => ({ ...s, trackIds: p.tracks.filter((t) => t.kind === 'component' && !t.hidden && Math.round(t.start) / 1000 === s.at).map((t) => t.id) }))
+  const outputs = JSON.parse(await readFile(path.join(root, p.id, 'outputs.json'), 'utf8').catch(() => '[]'))
+  return { summary: `${p.name}: a ${authored ? 'reel' : 'capture film'} of ${p.source || 'no site'}, ${Math.round((p.settings.to - p.settings.from) / 100) / 10} seconds in ${shots.length} shots.${outputs.length ? ` Last written to ${outputs.at(-1).file}.` : ''}`,
+    ids: { projectId: p.id, files: outputs.map((o) => o.file) },
+    structured: { projectId: p.id, name: p.name, kind: authored ? 'reel' : 'film', source: p.source, pace: p.film?.pace || null, origin: p.film?.origin || null, seconds: Math.round((p.settings.to - p.settings.from) / 100) / 10, shots, locked: p.tracks.filter((t) => t.locked).map((t) => t.id), outputs, eventStatus: undefined },
+    next: [{ tool: 'look', args: { projectId: p.id }, why: 'render it and see its frames' }, { tool: 'change', args: { projectId: p.id, ...(authored ? { motion: { direction: '<change>', trackIds: ['<trackId>'] } } : { cut: { drop: ['<shot number>'] } }) }, why: 'make a new take of it' }] }
 }
 
 async function call(name, args, id, meta) {
   let step=0
   const progress=message=>{if(typeof meta?.progressToken==='string'||typeof meta?.progressToken==='number')send({jsonrpc:'2.0',method:'notifications/progress',params:{progressToken:meta.progressToken,progress:step++,message}})}
-  if(name==='film'||name==='revise'||name==='reel')progress('Preparing the film workspace.')
-  if(name==='doctor'){const {diagnose}=await import('../tools/environment.mjs');const report=await diagnose(args||{});return ok(id,{structured:report,text:report.ready?'Motioneer is configured and its renderer works. Model authentication is checked on the first request.':report.checks.filter(c=>!c.ok).map(c=>c.message+' '+(c.next||'')).join('\n')})}
-  if (name === 'studio') return ok(id, await studio(args ?? {}))
-  if (name === 'motion') return ok(id, await motion(args ?? {}))
-  if (name === 'rescore') return ok(id, await rescore(args ?? {},progress))
-  if (name === 'reel') return ok(id, await reel(args ?? {},progress))
-  if (name === 'review'||name === 'refine') {
-    const at=await studioFor(name==='refine'?'refine':'review');
-    const {prepareRenderer}=await import('../tools/environment.mjs');await prepareRenderer(at,progress);
-    const result=await runFilmTool(name,args??{},{at,onStep:progress}),file=await keepFile(result,args?.dir),image=await reviewResult(result,file,progress);
-    return ok(id,{structured:{...result,review:publicReview(result.review),file,editor:`${at}/__motioneer/editor/?project=${result.projectId}&view=film`,artifacts:{video:file,storyboard:result.storyboard||null}},images:image?[image]:[],text:`${name==='refine'?(result.unchanged?'No motion changes were made; the source take is retained.':'Saved the scoped refinement as an independent take.'):'Rendered the saved film for sampled review.'} Video: ${file}. Review status: ${result.review.status}. Unresolved observations: ${result.review.issues?.length??'unknown'}. ${result.review.error||result.limitation}`})
-  }
-  if (name === 'film') return ok(id, await film(args ?? {},progress))
-  if (name === 'inspect') return ok(id, await inspect(args ?? {}))
-  if (name === 'revise') return ok(id, await revise(args ?? {},progress))
-  if (name === 'open') return ok(id, await open(args ?? {}))
+  const a = args ?? {}
+  if (['film', 'change', 'look', 'reel', 'revise', 'refine', 'rescore', 'review', 'inspect'].includes(name)) progress('Preparing the film workspace.')
+  if (name === 'doctor') { const { diagnose } = await import('../tools/environment.mjs'); const report = await diagnose(a); return answer(id, { structured: report, summary: report.ready ? 'Motioneer is configured and its renderer works. Model authentication is checked on the first model request.' : report.checks.filter((c) => !c.ok).map((c) => c.message + ' ' + (c.next || '')).join(' ') }) }
+  if (name === 'film') return answer(id, await filmTool(a, progress))
+  if (name === 'change') return answer(id, await changeTool(a, progress))
+  if (name === 'look') return answer(id, await lookTool(a, progress))
+  if (name === 'projects') return answer(id, await projectsTool(a))
+  if (name === 'motion') return answer(id, await motion(a))
+  if (name === 'studio') return answer(id, await studio(a))
+  if (name === 'open') return answer(id, await open(a))
+  // the names the surface used to have, each onto the tool that does its job now
+  if (name === 'reel') return answer(id, await filmTool({ ...a, mode: a.mode || 'auto', url: a.url || (a.domain ? `https://${a.domain}` : undefined) }, progress))
+  if (name === 'inspect') return answer(id, await inspect(a))
+  if (name === 'review') return answer(id, await reviewTool({ projectId: a.projectId, critique: true }, progress))
+  if (name === 'revise') return answer(id, await changeTool({ projectId: a.projectId, dir: a.dir, cut: Object.fromEntries(Object.entries({ pace: a.pace, seconds: a.seconds, opening: a.opening, closing: a.closing, drop: a.drop, order: a.order, fps: a.fps, soundtrack: a.soundtrack, background: a.background, ink: a.ink }).filter(([, v]) => v !== undefined)), ...(a.motionDirection ? { motion: { direction: a.motionDirection, elements: a.motionElements } } : {}) }, progress))
+  if (name === 'refine') return answer(id, await changeTool({ projectId: a.projectId, dir: a.dir, motion: { direction: a.direction, trackIds: a.trackIds, lockedTrackIds: a.lockedTrackIds, reviewPasses: a.reviewPasses } }, progress))
+  if (name === 'rescore') return answer(id, await changeTool({ projectId: a.projectId, dir: a.dir, music: { identity: a.music, direction: a.direction, bpm: a.bpm, audioFile: a.audioFile, replaceAudioTrackIds: a.replaceAudioTrackIds } }, progress))
   /**
    * A name nobody serves is answered rather than ignored.
    *
@@ -700,7 +587,7 @@ if (process.stdin.isTTY) {
   console.log('    npx motioneer                 open the studio on the components it ships with')
   console.log('    npx motioneer localhost:3000     open it on your own app\n')
   console.log('  To give it to an agent instead:\n')
-  console.log('    claude mcp add --scope user motioneer -- npx -y -p motioneer motioneer-mcp\n')
+  console.log('    npx motioneer setup --claude      connect this Claude Code project\n')
   console.log('    npx motioneer setup --codex     connect a trusted Codex project\n')
   process.exit(0)
 }

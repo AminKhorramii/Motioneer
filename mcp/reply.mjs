@@ -43,4 +43,20 @@ export const fail = (id, error, extra = {}) => {
   send({ jsonrpc: '2.0', id, result: { isError: true, content: [{ type: 'text', text }], structuredContent: { error: text, ...(extra.projectId ? { projectId: extra.projectId } : {}) } } })
 }
 
+/**
+ * A finished call. The summary and the next calls go inside the structured copy, since that is all
+ * Claude Code shows the model; the same summary, any detail, and every identifier another call needs
+ * go in the words, since those are all some other clients show.
+ *
+ * @param summary   what happened, in a few sentences, including the verified line for a film
+ * @param detail    lines for clients that read only the words, such as a page's element list
+ * @param ids       identifiers and paths another call needs, repeated in the words
+ * @param next      [{tool, args, why}], the calls that make sense from here
+ */
+export const answer = (id, { summary, detail = '', structured = {}, next = [], images = [], ids = {} }) => {
+  const facts = Object.entries(ids).filter(([, v]) => v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && !v.length)).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
+  const then = next.length ? 'Possible next calls: ' + next.map((n) => `${n.tool} ${JSON.stringify(n.args)} to ${n.why}`).join('; ') : ''
+  ok(id, { text: [summary, detail, facts.join('\n'), then].filter(Boolean).join('\n\n'), images, structured: { summary, ...structured, next } })
+}
+
 export { send }

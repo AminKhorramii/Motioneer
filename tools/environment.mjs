@@ -75,12 +75,27 @@ export async function connectClaude(dir){
  try{original=await readFile(file,'utf8')}catch(e){if(e.code!=='ENOENT')throw e}
  let config;try{config=original?JSON.parse(original):{}}catch{throw Error('Cannot update .mcp.json: it is not valid JSON. Next: repair it or use npx motioneer mcp-config to copy the entry yourself.')}
  if(!config||typeof config!=='object'||Array.isArray(config)||config.mcpServers&&(typeof config.mcpServers!=='object'||Array.isArray(config.mcpServers)))throw Error('Cannot update .mcp.json: expected an object with mcpServers. Next: use npx motioneer mcp-config.')
- const existing=config.mcpServers?.motioneer
- if(existing&&JSON.stringify(existing)!==JSON.stringify(entry))throw Error('Cannot replace the existing motioneer MCP entry automatically. Next: review npx motioneer mcp-config and update that entry.')
- if(existing)return{file,changed:false}
+ const existing=config.mcpServers?.motioneer,skill=await installSkill(dir)
+ // an entry this setup wrote for an earlier version is ours to move forward; anything else is the person's
+ const ours=existing&&JSON.stringify({...existing,args:(existing.args||[]).map(a=>/^motioneer@/.test(a)?'motioneer@':a)})===JSON.stringify({...entry,args:entry.args.map(a=>/^motioneer@/.test(a)?'motioneer@':a)})
+ if(existing&&!ours)throw Error('Cannot replace the existing motioneer MCP entry automatically. Next: review npx motioneer mcp-config and update that entry.')
+ if(existing&&JSON.stringify(existing)===JSON.stringify(entry))return{file,changed:false,skill}
  config.mcpServers={...config.mcpServers,motioneer:entry};const temp=file+'.'+randomUUID()+'.tmp'
  try{await writeFile(temp,JSON.stringify(config,null,2)+'\n',{mode:0o600,flag:'wx'});await rename(temp,file)}finally{await rm(temp,{force:true})}
- return{file,changed:true}
+ return{file,changed:true,...(existing?{upgraded:true}:{}),skill}
+}
+/**
+ * The long guidance an agent needs, as a Claude Code skill it loads when the task calls for it.
+ * Claude Code shows a server's connect-time card only up to 2,048 characters, so how to direct a
+ * film, review a storyboard and keep the house style lives here instead. A skill the person has
+ * edited is kept as it is.
+ */
+export async function installSkill(dir){
+ const folder=path.join(await workspace(dir),'.claude','skills','motioneer'),file=path.join(folder,'SKILL.md'),text=await readFile(path.join(root,'docs','agent-skill.md'),'utf8')
+ const current=await readFile(file,'utf8').catch(e=>{if(e.code==='ENOENT')return null;throw e})
+ if(current===text)return{file,changed:false}
+ if(current!==null)return{file,changed:false,kept:true}
+ await mkdir(folder,{recursive:true});await writeFile(file,text,{flag:'wx'});return{file,changed:true}
 }
 /** JSON basic strings also escape TOML strings, including Windows paths and control characters. */
 export async function codexConfig(dir){

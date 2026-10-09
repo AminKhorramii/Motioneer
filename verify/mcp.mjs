@@ -87,67 +87,50 @@ console.log('\n  the handshake')
 const hello = await rpc('initialize', {
   protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'verify', version: '1' },
 })
+const card = hello.result?.instructions ?? ''
 ok('it answers initialize', !!hello.result, JSON.stringify(hello.result?.serverInfo ?? {}))
 ok('and names itself with a version', /\d+\.\d+/.test(hello.result?.serverInfo?.version ?? ''))
-ok('and hands the agent its etiquette, including how a film ends',
-  /open the editor/i.test(hello.result?.instructions ?? '') && /continue chatting/i.test(hello.result?.instructions ?? ''))
-ok('and how to read a failure, so it relays the next step rather than guessing',
-  /starts with "Cannot"/.test(hello.result?.instructions ?? '') && /do not invent/.test(hello.result?.instructions ?? ''))
-ok('and when to look before filming',
-  /inspect/.test(hello.result?.instructions ?? '') && /pick/.test(hello.result?.instructions ?? ''))
+ok('its card fits inside the 2,048 characters Claude Code shows, with room to spare', card.length <= 1900, `${card.length} characters`)
+ok('and how to read a failure, so it relays the next step rather than guessing', /starts with "Cannot"/.test(card) && /Relay it as given/.test(card))
+ok('and that a film is a wait rather than something to poll', /never call it again/i.test(card))
+ok('and to look at the storyboard before calling a film finished, without mistaking the verdict for taste', /storyboard/.test(card) && /not taste/.test(card))
+ok('and to open things only when asked', /only for when they ask to open/.test(card))
 
 console.log('\n  what it offers')
 const list = await rpc('tools/list', {})
 const tools = list.result?.tools ?? []
+const tool = (name) => tools.find((t) => t.name === name)
+const props = (name) => tool(name)?.inputSchema?.properties ?? {}
 const names = tools.map((t) => t.name).sort()
-ok('eleven tools, including sampled review and scoped refinement', names.join(',') === 'doctor,film,inspect,motion,open,reel,refine,rescore,review,revise,studio', names.join(','))
-ok('every one has a description an agent can act on',
-  tools.every((t) => (t.description ?? '').length > 80))
+ok('eight tools, one job each', names.join(',') === 'change,doctor,film,look,motion,open,projects,studio', names.join(','))
+ok('the card names every one of them, since a deferred client shows only the card and the names', names.every((n) => card.includes(n)))
+ok('every one has a title and annotations, which clients use to show and to permit a call', tools.every((t) => t.title && t.annotations && typeof t.annotations === 'object'))
+ok('every description stands on its own and stays within budget', tools.every((t) => (t.description ?? '').length > 80 && t.description.length <= 900), tools.map((t) => `${t.name} ${t.description?.length}`).join(', '))
 ok('every one has an object schema', tools.every((t) => t.inputSchema?.type === 'object'))
-ok('motion requires the markup, since it cannot be guessed',
-  (tools.find((t) => t.name === 'motion')?.inputSchema?.required ?? []).includes('html'))
-ok('studio requires nothing, because opening it is the whole call',
-  (tools.find((t) => t.name === 'studio')?.inputSchema?.required ?? []).length === 0)
-ok('film requires the url, since a video of nowhere is not a call',
-  (tools.find((t) => t.name === 'film')?.inputSchema?.required ?? []).includes('url'))
-ok('open requires a target, since it has to know what to open',
-  (tools.find((t) => t.name === 'open')?.inputSchema?.required ?? []).includes('target'))
-ok('film accepts a pace, since fast is a cut and not a look',
-  JSON.stringify(tools.find((t) => t.name === 'film')?.inputSchema?.properties?.pace?.enum ?? []) === '["calm","brisk","fast"]')
-ok('and the etiquette maps fast to the fast pace and asks for the measured line to be repeated',
-  /pace "fast"/.test(hello.result?.instructions ?? '') && /Verified/.test(hello.result?.instructions ?? ''))
-ok('inspect requires the url, and film accepts pick in the person\'s words',
-  (tools.find((t) => t.name === 'inspect')?.inputSchema?.required ?? []).includes('url')
-  && !!tools.find((t) => t.name === 'film')?.inputSchema?.properties?.pick)
+ok('the tools that change nothing say so, and film and change never destroy', tool('doctor')?.annotations.readOnlyHint && tool('projects')?.annotations.readOnlyHint && tool('look')?.annotations.readOnlyHint && tool('film')?.annotations.destructiveHint === false && tool('change')?.annotations.destructiveHint === false)
+ok('motion requires the markup, since it cannot be guessed', (tool('motion')?.inputSchema?.required ?? []).includes('html'))
+ok('studio requires nothing, because opening it is the whole call', (tool('studio')?.inputSchema?.required ?? []).length === 0)
+ok('open requires a target, since it has to know what to open, and can open a project', (tool('open')?.inputSchema?.required ?? []).includes('target') && !!props('open').projectId)
+ok('change requires the film it changes', (tool('change')?.inputSchema?.required ?? []).includes('projectId'))
+ok('film makes every kind of film: capture, authored from the DOM, screenshots mixed in, and graphics alone', JSON.stringify(props('film').mode?.enum) === '["auto","capture","native","hybrid","graphic"]')
+ok('a capture film takes a pace, a pick in the person\'s words, a count, a treatment and a capture mode', JSON.stringify(props('film').pace?.enum) === '["calm","brisk","fast"]' && !!props('film').pick && !!props('film').count && JSON.stringify(props('film').treatment?.enum) === '["subtle","expressive","bold"]' && props('film').captureMode?.enum.includes('pixels'))
+ok('an authored film takes twenty-two musical identities, a tempo, six art directions, the brand mode and documentation', props('film').music?.enum.length === 22 && props('film').bpm?.maximum === 180 && props('film').art?.enum.length === 6 && props('film').brandMode?.enum.join(',') === 'site,expressive' && props('film').referenceUrls?.maxItems === 3 && !!props('film').soundKit)
+ok('finishing options and locale selection are on film', props('film').soundtrack?.enum.includes('none') && !!props('film').language && props('film').theme?.enum.includes('dark') && props('film').fps?.enum.includes(60))
+ok('change recuts by shot number, rewrites motion by track with locks, and replaces only the music', !!props('change').cut?.properties?.drop && !!props('change').cut?.properties?.order && props('change').motion?.properties?.trackIds?.maxItems === 12 && !!props('change').motion?.properties?.lockedTrackIds && !!props('change').music?.properties?.audioFile && props('change').music?.properties?.identity?.enum.includes('none'))
+ok('look sees a page or a film, and can ask for a critique', !!props('look').url && !!props('look').projectId && props('look').critique?.type === 'boolean')
+ok('projects lists earlier work or describes one film', !!props('projects').projectId && !!props('projects').limit)
+
+console.log('\n  the names it used to have')
 const noProject = await callTool('revise', {})
-ok('revise without a project says what it cannot do and what to do next', noProject.isError && /^Cannot revise/.test(noProject.text) && /Next:/.test(noProject.text), noProject.text)
-ok('revise takes drop and order, since a reaction to a film is a change to its shots',
-  !!tools.find((t) => t.name === 'revise')?.inputSchema?.properties?.drop && !!tools.find((t) => t.name === 'revise')?.inputSchema?.properties?.order)
-ok('reels can direct twenty-two musical identities and rescore an existing edit',tools.find(t=>t.name==='reel')?.inputSchema?.properties?.music?.enum.length===22 && tools.find(t=>t.name==='rescore')?.inputSchema?.properties?.direction)
-ok('rescore accepts a finished soundtrack and explicit imported-track replacement',tools.find(t=>t.name==='rescore')?.inputSchema?.properties?.audioFile?.type==='string' && tools.find(t=>t.name==='rescore')?.inputSchema?.properties?.replaceAudioTrackIds?.items?.type==='string' && /procedural synthesis/.test(hello.result.instructions))
-ok('agent tools expose scoped refinement, sampled review and recorded kits',tools.find(t=>t.name==='refine')?.inputSchema?.properties?.trackIds?.maxItems===12 && tools.find(t=>t.name==='review') && tools.find(t=>t.name==='reel')?.inputSchema?.properties?.reviewPasses?.maximum===2 && tools.find(t=>t.name==='reel')?.inputSchema?.properties?.soundKit?.type==='string')
-ok('reels can read bounded product documentation',tools.find(t=>t.name==='reel')?.inputSchema?.properties?.referenceUrls?.maxItems===3)
-ok('reels default to source brand identity with an explicit expressive option',tools.find(t=>t.name==='reel')?.inputSchema?.properties?.brandMode?.enum.join(',')==='site,expressive')
-ok('reels expose a shared tempo for music and visual cuts',tools.find(t=>t.name==='reel')?.inputSchema?.properties?.bpm?.maximum===180)
-ok('reels expose six reusable art directions',tools.find(t=>t.name==='reel')?.inputSchema?.properties?.art?.enum.length===6 && tools.find(t=>t.name==='reel')?.inputSchema?.properties?.concept)
-ok('reels default to an 18-second source film and require artistic review',tools.find(t=>t.name==='reel')?.inputSchema?.properties?.mode?.default==='auto' && tools.find(t=>t.name==='reel')?.inputSchema?.properties?.seconds?.default===18 && /not artistic merit/.test(hello.result.instructions))
-ok('native detail films are discoverable through MCP',tools.find(t=>t.name==='reel')?.inputSchema?.properties?.mode?.enum.includes('native') && /mode native/.test(hello.result.instructions))
-ok('hybrid reels accept existing captures or a website URL',tools.find(t=>t.name==='reel')?.inputSchema?.properties?.mode?.enum.includes('hybrid') && tools.find(t=>t.name==='reel')?.inputSchema?.properties?.url)
-ok('artistic briefs have an authored reel tool with explicit creative direction',tools.find(t=>t.name==='reel')?.inputSchema?.properties?.direction && /use reel/.test(hello.result.instructions))
-ok('film offers 60 fps and revision can change motion without recapturing',
-  tools.find(t=>t.name==='film')?.inputSchema?.properties?.fps?.enum.includes(60)
-  && tools.find(t=>t.name==='revise')?.inputSchema?.properties?.motionDirection
-  && tools.find(t=>t.name==='revise')?.inputSchema?.properties?.motionElements)
-ok('finishing options and locale selection are available through the same agent tools',
-  tools.find(t=>t.name==='film')?.inputSchema?.properties?.soundtrack?.enum.includes('none')
-  && tools.find(t=>t.name==='film')?.inputSchema?.properties?.language
-  && tools.find(t=>t.name==='film')?.inputSchema?.properties?.captureMode?.enum.includes('pixels')
-  && tools.find(t=>t.name==='film')?.inputSchema?.properties?.theme?.enum.includes('dark')
-  && tools.find(t=>t.name==='revise')?.inputSchema?.properties?.background
-  && tools.find(t=>t.name==='revise')?.inputSchema?.properties?.fps?.enum.includes(60)
-  && tools.find(t=>t.name==='revise')?.inputSchema?.properties?.soundtrack?.enum.includes('playful'))
-ok('agents are told to review the delivered frames and disclose partial coverage',
-  /storyboard decoded from the final MP4/.test(hello.result.instructions) && /partial coverage/.test(hello.result.instructions))
+ok('revise still answers, as change, and says what it cannot do and what to do next', noProject.isError && /^Cannot/.test(noProject.text) && /Next:/.test(noProject.text), noProject.text.slice(0, 70))
+for (const old of ['refine', 'rescore', 'reel', 'review']) {
+  const said = await callTool(old, {})
+  ok(`${old} still answers rather than being an unknown tool`, said.isError && /^Cannot/.test(said.text) && !/no tool by that name/.test(said.text), said.text.slice(0, 70))
+}
+const doctorRaw = await rpc('tools/call', { name: 'doctor', arguments: {} })
+ok('a success carries its summary and its next calls inside the structured copy, which is all Claude Code shows', typeof doctorRaw.result?.structuredContent?.summary === 'string' && Array.isArray(doctorRaw.result?.structuredContent?.next) && Array.isArray(doctorRaw.result?.structuredContent?.checks))
+const lookNothing = await callTool('look', {})
+ok('look with nothing to look at says what it needs', lookNothing.isError && /url or a projectId/.test(lookNothing.text))
 const tracked=await rpc('tools/call',{name:'revise',arguments:{},_meta:{progressToken:'review-test'}})
 ok('a long tool carries correlated progress without losing its terminal error',
   tracked.result?.isError && notifications.some(n=>n.progressToken==='review-test'&&n.progress===0&&n.message))
@@ -193,17 +176,29 @@ const tooLong = await fetch(`http://127.0.0.1:${PORT}/__motioneer/ask`, { method
 const tooLongSaid = await tooLong.json().catch(() => ({}))
 ok('a prompt too long for one model call is refused whole, with the next step, rather than cut', tooLong.status === 413 && /^Cannot ask/.test(tooLongSaid.error || '') && /Next:/.test(tooLongSaid.error || ''), tooLongSaid.error?.slice(0, 60))
 const elsewhere = realpathSync(mkdtempSync(path.join(tmpdir(), 'motioneer-elsewhere-')))
+const { projectStore } = await import('../tools/editor/projects.mjs')
+const seeded = await projectStore(path.join(elsewhere, '.studio', 'projects')).create('Seeded film')
 const other = spawn('node', ['mcp/index.mjs'], { stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, MOTIONEER_PORT: String(PORT), MOTIONEER_WORKSPACE: elsewhere, MOTIONEER_NO_OPEN: '1' } })
-const otherSaid = await new Promise((done) => {
-  let out = ''
-  other.stdout.on('data', (d) => { out += d; const line = out.split('\n').find((l) => l.includes('"id":7')); if (line) done(JSON.parse(line).result?.content?.[0]?.text || '') })
-  other.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 7, method: 'tools/call', params: { name: 'studio', arguments: {} } }) + '\n')
-  setTimeout(() => done(out), 20000)
-})
+const otherWaiting = new Map()
+let otherBuf = '', otherN = 100
+other.stdout.on('data', (d) => { otherBuf += d; const lines = otherBuf.split('\n'); otherBuf = lines.pop(); for (const l of lines) { try { const m = JSON.parse(l); otherWaiting.get(m.id)?.(m) } catch { /* not a message */ } } })
+const otherCall = (name, args) => new Promise((done) => { const id = ++otherN; otherWaiting.set(id, done); other.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method: 'tools/call', params: { name, arguments: args } }) + '\n'); setTimeout(() => done({}), 30000) })
+const otherSaid = (await otherCall('studio', {})).result?.content?.[0]?.text || ''
 let theirs = null
 try { theirs = JSON.parse(readFileSync(path.join(elsewhere, '.studio', 'studio.json'), 'utf8')) } catch { /* it never started */ }
 ok('an agent for another workspace starts its own studio on the next port instead of reusing this one', !/already open/i.test(otherSaid) && theirs?.workspace === elsewhere && theirs?.port !== PORT && otherSaid.includes(String(theirs?.port)), otherSaid.slice(0, 70))
+const listed = (await otherCall('projects', {})).result?.structuredContent
+ok('projects lists the films on disk in its own workspace, with a summary and the next call', listed?.total === 1 && listed.projects?.[0]?.id === seeded.id && typeof listed.summary === 'string' && listed.next?.[0]?.tool === 'projects', listed?.summary)
+const one = (await otherCall('projects', { projectId: seeded.id })).result?.structuredContent
+ok('and describes one film by its id', one?.projectId === seeded.id && Array.isArray(one.shots) && Array.isArray(one.locked), one?.summary)
 try { process.kill(theirs?.pid, 'SIGKILL') } catch { /* gone */ }
+await new Promise((r) => setTimeout(r, 300))
+const changed = (await otherCall('change', { projectId: seeded.id, cut: { seconds: 9 } })).result
+const restarted = (() => { try { return JSON.parse(readFileSync(path.join(elsewhere, '.studio', 'studio.json'), 'utf8')) } catch { return null } })()
+ok('change starts a studio when none is running and reaches the film, rather than saying to film again', changed?.isError && /no shots yet/.test(changed.content?.[0]?.text || '') && restarted?.nonce && restarted.nonce !== theirs?.nonce, changed?.content?.[0]?.text?.slice(0, 80))
+const after = (await otherCall('projects', {})).result?.structuredContent
+ok('and a capture film is changed on a take of its own, which records where it came from', after?.projects?.some((p) => p.origin?.sourceProjectId === seeded.id && p.origin?.tool === 'change'), JSON.stringify(after?.projects?.map((p) => p.origin)))
+try { process.kill(restarted?.pid, 'SIGKILL') } catch { /* gone */ }
 try { other.kill('SIGKILL') } catch { /* gone */ }
 
 /* ── open, which is how a finished film's three choices get acted on ─────────────────────────── */
