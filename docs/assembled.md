@@ -38,6 +38,43 @@ control can arrive by itself, timed like the machine it borrows from.
 The numbers, the sound map and the guide spec are data in `src/design/assembled.ts`. The verbs
 are the deck in `src/design/motion.ts`.
 
+## The looks
+
+A capture film is composed in a mix of two looks, data in `src/design/looks.ts`, rather than one
+centred box on a flat colour. They are the decisions an art director makes once and holds across a
+film: a ground, a material, a type system and how the interface is presented.
+
+- **Plate** makes the house style visible. The interface is printed onto stock as a plate of its own
+  ground, with crop marks, registration targets, its real width measured above it and a colour
+  strip below, and the type is set like a job sheet in the product's own faces. In motion the marks
+  draw, the plate prints from the top, the cyan and magenta plates close to a hair off register, and
+  the parts assemble.
+- **Editorial** is a spread. A page holds a headline on a grid, light beside a dark product and dark
+  beside a light one, and the interface is cropped hard into one passage at twice its size, drifting
+  a little closer while it holds.
+
+The mix, composed by the first cut in `src/editor/project.ts`:
+- The opening and closing are sheets of type, a short name set large.
+- A heading captured on its own is set as type on its own sheet. It stays its capture's track, so
+  the shot keeps its number.
+- An interface alternates between its whole sheet, printed beside its headline, and a passage of it.
+  An element that comes round again returns as a passage, a new scale rather than a nudge.
+- Headlines are the capture's own heading, or the plan's name for it without its generic noun. A
+  shot with neither prints its sheet alone, larger.
+- A pair prints as two sheets, and a heading paired with its visual is set as the headline beside
+  it; shown again, the pair becomes a spread.
+- Shots are framed before they are timed. A shot framed exactly as an earlier one is dropped and its
+  time goes to the others, so a page with few things on it makes fewer, longer shots rather than
+  repeats. A fast film is many short shots, so it may cut back to a framing, and drops only a shot
+  identical to the one before it.
+- A passage that comes back centres on another part of the capture, from four focus points.
+- The film's own camera stays still, so the stock never moves under the print, and each shot moves
+  once on its own.
+
+Every capture's faces come with it, so the type is set in the product's own fonts, and the grain is
+a few hundred bytes of drawn noise. Nothing is fetched. Authored reels keep their own scenes and font
+themes in `tools/editor/art-direction.mjs` for now.
+
 ## What is in place
 
 - **The deck is dealt again.**

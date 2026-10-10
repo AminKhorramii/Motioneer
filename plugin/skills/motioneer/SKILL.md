@@ -65,6 +65,16 @@ Nothing fades in. The real interface is built in front of the viewer, part by pa
   read.
 - **One real detail carries the eye between shots,** rather than a slow zoom on everything.
 
+Capture films are art directed in a mix of two looks, so describe a storyboard in their terms:
+- **Plate:** the interface printed on paper stock as a sheet, with crop marks, registration targets
+  and its real width, the headline set beside it in the product's own font. Openings, headings and
+  the closing are sheets of type.
+- **Editorial:** a spread, a page of type beside a passage of the interface cropped at twice its
+  size.
+
+A shot's headline is the capture's own heading. When a sheet shows no headline, the capture had
+none; suggest filming an element that does, rather than asking for a title.
+
 ## Reviewing a result
 
 Every film and change reply carries a storyboard image and a verdict measured from the frames:

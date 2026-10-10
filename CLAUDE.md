@@ -38,6 +38,11 @@ one per option. `assembled()` in `src/written.ts` reports how far a sheet is fro
 `assembledReport()` in `tools/editor/autofilm.mjs` does the same for a cut. Both are advisory until
 real output calibrates them. See `docs/assembled.md`.
 
+Capture films are art directed: `src/design/looks.ts` holds two looks, Plate (the interface printed on
+stock with printer's marks) and Editorial (a page of type beside a cropped passage), and the first
+cut composes shots in a mix of them. The runtime in `src/editor/composition.ts` draws them; it is
+serialized into every film, so it takes the looks as data and can close over nothing.
+
 ## Where things live
 
 - `mcp/` is the agent side. The protocol is in `index.mjs`, the card and schemas in `tools.mjs`,

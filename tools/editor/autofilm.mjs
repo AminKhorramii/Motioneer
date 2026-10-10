@@ -14,7 +14,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { loadChromium } from './render.mjs'
 import { lit, proveFilm } from './proof.mjs'
-import { firstCut, createProject, compositionDocument, contrastInk, ASSEMBLED } from '../../dist-core/core.js'
+import { firstCut, createProject, compositionDocument, contrastInk, lookInk, ASSEMBLED } from '../../dist-core/core.js'
 
 import { candidates, aim, freshProject, openPage, contactSheet, dropDecoration, describe, reveal } from './survey.mjs'
 import { withSoundtrack, scoreStyle } from './soundtrack.mjs'
@@ -22,7 +22,8 @@ export { inspectSite, describe, contactSheet } from './survey.mjs'
 const label = (page, name) => page.getByRole('button', { name, exact: true })
 const name = (c) => c ? (c.text || `the ${c.role} in the ${c.section}`) : 'an element'
 const validColour=(value,label)=>{if(value!==undefined&&!/^#[0-9a-f]{6}$/i.test(value))throw new Error(`Cannot film: ${label} must be a six-digit hex color. Next: pass a color such as #101319.`);return value}
-const titleScale=cut=>({...cut,tracks:cut.tracks.map(t=>t.kind==='title'?{...t,fontSize:(t.text||'').length>32?96:128}:t)})
+// a title in a look is sized by its look; only plain titles take the film's two sizes
+const titleScale=cut=>({...cut,tracks:cut.tracks.map(t=>t.kind==='title'&&!t.look?{...t,fontSize:(t.text||'').length>32?96:128}:t)})
 
 export async function planFilm({ at, title, source, cands, pick, max, pace = 'brisk', direction = '', sheet = null }) {
   // A general product film should first explain the product. When complete interfaces exist,
@@ -141,13 +142,15 @@ function keptScenes(cut, scenes) {
  * reports it gathers, until real films have calibrated it.
  */
 export function assembledReport(project, proof) {
-  const used = new Set(project.tracks.filter((t) => t.kind === 'component' && !t.hidden).map((t) => t.motionId))
+  // a heading set as type does not run its motion, so its motion is not the film's
+  const used = new Set(project.tracks.filter((t) => t.kind === 'component' && !t.hidden && !t.text).map((t) => t.motionId))
   const reports = project.motions.filter((m) => used.has(m.id) && m.assembled).map((m) => m.assembled)
   const counted = new Map()
   for (const r of reports) for (const n of r.notes) counted.set(n.replace(/\d+ of \d+ /, ''), (counted.get(n.replace(/\d+ of \d+ /, '')) || 0) + 1)
   const notes = [...counted].map(([n, c]) => `${c} of ${reports.length} motions: ${n}`)
-  const shots = project.direction ? [] : shotList(project), seen = new Map()
-  for (const s of shots) for (const id of s.ids) seen.set(id, (seen.get(id) || 0) + 1)
+  // a capture shown again at a new scale, a sheet and then a passage of it, is a new shot rather than a repeat
+  const seen = new Map()
+  if (!project.direction) for (const t of project.tracks.filter((t) => t.kind === 'component' && !t.hidden)) { const key = `${t.subjectId}|${t.look || ''}|${t.focus?.x ?? ''}`; seen.set(key, (seen.get(key) || 0) + 1) }
   const repeated = [...seen.values()].filter((c) => c > 1).length
   if (repeated) notes.push(`${repeated} capture${repeated === 1 ? '' : 's'} appear in more than one shot`)
   const pace = paceOf(project), least = pace === 'fast' ? ASSEMBLED.fastHoldMs : ASSEMBLED.holdMs
@@ -512,7 +515,8 @@ export async function autofilm({ at, url, language = 'en', theme, background, in
 
     /** Cut the project with these scenes, save it, and say what the cut is. */
     const assemble = async (scenes) => {
-      let cut = titleScale(firstCut(project, { pace, seconds, opening: chosen.opening, closing: chosen.closing, background: background ?? colours.background, ink, scenes }))
+      // the cut names the site on its sheets, so it is told the source before it is cut
+      let cut = titleScale(firstCut({ ...project, source }, { pace, seconds, opening: chosen.opening, closing: chosen.closing, background: background ?? colours.background, ink, scenes, art: 'mix' }))
       cut.settings.fps = fps
       cut.source = source
       cut.film = { ...cut.film, pace, scenes: keptScenes(cut, scenes), recipe: { mode: 'capture', url, pick, direction, pace, seconds, treatment: look, count: max, captureMode, language, theme, fps, soundtrack } }
@@ -647,10 +651,11 @@ export async function revise({ at, projectId, pace, seconds, opening, closing, d
   // A note about movement changes references only. Recutting here would lose hand placement,
   // audio, camera, and linked timing even though none of them was part of the request.
   const recut = pace != null || seconds != null || opening != null || closing != null || drop.length || order.length
-  let cut = recut ? titleScale(firstCut(project, { ...want, scenes })) : project
+  let cut = recut ? titleScale(firstCut(project, { ...want, scenes, art: project.film?.art })) : project
   if (recut) cut.film = { ...project.film, pace: want.pace, scenes: keptScenes(cut, scenes) }
   if(background!==undefined)cut={...cut,settings:{...cut.settings,background}}
-  if(ink!==undefined||background!==undefined)cut={...cut,tracks:cut.tracks.map(t=>t.kind==='title'?{...t,color:ink??contrastInk(background)}:t)}
+  // a title in a look takes its look's ink for what it sits on, and a plain title the ink that reads on the new ground
+  if(ink!==undefined||background!==undefined)cut={...cut,tracks:cut.tracks.map(t=>t.look&&(t.kind==='title'||t.text)?{...t,color:lookInk(t.look,background??cut.settings.background,ink)}:t.kind==='title'?{...t,color:ink??contrastInk(background)}:t)}
   if(recut)cut.tracks.push(...project.tracks.filter(t=>t.kind==='audio'))
   if(fps!==undefined){cut.settings={...cut.settings,fps};changes.push(`${fps} fps`)}
   const score=soundtrack??(recut?scoreStyle(project):undefined)

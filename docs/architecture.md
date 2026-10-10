@@ -26,6 +26,7 @@ src/                   what the studio imports through a built bundle, because n
   design/motion.ts     the two decks, named: the verbs (print, flap, register, draw, type, stamp, scan,
                        wind) and the errands each purpose allows, and what a motion is asked to be
   design/assembled.ts  the house style as data: its numbers, the sound of each verb, the guides
+  design/looks.ts      art direction as data: Plate and Editorial, the stock, marks, page, type sizes and print timing
   written.ts           the gates, and assembled(): how far a sheet is from the house style
   theme.ts, taste.ts   the palettes a preview is dressed in
   reply.ts             pulling json out of a reply that may be wrapped in prose

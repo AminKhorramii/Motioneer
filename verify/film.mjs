@@ -30,7 +30,7 @@ import {websiteMedia} from '../tools/editor/media-source.mjs'
 import {captureInventory} from '../tools/editor/hybrid.mjs'
 import {SCENES} from '../tools/editor/kinetic-scenes.mjs'
 import { proveFilm } from '../tools/editor/proof.mjs'
-import { firstCut, createProject, compositionDocument, newTrack } from '../dist-core/core.js'
+import { firstCut, createProject, compositionDocument, newTrack, validateProject, lookInk, headlineOf, LOOKS } from '../dist-core/core.js'
 
 const root = path.dirname(fileURLToPath(new URL('.', import.meta.url)))
 if (!(await loadChromium())) { console.log('skip: the local renderer is not installed, so the film path cannot be exercised here'); process.exit(0) }
@@ -207,6 +207,73 @@ if (!(await loadChromium())) { console.log('skip: the local renderer is not inst
   console.log('ok: the house score ticks when each part lands, in the sound of its verb')
 }
 
+// the mix of looks: a heading is set as type, an interface prints as a sheet and comes round again as a passage, a pair prints as two sheets
+{
+  const p = createProject('mix'); p.source = 'https://www.example.com/'
+  const ui = (id, name, w, h, heading) => ({ id, name, html: `<div>${heading ? `<h2>${heading}</h2>` : ''}<img src="x.png"><p>rows</p></div>`, css: '', w, h, warnings: [] })
+  p.subjects = [ui('board', 'Board workspace', 1200, 760, 'Plan the quarter'), ui('chart', 'Revenue chart product interface', 1000, 640, ''), { id: 'line', name: 'Headline', html: '<h1>Built for <em>teams</em> that ship Built for teams</h1>', css: '', w: 900, h: 110, warnings: [] }, ui('card', 'Card', 320, 480, 'One card'), ui('card2', 'Card two', 320, 480, 'Two cards'), ui('wordless', 'A long description of an interface with many words in it and no end', 900, 600, '')]
+  p.motions = p.subjects.map((s) => ({ id: 'm-' + s.id, subjectId: s.id, css: '', scope: 'data-x', note: '', brief: p.brief, treatment: 'subtle', duration: 500, saved: true }))
+  const mix = firstCut(p, { pace: 'brisk', seconds: 18, opening: 'Example', closing: 'Start today', art: 'mix', scenes: [{ ids: ['line'] }, { ids: ['board'] }, { ids: ['chart'] }, { ids: ['card', 'card2'], layout: 'pair' }, { ids: ['wordless'] }] })
+  validateProject(mix)
+  const comp = (id) => mix.tracks.filter((t) => t.kind === 'component' && t.subjectId === id), typeOf = (t) => mix.tracks.find((o) => o.kind === 'title' && o.start === t.start)
+  assert.equal(mix.film.art, 'mix'); assert.deepEqual(mix.camera, [], 'the stock never moves under the print, so the film\'s own camera stays still')
+  const open = mix.tracks.find((t) => t.name === 'Opening'), close = mix.tracks.find((t) => t.name === 'Closing')
+  assert.ok(open.look === 'plate' && open.text === 'Example' && open.label === 'example.com' && open.fontSize === LOOKS.type.shortSheet && /^sheet 01 of 07$/.test(open.caption) && close.text === 'Start today', 'the opening and closing are sheets of type, a short name set large')
+  const line = comp('line')[0]
+  assert.ok(line.look === 'plate' && line.text === 'Built for teams that ship', `a heading captured on its own is set as type, stopping where an animated heading starts again, got ${line.text}`)
+  const board = comp('board')[0], chart = comp('chart')[0]
+  assert.ok(board.look === 'plate' && typeOf(board).text === 'Plan the quarter' && board.x === LOOKS.plate.sheet.x, 'an interface prints as a sheet on the grid line, headed with its own heading')
+  assert.ok(chart.look === 'editorial' && chart.zoom === LOOKS.editorial.zoom && chart.focus && typeOf(chart).text === 'Revenue chart', 'the next prints as a passage, headed with its planned name less the generic noun')
+  assert.equal(typeOf(chart).color, LOOKS.editorial.dark, 'a spread beside a dark product sets dark type on a light page')
+  assert.ok(comp('card')[0].look === 'plate' && comp('card2')[0].look === 'plate' && !typeOf(comp('card')[0]), 'a pair prints as two sheets with nothing set beside them')
+  const alone = comp('wordless')[0]
+  assert.ok(alone.look === 'plate' && typeOf(alone).text === '' && /900 × 600/.test(typeOf(alone).caption), 'an interface with no words to set beside it is printed alone with its job line')
+  const planned = firstCut(p, { pace: 'brisk', seconds: 12, art: 'mix', scenes: [{ ids: ['wordless'], layout: 'full' }, { ids: ['wordless'], layout: 'detail' }] })
+  const near = planned.tracks.filter((t) => t.kind === 'component')[1]
+  assert.ok(near.look === 'editorial' && near.x === 0 && near.width === 100 && !planned.tracks.some((t) => t.kind === 'title' && t.start === near.start), 'a planned detail with no words beside it is a passage across the whole frame')
+  const pairs = firstCut(p, { pace: 'brisk', seconds: 12, art: 'mix', scenes: [{ ids: ['line', 'board'], layout: 'stack' }] }).tracks.filter((t) => t.kind === 'component'), paired = pairs.filter((t) => t.start === pairs[0].start)
+  assert.ok(paired.length === 2 && paired.find((t) => t.subjectId === 'board').look === 'plate' && paired.find((t) => t.subjectId === 'line').text === 'Built for teams that ship' && paired.find((t) => t.subjectId === 'line').x < LOOKS.plate.sheet.x, 'a heading paired with its visual is set as the headline beside the visual\'s sheet, and stays its capture\'s track')
+  const again = pairs.filter((t) => t.start !== pairs[0].start).slice(0, 2)
+  assert.ok(again.find((t) => t.subjectId === 'board')?.look === 'editorial' && again.find((t) => t.subjectId === 'line')?.look === 'editorial', 'shown again, the pair becomes a spread rather than the same sheet twice')
+  const typed = firstCut(p, { pace: 'brisk', seconds: 16, art: 'mix', scenes: [{ ids: ['line'] }, { ids: ['board'] }] }).tracks.filter((t) => t.kind === 'component' && t.subjectId === 'line')
+  assert.equal(typed.length, 1, 'a heading sheet is set once, never repeated when the film comes round again')
+  const listed = firstCut(p, { pace: 'brisk', seconds: 18, art: 'mix', scenes: [{ ids: ['line'] }, { ids: ['card'] }, { ids: ['line'] }, { ids: ['card'] }] }).tracks.filter((t) => t.kind === 'component')
+  assert.ok(listed.filter((t) => t.subjectId === 'line').length === 1 && listed.filter((t) => t.subjectId === 'card').map((t) => t.x).reduce((a, x, i, all) => a || (i > 0 && x !== all[0]), false), 'nor when the plan lists it twice, and a card the plan lists again is reframed')
+  assert.equal(headlineOf({ ...p.subjects[1], name: 'the image in the body' }), '', 'the picker\'s label for an element it could not name heads nothing')
+  const sized = (w, h) => firstCut({ ...p, subjects: p.subjects.map((s) => s.id === 'card' ? { ...s, w, h } : s) }, { pace: 'brisk', seconds: 12, art: 'mix', scenes: [{ ids: ['card'], layout: 'detail' }] }).tracks.find((t) => t.kind === 'component')
+  assert.equal(sized(1500, 1000).zoom, LOOKS.editorial.zoom, 'a large capture planned as a detail is cropped to a passage')
+  assert.equal(sized(320, 480).look, 'plate', 'a small card planned as a detail prints as a sheet, since enlarging it further would blur its pictures before it read as a crop')
+  const reframed = firstCut(p, { pace: 'brisk', seconds: 12, art: 'mix', scenes: [{ ids: ['card'], layout: 'full' }, { ids: ['card'], layout: 'detail' }] }).tracks.filter((t) => t.kind === 'component')
+  assert.ok(reframed[0].x !== reframed[1].x, 'and is reframed alone rather than printed again exactly as it was')
+  const first = firstCut(p, { pace: 'brisk', seconds: 12, art: 'mix', scenes: [{ ids: ['card'], layout: 'detail' }] })
+  assert.equal(first.tracks.find((t) => t.kind === 'title' && t.start === first.tracks.find((c) => c.kind === 'component').start)?.text, 'One card', 'but the first time it is shown it keeps its headline')
+  const round = firstCut(p, { pace: 'brisk', seconds: 12, art: 'mix', scenes: [{ ids: ['board'] }] }).tracks.filter((t) => t.kind === 'component')
+  assert.deepEqual(round.map((t) => t.look), ['plate', 'editorial', 'editorial'], 'an element that comes round again comes back as a passage, a new scale rather than a nudge')
+  assert.notDeepEqual(round[1].focus, round[2].focus, 'and each time round it is a different passage')
+  assert.equal(lookInk('plate', '#ffffff'), LOOKS.plate.ink); assert.equal(lookInk('editorial', '#ffffff'), LOOKS.editorial.light); assert.equal(lookInk('editorial', '#ffffff', '#3ecf8e'), '#3ecf8e')
+  assert.equal(lookInk('editorial', '#ffffff', LOOKS.plate.ink), LOOKS.editorial.light, 'the stock\'s own ink carried over from an earlier cut is not a request')
+  assert.throws(() => validateProject({ ...mix, tracks: mix.tracks.map((t) => t.look === 'editorial' ? { ...t, zoom: 9 } : t) }), /invalid look, crop or caption/)
+  const chromium = await loadChromium()
+  if (chromium) {
+    const browser = await chromium.launch({ channel: 'chromium' })
+    try {
+      const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } })
+      await page.setContent(compositionDocument(mix, ''))
+      await page.waitForFunction(() => !!window.__composition)
+      await page.evaluate(() => window.__composition.ready())
+      const at = async (ms) => { await page.evaluate((t) => window.__composition.seek(t), ms); return page.evaluate(() => ({ stock: getComputedStyle(document.getElementById('ground')).display, plate: [...document.querySelectorAll('[data-plate]')].filter((n) => n.closest('[data-track]').style.visibility === 'visible').map((n) => n.style.filter), marks: [...document.querySelectorAll('[data-marks]')].filter((n) => n.closest('[data-track]').style.visibility === 'visible').map((n) => n.children.length), heads: [...document.querySelectorAll('[data-type="headline"]')].filter((n) => n.closest('[data-track]').style.visibility === 'visible').map((n) => n.dataset.full), page: [...document.querySelectorAll('[data-track]')].filter((n) => n.style.visibility === 'visible' && n.style.backgroundColor).map((n) => n.style.backgroundColor) })) }
+      const sheetShot = await at(board.start + 200), settled = await at(board.start + board.duration - 50), spread = await at(chart.start + 500), typeset = await at(line.start + 900)
+      assert.ok(sheetShot.stock === 'block' && sheetShot.plate.length === 1 && sheetShot.marks[0] >= 15 && sheetShot.heads.includes('Plan the quarter'), `a sheet prints on the stock with its marks and its headline, got ${JSON.stringify(sheetShot)}`)
+      // the browser writes the shadow's colour first, so the offset is the first length in it
+      const off = (f) => Math.abs(parseFloat(/(-?[\d.]+)px/.exec(f)?.[1] || '0'))
+      assert.ok(off(sheetShot.plate[0]) > off(settled.plate[0]) && off(settled.plate[0]) <= LOOKS.plate.registerTo + 0.01, `the plates close to a hair off register, from ${sheetShot.plate[0]} to ${settled.plate[0]}`)
+      assert.ok(spread.stock === 'none' && spread.page.length >= 1 && spread.heads.includes('Revenue chart'), `a passage sits beside a page of type on the product's own ground, got ${JSON.stringify(spread)}`)
+      assert.ok(typeset.heads.includes('Built for teams that ship') && !(await page.evaluate((id) => !!document.querySelector(`[data-track="${id}"] iframe`), line.id)), 'a heading sheet is set in type, with no capture frame behind it')
+    } finally { await browser.close() }
+  }
+  console.log('ok: the mix composes sheets, passages, heading sheets and pairs, and the runtime prints them on the stock and sets them on the page')
+}
+
 // the cut's rhythm, before any browser: fast means many short shots and short titles
 {
   const p = createProject('pace'); p.subjects = [{ id: 'a', name: 'A', html: '<b>a</b>', css: '', w: 100, h: 50, warnings: [] }, { id: 'b', name: 'B', html: '<b>b</b>', css: '', w: 100, h: 50, warnings: [] }]
@@ -380,10 +447,11 @@ try {
       console.log('ok: a captured root sits flush in its frame, its page margin dropped')
     } finally { await browser.close() }
   }
-  const titles = saved.tracks.filter((t) => t.kind === 'title').map((t) => t.text)
-  assert.deepEqual(titles, ['Ship it with confidence', 'Get started today'], 'both title tracks should carry the model\'s words')
+  const titles = saved.tracks.filter((t) => t.kind === 'title').sort((a, b) => a.start - b.start)
+  assert.deepEqual([titles[0].text, titles.at(-1).text], ['Ship it with confidence', 'Get started today'], 'the opening and closing sheets should carry the model\'s words')
   assert.equal(saved.settings.background, '#eef1f6', 'the film should stand on the site\'s own background')
-  assert.ok(saved.tracks.filter((t) => t.kind === 'title').every((t) => t.color === '#111318'), 'titles on a light ground should be dark')
+  assert.equal(saved.film?.art, 'mix', 'a capture film is composed in the mix of looks')
+  assert.ok(saved.tracks.filter((t) => t.look && (t.kind === 'title' || t.text)).every((t) => t.color === (t.look === 'plate' ? LOOKS.plate.ink : LOOKS.editorial.light)), 'type on the stock is printed dark, and a spread beside a light product sets light type on a dark page')
   assert.equal(result.background, '#eef1f6', 'the driver should report the background it matched')
   assert.ok(saved.tracks.filter((t) => t.kind === 'component').length >= 7, 'a fast cut should carry many shots, not one per element')
   {

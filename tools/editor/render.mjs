@@ -65,9 +65,11 @@ export function renderer(store) {
       await page.goto(origin+'/__motioneer/render-shell');await page.setContent(compositionDocument(p,`${origin}/__motioneer/projects/${p.id}/assets/`));
       await page.evaluate(()=>window.__composition.ready());job.state='rendering'
       const count=Math.ceil((p.settings.to-p.settings.from)/1000*p.settings.fps);job.total=count
-      for(let i=0;i<count;i++){if(job.controller.signal.aborted)throw new Error('Cancelled');await page.evaluate(t=>window.__composition.seek(t),p.settings.from+i*1000/p.settings.fps);await page.screenshot({path:path.join(frames,String(i).padStart(6,'0')+'.png'),animations:'allow'});job.done=i+1;job.message=`Rendering frame ${i+1} of ${count}`}
+      for(let i=0;i<count;i++){if(job.controller.signal.aborted)throw new Error('Cancelled');await page.evaluate(t=>window.__composition.seek(t),p.settings.from+i*1000/p.settings.fps);await page.screenshot({path:path.join(frames,String(i).padStart(6,'0')+'.jpg'),type:'jpeg',quality:94,animations:'allow'});job.done=i+1;job.message=`Rendering frame ${i+1} of ${count}`}
       await browser.close();browser=null;job.state='encoding';job.message='Encoding picture and mixing sound'
-      const args=['-y','-framerate',String(p.settings.fps),'-i',path.join(frames,'%06d.png')],filters=[],inputs=[]
+      // frames are near-lossless jpeg: a lossless png of paper grain is several megabytes, so a minute of them
+      // filled the disk, and every frame is encoded to h264 afterwards anyway
+      const args=['-y','-framerate',String(p.settings.fps),'-i',path.join(frames,'%06d.jpg')],filters=[],inputs=[]
       for(const t of p.tracks.filter(t=>t.kind==='audio'&&!t.hidden)) {
         const left=Math.max(p.settings.from,t.start),right=Math.min(p.settings.to,t.start+t.duration);if(right<=left)continue
         const index=inputs.length+1;args.push('-i',store.assetPath(p.id,t.assetId));const local=(left-t.start)/1000,span=(right-left)/1000,offset=Math.round(left-p.settings.from)

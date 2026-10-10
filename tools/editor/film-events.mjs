@@ -2,7 +2,7 @@
 import {captureArrivalMs} from './source-choreography.mjs'
 import {ACTION_PHASES,MECHANISMS} from './product-graphics.mjs'
 import {createHash} from 'node:crypto'
-import {tempo} from '../../dist-core/core.js'
+import {tempo,LOOKS} from '../../dist-core/core.js'
 /** Stored events describe a particular visual edit, never silently reuse them after edits. */
 export function visualClock(project){
  const tracks=project.tracks.filter(t=>t.kind!=='audio').map(({locked,name,...t})=>t)
@@ -33,13 +33,21 @@ export const eventCues=events=>events.filter(e=>e.kind!=='cut').map(e=>({...e}))
  * part to land settles the shot. Parts under 40ms apart share one cue, because closer sounds smear
  * into one, and a shot keeps at most eight, so a long list prints rather than buzzes.
  *
+ * In a look, the print is heard too: a sheet lands with a press beat when its plate has printed, and
+ * a heading set as type is struck when its line has printed across, since it runs no motion of its own.
+ *
  * @param starts  each track's resolved start in ms, by track id
  * @returns cues in seconds on the film clock, each with the verb its part moved by
  */
 export function arrivalCues(project,starts){
- const cues=[]
+ const cues=[],T=LOOKS.timing
  for(const t of project.tracks){
-  const motion=t.kind==='component'&&!t.hidden&&starts.has(t.id)&&project.motions.find(m=>m.id===t.motionId)
+  if(t.kind==='component'&&!t.hidden&&starts.has(t.id)&&t.look==='plate'){
+   const at=starts.get(t.id)+(t.text?120+T.print:T.marks*.4+T.print)
+   if(at<starts.get(t.id)+t.duration)cues.push({at:at/1000,phase:t.text?0:3,kind:t.text?'type':'print',trackId:t.id,verb:null})
+   if(t.text)continue
+  }
+  const motion=t.kind==='component'&&!t.hidden&&!t.text&&starts.has(t.id)&&project.motions.find(m=>m.id===t.motionId)
   if(!motion)continue
   const {delays,durations}=tempo(motion.css||'')
   if(!durations.length)continue
