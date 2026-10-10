@@ -15,45 +15,42 @@ where ownership goes to be forgotten and it grows without ever being read as a w
 
 Worked examples from the existing code:
 
-- Anything that walks a `Section` belongs in `sections.ts` or in the one `switch` in
-  `render.ts`, because `content` is an untyped bag and every reader of it should be findable in
-  one place.
-- Anything that decides how a page looks as a set belongs in `worlds.ts`, because a world is one
-  set of decisions that propagate together and splitting them re-creates the shuffle that
-  worlds replaced.
-- Anything that names a pattern, a preset, a face, an angle, a prompt or a rule belongs in
-  `src/design/`, one file per kind of knowledge, because that is the line between taste and
-  machinery.
+- Anything that measures a model-written stylesheet belongs in `src/written.ts`, beside the gates,
+  never in the studio page or the agent side, because a second copy of a measurement is how 3.2s
+  came to be read as 2s. `assembled()` lives there for that reason.
+- Anything that reads a cut's shots belongs in `tools/editor/autofilm.mjs` beside `shotList`:
+  `paceOf`, `scenesOf`, `assembledReport`. Anything that makes a take, such as a fork, a scoped
+  refinement or a retime, belongs in `tools/editor/refinement.mjs`.
+- Anything that names a verb, a number, a sound, a prompt or a rule belongs in `src/design/`, one
+  file per kind of knowledge, because that is the line between taste and machinery.
 
 ## Data and machinery are different files
 
-Opinions go in `src/design/` as data. Code that acts on opinions goes in `src/`. The test is
-whether a change to the thing is a change of mind or a change of behaviour: a new slop pattern
-is a change of mind and belongs in `src/design/slop.ts`, where a new way of scanning for slop is
-a change of behaviour and belongs in `src/slop.ts`.
+Opinions go in `src/design/` as data. Code that acts on opinions goes in `src/` or `tools/`. The
+test is whether a change to the thing is a change of mind or a change of behaviour:
+- A new verb or a different timing band is a change of mind: it goes in `src/design/motion.ts` or
+  `assembled.ts`.
+- A new way of measuring a sheet against them is a change of behaviour: it goes in `src/written.ts`.
 
-Keeping them apart is what lets taste be tuned by editing a list, which is the only way a
-catalogue stays current.
-
-## The three boundaries that are load bearing
+## The boundaries that are load bearing
 
 Crossing these is not a style question, it costs a fork.
 
-**`src/host.ts`** is the only file that knows where Motioneer is running. Above it there is one
-codebase, below it there are answers for state, export, preview, streaming and images per
-shell. If you find yourself asking "am I in Tauri" anywhere else, the answer belongs in
-`host.ts` as a capability the caller asks for by name, because a fourth shell should be a file
-rather than a sweep through the app.
+**`src/core.ts`** is what node can run of the TypeScript side: the decks, the gates, the house style
+and the project model, built to `dist-core` for the studio, the film pipeline and the agent.
+Reaching for `document`, `window` or `localStorage` below this line breaks all three at once.
 
-**`src/core.ts`** is page making without a browser. The model, the renderer, the worlds and the
-checks have no DOM dependency. Reaching for `document`, `window` or `localStorage` below this
-line breaks the agent tool and the render service at once, so if a function needs the DOM it is
-not core logic and belongs in a component.
+**`mcp/tools.mjs`** is everything an agent is shown, the card and the eight tools, and it has a
+budget: Claude Code shows only 2,048 characters of the card. What a tool needs to be chosen
+correctly belongs in its own description, and detail belongs in a reply's `next` or in
+`docs/agent-skill.md`, not in the card. `verify/routing.mjs` measures any change here.
 
-**`shared/providers.mjs`** separates Motioneer from the vendors and, separately, the wire format from
-the transport. Request shapes and SSE parsing live there once. A shell that needs a different
-fetch hands one in with `setFetch()` rather than carrying its own copy of the request shapes,
-because two copies of a wire format drift and then disagree in production only.
+**`tools/studio.mjs`** is the one room: the proxy, the routes and the model calls. Nothing imports
+from it. The agent side talks to it over HTTP, and to a studio only when that studio belongs to the
+same workspace (`mcp/studio-process.mjs`).
+
+**`shared/providers.mjs`** separates Motioneer from the vendors and the wire format from the
+transport. Request shapes live there once.
 
 ## Size
 
@@ -66,8 +63,8 @@ because the cheap ones usually make the expensive one unnecessary:
 3. Only then split into a sibling module, named for the data it owns rather than for being the
    overflow of its neighbour. `render-helpers.ts` is a file nobody can decide what to put in.
 
-`src/imagewasm.ts` is generated and inlined, so it is exempt. Generated files do not count
-against a budget meant to keep human-read files readable.
+`tools/studio.mjs` and `shared/page.mjs` are already past the budget. Shrink them when you touch
+them, and do not grow them.
 
 ## Two invariants the code already holds
 
@@ -93,9 +90,10 @@ An abstraction with one caller is a rename with extra steps.
 
 ## Signs a boundary is slipping
 
-- A component imports from `src-tauri` or branches on the shell it is running in.
 - Something under `core.ts` touches `document`, `window` or `localStorage`.
-- A vendor name appears outside `shared/providers.mjs` and `models.tsx`.
+- A vendor name appears outside `shared/providers.mjs` and `shared/model.mjs`.
+- The card in `mcp/tools.mjs` grows past 1,900 characters, or a reply puts something an agent needs
+  only in its text, where Claude Code never shows it.
 - A number from a model reaches the renderer without passing a clamp.
 - A new file whose name describes its position rather than its contents: helpers, utils, misc,
   common, shared logic.

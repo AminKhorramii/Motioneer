@@ -1,73 +1,86 @@
 # Working on Motioneer
 
-Motioneer is a motion studio. You point it at a running site, pick elements off it, and get several
-motions for each to compare on one timeline. It used to also make walls of landing pages; that
-half was removed, and anything in git history about sections, worlds, composing or slop belongs
-to it rather than to this. Read `docs/flows.md` for every path through the studio and the code
-that carries it, and `docs/architecture.md` for the module map.
+Motioneer makes motion for a person's own product, and is mostly driven by agents. It turns a
+running site into a film, writes CSS motion for components somebody already has, and changes a
+film into new takes. A person can also open the studio to pick elements and compare motions by
+hand, and edit any film in the editor. It used to also make walls of landing pages; that half was
+removed, and anything in git history about sections, worlds, composing or slop belongs to it rather
+than to this. `docs/architecture.md` is the module map; `docs/flows.md` covers the studio itself.
+
+## What an agent sees, and why it is small
+
+Claude Code shows an MCP server's connect-time card only up to 2,048 characters, and when a reply
+carries structuredContent it gives the model that JSON and the images and drops the prose. So:
+- The card in `mcp/tools.mjs` stays under 1,900 characters (the suite checks), and every tool
+  description stands on its own within 900.
+- Every reply goes through `answer()` in `mcp/reply.mjs`. It puts `summary` and `next` inside
+  the structured copy, and puts the ids another call needs in the text.
+- The eight listed tools are film, change, look, motion, projects, studio, open and doctor. The
+  older names (reel, revise, refine, rescore, review, inspect) still answer, but are not listed.
+- Long guidance lives in `docs/agent-skill.md`, which `setup --claude` installs as a skill.
+- A change to the card or a description is measured with `node verify/routing.mjs --runs 3`
+  (needs the claude command, spends model calls). It asks a real model what it would call for 38
+  requests. Keep the number up, and put it in the commit message.
+
+## The house style
+
+Assembled: nothing fades in; the real interface is built part by part, on time. The numbers, the
+sound each verb makes and the guides are data in `src/design/assembled.ts`. The deck of verbs (print,
+flap, register, draw, type, stamp, scan, wind) is in `src/design/motion.ts`, and `/generate` deals
+one per option. `assembled()` in `src/written.ts` reports how far a sheet is from the style, and
+`assembledReport()` in `tools/editor/autofilm.mjs` does the same for a cut. Both are advisory until
+real output calibrates them. See `docs/assembled.md`.
 
 ## Where things live
 
-- The studio is `tools/studio.mjs`: the proxy, the picker, the transport, the rail. It is one
-  file because it is one room, and nothing else imports from it.
-- The page it serves is `shared/page.mjs`, lifted out because a worker has no filesystem to
-  read a component folder from. It is one template literal, so **watch the backslashes**: a
-  regex written there loses its escapes before a browser sees it. There is a startup guard that
-  reads the source and refuses to run when it finds one, because this has cost seven bugs.
-- Everything opinionated is data in `src/design/`, one file per kind of knowledge. The two decks
-  and what a motion is asked to be are `src/design/motion.ts`; the palettes are `presets.ts`.
-  Tune taste there without touching machinery.
-- What judges model written css lives in `src/written.ts` beside the other gates, never in the
-  studio page: `unmoved`, `brittle`, `janky`, `unstill`, `leaks`, `scopeOf`, `tempo`, `retimed`,
-  `namespaced`. A second copy of a measurement is how `3.2s` came to be read as `2s`.
-- Nothing in `shared/` imports a node builtin at module scope except `cli.mjs`, which is loaded
-  only when the command line provider is chosen. Keep it that way.
+- `mcp/` is the agent side. The protocol is in `index.mjs`, the card and schemas in `tools.mjs`,
+  the envelope in `reply.mjs`, and `studio-process.mjs` decides which studio a call talks to. A
+  studio belongs to a workspace: it writes `.studio/studio.json` and answers `/__motioneer/health`,
+  and is reused only when both match.
+- The studio is `tools/studio.mjs`: the proxy, the picker, the routes and the model calls. Nothing
+  else imports from it.
+- The page it serves is `shared/page.mjs`. It is one template literal, so **watch the
+  backslashes**: a regex written there loses its escapes before a browser sees it. A startup guard
+  refuses to run when it finds one.
+- `tools/editor/` is the film pipeline: `autofilm.mjs` (capture films and revise), `kinetic.mjs`
+  and `native-reel.mjs` (authored reels), `proof.mjs` (measured from frames), `refinement.mjs`
+  (takes, scoped refinement, model-free retiming), `projects.mjs` (the store and forks).
+- Everything opinionated is data in `src/design/`, one file per kind of knowledge. Tune taste there
+  without touching machinery.
+- What judges model-written css lives in `src/written.ts` beside the other gates, never in the
+  studio page. A second copy of a measurement is how `3.2s` came to be read as `2s`.
+- Nothing in `shared/` imports a node builtin at module scope except `cli.mjs` and `codex.mjs`,
+  which load only when their provider is chosen.
 
 ## House rules
 
 - Copy: no all caps, no em dashes, no decorative symbols, and every instruction states its
-  reason. The suite asserts this against the onboarding card.
-- Code: keep logic in the file that owns the data it reads, keep every file far from 1k
-  lines, and prefer deleting complexity to rearranging it.
+  reason.
+- Code: keep logic in the file that owns the data it reads, keep every file far from 1k lines, and
+  prefer deleting complexity to rearranging it.
 - Gates are calibrated against real output before they are enforced, never against an imagined
-  distribution. Measured over 23 real motions, every one already respected reduced motion, so
-  requiring it costs nothing; only 70 percent landed inside the timings the prompt asks for, and
-  the tail was the errands that are supposed to be slow, so those are reported and not enforced.
-  A gate tuned by taste is how a field guide gets rejected for the italics its subject requires.
-- The house obeys its own detector: `verify/app.mjs` renders every built-in world on every look
-  and fails if Motioneer's own output trips the slop catalogue. Those pages wear placeholder copy on
-  purpose, so the gate judges the design half, and the copy half of the defaults is asserted
-  separately: each placeholder has a tell of its own and the suite fails if one stops firing,
-  because a stand-in the writing call leaves alone is one that ships.
+  distribution. The Assembled report and the frame holds are reported, not enforced, for that reason.
+- A failure reads "Cannot … Next: …", through `cannot()` in `mcp/reply.mjs`.
 
 ## Before pushing
 
-Run `npm run verify:all` at minimum, which builds and runs everything that needs no network.
-When the studio changed, drive it: `npm run verify:studio` for the proxy and the picker,
-`npm run verify:capture` for what survives being picked. Both need the network and both are
-worth the minutes, because every proxy bug so far was invisible to a fixture.
+Run `npm run verify:all`, `npm run verify:editor` and `node verify/film.mjs`. When the studio
+changed, also run `npm run verify:studio` and `npm run verify:capture`; both need the network and
+are worth the minutes, because every proxy bug so far was invisible to a fixture.
 
-Drive the actual room for anything a person touches. Three separate faults in one sitting came
-from reading a `let` before its line ran, which kills the whole page script and takes every
-listener below it with it, and none of those were visible to `node --check`.
+Drive the real thing for anything a person or an agent touches. For agents, run a separate
+`claude -p --strict-mcp-config` session against a page served locally (see `.context` drives from
+earlier sessions), and read what the agent actually received. Three faults in one sitting came from
+reading a `let` before its line ran, and none were visible to `node --check`.
 
-`npm run studio` watches its own sources, so editing it restarts it in about half a second and
-the page puts your work back: the aim, the picks and the options all survive, because losing two
-minutes of generation on every save is how you end up not changing anything. The server half is
-kept in `.studio/session.json` and only read back if it was written in the last twenty seconds,
-so opening the studio tomorrow is a fresh start rather than a haunting.
-
-Kill the old studio by port before starting a new one anyway when driving it from a script. A busy
-port makes it roam to 4322 and say so, which is right for a person and a trap for a script: `for p
-in 4321 4322 4323; do lsof -ti tcp:$p | xargs -r kill -9; done`. Testing a stale process cost four
-wrong diagnoses in one session. Commit straight
-to master with a one-line sentence subject that says why, not what. No pull requests.
+Ports: the person's own studio may be on 4321, so never kill or reuse it. Suites use 4390 to 4399;
+use 4340 and up for anything else. Commit straight to master with a one-line sentence subject that
+says why, not what. No pull requests.
 
 ## More than one session at once
 
 This repo is often worked on by two agent sessions at the same time, and mixed commits have
-happened. Before editing, run `git status` and treat files you did not change as another
-session's work in progress: never commit them, never revert them. If your change overlaps a
-file that is already dirty, work in a git worktree from clean master and push from there,
-or wait for the other session to land. Never run a commit command that sweeps the whole
-tree; add files by name.
+happened. Before editing, run `git status` and treat files you did not change as another session's
+work in progress: never commit them, never revert them. If your change overlaps a file that is
+already dirty, work in a git worktree from clean master and push from there, or wait for the other
+session to land. Never run a commit command that sweeps the whole tree; add files by name.

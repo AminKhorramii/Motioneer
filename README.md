@@ -151,9 +151,22 @@ cannot replace whatever your application already called `rise`, and everything i
 
 ## For an agent
 
-`studio` opens the room, for when somebody wants to look at several motions and choose.
-`motion` writes the stylesheet straight into your code without opening anything, for when they
-do not. Same decks, same gates, nobody watching.
+Eight tools, one job each:
+- **`film`:** a video of a site, a demo of named elements, or an idea in words.
+- **`change`:** every reaction afterwards, as a new take: the cut, the motion, the timing (exactly,
+  with no model call) or the music.
+- **`look`:** what is on a page before filming, or a film's frames afterwards. A shot can be shown
+  as six frames, which is how an arrival is judged.
+- **`motion`:** CSS for markup you already have.
+- **`projects`:** finds earlier work.
+- **`studio`**, **`open`** and **`doctor`:** the rest.
+
+Every reply carries a `summary` and the `next` calls that make sense, inside the structured copy
+clients show the model. `setup --claude` also installs a skill with the long guidance.
+
+Everything Motioneer makes follows one house style, Assembled: nothing fades in, and the real
+interface is built part by part, each part timed like a real object. Each film reports how far it
+is from that style. See [the house style](docs/assembled.md).
 
 ## Developing on it
 

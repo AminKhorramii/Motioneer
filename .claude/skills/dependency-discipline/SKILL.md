@@ -5,8 +5,9 @@ description: What Motioneer is allowed to depend on, and why a shipped page is a
 
 # What Motioneer depends on
 
-Motioneer has no runtime dependencies. `package.json` lists devDependencies only, and
-`server/index.mjs` is one file with no dependencies at all. That is a property worth checking
+Motioneer has no runtime dependencies. `package.json` lists devDependencies only, and the MCP
+server in `mcp/` speaks JSON-RPC over stdio directly, with no SDK. The renderer (Playwright and
+FFmpeg) is downloaded once into a shared cache by setup rather than installed as a dependency. That is a property worth checking
 before it is lost, because the first runtime dependency is the expensive one and every one after
 it is easy.
 
@@ -20,10 +21,6 @@ flexibility of letting a model reach for a font.
 **Fonts are bundled, not fetched.** Inter Variable ships with the app so it works offline and
 loads nothing from a third party. A CDN font is a request, a tracking surface, and a flash of
 unstyled text, in exchange for a few kilobytes.
-
-**One binary for every shell.** Real compute lives in `crates/motioneer-image`, compiled to wasm and
-inlined, so the desktop app, the web build and a served deployment run the same code rather than
-three implementations that drift.
 
 **Drawn beats generated.** Backdrops are drawn from the taste sheet at about 2KB inside the
 page. A generated image costs roughly a megabyte and is the fastest way to look like every other
@@ -40,8 +37,8 @@ later is a dependency nobody dares remove:
 3. What would writing the part you need cost? Motioneer's SSE parsing, static server, and JSON walk
    are all hand written because each is tens of lines and a library for it is a dependency plus
    an API to learn plus a version to track.
-4. Does it work in all three shells, including the desktop webview and the headless core with no
-   DOM?
+4. Does it work in node without a DOM, which is where the studio, the film pipeline and the
+   agent run?
 5. What happens when it is unmaintained in two years?
 
 If the honest answer to 3 is that the library is doing something genuinely hard, take it. That
@@ -55,8 +52,8 @@ is what `playwright`, `vite`, `typescript` and the Tauri plugins are.
   drift and disagree in production only.
 - A polyfill for a platform Motioneer does not target. `engines` says Node 20 and up, and the browser
   target is whatever the webview and Vite agree on.
-- A dependency added to make one test easier. Suites drive the real app through `harness.mjs`,
-  and a test only dependency that shapes the app's code has changed the app to suit the test.
+- A dependency added to make one test easier. Suites drive the real server, studio and browser,
+  and a test only dependency that shapes the code has changed the code to suit the test.
 
 ## When you do add one
 

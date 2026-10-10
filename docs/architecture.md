@@ -1,7 +1,9 @@
 # The module map
 
-Motioneer is a motion studio. One room, served by one node program, with the parts that have to agree
-with each other kept outside it.
+Motioneer makes motion for a person's own product, mostly through agents: films of a running site,
+CSS motion for components, and new takes of films already made. One studio program serves the room
+and the routes; the agent side, the film pipeline and the parts that have to agree with each other
+are kept outside it.
 
 ```
 tools/
@@ -21,14 +23,20 @@ shared/                everything the studio uses that is not the room itself
   port.mjs             listening near a port rather than on it
 
 src/                   what the studio imports through a built bundle, because node cannot read ts
-  design/motion.ts     the two decks, and what a motion is asked to be
-  written.ts           the gates: what makes a written sheet acceptable
+  design/motion.ts     the two decks, named: the verbs (print, flap, register, draw, type, stamp, scan,
+                       wind) and the errands each purpose allows, and what a motion is asked to be
+  design/assembled.ts  the house style as data: its numbers, the sound of each verb, the guides
+  written.ts           the gates, and assembled(): how far a sheet is from the house style
   theme.ts, taste.ts   the palettes a preview is dressed in
   reply.ts             pulling json out of a reply that may be wrapped in prose
   core.ts              the barrel, exporting exactly what runs outside a browser
 
 mcp/
-  index.mjs            Motioneer as a tool an agent calls: inspect reads a page and shows it, film makes the video, revise changes it without filming again, studio opens the room, motion skips it, open shows what was made
+  index.mjs            the protocol and the work: eight tools, and the older names mapped onto them
+  tools.mjs            what an agent is shown: a card under 1,900 characters and eight self-sufficient tools
+  reply.mjs            the envelope: summary and next inside the structured copy, Cannot and Next on failure
+  studio-process.mjs   which studio a call talks to: this workspace's, started on a port it holds
+  film-tools.mjs       render, prove and review a saved film; the shots of a reel
 
 tools/editor/
   autofilm.mjs         the headless driver behind film, inspect and revise: the plan it asks the model for with a contact sheet, the repair round the proof drives, and the cut read back for a revision
@@ -49,7 +57,10 @@ tools/editor/
   rescore.mjs          a music-only take that copies assets and preserves the complete visual edit
   score-file.mjs       validates and decodes a finished local soundtrack for an independent rescore take
   soundtrack.mjs       original synthesized music fitted to the cut, stored as editable project audio
-  proof.mjs            a rendered film measured off its frames: cuts, shot length, blank frames
+  proof.mjs            a rendered film measured off its frames: cuts, shot length, arrival, blank frames, holds
+  refinement.mjs       takes: scoped CSS refinement, model-free retiming, and forks through the studio
+  film-review.mjs      sampled-frame critique and bounded repair passes
+  projects.mjs         the project store: revision-checked saves, small summaries for listing, linked forks
 
 site/
   index.html           the landing page: one hero over a shader, in one file that loads nothing
@@ -65,6 +76,8 @@ verify/                the suites, read as a set
   model.mjs            the provider layer, against a server that speaks the wire formats
   guard.mjs            the proxy guard, against the addresses people use to get past one
   mcp.mjs              the server over stdio, driven the way an agent drives it
+  routing.mjs          whether a real model picks the right tool for 38 requests (network, not in verify:all)
+  agentic-film.mjs     takes, reviews, the deck, the house style report and retiming
   cli.mjs              the claude command path
 ```
 

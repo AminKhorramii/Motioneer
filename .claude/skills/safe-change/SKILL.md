@@ -39,7 +39,7 @@ Add files by name. Never run a command that sweeps the tree, which means no `git
 files and there is no way to notice from the command's own output.
 
 ```
-git add src/render.ts src/design/craft.ts
+git add mcp/tools.mjs src/design/assembled.ts
 git status                      # confirm nothing else is staged
 git commit -m "..."
 ```
@@ -50,12 +50,15 @@ between a clean history and a mixed commit.
 ## The gates
 
 ```
-npm run build && node verify/app.mjs
+npm run verify:all && npm run verify:editor && node verify/film.mjs
 ```
 
-is the floor for every change. Add `verify:stream` when the model path or the renderer changed,
-and `verify:oneline` when the handoff format changed, because those are the paths the floor does
-not open.
+is the floor for every change. Add these when their path changed, because the floor does not open
+them:
+- `npm run verify:studio` and `npm run verify:capture` for the proxy and the picker
+- `node verify/routing.mjs --runs 3` for what an agent is shown in `mcp/tools.mjs`
+
+The verify-suite skill says what each suite proves.
 
 If a suite fails, say so with its output. A failure reported as a pass costs more than the bug,
 because it spends the trust that makes the next report worth reading.
