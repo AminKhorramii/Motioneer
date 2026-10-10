@@ -42,7 +42,7 @@ import { streamText } from '../shared/providers.mjs'
 import { listenNear, movedFrom } from '../shared/port.mjs'
 import { localRequest } from '../shared/local-http.mjs'
 import {
-  MOTION_SYSTEM, dealMotions, dealErrands, grabJson, safeStyle, unmoved, brittle, janky, scopeOf, retimed,
+  MOTION_SYSTEM, dealMotions, dealErrands, dealVerbs, errandFor, assembled, grabJson, safeStyle, unmoved, brittle, janky, scopeOf, retimed,
   tempo, unstill, leaks, grounded, namespaced, typefaces, faceList, unfaced,
   PRESETS, themeOf, themeCss, motionBrief, motionDirection, judgeMotion,
 } from '../dist-core/core.js'
@@ -2490,9 +2490,18 @@ const editor = editorRoutes({
     const tw = wantsTailwind(read.markup, base) && !!(await getTailwind()).js
     return preview({ markup: read.markup, base, css: '', scope: '', tw }).replace('</body>', PICKER + '</body>')
   },
-  generate: async ({ subject, brief: rawBrief, treatment, previous }, signal) => {
+  /**
+   * One motion for one subject, dealt a verb from the deck and an errand that fits its purpose.
+   *
+   * The deck was the reason several options disagreed, and it had survived only on the legacy page:
+   * the editor, every film and the agent tool asked for an intensity and got three takes on one
+   * easing. A caller dealing a batch sends each option its verb so no two share one; a refinement
+   * keeps the verb it refines; anything else is dealt here.
+   */
+  generate: async ({ subject, brief: rawBrief, treatment, previous, verb, errand }, signal) => {
     if (!subject || typeof subject.html !== 'string' || !subject.html.trim()) throw new Error('Pick a component before generating motion.')
-    const brief = motionBrief(rawBrief), direction = motionDirection(brief, treatment)
+    const brief = motionBrief(rawBrief), deck = { verb: verb || previous?.verb || dealVerbs(1)[0], errand: errand || previous?.errand || errandFor(brief.purpose) }
+    const direction = motionDirection(brief, treatment, deck)
     const about = `The captured component, with embedded pixels and hidden responsive copies omitted so its visible structure can be read:\n${componentBrief(subject.html)}\nIts CSS:\n${briefStyles(subject.css)}\n${direction}`
       + '\nCaptured transform matrices are part of the layout. Never animate transform to none on elements that already have a transform: that destroys their placement. Prefer independent translate and scale keyframes, ending at translate:0 0 and scale:1, which compose with the captured transform. Preserve any existing independent translate/scale values too. Do not animate hidden responsive copies. Avoid changing opacity permanently: finish at each element\'s captured opacity, or use a motion with no opacity change.'
       + (previous ? `\nRefine this existing motion, preserving its idea unless the direction requests otherwise:\n${String(previous.css).slice(0, 10000)}` : '')
@@ -2506,7 +2515,7 @@ const editor = editorRoutes({
       const rest = await drifts({ markup: subject.html, base: subject.css, css: judged.css, scope: judged.scope, wide: subject.w })
       const faults = brief.purpose === 'idle' ? (rest.running === 0 ? ['No visible animation was found.'] : []) : resting(rest)
       if (faults.length) { why = faults[0]; continue }
-      return { id: randomUUID(), subjectId: subject.id, ...judged, treatment, brief, duration: tempo(judged.css).span || brief.duration, parentId: previous?.id,
+      return { id: randomUUID(), subjectId: subject.id, ...judged, treatment, ...deck, assembled: assembled(judged.css, { purpose: brief.purpose }), brief, duration: tempo(judged.css).span || brief.duration, parentId: previous?.id,
         seen: { blank: rest.blank || 0, escape: rest.escape || 0, stir: rest.stir || 0 }, checked: !rest.skipped }
     }
     throw new Error(why || 'No usable motion came back. Try a more specific direction.')

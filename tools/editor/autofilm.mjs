@@ -14,7 +14,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { loadChromium } from './render.mjs'
 import { lit, proveFilm } from './proof.mjs'
-import { firstCut, createProject, compositionDocument, contrastInk } from '../../dist-core/core.js'
+import { firstCut, createProject, compositionDocument, contrastInk, ASSEMBLED } from '../../dist-core/core.js'
 
 import { candidates, aim, freshProject, openPage, contactSheet, dropDecoration, describe, reveal } from './survey.mjs'
 import { withSoundtrack, scoreStyle } from './soundtrack.mjs'
@@ -93,6 +93,12 @@ export async function proveRender(url, { pace, seconds, cuts }) {
   return { file, proof }
 }
 
+/**
+ * A motion's brief within the 1,400 characters a motion takes, cut from the person's and the plan's
+ * words rather than from the house rules or a refusal's reason, which used to fall off the end.
+ */
+export const fitBrief = (words, tail) => (String(words).slice(0, Math.max(0, 1400 - tail.length)).trim() + ' ' + tail).trim()
+
 /** Every boundary in a cut: each shot's start and the closing title's, for the proof to check in place. */
 const boundariesOf = (cut) => [...new Set(cut.tracks.filter((t) => !t.hidden && t.kind !== 'audio' && (t.kind !== 'title' || t.start > 0)).map((t) => Math.round(t.start)))].sort((a, b) => a - b)
 
@@ -127,6 +133,27 @@ export function paceOf(project) {
  */
 function keptScenes(cut, scenes) {
   return shotList(cut).map((s, i) => ({ ids: s.ids, layout: scenes[i % scenes.length]?.layout, hold: scenes[i % scenes.length]?.hold }))
+}
+
+/**
+ * How far a cut is from the house style: each motion's own report from when it was written, a
+ * capture that comes round again, and shots that cut before they hold still. Advisory, like the
+ * reports it gathers, until real films have calibrated it.
+ */
+export function assembledReport(project, proof) {
+  const used = new Set(project.tracks.filter((t) => t.kind === 'component' && !t.hidden).map((t) => t.motionId))
+  const reports = project.motions.filter((m) => used.has(m.id) && m.assembled).map((m) => m.assembled)
+  const counted = new Map()
+  for (const r of reports) for (const n of r.notes) counted.set(n.replace(/\d+ of \d+ /, ''), (counted.get(n.replace(/\d+ of \d+ /, '')) || 0) + 1)
+  const notes = [...counted].map(([n, c]) => `${c} of ${reports.length} motions: ${n}`)
+  const shots = project.direction ? [] : shotList(project), seen = new Map()
+  for (const s of shots) for (const id of s.ids) seen.set(id, (seen.get(id) || 0) + 1)
+  const repeated = [...seen.values()].filter((c) => c > 1).length
+  if (repeated) notes.push(`${repeated} capture${repeated === 1 ? '' : 's'} appear in more than one shot`)
+  const pace = paceOf(project), least = pace === 'fast' ? ASSEMBLED.fastHoldMs : ASSEMBLED.holdMs
+  const short = (proof?.holds || []).slice(1, -1).filter((h) => h < least).length
+  if (short) notes.push(`${short} shot${short === 1 ? '' : 's'} cut before holding still for ${least}ms`)
+  return { ok: notes.length === 0, notes, verbs: [...new Set(project.motions.filter((m) => used.has(m.id) && m.verb).map((m) => m.verb))] }
 }
 
 /** The shape of a cut: as the film kept it when it did, otherwise read back from its tracks. */
@@ -307,9 +334,14 @@ export async function autofilm({ at, url, language = 'en', theme, background, in
      */
     // the whole duration, but from the first frame: asked for a slow arrival, a model once held the
     // root invisible for 850ms of a 1200ms shot and revealed it in the last third, which is a blank shot
-    const paceNote = pace === 'calm' ? '' : ' Use the whole duration for the arrival, with the parts staggered across it, rather than an easing that is finished in the first third. Every part is visible and already moving from the very first frame; never hold the root or any part invisible, and keep every delay under 150ms. The last part should still be settling at seventy percent of the duration, so spread the stagger across it and use an ease that is not over in its first third.'
-    // the element's own direction first, then the film's, so a detailed brief reaches every motion rather than only the plan
-    const filmNote = direction ? ` The film's direction: ${direction}` : ''
+    /**
+     * The house style, as the brief states it: every part visible and moving from its first frame,
+     * parts in reading order on mechanical time, then a still hold. The note it replaces asked every
+     * motion to fill its whole shot, which kept films from ever holding still long enough to read.
+     */
+    const contract = ` Assembled: every part is visible and already moving from the very first frame, never hidden; parts arrive in reading order, each moving ${ASSEMBLED.partMs[0]} to ${ASSEMBLED.partMs[1]}ms and starting ${ASSEMBLED.gapMs[0]} to ${ASSEMBLED.gapMs[1]}ms after the last; the element is built within ${ASSEMBLED.componentMs}ms and then holds still; never fade the whole element in.`
+    // the person's words first, since they are what the film is for; the plan's sentence for the element after
+    const filmNote = direction ? `The film's direction: ${direction} ` : ''
     // a refused attempt is retried with its refusal in the brief: the same element failed the same gate twice on railway.com when asked again blind
     // the outline of what the selectors have to reach: the root and its first two levels, tags and classes, since a sheet that names parts the markup lacks animates nothing
     const outlineOf = async (k) => {
@@ -321,8 +353,8 @@ export async function autofilm({ at, url, language = 'en', theme, background, in
         return tag(root) + ' > ' + [...root.children].slice(0, 8).map((c) => tag(c) + (c.children.length ? ' > (' + [...c.children].slice(0, 4).map(tag).join(', ') + ')' : '')).join(', ')
       }, html).catch(() => '')
     }
-    const briefFor = (k, why = '', outline = '') => (String(chosen.directions[String(captured[k])] || '') + paceNote + filmNote
-      + (why ? ` A previous attempt was refused: ${why.slice(0, 160)}. ${/nothing on the component is animating/.test(why) ? `So write selectors that reach this markup${outline ? `, which is ${outline.slice(0, 400)}` : ''}: animate the root itself and its direct children as [data-mn] > *, not classes you assume are there.` : 'Preserve captured transform matrices. Prefer independent translate and scale, ending at zero and one. Never change padding, margin, gap, display, position, overflow, width or height.'}` : '')).trim().slice(0, 1400)
+    const briefFor = (k, why = '', outline = '') => fitBrief(filmNote + String(chosen.directions[String(captured[k])] || ''), contract
+      + (why ? ` A previous attempt was refused: ${why.slice(0, 160)}. ${/nothing on the component is animating/.test(why) ? `So write selectors that reach this markup${outline ? `, which is ${outline.slice(0, 400)}` : ''}: animate the root itself and its direct children as [data-mn] > *, not classes you assume are there.` : 'Preserve captured transform matrices. Prefer independent translate and scale, ending at zero and one. Never change padding, margin, gap, display, position, overflow, width or height.'}` : ''))
     for (let k = 0; k < captured.length; k++) {
       if (emptyOnes.has(k)) continue
       await page.locator('.subject-item').nth(subjectAt[k]).click()
@@ -466,6 +498,8 @@ export async function autofilm({ at, url, language = 'en', theme, background, in
       onStep(`Element ${k + 1} stays hidden for a third of its motion, asking for one that shows from the first frame.`)
       if (await refineStart(k)) repairs.push(`rewrote the motion of ${sub.name} so it shows from its first frame`)
     }
+    // the brief typed for each element was the film's, not the person's: their own box is left empty again
+    { const box = page.getByLabel('Creative direction', { exact: true }); if (await box.count() && (await box.inputValue())) { await box.fill(''); project = await settled() } }
 
     // scenes name candidates; the project's subjects sit in capture order, so a captured index maps to its subject
     const subjectOf = new Map(captured.map((cand, k) => [cand, emptyOnes.has(k) ? null : project.subjects[subjectAt[k]]?.id]).filter(([, id]) => id))

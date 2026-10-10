@@ -2,7 +2,7 @@
 export type Purpose = 'entrance' | 'emphasis' | 'idle' | 'interaction'
 export type Brief = { purpose: Purpose; intensity: 'range' | 'subtle' | 'expressive' | 'bold'; duration: number; direction: string }
 export type Subject = { id: string; name: string; html: string; css: string; w: number; h: number; shot?: string; warnings: string[]; source?: string }
-export type Motion = { id: string; subjectId: string; css: string; scope: string; note: string; treatment: string; brief: Brief; duration: number; saved?: boolean; seen?: { blank: number; escape: number; stir: number }; parentId?: string }
+export type Motion = { id: string; subjectId: string; css: string; scope: string; note: string; treatment: string; verb?: string; errand?: string; assembled?: { ok: boolean; notes: string[] }; brief: Brief; duration: number; saved?: boolean; seen?: { blank: number; escape: number; stir: number }; parentId?: string }
 export type Move = { at: number; duration: number; x: number; y: number; scale: number; ease: string }
 export type Track = { id: string; kind: 'component' | 'title' | 'image' | 'audio'; name: string; subjectId?: string; motionId?: string; assetId?: string; text?: string; color: string; fontSize: number; start: number; duration: number; entrance: number; x: number; y: number; width: number; height: number; hidden: boolean; locked: boolean; moves: Move[]; volume: number; sourceStart: number; fadeIn: number; fadeOut: number; after?: { key: string; mode: 'after' | 'with'; gap: number } }
 export type Asset = { id: string; name: string; kind: 'image' | 'audio'; mime: string; duration?: number; waveform?: number[]; width?: number; height?: number }

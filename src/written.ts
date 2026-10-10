@@ -1,3 +1,5 @@
+import { ASSEMBLED } from '@/design/assembled'
+
 /**
  * A page the model wrote whole, rather than one arranged from roles and forms.
  *
@@ -250,6 +252,7 @@ export function retimed(css: string, { duration = 1, stagger = 1, ease }: Retime
  */
 export interface Tempo {
   durations: number[]
+  delays: number[]
   gaps: number[]
   span: number
   stillness: 'wrapped' | 'guarded' | 'ignored'
@@ -294,7 +297,7 @@ export function tempo(css: string): Tempo {
     .flatMap((m) => [...m[1].matchAll(/([a-z-]+)\s*:/gi)].map((d) => d[1].toLowerCase())))]
 
   return {
-    durations, gaps, span,
+    durations, delays, gaps, span,
     stillness: wrapped ? 'wrapped' : guarded ? 'guarded' : 'ignored',
     paints,
   }
@@ -528,4 +531,34 @@ export function judgeMotion(raw: { css?: unknown; scope?: string; note?: unknown
   const faults = [...unmoved({html:'',css,note:''},{parts}), ...brittle(css), ...janky(css), ...unstill(css), ...leaks(css,scope)]
   if (faults.length) return { why: faults[0] }
   return { css, scope, note: String(raw.note ?? '').slice(0, 150) }
+}
+
+/**
+ * How far a stylesheet is from the house style, measured rather than described.
+ *
+ * Advisory, and so not a gate: the numbers come from ASSEMBLED, and a gate is calibrated against
+ * real output before it refuses anything. This reports what it finds so an agent and a person can
+ * see the distance, and so the calibration has something to count.
+ */
+export function assembled(css: string, { purpose = 'entrance' }: { purpose?: string } = {}) {
+  const { partMs, gapMs, componentMs, never } = ASSEMBLED
+  const t = tempo(css), notes: string[] = []
+  const outside = t.durations.filter((d) => d < partMs[0] || d > partMs[1])
+  if (t.durations.length && outside.length) notes.push(`${outside.length} of ${t.durations.length} movements last outside ${partMs[0]} to ${partMs[1]}ms`)
+  const loose = t.gaps.filter((g) => g < gapMs[0] || g > gapMs[1])
+  if (t.gaps.length && loose.length) notes.push(`${loose.length} of ${t.gaps.length} gaps between parts fall outside ${gapMs[0]} to ${gapMs[1]}ms`)
+  if (purpose === 'entrance' && t.span > componentMs) notes.push(`the component takes ${Math.round(t.span)}ms to build, over ${componentMs}`)
+  // a stagger's first part usually has no delay written, so any later start counts as one
+  if (purpose === 'entrance' && t.durations.length && !t.delays.some((d) => d > 0)) notes.push('every part starts at once, so the whole moves rather than its parts')
+  const curves = [...css.matchAll(/animation(?:-timing-function)?\s*:\s*([^;}]+)/gi)].map((m) => m[1])
+  const defaults = never.filter((name) => curves.some((c) => new RegExp(`(^|[\\s,])${name}([\\s,]|$)`).test(c)))
+  if (defaults.length) notes.push(`uses ${defaults.join(' and ')}, the curves every generated interface already wears`)
+  // nothing fades in: the root's own animation never starts from invisible
+  const scope = scopeOf(css)
+  if (scope) {
+    const rootNames = [...css.matchAll(new RegExp(`\\[${scope}\\]\\s*\\{([^}]*)\\}`, 'g'))].flatMap((m) => [...m[1].matchAll(/animation(?:-name)?\s*:\s*([\w-]+)/g)].map((n) => n[1]))
+    const fades = rootNames.some((name) => new RegExp(`@keyframes\\s+${name}\\s*\\{\\s*(?:from|0%)\\s*\\{[^}]*opacity\\s*:\\s*0(?:\\.0*)?\\s*[;}]`).test(css))
+    if (fades) notes.push('the component fades in as a whole from opacity 0')
+  }
+  return { ok: notes.length === 0, notes, measured: { durations: t.durations, gaps: t.gaps, span: Math.round(t.span) } }
 }

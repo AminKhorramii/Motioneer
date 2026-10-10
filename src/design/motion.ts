@@ -49,6 +49,35 @@ const ERRANDS: { does: string; parts: boolean }[] = [
   { does: 'to mark it as the current one among several of its kind', parts: false },
 ]
 
+/**
+ * The same deck, named. A verb travels with a motion from the brief to the editor's label and
+ * the film's sound, so it needs a name that is stable when the prose is reworded.
+ */
+export const VERBS: { id: string; does: string }[] = ['print', 'flap', 'register', 'draw', 'type', 'stamp', 'scan', 'wind'].map((id, i) => ({ id, does: MOTIONS[i] }))
+export const verbOf = (id?: string) => VERBS.find((v) => v.id === id)
+
+/** n verbs, all different until the deck runs out, so parallel options never share one. */
+export function dealVerbs(n: number): string[] {
+  const deck = VERBS.map((v) => v.id)
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[deck[i], deck[j]] = [deck[j], deck[i]]
+  }
+  return Array.from({ length: n }, (_, i) => deck[i % deck.length])
+}
+
+/**
+ * Which errands each purpose allows. Dealing from the whole deck handed an entrance the errand of
+ * answering a press, and the brief then asked for two different motions at once.
+ */
+const ERRAND_IDS = ['reveal', 'reading-order', 'settle', 'single-out', 'alive', 'value', 'press', 'current']
+const BY_PURPOSE: Record<string, string[]> = { entrance: ['reveal', 'reading-order', 'settle'], emphasis: ['single-out', 'current'], idle: ['alive'], interaction: ['press', 'value'] }
+export const errandOf = (id?: string) => { const i = ERRAND_IDS.indexOf(id || ''); return i < 0 ? undefined : { id: ERRAND_IDS[i], ...ERRANDS[i] } }
+export function errandFor(purpose = 'entrance'): string {
+  const ids = BY_PURPOSE[purpose] || BY_PURPOSE.entrance
+  return ids[Math.floor(Math.random() * ids.length)]
+}
+
 export function dealErrands(n: number): { does: string; parts: boolean }[] {
   const deck = [...ERRANDS]
   for (let i = deck.length - 1; i > 0; i--) {
@@ -153,11 +182,12 @@ export type MotionBrief = { purpose?: string; intensity?: string; duration?: num
 export function motionBrief(raw: MotionBrief = {}) {
   return { purpose: ['entrance','emphasis','idle','interaction'].includes(raw.purpose || '') ? raw.purpose! : 'entrance',
     intensity: ['subtle','expressive','bold'].includes(raw.intensity || '') ? raw.intensity! : 'range',
-    duration: Math.max(200, Math.min(10000, Number(raw.duration) || 1000)), direction: String(raw.direction || '').trim().slice(0,800) }
+    duration: Math.max(200, Math.min(10000, Number(raw.duration) || 1000)), direction: String(raw.direction || '').trim().slice(0,1400) }
 }
-export function motionDirection(raw: MotionBrief = {}, treatment = 'expressive') {
-  const brief = motionBrief(raw)
+/** The brief for one option: its purpose and treatment, and the object and errand it was dealt. */
+export function motionDirection(raw: MotionBrief = {}, treatment = 'expressive', deck: { verb?: string; errand?: string } = {}) {
+  const brief = motionBrief(raw), verb = verbOf(deck.verb), errand = errandOf(deck.errand)
   const purpose: Record<string,string> = { entrance: 'Reveal the component in its reading order. Establish the main content first, then its supporting details. Finish at its original resting appearance.', emphasis: 'Direct attention to one meaningful detail while the surrounding UI remains still and readable. Return to its resting appearance.', idle: 'Create a quiet seamless ambient cycle. Keep all information visible throughout; do not repeatedly introduce the component.', interaction: 'Acknowledge a single press or change with clear, brief feedback on the relevant control. Leave unrelated content still and return to rest.' }
   const intensity: Record<string,string> = { subtle: 'Use small distances and restrained timing. Prefer precision and legibility over spectacle.', expressive: 'Use a clear lead and follow rhythm with controlled overshoot where the component supports it.', bold: 'Use a distinctive staged reveal or directional gesture. Be confident, but do not sacrifice readability or animate every part at once.' }
-  return `Purpose: ${purpose[brief.purpose]}\nTreatment: ${treatment}. ${intensity[treatment] || intensity.expressive}\nTarget duration: ${brief.duration}ms. Read the actual component structure before choosing what moves; do not invent parts. ${brief.direction ? `User direction, which takes priority over the default treatment: ${brief.direction}` : ''}\nPreserve its layout, colors, typography and content. ${brief.purpose === 'entrance' ? 'Stagger only when multiple meaningful parts exist.' : 'One moving part is sufficient for this purpose; never add a stagger just to satisfy a rule.'}`
+  return `Purpose: ${purpose[brief.purpose]}\nTreatment: ${treatment}. ${intensity[treatment] || intensity.expressive}\nTarget duration: ${brief.duration}ms. Read the actual component structure before choosing what moves; do not invent parts. ${brief.direction ? `User direction, which takes priority over the default treatment: ${brief.direction}` : ''}\nPreserve its layout, colors, typography and content. ${brief.purpose === 'entrance' ? 'Stagger only when multiple meaningful parts exist.' : 'One moving part is sufficient for this purpose; never add a stagger just to satisfy a rule.'}${verb ? `\nMove it the way a real object behaves: ${verb.does}. Take the timing from that object rather than from a default easing.` : ''}${errand ? `\nIts errand: ${errand.does}.` : ''}`
 }

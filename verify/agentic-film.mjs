@@ -2,14 +2,14 @@ import assert from 'node:assert/strict'
 import {readFile,mkdtemp,writeFile,rm} from 'node:fs/promises'
 import {tmpdir} from 'node:os'
 import path from 'node:path'
-import {createProject,compositionDocument,newTrack} from '../dist-core/core.js'
+import {createProject,compositionDocument,newTrack,firstCut,dealVerbs,errandFor,motionDirection,assembled,VERBS,SOUNDS} from '../dist-core/core.js'
 import {normalizeReel,reelProject} from '../tools/editor/kinetic.mjs'
 import {productBrief,groundStory,captureCapabilities} from '../tools/editor/product-brief.mjs'
 import {normalizeHandoffs} from '../tools/editor/source-handoffs.mjs'
 import {applyMotionPatches,refinementScope,forkProject,connectedTracks} from '../tools/editor/refinement.mjs'
 import {normalizeCritique,reviewAndRefine} from '../tools/editor/film-review.mjs'
 import {regressed} from '../tools/editor/proof.mjs'
-import {paceOf} from '../tools/editor/autofilm.mjs'
+import {paceOf,assembledReport,fitBrief} from '../tools/editor/autofilm.mjs'
 import {currentEvents,visualClock} from '../tools/editor/film-events.mjs'
 import {sampledScore,readSoundKit} from '../tools/editor/sampled-score.mjs'
 import {runBenchmark} from '../tools/editor/benchmark.mjs'
@@ -47,6 +47,20 @@ const result=await reviewAndRefine({at:'fixture',project:made.project,rendered:{
 assert.equal(result.project.id,'candidate');assert.equal(result.review.attempts.length,1)
 const failed=await reviewAndRefine({at:'fixture',project:made.project,rendered:{file:'old'},shots:made.shots,passes:2},{critique:async()=>({status:'sampled-review-complete',issues:[issue]}),refine:async()=>({project:made.project,changes:[{}]}),fork:async()=>({...made.project,id:'rejected'}),render:async()=>({url:'new'}),prove:async()=>({file:'bad',proof:{ok:false}})})
 assert.equal(failed.file,'old');assert.equal(failed.review.attempts.length,2);assert.equal(failed.review.attempts[0].projectId,'rejected')
+// Assembled: parallel options are dealt different verbs, errands stay inside their purpose, and the brief names both.
+assert.equal(new Set(dealVerbs(3)).size,3);assert.deepEqual(new Set(dealVerbs(8)),new Set(VERBS.map(v=>v.id)));assert.ok(VERBS.every(v=>SOUNDS[v.id]),'every verb makes a sound')
+assert.equal(errandFor('idle'),'alive');assert.ok(['reveal','reading-order','settle'].includes(errandFor('entrance')));assert.ok(['press','value'].includes(errandFor('interaction')))
+const briefed=motionDirection({purpose:'entrance'},'expressive',{verb:'flap',errand:'reveal'});assert.match(briefed,/^Purpose: /);assert.match(briefed,/\nTreatment: expressive/);assert.match(briefed,/split flap/);assert.match(briefed,/Its errand: to reveal it/)
+// the report measures distance from the house style without refusing anything
+const stagger='@media (prefers-reduced-motion: no-preference){[data-motion-flap] > li{animation:flip 320ms cubic-bezier(.16,1,.3,1) both}[data-motion-flap] > li:nth-child(2){animation-delay:60ms}@keyframes flip{from{rotate:x 90deg}to{rotate:x 0deg}}}'
+const fade='@media (prefers-reduced-motion: no-preference){[data-motion-fade]{animation:fade 900ms ease-in-out both}@keyframes fade{from{opacity:0}to{opacity:1}}}'
+assert.equal(assembled(stagger).ok,true);const faded=assembled(fade).notes.join(' | ');assert.match(faded,/opacity 0/);assert.match(faded,/ease-in-out/);assert.match(faded,/at once/);assert.match(faded,/outside 240 to 520ms/)
+// a brief keeps the house rules and a refusal's reason whole, and gives the person's words what is left
+const tail=' The contract. A previous attempt was refused: nothing moved.';assert.ok(fitBrief('w'.repeat(3000),tail).endsWith(tail));assert.ok(fitBrief('w'.repeat(3000),tail).length<=1401)
+// a cut that brings a capture round again, or cuts before a hold, says so
+const twice={...createProject('Twice'),subjects:[{id:'a',name:'A',html:'<b>a</b>',css:'',w:300,h:100,warnings:[]}],motions:[{id:'m',subjectId:'a',css:'',scope:'data-m',note:'',treatment:'subtle',verb:'flap',assembled:{ok:false,notes:['uses ease-in-out, the curves every generated interface already wears']},brief:{purpose:'entrance',intensity:'subtle',duration:1000,direction:''},duration:900,saved:true}]}
+const cut=firstCut(twice,{pace:'fast',seconds:6,scenes:[{ids:['a']}]}),report=assembledReport(cut,{holds:[900,100,100,900]})
+assert.equal(report.ok,false);assert.match(report.notes.join(' | '),/appear in more than one shot/);assert.match(report.notes.join(' | '),/cut before holding still for 300ms/);assert.match(report.notes.join(' | '),/motions: uses ease-in-out/);assert.deepEqual(report.verbs,['flap'])
 // Every film is proved at its own pace: a reel says fast, a calm film says calm, and an old film is read off its shots.
 assert.equal(paceOf(made.project),'fast');assert.equal(paceOf({...createProject('Calm one'),film:{pace:'calm'}}),'calm')
 // A repair is judged against the take it repairs, so a fault the take already had cannot reject it, and a new one does.

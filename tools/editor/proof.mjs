@@ -139,6 +139,17 @@ export async function proveFilm({ file, pace = 'calm', seconds, cuts: planned })
   const lateAt = seen.filter((b) => { const i = Math.min(fs.length - 1, b.at + Math.round(FPS * 0.3)); return lits[i] < 0.002 }).map((b) => Math.round(b.at / FPS * 1000))
   const lateShots = lateAt.length
 
+  /**
+   * How long each shot stays still before it cuts: the house style ends every shot on a hold long
+   * enough to read. Measured and reported, and kept out of the notes, since the verdict gates
+   * delivery and a hold has not been calibrated against real films yet.
+   *
+   * Still means legible, not frozen. The cut's slow camera zoom changes about 0.4 percent of the
+   * frame a step at this threshold, never above 1, while a part arriving changes 2.5 to 7; measured
+   * on a real fast film, a frozen-frame test called every shot unheld because of the zoom alone.
+   */
+  const holds = marks.slice(1).map((end, k) => { let i = end - 1; while (i > marks[k] + 1 && changed(fs[i], fs[i - 1], 90) < 0.012) i--; return Math.round((end - 1 - i) / FPS * 1000) })
+
   const notes = []
   const want = pace === 'fast' ? { minCuts: Math.max(6, Math.round(total / 2)), maxAvg: 1800 } : pace === 'brisk' ? { minCuts: Math.max(3, Math.round(total / 4)), maxAvg: 3200 } : { minCuts: 1, maxAvg: Infinity }
   if (Array.isArray(planned) && planned.length && cuts < planned.length) notes.push(`${planned.length - cuts} of the ${planned.length} planned cuts did not show in the frames`)
@@ -148,7 +159,7 @@ export async function proveFilm({ file, pace = 'calm', seconds, cuts: planned })
   if (arrivals.length && arriveMs < 200) notes.push(arriveMs < 50 ? 'elements pop in at once rather than arrive' : `elements pop in rather than arrive, settling in about ${arriveMs}ms`)
   if (lateShots) notes.push(`${lateShots} shot${lateShots === 1 ? '' : 's'} still empty a third of a second in, a motion that hides its element before revealing it`)
   if (seconds && Math.abs(total - seconds) > 1.5) notes.push(`it runs ${total.toFixed(0)} seconds, not the ${seconds} asked for`)
-  return { seconds: Math.round(total), cuts, planned: Array.isArray(planned) ? planned.length : null, shots: shots.length, avgShotMs, longestShotMs, arriveMs, lateShots, late: lateAt, missing, blank: Math.round(blank * 100) / 100, ok: notes.length === 0, notes }
+  return { seconds: Math.round(total), cuts, planned: Array.isArray(planned) ? planned.length : null, shots: shots.length, avgShotMs, longestShotMs, arriveMs, lateShots, late: lateAt, missing, blank: Math.round(blank * 100) / 100, holds, ok: notes.length === 0, notes }
 }
 
 /** One sentence an agent can repeat. */

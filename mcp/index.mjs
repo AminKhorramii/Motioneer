@@ -151,13 +151,14 @@ async function film({ url, dir, language, theme, captureMode, seconds, fps, soun
   const buf = { length: (await stat(file)).size }
   const { proofLine } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'proof.mjs')).href)
   const verified = proofLine(result.proof)
-  const structured = { ...shape(result, file, wantPace), found: Number(/Found (\d+) things/.exec(steps.join(' '))?.[1]) || null }
+  const style = await styleOf(at, result.projectId, result.proof)
+  const structured = { ...shape(result, file, wantPace), assembled: style, found: Number(/Found (\d+) things/.exec(steps.join(' '))?.[1]) || null }
   const mended = result.repairs?.length ? ` It mended itself once before the final render: ${result.repairs.join('; ')}.` : ''
   const fates = result.elements.filter((e) => e.status !== 'filmed')
   const leftOut = fates.length ? ` Left out: ${fates.map((e) => `${e.name} (${e.status})`).join('; ')}.` : ''
   return { structured, images: review ? [review] : [], ids: { projectId: result.projectId, video: file, storyboard: result.storyboard },
     summary: `Filmed ${result.distinct} of ${result.elements.length} selected element${result.elements.length === 1 ? '' : 's'} from ${url}${result.product ? `, "${result.product}",` : ''} into a ${Math.round(result.seconds)} second ${wantPace} film`
-      + `${result.opening ? ` titled "${result.opening}"` : ''}: ${result.shots} shots of ${result.distinct} distinct element${result.distinct === 1 ? '' : 's'} in ${result.layouts} layout${result.layouts === 1 ? '' : 's'}, saved to ${file} (${(buf.length / 1e6).toFixed(1)} MB). ${verified}${mended}${leftOut}`,
+      + `${result.opening ? ` titled "${result.opening}"` : ''}: ${result.shots} shots of ${result.distinct} distinct element${result.distinct === 1 ? '' : 's'} in ${result.layouts} layout${result.layouts === 1 ? '' : 's'}, saved to ${file} (${(buf.length / 1e6).toFixed(1)} MB). ${verified}${mended}${leftOut}${styleLine(style)}`,
     next: filmNext(result.projectId, result.proof, false) }
 }
 
@@ -170,12 +171,12 @@ async function reel({brand,domain,projectId,url,mode='auto',direction,seconds=18
   const sourceSheet=result.sourceSheet?file.replace(/\.mp4$/,'-sources.jpg'):null
   if(sourceSheet)await writeFile(sourceSheet,Buffer.from(result.sourceSheet.data,'base64'))
   const reviewed=result.review?.status==='unavailable'?'Visual review unavailable: '+result.review.error:'Sampled-frame review '+result.review?.status+': '+(result.review?.issues?.length||0)+' unresolved observations; artistic quality is not certified.'
-  const {proofLine}=await import(pathToFileURL(path.join(ROOT,'tools','editor','proof.mjs')).href)
+  const {proofLine}=await import(pathToFileURL(path.join(ROOT,'tools','editor','proof.mjs')).href),style=await styleOf(at,result.projectId,result.proof)
   return {images:review?[review]:[],ids:{projectId:result.projectId,video:file,storyboard:result.storyboard,sources:sourceSheet,trackIds:result.shotList.map(s=>s.trackId)},
     structured:{projectId:result.projectId,editor:`${at}/__motioneer/editor/?project=${encodeURIComponent(result.projectId)}&view=film`,studio:at,file,seconds,fps:60,style:result.mode==='native'?'native':result.mode==='hybrid'?'hybrid':'kinetic',sourceSelection:result.sourceSelection,soundtrack:result.soundtrack,music:{profile:result.music?.profile,label:result.music?.label},bpm:result.bpm,concept:result.plan.concept,
       shots:result.shotList.map(s=>({shot:s.shot,trackId:s.trackId,sceneId:s.sceneId,at:s.at,seconds:s.seconds,elements:s.elements,layout:s.layout,choreography:s.choreography,...(s.renderedMotion?{renderedMotion:s.renderedMotion}:{})})),
       sourceProjectId:result.sourceProjectId,artifacts:{video:file,storyboard:result.storyboard||null,sources:sourceSheet},reviewError:result.reviewError||null,verdict:{ok:!!result.proof?.ok,notes:result.proof?.notes||[],cuts:result.proof?.cuts,arriveMs:result.proof?.arriveMs,blank:result.proof?.blank},quality:{warnings:result.quality?.warnings||[]},
-      review:result.review?{status:result.review.status,summary:result.review.summary,issues:result.review.issues||[],attempts:result.review.attempts||[],error:result.review.error}:null,eventStatus:result.eventStatus,transitions:(result.transitions||[]).length,captureSkipped:result.captureSkipped||[],limitation:result.limitation},
+      review:result.review?{status:result.review.status,summary:result.review.summary,issues:result.review.issues||[],attempts:result.review.attempts||[],error:result.review.error}:null,assembled:style,eventStatus:result.eventStatus,transitions:(result.transitions||[]).length,captureSkipped:result.captureSkipped||[],limitation:result.limitation},
     summary:`Created ${brand}: ${result.plan.concept}. ${result.shotList.length} scenes in ${seconds} seconds at 60 fps, with original ${result.music.label} music, saved to ${file}. ${proofLine(result.proof)} ${reviewed} ${result.limitation||''}`.trim(),
     next:filmNext(result.projectId,result.proof,true,result.shotList)}
 }
@@ -194,6 +195,14 @@ async function rescore(args,progress=()=>{}){
     summary:`Made a new take with ${result.soundtrack==='imported'?'the supplied soundtrack':`an original ${result.music.label} score`}: ${result.music.description} The visuals and the original film are unchanged. Video ${file}, audio ${audio}.`,
     next:[{tool:'change',args:{projectId:result.projectId,music:{identity:'<another identity>'}},why:'try a different musical identity on the same edit'},{tool:'open',args:{target:'editor',projectId:result.projectId},why:'only if they ask to open the editor'}]}
 }
+
+/** The house style report for a saved film, read from the studio that made it. */
+async function styleOf(at, projectId, proof) {
+  const { assembledReport } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'autofilm.mjs')).href)
+  const project = await fetch(`${at}/__motioneer/projects/${encodeURIComponent(projectId)}`).then((r) => r.ok ? r.json() : null).catch(() => null)
+  return project ? assembledReport(project, proof) : null
+}
+const styleLine = (style) => style && !style.ok ? ` House style notes: ${style.notes.join('; ')}.` : ''
 
 /**
  * The rendered file, moved from where the driver measured it to where the person works.
@@ -260,160 +269,57 @@ async function revise({ projectId, dir, pace, seconds, opening, closing, drop, o
   const file = await keepFile(result, dir, `${new URL(result.source || 'http://film').host}-${result.pace}-take`)
   const review=await reviewResult(result,file,progress)
   const { proofLine } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'proof.mjs')).href)
-  return { structured: { ...shape(result, file, result.pace), ...(sourceProjectId ? { sourceProjectId } : {}) }, images: review ? [review] : [], ids: { projectId: result.projectId, video: file, storyboard: result.storyboard },
-    summary: `${sourceProjectId ? 'Made a new take' : 'Revised the film'}: ${result.changes.join('; ') || 'cut again as it was'}. Now ${result.shots} shots of ${result.distinct} element${result.distinct === 1 ? '' : 's'} in ${Math.round(result.seconds)} seconds, ${result.pace}, saved to ${file}. ${proofLine(result.proof)}`,
+  const style = await styleOf(at, result.projectId, result.proof)
+  return { structured: { ...shape(result, file, result.pace), assembled: style, ...(sourceProjectId ? { sourceProjectId } : {}) }, images: review ? [review] : [], ids: { projectId: result.projectId, video: file, storyboard: result.storyboard },
+    summary: `${sourceProjectId ? 'Made a new take' : 'Revised the film'}: ${result.changes.join('; ') || 'cut again as it was'}. Now ${result.shots} shots of ${result.distinct} element${result.distinct === 1 ? '' : 's'} in ${Math.round(result.seconds)} seconds, ${result.pace}, saved to ${file}. ${proofLine(result.proof)}${styleLine(style)}`,
     next: filmNext(result.projectId, result.proof, false) }
 }
 
 /**
- * Motion for a component somebody else built, handed back as a stylesheet and nothing else.
+ * Motion for a component somebody else built, handed back as stylesheets and nothing else.
  *
- * Several at once for the reason the wall exists: asked once, every call reaches for the same
- * easing, and measured on this repository's own output eight independent calls drew one watch dial
- * and would fade one way. Each option is dealt a different motion from the deck, taken from what a
- * real object does, so they disagree by construction rather than by being asked to.
- *
- * The gate is the point of returning anything at all. unmoved reads whether the parts arrive at
- * different times, which is the whole difference between a mechanism and a slideshow, and an option
- * that only slides the finished component is dropped rather than shown: a caller handed four
- * options where one is a fade has to do the judging this tool exists to have already done.
+ * Several at once, each dealt a different verb from the deck, so they disagree by construction:
+ * asked once, every call reaches for the same easing. They are written by the studio's own
+ * /generate, the path the editor and every film use, so an agent's options pass the same gates and
+ * the same rendered check that the motion comes back to rest. This tool then enforces what its
+ * description promises: an option that only slides the finished component is dropped, because a
+ * caller handed four options where one is a fade has to do the judging this tool exists to do.
  */
 async function motion(args) {
   const html = String(args?.html ?? '')
   if (!html.trim()) throw cannot('write motion: motion needs the component markup, so the keyframes can name its parts.', 'send the component markup as html.')
   const want = Math.max(1, Math.min(6, Number(args?.options) || 3))
   const core = await import(pathToFileURL(path.join(ROOT, 'dist-core', 'core.js')).href)
-  const { write: complete } = await import('../shared/model.mjs')
-  const { defaultModel } = await import('../tools/environment.mjs')
-  let config=defaultModel()
-  try{config={...config,...JSON.parse(await readFile(path.join(await workspace(),'.studio','model.json'),'utf8'))}}
-  catch(e){if(e.code!=='ENOENT')throw Error('Cannot read saved model settings. Next: repair .studio/model.json or choose a provider in studio Settings.')}
-  const brief = core.motionBrief(args)
-  const motions = Array.from({ length: want }, (_, i) => brief.intensity === 'range' ? ['subtle','expressive','bold'][i % 3] : brief.intensity)
-  // the markup is what the selectors have to name, so it goes over whole rather than summarised
-  const seen = html.slice(0, 6000)
-  const styles = args?.css ? `\n\nIts stylesheet, for the timing to fit:\n${String(args.css).slice(0, 4000)}` : ''
-  let browserPromise
-  const browserForChecks=()=>browserPromise ||= (async()=>{
-    const {loadChromium}=await import(pathToFileURL(path.join(ROOT,'tools','editor','render.mjs')).href)
-    const installed=await loadChromium(), chromium=installed || (await import('playwright').catch(()=>null))?.chromium
-    return chromium ? chromium.launch(installed?{channel:'chromium'}:{}) : null
-  })().catch(()=>null)
-
-  /**
-   * How many distinct frames a component shows over four seconds with a stylesheet applied.
-   *
-   * Distinct rather than merely different: a screenshot is compared by its bytes, so a frame that
-   * differs by one antialiased pixel counts as a change, and that is the honest reading. What is
-   * being asked is whether anything at all is happening on screen, which is the question the css
-   * cannot answer about itself.
-   */
-  async function frames(markup, scope, css) {
-    /**
-     * Only when a browser is actually here.
-     *
-     * playwright is a development dependency and this package ships mcp/ without it, so on a normal
-     * install this import throws and the whole tool would fail on a check rather than on the work.
-     * Missing is not failing: the source gates still ran, and the reply says plainly which options
-     * were watched and which were only read, because a check reported as done when it was skipped
-     * is the one kind of green this repository refuses to print.
-     */
-    const browser = await browserForChecks()
-    if(!browser)return null
-    const ctx = await browser.newContext({ viewport: { width: 420, height: 420 } })
-    try {
-      const tab = await ctx.newPage()
-      const scoped = scope ? markup.replace(/<(\w+)/, `<$1 ${scope}`) : markup
-      await tab.setContent(`<style>${core.safeStyle(args?.css || '')}\n${css}</style>${scoped}`, { waitUntil: 'load' })
-      const shots = new Set()
-      for (let i = 0; i < 8; i++) {
-        await tab.waitForTimeout(i === 0 ? 60 : 480)
-        shots.add((await tab.screenshot()).toString('base64'))
-      }
-      return { distinct: shots.size }
-    } finally {
-      await ctx.close()
-    }
-  }
-
-  const tried = await Promise.all(motions.map(async (m) => {
-    const prompt = `The component:\n${seen}${styles}\n\n${core.motionDirection(brief, m)}`
-    /**
-     * One retry, because a dropped reply is not an opinion about the component.
-     *
-     * Run over eight real components, the only outright failure was a reply that came back
-     * unparseable, and a caller told "no option moved the parts" for that reason has been given a
-     * verdict where there was only a hiccup. The second attempt is allowed to think, since the
-     * first was probably running under the fast dial, and thinking is the thing that was skipped.
-     */
-    let reply = await complete(core.MOTION_SYSTEM, prompt, config).catch(() => null)
-    let raw = reply ? core.grabJson(typeof reply === 'string' ? reply : reply.text ?? '') : null
-    if (!raw) {
-      reply = await complete(core.MOTION_SYSTEM, prompt, config, { thinking: undefined }).catch(() => null)
-      raw = reply ? core.grabJson(typeof reply === 'string' ? reply : reply.text ?? '') : null
-    }
-    const judged = raw ? core.judgeMotion(raw, undefined, false) : { why: reply?.error || 'No usable CSS came back.' }
-    if (!judged.css) return { m, css: '', scope: '', note: '', faults: [judged.why] }
-    return { m, css: judged.css, scope: judged.scope, note: judged.note, faults: [] }
-
+  const brief = core.motionBrief(args), verbs = core.dealVerbs(want)
+  const treatments = Array.from({ length: want }, (_, i) => brief.intensity === 'range' ? ['subtle', 'expressive', 'bold'][i % 3] : brief.intensity)
+  const at = await studioFor('write motion')
+  const subject = { id: 'component', name: 'Component', html: html.slice(0, 60000), css: String(args?.css || '').slice(0, 60000), w: 960, h: 540, warnings: [] }
+  const tried = await Promise.all(treatments.map(async (treatment, i) => {
+    const made = await fetch(`${at}/__motioneer/generate`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ subject, brief, treatment, verb: verbs[i] }) }).then((r) => r.json()).catch((e) => ({ error: e.message }))
+    if (made.error || !made.css) return { verb: verbs[i], treatment, faults: [made.error || 'No usable CSS came back.'] }
+    // parts arriving at different times is the difference between a mechanism and a slideshow
+    const judged = core.judgeMotion({ css: made.css, scope: made.scope, note: made.note }, made.scope, brief.purpose === 'entrance')
+    return judged.css ? { ...made, faults: [] } : { verb: verbs[i], treatment, faults: [judged.why] }
   }))
-
-  /**
-   * And then watch each one, because reading the css cannot tell you whether anything moved.
-   *
-   * Every gate that has ever gone wrong in this repository went wrong by reading source. An option
-   * with six keyframes and staggered delays reads perfectly and can still be a four hundred
-   * millisecond entrance that is over before anybody looks, or a set of rules whose selectors match
-   * nothing in the component they were written for. Frames settle both questions: the component is
-   * rendered with the stylesheet appended, sampled across four seconds, and an option whose frames
-   * are all identical did not move whatever its css says.
-   */
-  const watched = await Promise.all(tried.map(async (t) => {
-    if (!t || t.faults.length) return t
-    const seen = await frames(html, t.scope, t.css).catch(() => null)
-    if (seen === null) return { ...t, unwatched: true }
-    if (seen.distinct < 2) {
-      return { ...t, faults: [...t.faults, 'rendered, nothing on it changed. Either the selectors match '
-        + 'nothing in this component, or the movement is over before anybody could see it.'] }
-    }
-    return { ...t, distinct: seen.distinct }
-  }))
-  await browserPromise?.then(b=>b?.close()).catch(()=>{})
-
-  const kept = watched.filter((t) => t && !t.faults.length)
-  const dropped = tried.filter((t) => t && t.faults.length)
+  const kept = tried.filter((t) => !t.faults.length), dropped = tried.filter((t) => t.faults.length)
   if (!kept.length) {
     /**
-     * A component with one part cannot have a mechanism, and saying otherwise is unhelpful.
-     *
-     * Run over eight real shadcn components, six got staggered motion and the button did not: it is
-     * an icon and a label, so there is nothing to arrive in sequence and every option correctly came
-     * back as a transition. The gate was right and the message was wrong, because it blamed the
-     * options for a property of the component. Counting the elements separates "this did not work"
-     * from "there is nothing here to stagger", and only the first is worth retrying.
+     * A component with one part cannot have a mechanism, and saying otherwise is unhelpful. Over
+     * eight real shadcn components the button alone failed: an icon and a label have nothing to
+     * arrive in sequence. Counting its elements separates "this did not work" from "there is
+     * nothing here to stagger", and only the first is worth retrying.
      */
     const parts = (html.match(/<(?!\/)(?!br|hr|img|input|meta|link)[a-zA-Z]/g) ?? []).length
     const why = dropped[0]?.faults[0] ?? 'no usable reply came back'
-    if (parts < 5 && dropped.some((d) => d.faults.some((f) => f.includes('at once')))) {
-      throw new Error(
-        `This component has ${parts} element${parts === 1 ? '' : 's'}, so there is nothing to `
-        + 'stagger: motion on it can only be the whole thing moving, which is the transition you '
-        + 'already have. Send a component with parts that can arrive in sequence, rows, cards, '
-        + 'fields, cells, and the motion has something to be made of.')
-    }
-    throw new Error(`No option moved the parts. ${why}`)
+    if (parts < 5 && dropped.some((d) => d.faults.some((f) => f.includes('at once')))) throw cannot(`give this component staggered motion: it has ${parts} element${parts === 1 ? '' : 's'}, so motion on it can only move the whole, which is the transition it already has.`, 'send a component with parts that can arrive in sequence, such as rows, cards, fields or cells.')
+    throw cannot(`write motion that moves the parts: ${why}`, 'try a more specific direction, or send the component\'s css as well.')
   }
-  const why = [...new Set(dropped.flatMap((d) => d.faults.map((f) => f.split('.')[0])))]
-  // said out loud, because an option that was only read is a weaker claim than one that was watched
-  const unwatched = kept.some((k) => k.unwatched)
-  const options = kept.map((k) => ({ note: k.note || 'untitled', treatment: k.m, scope: k.scope, css: k.css, watched: !k.unwatched, distinct: k.distinct ?? null }))
+  const why = [...new Set(dropped.flatMap((d) => d.faults.map((f) => String(f).split('.')[0])))]
+  const watched = kept.every((k) => k.checked)
+  const options = kept.map((k) => ({ verb: k.verb, errand: k.errand, note: k.note || 'untitled', treatment: k.treatment, scope: k.scope, css: k.css, assembled: k.assembled, watched: !!k.checked }))
   return { structured: { options, dropped: dropped.length, droppedBecause: why },
-    summary: `${kept.length} motion${kept.length === 1 ? '' : 's'} for this component${dropped.length ? `, after ${dropped.length} written and dropped (${why.join('; ')})` : ''}. For each, put its scope attribute on the component's outermost element and append its css. ${unwatched ? 'They were checked by reading the css only, because no browser is installed here.' : 'Each was rendered on the component and watched for four seconds, so its selectors match and its movement is visible.'}`,
-    detail: kept.map((k, i) =>
-    `## ${i + 1}. ${k.note || 'untitled'}\n\n`
-    + (k.scope ? `Put \`${k.scope}\` on the component's outermost element, then append:\n\n` : 'Append:\n\n')
-    + `\`\`\`css\n${k.css}\n\`\`\``,
-  ).join('\n\n'), next: [] }
+    summary: `${kept.length} motion${kept.length === 1 ? '' : 's'} for this component, each taking its timing from a different real object (${options.map((o) => o.verb).join(', ')})${dropped.length ? `, after ${dropped.length} written and dropped (${why.join('; ')})` : ''}. For each, put its scope attribute on the component's outermost element and append its css. ${watched ? 'Each was rendered on the component and seen to come back to rest.' : 'Some were checked by reading the css only, because no browser is installed here.'}`,
+    detail: kept.map((k, i) => `## ${i + 1}. ${k.note || 'untitled'} (${k.verb})\n\n` + (k.scope ? `Put \`${k.scope}\` on the component's outermost element, then append:\n\n` : 'Append:\n\n') + `\`\`\`css\n${k.css}\n\`\`\``).join('\n\n'), next: [] }
 }
 
 /** What makes sense after a film or a take, filled in with its own projectId. */
