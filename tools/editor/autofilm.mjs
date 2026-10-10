@@ -515,7 +515,7 @@ export async function autofilm({ at, url, language = 'en', theme, background, in
       let cut = titleScale(firstCut(project, { pace, seconds, opening: chosen.opening, closing: chosen.closing, background: background ?? colours.background, ink, scenes }))
       cut.settings.fps = fps
       cut.source = source
-      cut.film = { ...cut.film, pace, scenes: keptScenes(cut, scenes) }
+      cut.film = { ...cut.film, pace, scenes: keptScenes(cut, scenes), recipe: { mode: 'capture', url, pick, direction, pace, seconds, treatment: look, count: max, captureMode, language, theme, fps, soundtrack } }
       if(soundtrack!=='none')cut=await withSoundtrack(cut,{at,style:soundtrack,onStep})
       const components = cut.tracks.filter((t) => t.kind === 'component').length
       if (!components) throw new Error('Cannot cut: no kept motion was saved, so there was nothing to place. Next: try again; if it repeats, open the studio and keep a motion by hand.')

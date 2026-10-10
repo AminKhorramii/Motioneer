@@ -58,6 +58,8 @@ tools/editor/
   score-file.mjs       validates and decodes a finished local soundtrack for an independent rescore take
   soundtrack.mjs       original synthesized music fitted to the cut, stored as editable project audio
   proof.mjs            a rendered film measured off its frames: cuts, shot length, arrival, blank frames, holds
+  live-film.mjs        the live HTML film: the real captures on the film's timeline, one file that plays anywhere
+  motion-system.mjs    a product's own motion read off its page, turned into house-style tokens and an audit
   refinement.mjs       takes: scoped CSS refinement, model-free retiming, and forks through the studio
   film-review.mjs      sampled-frame critique and bounded repair passes
   projects.mjs         the project store: revision-checked saves, small summaries for listing, linked forks

@@ -98,8 +98,9 @@ MCP `_meta.progressToken`, and gets the MP4, a storyboard decoded from that MP4,
 coverage and frame checks. Claude CLI uses its supported `sonnet`, `opus`, and `haiku` aliases
 by default, so a new setup follows the models available in the installed CLI.
 
-Film now defaults to 60 fps and an original synthesized score: ambient for calm films, pulse
-otherwise, with playful available for lighter briefs. `soundtrack: "none"` makes a silent film.
+Film now defaults to 60 fps and the `assembled` score: a dry tick on every part's arrival, in the
+sound of the verb the parts mostly move by, at a tempo set by the pace. ambient, pulse, playful and
+percussive remain for lighter briefs. `soundtrack: "none"` makes a silent film.
 The score is an ordinary audio track with its own asset and waveform, so it can be mixed, muted,
 or replaced in the editor. Recutting regenerates its timing while retaining imported audio.
 `revise` accepts `fps` and `soundtrack` as finishing notes without recapturing the page.

@@ -3,7 +3,7 @@
 import {readFile,mkdir} from 'node:fs/promises'
 import {fileURLToPath} from 'node:url'
 const pkg=JSON.parse(await readFile(new URL('../package.json',import.meta.url),'utf8'))
-const help=`Motioneer ${pkg.version} — motion films from your product, through your agent.
+const help=`Motioneer ${pkg.version}: motion films from your product, through your agent.
 
   npx motioneer setup --claude     Install the renderer and connect this Claude Code project
   npx motioneer setup --claude-desktop  Connect Claude Desktop and prepare the renderer
@@ -18,6 +18,10 @@ const help=`Motioneer ${pkg.version} — motion films from your product, through
   npx motioneer refine --project <id> --tracks <ids> --direction "Sharper arrival"
   npx motioneer benchmark --dry-run  Inspect the 20-product evaluation suite
   npx motioneer benchmark --out <folder> --limit 1  Render and revise a benchmark case
+  npx motioneer film <url>         Make a film from the terminal: an MP4 and a live HTML film
+  npx motioneer refresh <id>       Film an earlier film again from its recipe, as the app looks now
+  npx motioneer films <file.json>  Film every recipe in a file, for CI
+  npx motioneer lint [files]       Check stylesheets against the Assembled house style
   npx motioneer [url|folder]       Open the local studio
 
 Options: --dir <workspace>  --no-open  --port <1024–65535>  --help  --version
@@ -51,6 +55,14 @@ try{
    process.exitCode=report.ready?0:1
   }
  }else if(['review','refine','benchmark'].includes(command)){const {filmCommand}=await import('./film-cli.mjs');await filmCommand(command,args.slice(1))
+ }else if(['film','refresh','films'].includes(command)){const {filmsCommand}=await import('./film-cli.mjs');await filmsCommand(command,args.slice(1))
+ }else if(command==='lint'){
+  // the house style on a project's own stylesheets; --strict fails the run, for CI
+  const unknown=args.slice(1).find(a=>a.startsWith('--')&&!['--json','--strict'].includes(a));if(unknown)throw Error(`Cannot read option ${unknown}. Next: run npx motioneer --help.`)
+  const {lint}=await import('./lint.mjs'),core=await import('../dist-core/core.js'),report=await lint(args.slice(1).filter(a=>!a.startsWith('--')),core)
+  if(args.includes('--json'))console.log(JSON.stringify(report,null,2))
+  else{for(const f of report.files)console.log(`${f.notes.length?'!':'✓'} ${f.file}${f.notes.map(n=>'\n  '+n).join('')}`);console.log(`\n${report.checked} stylesheet${report.checked===1?'':'s'} with motion, ${report.flagged} with notes.`)}
+  if(args.includes('--strict')&&report.flagged)process.exitCode=1
  }else{
   const studioArgs=command==='studio'?args.slice(1):args
   const unknown=studioArgs.find(a=>a.startsWith('--')&&!['--app','--css'].includes(a));if(unknown)throw Error(`Cannot read option ${unknown}. Next: run npx motioneer --help.`)

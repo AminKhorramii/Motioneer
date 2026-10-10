@@ -108,7 +108,7 @@ ok('every one has a title and annotations, which clients use to show and to perm
 ok('every description stands on its own and stays within budget', tools.every((t) => (t.description ?? '').length > 80 && t.description.length <= 900), tools.map((t) => `${t.name} ${t.description?.length}`).join(', '))
 ok('every one has an object schema', tools.every((t) => t.inputSchema?.type === 'object'))
 ok('the tools that change nothing say so, and film and change never destroy', tool('doctor')?.annotations.readOnlyHint && tool('projects')?.annotations.readOnlyHint && tool('look')?.annotations.readOnlyHint && tool('film')?.annotations.destructiveHint === false && tool('change')?.annotations.destructiveHint === false)
-ok('motion requires the markup, since it cannot be guessed', (tool('motion')?.inputSchema?.required ?? []).includes('html'))
+ok('motion takes a component\'s markup, and lists nothing that would make a request for css look like it needs a site', !!props('motion').html && !props('motion').url && !props('motion').check)
 ok('studio requires nothing, because opening it is the whole call', (tool('studio')?.inputSchema?.required ?? []).length === 0)
 ok('open requires a target, since it has to know what to open, and can open a project', (tool('open')?.inputSchema?.required ?? []).includes('target') && !!props('open').projectId)
 ok('change requires the film it changes', (tool('change')?.inputSchema?.required ?? []).includes('projectId'))
@@ -201,6 +201,8 @@ const after = (await otherCall('projects', {})).result?.structuredContent
 ok('and a capture film is changed on a take of its own, which records where it came from', after?.projects?.some((p) => p.origin?.sourceProjectId === seeded.id && p.origin?.tool === 'change'), JSON.stringify(after?.projects?.map((p) => p.origin)))
 const noShot = (await otherCall('look', { projectId: seeded.id, shot: 3 })).result
 ok('a filmstrip of a shot the film does not have says how many it has', noShot?.isError && /has 0 shots/.test(noShot.content?.[0]?.text || ''), noShot?.content?.[0]?.text?.slice(0, 80))
+const noRecipe = (await otherCall('film', { refresh: seeded.id })).result
+ok('a film made before recipes says why it cannot be refreshed, rather than filming something else', noRecipe?.isError && /before films kept their recipe/.test(noRecipe.content?.[0]?.text || ''), noRecipe?.content?.[0]?.text?.slice(0, 80))
 const noTiming = (await otherCall('change', { projectId: seeded.id, timing: { duration: 0.7 } })).result
 ok('timing on a film with nothing in it is refused before any take is made', noTiming?.isError && /does not have/.test(noTiming.content?.[0]?.text || ''), noTiming?.content?.[0]?.text?.slice(0, 80))
 try { process.kill(restarted?.pid, 'SIGKILL') } catch { /* gone */ }
@@ -217,6 +219,14 @@ const video = await callTool('open', { target: 'video', path: clip })
 ok('a video that exists is opened by path', !video.isError && video.text.includes(clip), video.text.slice(0, 70))
 const folder = await callTool('open', { target: 'folder', path: clip })
 ok('and its folder is the directory, not the file', !folder.isError && folder.text.includes(path.dirname(clip)) && !folder.text.endsWith('film.mp4.'), folder.text.slice(0, 70))
+
+/* ── an agent's own motion, held to the same gates and watched on its markup ──────────────────── */
+console.log('\n  checking motion an agent wrote')
+const rows = '<ul class="list"><li>One</li><li>Two</li><li>Three</li></ul>'
+const passes = (await rpc('tools/call', { name: 'motion', arguments: { html: rows, check: '@media (prefers-reduced-motion: no-preference){[data-motion-rows] > li{animation:rise 320ms cubic-bezier(.16,1,.3,1) both}[data-motion-rows] > li:nth-child(2){animation-delay:60ms}[data-motion-rows] > li:nth-child(3){animation-delay:120ms}@keyframes rise{from{translate:0 14px}to{translate:0 0}}}' } })).result?.structuredContent
+ok('a staggered sheet passes the gates and the house style', passes?.ok === true && passes.assembled?.ok === true, passes?.summary?.slice(0, 80))
+const fails = (await rpc('tools/call', { name: 'motion', arguments: { html: rows, check: '@media (prefers-reduced-motion: no-preference){[data-motion-fade]{animation:fade 900ms ease-in-out both}@keyframes fade{from{opacity:0}to{opacity:1}}}' } })).result?.structuredContent
+ok('a whole-component fade is refused with its reasons', fails?.ok === false && /at once/.test(fails.faults?.join(' ') || '') && /opacity 0/.test(fails.assembled?.notes?.join(' ') || ''), fails?.summary?.slice(0, 80))
 
 /* ── one request never waits on another, and a cancelled one stays quiet ─────────────────────── */
 console.log('\n  one request does not wait on another')

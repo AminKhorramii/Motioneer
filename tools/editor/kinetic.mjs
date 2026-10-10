@@ -155,6 +155,8 @@ export async function kineticReel({at,brand,domain,projectId,url,mode='auto',dir
  const made=reelProject(fresh,plan,inventory.captures)
  onStep(`${plan.concept}: ${made.shots.length} graphic scenes, ${Math.round(made.bpm)} BPM.`)
  made.project.direction={...made.project.direction,brief}
+ // auto when auto was asked for, so filming it again can fall back the same way if the page changed
+ made.project.film={...made.project.film,recipe:{mode:sourceSelection?'auto':mode,url:url||'',brand,domain,direction,seconds,music,art,concept,bpm,brandMode,referenceUrls,palette}}
  const project=await withSoundtrack(made.project,{at,style:'signature',bpm:made.bpm,music:plan.music,cues:made.cues,soundKit,onStep})
  const saved=await fetch(`${at}/__motioneer/projects/${project.id}`,{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(project)}).then(r=>r.json())
  if(saved.error)throw new Error(`Cannot save the reel: ${saved.error}. Next: retry.`)

@@ -181,13 +181,25 @@ Eight tools, one job each:
 - **`change`:** every reaction afterwards, as a new take: the cut, the motion, the timing (exactly,
   with no model call) or the music.
 - **`look`:** what is on a page before filming, or a film's frames afterwards. A shot can be shown
-  as six frames, which is how an arrival is judged.
-- **`motion`:** CSS for markup you already have.
+  as six frames, which is how an arrival is judged. On a page it also reads the motion the product
+  already uses and returns its motion system: tokens as CSS variables and a Tailwind preset, the
+  verbs that fit, and an audit of what it does today.
+- **`motion`:** CSS for markup you already have. `check` holds CSS the agent wrote itself to the
+  same gates, watched on the markup.
 - **`projects`:** finds earlier work.
 - **`studio`**, **`open`** and **`doctor`:** the rest.
 
 Every reply carries a `summary` and the `next` calls that make sense, inside the structured copy
 clients show the model. `setup --claude` also installs a skill with the long guidance.
+
+From the terminal:
+- `npx motioneer film <url>` makes a film.
+- `npx motioneer refresh <projectId>` films an earlier film again from its recipe, as the app looks
+  today.
+- `npx motioneer films motioneer.films.json` films every recipe in a file, for CI.
+- `npx motioneer lint` checks your own stylesheets against the house style.
+
+See [films that stay current](docs/ci.md).
 
 Everything Motioneer makes follows one house style, Assembled: nothing fades in, and the real
 interface is built part by part, each part timed like a real object. Each film reports how far it

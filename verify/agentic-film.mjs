@@ -9,6 +9,7 @@ import {normalizeHandoffs} from '../tools/editor/source-handoffs.mjs'
 import {applyMotionPatches,refinementScope,forkProject,connectedTracks,retimeTracks} from '../tools/editor/refinement.mjs'
 import {normalizeCritique,reviewAndRefine} from '../tools/editor/film-review.mjs'
 import {regressed} from '../tools/editor/proof.mjs'
+import {motionSystem} from '../tools/editor/motion-system.mjs'
 import {paceOf,assembledReport,fitBrief} from '../tools/editor/autofilm.mjs'
 import {currentEvents,visualClock} from '../tools/editor/film-events.mjs'
 import {sampledScore,readSoundKit} from '../tools/editor/sampled-score.mjs'
@@ -66,6 +67,12 @@ const timed={...twice,motions:[{...twice.motions[0],css:'[data-m] > li{animation
 const lockedId=timedCut.tracks.filter(t=>t.kind==='component')[1].id;timedCut.tracks.find(t=>t.id===lockedId).locked=true
 const quicker=retimeTracks(timedCut,{trackIds:timedCut.tracks.filter(t=>t.kind==='component').map(t=>t.id),duration:.5,stagger:.5})
 const fresh=quicker.project.motions.find(m=>m.parentId==='m');assert.ok(fresh,'a new version, the original kept');assert.match(fresh.css,/200ms/);assert.match(fresh.css,/40ms/);assert.equal(quicker.project.tracks.find(t=>t.id===lockedId).motionId,'m','a locked track keeps its approved motion');assert.ok(quicker.changes.length>=1&&quicker.changes.every(c=>c.toMotionId===fresh.id))
+// A product's own motion becomes its motion system: tokens inside the house bands, verbs that fit how it already moves, and an audit of what it does today.
+const read={found:[{selector:'.card',media:'',transition:{duration:'0.2s, 150ms',easing:'cubic-bezier(0.2, 0.9, 0.3, 1), ease',property:'transform, width',delay:'0s'},animation:null},{selector:'.toast',media:'',transition:null,animation:{name:'pop',duration:'900ms',easing:'cubic-bezier(0.3, 1.4, 0.5, 1)',delay:'0s'}},{selector:'.row',media:'',transition:{duration:'80ms',easing:'linear',property:'all',delay:'0s'},animation:null}],keyframes:['pop'],guards:{reduce:0,noPreference:0}}
+const system=motionSystem(read)
+assert.equal(system.tokens.part,240,'a product faster than the house band starts at its floor');assert.equal(system.tokens.arrive,'cubic-bezier(0.2, 0.9, 0.3, 1)','the product\'s own arrival curve is kept');assert.deepEqual(system.verbs,['flap','wind','register'],'a springy product is dealt springy verbs')
+const audited=system.audit.join(' | ');assert.match(audited,/width/);assert.match(audited,/"all"/);assert.match(audited,/prefers-reduced-motion/);assert.match(audited,/ease, ease-in-out or linear/);assert.match(audited,/under 150ms/);assert.match(audited,/longer than 700ms/)
+assert.match(system.css,/--motion-part: 240ms/);assert.match(system.tailwind,/transitionTimingFunction/);assert.equal(system.fingerprint.reducedMotion,false)
 // Every film is proved at its own pace: a reel says fast, a calm film says calm, and an old film is read off its shots.
 assert.equal(paceOf(made.project),'fast');assert.equal(paceOf({...createProject('Calm one'),film:{pace:'calm'}}),'calm')
 // A repair is judged against the take it repairs, so a fault the take already had cannot reject it, and a new one does.

@@ -61,12 +61,20 @@ are the deck in `src/design/motion.ts`.
 - **Seeing and adjusting.** `look` with `shot` shows six frames across a shot, which is how an
   arrival is judged. `change` with `timing` rescales speed, spacing or easing exactly, with no
   model.
+- **Every arrival makes a sound, in capture films.** The `assembled` soundtrack is the capture
+  default.
+  - Its instrument is the sound of the verb the film's parts mostly move by, from the map above.
+  - Its cues are read from each motion's own css: a part lands two fifths into its motion, which
+    is where the arrival curve has carried it most of the way, and the last part settles the shot.
+  - A recut scores again on the new timing, because the score is recorded as itself.
+  - This lives in `arrivalCues()` in `tools/editor/film-events.mjs` and the house score in
+    `tools/editor/soundtrack.mjs`.
 
 ## Not yet
 
 - **Rule 2:** construction guides drawn from capture bounds.
 - **Rule 4:** detail-to-interface moves in capture films instead of the linear zoom.
-- **Rule 5:** arrival ticks wired to the verb's sound.
+- **Rule 5:** one instrument per film; a shot whose verb differs still ticks in the film's sound.
 - **Rule 7:** repeats replaced by a crop of one part and a pull-back, and the logo drawing its own
   paths.
 - **Enforcement:** nothing here refuses a motion yet. The pass rates will be measured over real

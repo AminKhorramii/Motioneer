@@ -24,6 +24,10 @@ carries structuredContent it gives the model that JSON and the images and drops 
 - A change to the card or a description is measured with `node verify/routing.mjs --runs 3`
   (needs the claude command, spends model calls). It asks a real model what it would call for 38
   requests. Keep the number up, and put it in the commit message.
+- A new listed field costs routing even when no description changes, because the model reads the
+  schema as what a tool needs. `url` and `check` on motion and `refresh` on film each took one
+  request from 6 of 6 to about 3 of 6. They answer unlisted, and the skill teaches them. Measure
+  one intent with `--only <n> --runs 6` before and after a schema change.
 
 ## The house style
 
@@ -45,9 +49,16 @@ real output calibrates them. See `docs/assembled.md`.
 - The page it serves is `shared/page.mjs`. It is one template literal, so **watch the
   backslashes**: a regex written there loses its escapes before a browser sees it. A startup guard
   refuses to run when it finds one.
-- `tools/editor/` is the film pipeline: `autofilm.mjs` (capture films and revise), `kinetic.mjs`
-  and `native-reel.mjs` (authored reels), `proof.mjs` (measured from frames), `refinement.mjs`
-  (takes, scoped refinement, model-free retiming), `projects.mjs` (the store and forks).
+- `tools/editor/` is the film pipeline:
+  - `autofilm.mjs`: capture films, revise, recipes and the cut's style report
+  - `kinetic.mjs` and `native-reel.mjs`: authored reels
+  - `proof.mjs`: measurements from frames
+  - `refinement.mjs`: takes, scoped refinement and model-free retiming
+  - `projects.mjs`: the store and forks
+  - `live-film.mjs`: the live HTML film
+  - `motion-system.mjs`: a product's own motion read off its page, turned into tokens and an audit
+- `tools/lint.mjs` is `npx motioneer lint`, and `tools/film-cli.mjs` holds the terminal's `film`,
+  `refresh` and `films`. Both drive the same code as the MCP server.
 - Everything opinionated is data in `src/design/`, one file per kind of knowledge. Tune taste there
   without touching machinery.
 - What judges model-written css lives in `src/written.ts` beside the other gates, never in the

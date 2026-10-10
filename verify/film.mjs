@@ -22,14 +22,15 @@ import {websiteBrand,publicBrand} from '../tools/editor/brand.mjs'
 import {ART,artStyles} from '../tools/editor/art-direction.mjs'
 import {MUSIC,musicWav} from '../tools/editor/music.mjs'
 import {rescoreFilm} from '../tools/editor/rescore.mjs'
-import { withSoundtrack, scoreStyle, scoreWav } from '../tools/editor/soundtrack.mjs'
+import { withSoundtrack, scoreStyle, scoreWav, houseSound } from '../tools/editor/soundtrack.mjs'
+import { arrivalCues } from '../tools/editor/film-events.mjs'
 import { loadChromium } from '../tools/editor/render.mjs'
 import {normalizeReel,reelProject,kineticReel} from '../tools/editor/kinetic.mjs'
 import {websiteMedia} from '../tools/editor/media-source.mjs'
 import {captureInventory} from '../tools/editor/hybrid.mjs'
 import {SCENES} from '../tools/editor/kinetic-scenes.mjs'
 import { proveFilm } from '../tools/editor/proof.mjs'
-import { firstCut, createProject, compositionDocument } from '../dist-core/core.js'
+import { firstCut, createProject, compositionDocument, newTrack } from '../dist-core/core.js'
 
 const root = path.dirname(fileURLToPath(new URL('.', import.meta.url)))
 if (!(await loadChromium())) { console.log('skip: the local renderer is not installed, so the film path cannot be exercised here'); process.exit(0) }
@@ -192,6 +193,20 @@ if (!(await loadChromium())) { console.log('skip: the local renderer is not inst
   console.log('ok: complete product scenes survive a long page and the model reads visible structure instead of embedded pixels')
 }
 
+// the house score's clock: every staggered part of a capture lands on a cue, in the sound of its verb
+{
+  const p = createProject('arrivals')
+  p.subjects = [{ id: 'a', name: 'A', html: '<ul><li>1</li><li>2</li><li>3</li></ul>', css: '', w: 100, h: 50, warnings: [] }]
+  const css = '@media (prefers-reduced-motion: no-preference){[data-m] > li{animation:rise 360ms cubic-bezier(.16,1,.3,1) both}[data-m] > li:nth-child(2){animation-delay:60ms}[data-m] > li:nth-child(3){animation-delay:120ms}@keyframes rise{from{translate:0 14px}to{translate:0 0}}}'
+  p.motions = [{ id: 'm', subjectId: 'a', css, scope: 'data-m', note: '', brief: p.brief, treatment: 'subtle', duration: 480, saved: true, verb: 'stamp' }]
+  p.tracks = [{ ...newTrack('component', 'A', 1000), subjectId: 'a', motionId: 'm', entrance: 200, duration: 2000 }]
+  const cues = arrivalCues(p, new Map([[p.tracks[0].id, 1000]]))
+  assert.deepEqual(cues.map((c) => Math.round(c.at * 1000)), [1344, 1404, 1464], 'each part lands two fifths into its motion, counted from the track start and its entrance')
+  assert.deepEqual(cues.map((c) => c.phase), [0, 1, 3], 'the last part to land settles the shot')
+  assert.equal(houseSound(p), 'postmark', 'a stamped film sounds like a postmark')
+  console.log('ok: the house score ticks when each part lands, in the sound of its verb')
+}
+
 // the cut's rhythm, before any browser: fast means many short shots and short titles
 {
   const p = createProject('pace'); p.subjects = [{ id: 'a', name: 'A', html: '<b>a</b>', css: '', w: 100, h: 50, warnings: [] }, { id: 'b', name: 'B', html: '<b>b</b>', css: '', w: 100, h: 50, warnings: [] }]
@@ -343,6 +358,9 @@ try {
   const wav=scoreWav({seconds:1,style:'ambient',seed:'check'}).data
   assert.equal(wav.readUInt32LE(40),24000*4)
   assert.equal(wav.readInt16LE(44),0,'the score starts without a click')
+  const housed=await withSoundtrack(saved,{at,style:'assembled'}),tick=housed.assets.find(a=>housed.tracks.some(t=>t.kind==='audio'&&t.assetId===a.id))
+  assert.equal(scoreStyle(housed),'assembled','the house score is recorded as itself, so a recut scores it again on the new timing')
+  assert.ok(/^Motioneer score: assembled-(tabulator|relay|keystroke|postmark|handshake|release)\.wav$/.test(tick?.name)&&tick.waveform.some(v=>v>.01),'the house score is an audible action score named for its sound')
   /**
    * A captured root sits flush in its frame. The block was captured with an 18px top margin, and a
    * frame sized to its box once rendered it 18px down and clipped its foot. Rendered through the
@@ -431,7 +449,7 @@ try {
   const { revise } = await import('../tools/editor/autofilm.mjs')
   const revised = await revise({ at, projectId: result.projectId, seconds: 9, drop: ['1','2'], order:[4,3], background:'#101319',ink:'#3ecf8e', onStep: (m) => { if (process.env.MOTIONEER_STEPS) console.log('  step', m) } })
   const colored=await(await fetch(`${at}/__motioneer/projects/${result.projectId}`)).json()
-  assert.equal(colored.settings.background,'#101319');assert.ok(colored.tracks.filter(t=>t.kind==='title').every(t=>t.color==='#3ecf8e'),'a requested palette reaches the saved film and title tracks')
+  assert.equal(colored.film?.recipe?.mode,'capture','a capture film keeps the recipe it can be filmed again from');assert.equal(colored.settings.background,'#101319');assert.ok(colored.tracks.filter(t=>t.kind==='title').every(t=>t.color==='#3ecf8e'),'a requested palette reaches the saved film and title tracks')
   assert.equal(revised.shots,result.shots-2,'multiple numbered drops address the original cut without shifting later indices')
   assert.deepEqual(revised.shotList[0].elements,result.shotList[3].elements,'order uses the same original shot numbers as drop')
   assert.ok(revised.changes.some((c) => /dropped shot 1/.test(c)) && revised.changes.some((c) => /9 seconds/.test(c)), `the revision should say what it changed, got ${JSON.stringify(revised.changes)}`)

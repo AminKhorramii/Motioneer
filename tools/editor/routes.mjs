@@ -32,6 +32,7 @@ export function editorRoutes(hooks) {
         const request=await jsonBody(req), controller=new AbortController();res.on('close',()=>controller.abort())
         return send(await hooks.generate(request,controller.signal))
       }
+      if(p==='/__motioneer/judge' && req.method==='POST')return send(await hooks.judge(await jsonBody(req)))
       if(p==='/__motioneer/renderer')return send(req.method==='POST'?render.install():await render.status())
       if(parts[1]!=='projects')return false
       const id=parts[2]

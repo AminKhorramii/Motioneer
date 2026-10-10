@@ -45,7 +45,7 @@ export const TOOLS = [
         pace: { type: 'string', enum: ['calm', 'brisk', 'fast'], description: 'capture: fast is many one-second shots, brisk is a demo rhythm, calm is a few long shots.' },
         treatment: { type: 'string', enum: ['subtle', 'expressive', 'bold'], description: 'capture: how strongly each element moves. Expressive by default, subtle for calm.' },
         captureMode: { type: 'string', enum: ['dom', 'pixels'], description: 'capture: pixels photographs each element first, for when DOM capture loses its fonts, canvas or images; motion then moves a flat image.' },
-        soundtrack: { type: 'string', enum: ['none', 'ambient', 'pulse', 'playful', 'percussive'], description: 'capture: the synthesized score. none for silence.' },
+        soundtrack: { type: 'string', enum: ['none', 'assembled', 'ambient', 'pulse', 'playful', 'percussive'], description: 'capture: the synthesized score. assembled by default, a dry tick on every arrival in the sound of the film\'s verbs; none for silence.' },
         brand: { type: 'string', maxLength: 24, description: 'Authored films: the company or product name. Read from the address when left out; needed for graphic.' },
         concept: { type: 'string', maxLength: 45, description: 'Authored films: a title for this creative direction, to tell variations apart.' },
         music: { type: 'string', enum: MUSIC, description: 'Authored films: the musical identity. Dry action scores: keystroke, relay, tabulator, postmark, handshake, release. Deep fast techno: hypnosis, warehouse, submerge, acidline, fracture, alloy. Electronic and keys: glass, liquid, paper, monolith, elastic, voltage, current, branch, prism, conversation. The director chooses when left out.' },
@@ -86,7 +86,7 @@ export const TOOLS = [
             background: colour('stage background'),
             ink: colour('title colour'),
             fps: { type: 'number', enum: [30, 60] },
-            soundtrack: { type: 'string', enum: ['none', 'ambient', 'pulse', 'playful', 'percussive'], description: 'Replace or remove the generated score; imported audio stays.' },
+            soundtrack: { type: 'string', enum: ['none', 'assembled', 'ambient', 'pulse', 'playful', 'percussive'], description: 'Replace or remove the generated score; imported audio stays.' },
           },
         },
         motion: {
@@ -125,7 +125,7 @@ export const TOOLS = [
   },
   {
     name: 'look', title: 'Look at a page or a film',
-    description: 'See before filming or after rendering. With url it lists what on a page is worth filming, each element with its role, size, image and text, plus a contact sheet image with numbered tiles; follow with film, passing pick in the person\'s words. With projectId it returns a storyboard of that film\'s shots with stable track IDs and the measured verdict; at gives frames at chosen seconds, and shot gives one shot as a filmstrip of six frames, which is how to see an arrival move. critique true also has the configured model list concrete visible issues, which does not certify taste. It never changes a project, and reuses a render of the same revision.',
+    description: 'See before filming or after rendering. With url it lists what on a page is worth filming, each element with its role, size, image and text, plus a contact sheet image with numbered tiles; follow with film, passing pick in the person\'s words. It also reads the motion the page already has, as house-style tokens, a Tailwind preset and an audit. With projectId it returns a storyboard of that film\'s shots with stable track IDs and the measured verdict; at gives frames at chosen seconds, and shot gives one shot as a filmstrip of six frames, which is how to see an arrival move. critique true also has the configured model list concrete visible issues, which does not certify taste. It never changes a project, and reuses a render of the same revision.',
     annotations: { readOnlyHint: true, openWorldHint: true },
     inputSchema: {
       type: 'object',

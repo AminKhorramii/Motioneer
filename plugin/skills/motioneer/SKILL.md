@@ -21,6 +21,13 @@ invented interface. Say plainly when a source is only available as a screenshot.
 - **An idea in words, with no site:** `film` with `mode: "graphic"` and `brand`.
 - **CSS for markup they have:** `motion`. Send the real markup and its CSS, since selectors can
   only reach parts that are in it.
+- **Motion that matches the product:** `look` with the url returns `motion`, the motion system
+  read off the page: tokens as CSS variables and a Tailwind preset, the verbs that fit, and an
+  audit. Pass its tokens in the `direction` of each `motion` call, so new motion keeps the product's
+  own timing and curve.
+- **Motion you wrote yourself:** `motion` with `html` and `check` set to your CSS. It is judged by
+  the same gates as Motioneer's options and rendered on the markup, so a fade or a whole-element
+  slide is caught before the person sees it.
 - **Picking and comparing by hand:** `studio`.
 
 When unsure what is on a page, call `look` with the url first. Then show or describe the
@@ -101,6 +108,10 @@ lost:
 To add elements that were never filmed, call `film` again with `pick`. When the projectId is not in
 the conversation, `projects` lists earlier films and their takes.
 
+When they want the same film again because the product changed, call `film` with `refresh` set to
+its projectId. It films again from the stored recipe as the product looks today, and keeps the old
+film. A film made before recipes were stored says so, and needs one ordinary `film` call first.
+
 ## Music
 
 Authored films compose an original score on the cut:
@@ -108,8 +119,10 @@ Authored films compose an original score on the cut:
 - **Deep, fast techno:** hypnosis, warehouse, submerge, acidline, fracture and alloy, around 144 to
   162 BPM.
 
-Capture films take a lighter synthesized score: ambient, pulse, playful or percussive, or `none`
-for silence. Never promise stock music or a song composed to order.
+Capture films are scored `assembled` by default: a dry tick on every part's arrival, in the sound
+of the verb the parts mostly move by, so the cut is heard being built. ambient, pulse, playful and
+percussive are lighter alternatives, and `none` is silence. Never promise stock music or a song
+composed to order.
 
 ## When something fails
 

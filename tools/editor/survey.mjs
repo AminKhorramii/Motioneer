@@ -1,3 +1,4 @@
+import { readMotion } from './motion-system.mjs'
 import { loadChromium } from "./render.mjs"
 
 /** A compact, stable description of what is worth filming on the page inside the source frame. */
@@ -286,7 +287,9 @@ export async function inspectSite({ at, url, language = 'en', theme }) {
     let cands = await dropDecoration(page, await candidates(frame), () => {})
     for (let n = 0; n < 2 && !cands.length; n++) { await page.waitForTimeout(3000); cands = await dropDecoration(page, await candidates(frame), () => {}) }
     const sheet = await contactSheet(page, frame, cands)
-    return { source, title, colours, candidates: cands, sheet }
+    // the motion the page already has, read while it is open anyway
+    const motion = await readMotion(frame).catch(() => null)
+    return { source, title, colours, candidates: cands, sheet, motion }
   } finally { await browser.close() }
 }
 

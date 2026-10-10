@@ -2520,6 +2520,19 @@ const editor = editorRoutes({
     }
     throw new Error(why || 'No usable motion came back. Try a more specific direction.')
   },
+  /**
+   * A stylesheet somebody else wrote, held to the same gates and the same rendered rest check as
+   * the options written here. An agent writes css well; what it cannot do is watch the sheet run
+   * on the component, so this does it for the agent and says what passed and what did not.
+   */
+  judge: async ({ subject, css, scope, purpose = 'entrance' }) => {
+    if (!subject || typeof subject.html !== 'string' || !subject.html.trim()) throw new Error('Send the component markup the sheet was written for.')
+    const judged = judgeMotion({ css, scope, note: 'checked' }, scope, purpose === 'entrance')
+    if (!judged.css) return { ok: false, faults: [judged.why], assembled: assembled(String(css || ''), { purpose }) }
+    const rest = await drifts({ markup: subject.html, base: subject.css || '', css: judged.css, scope: judged.scope, wide: subject.w })
+    const faults = purpose === 'idle' ? (rest.running === 0 ? ['No visible animation was found.'] : []) : resting(rest)
+    return { ok: !faults.length, faults, css: judged.css, scope: judged.scope, assembled: assembled(judged.css, { purpose }), seen: { blank: rest.blank || 0, escape: rest.escape || 0, stir: rest.stir || 0 }, checked: !rest.skipped }
+  },
 })
 
 const server = createServer(async (req, res) => {

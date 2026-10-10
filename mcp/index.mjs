@@ -70,6 +70,20 @@ async function studio({ url, dir }) {
     + 'like in the studio itself.', structured: { studio: at, url: url || null }, ids: { studio: at } }
 }
 
+/**
+ * The product's motion system, read off what inspection saw: tokens in the house style, the verbs
+ * that fit how it already moves, and an audit of what it does today.
+ */
+async function pageMotion(read) {
+  if (!read) return null
+  const { motionSystem } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'motion-system.mjs')).href)
+  return motionSystem(read)
+}
+
+/** One sentence on the page's own motion, for look's summary. */
+const motionLine = (system) => !system ? '' : !system.fingerprint.rules ? ' Its stylesheets declare no motion, so motion.css holds house-style tokens to start from.'
+  : ` Its own motion: ${system.fingerprint.rules} rules, parts around ${system.tokens.part}ms on ${system.fingerprint.arrival ? 'its own arrival curve' : 'the house arrival curve'}, and the verbs that fit are ${system.verbs.join(', ')}. motion.css and motion.tailwind hold its tokens${system.audit.length ? `, and motion.audit names ${system.audit.length} thing${system.audit.length === 1 ? '' : 's'} to fix` : ''}.`
+
 /** This workspace's studio for a tool that needs one, started headless when none is running. */
 async function studioFor(what, { url } = {}) {
   const at = await ensureStudio({ url })
@@ -128,9 +142,11 @@ async function inspect({ url, dir, language, theme }) {
   const lines = seen.candidates.map(describe)
   const summary = `${seen.title || seen.source} has ${seen.candidates.length} things worth filming.`
     + (seen.sheet ? ` The image is a contact sheet of the first ${seen.sheet.tiles}, each tile labelled with its index; describe or show them, and ask which the person wants.` : '')
-  return { summary, detail: lines.join('\n'), images: seen.sheet ? [seen.sheet] : [], ids: { source: seen.source },
-    structured: { title: seen.title, source: seen.source, background: seen.colours?.background, elements: seen.candidates.map((c) => ({ index: c.i, role: c.role, section: c.section, width: c.w, height: c.h, image: !!c.image, text: c.text || '', alike: c.alike || 0 })) },
-    next: [{ tool: 'film', args: { url, mode: 'capture', pick: "<the elements they chose, in their words>" }, why: 'film what they choose' }, { tool: 'film', args: { url, mode: 'auto' }, why: 'make a brand film of the whole site instead' }] }
+  const system = await pageMotion(seen.motion)
+  return { summary: summary + motionLine(system), detail: lines.join('\n'), images: seen.sheet ? [seen.sheet] : [], ids: { source: seen.source },
+    structured: { title: seen.title, source: seen.source, background: seen.colours?.background, motion: system, elements: seen.candidates.map((c) => ({ index: c.i, role: c.role, section: c.section, width: c.w, height: c.h, image: !!c.image, text: c.text || '', alike: c.alike || 0 })) },
+    next: [{ tool: 'film', args: { url, mode: 'capture', pick: "<the elements they chose, in their words>" }, why: 'film what they choose' }, { tool: 'film', args: { url, mode: 'auto' }, why: 'make a brand film of the whole site instead' },
+      ...(system ? [{ tool: 'motion', args: { html: "<a component's markup>", direction: `Use this product's tokens: parts ${system.tokens.part}ms, ${system.tokens.gap}ms apart, arriving on ${system.tokens.arrive}.` }, why: 'write a component\'s motion in the product\'s own tokens' }] : [])] }
 }
 
 async function film({ url, dir, language, theme, captureMode, seconds, fps, soundtrack, background, ink, look, count, pick, pace, direction }, progress = () => {}) {
@@ -145,7 +161,7 @@ async function film({ url, dir, language, theme, captureMode, seconds, fps, soun
   const wantSeconds = Number(seconds) || (wantPace === 'fast' ? 12 : 20)
   // a fast film wants many elements; a calm one a few. the cap is what a render can carry in a few minutes
   const max = Math.max(1, Math.min(12, Number(count) || (wantPace === 'fast' ? 8 : wantPace === 'brisk' ? 5 : 3)))
-  const result = await autofilm({ at, url, language, theme, captureMode, background, ink, pick: String(pick || '').slice(0, 600), direction: String(direction || '').slice(0, 1400), seconds: wantSeconds, fps: fps ?? 60, soundtrack: soundtrack ?? (wantPace === 'calm' ? 'ambient' : 'pulse'), look: look || (wantPace === 'calm' ? 'subtle' : 'expressive'), pace: wantPace, max, onStep: (m) => {steps.push(m);progress(m)}, onProject: (id) => { made.projectId = id } }).catch((e) => { e.projectId = made.projectId; throw e })
+  const result = await autofilm({ at, url, language, theme, captureMode, background, ink, pick: String(pick || '').slice(0, 600), direction: String(direction || '').slice(0, 1400), seconds: wantSeconds, fps: fps ?? 60, soundtrack: soundtrack ?? 'assembled', look: look || (wantPace === 'calm' ? 'subtle' : 'expressive'), pace: wantPace, max, onStep: (m) => {steps.push(m);progress(m)}, onProject: (id) => { made.projectId = id } }).catch((e) => { e.projectId = made.projectId; throw e })
   const file = await keepFile(result, dir, `${new URL(url).host}-${wantPace}`)
   const review = await reviewResult(result,file,progress)
   const buf = { length: (await stat(file)).size }
@@ -293,7 +309,17 @@ async function revise({ projectId, dir, pace, seconds, opening, closing, drop, o
  */
 async function motion(args) {
   const html = String(args?.html ?? '')
-  if (!html.trim()) throw cannot('write motion: motion needs the component markup, so the keyframes can name its parts.', 'send the component markup as html.')
+  if (!html.trim()) throw cannot('write motion: motion needs the component markup, so the keyframes can name its parts.', 'send the component markup as html. To read the motion the product already has, call look with its url.')
+  if (args?.check) {
+    // the agent's own sheet, held to the same gates and watched on the same markup as Motioneer's options
+    const at = await studioFor('check the motion'), purpose = ['entrance', 'emphasis', 'idle', 'interaction'].includes(args.purpose) ? args.purpose : 'entrance'
+    const verdict = await fetch(`${at}/__motioneer/judge`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ subject: { id: 'component', html: html.slice(0, 60000), css: String(args.css || '').slice(0, 60000), w: 960, h: 540 }, css: String(args.check), purpose }) }).then((r) => r.json()).catch((e) => ({ error: e.message }))
+    if (verdict.error) throw cannot(`check the motion: ${verdict.error}`, 'send the component markup the css was written for.')
+    const style = verdict.assembled?.ok ? ' It is in the house style.' : verdict.assembled ? ` House style notes: ${verdict.assembled.notes.join('; ')}.` : ''
+    return { structured: verdict,
+      summary: verdict.ok ? `The motion passes the same gates as Motioneer's own options${verdict.checked ? ', and was rendered on the component and seen to come back to rest' : ''}.${style}` : `The motion does not pass: ${verdict.faults.map((f) => String(f).replace(/\.+$/, '')).join('; ')}.${style}`,
+      next: verdict.ok ? [] : [{ tool: 'motion', args: { html: '<the same markup>' }, why: 'have Motioneer write options that pass instead' }] }
+  }
   const want = Math.max(1, Math.min(6, Number(args?.options) || 3))
   const core = await import(pathToFileURL(path.join(ROOT, 'dist-core', 'core.js')).href)
   const brief = core.motionBrief(args), verbs = core.dealVerbs(want)
@@ -352,6 +378,7 @@ const brandOf = (url) => { const h = hostOf(url).replace(/^www\./, ''); if (!h |
  * given, and is otherwise read from what was asked for.
  */
 async function filmTool(args, progress) {
+  if (args?.refresh) return refreshTool(args, progress)
   const a = { ...args }
   const mode = a.mode || (a.pick || a.count || a.pace || a.treatment || (a.url && isLocal(hostOf(a.url))) ? 'capture' : a.url || a.projectId ? 'auto' : 'graphic')
   if (!['auto', 'capture', 'native', 'hybrid', 'graphic'].includes(mode)) throw cannot(`film in mode ${mode}.`, 'choose auto, capture, native, hybrid or graphic.')
@@ -361,6 +388,25 @@ async function filmTool(args, progress) {
   const brand = String(a.brand || brandOf(a.url || '') || '').slice(0, 24)
   if (!brand) throw cannot('make an authored film without a name: there is no site to read one from.', 'pass brand, the product\'s name.')
   return reel({ ...a, mode, brand }, progress)
+}
+
+/**
+ * A film made again from its recipe, as the product looks today. Screen recordings go stale with
+ * the next release; a Motioneer film is a recipe over the live interface, so filming it again is
+ * one call, and the new film records which one it renews.
+ */
+async function refreshTool({ refresh, dir }, progress) {
+  const { projectStore } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'projects.mjs')).href)
+  const source = await projectStore(path.join(await workspace(), '.studio', 'projects')).read(String(refresh)).catch(() => null)
+  if (!source) throw cannot(`film ${refresh} again: there is no such film in this workspace.`, 'call projects to find it.')
+  if (!source.film?.recipe) throw cannot(`film ${source.name} again: it was made before films kept their recipe.`, 'call film with its url and the same request once, and later films can be refreshed.')
+  const result = await filmTool({ ...source.film.recipe, dir }, progress), id = result.structured?.projectId
+  if (id) {
+    const at = await studioFor('record the refresh')
+    const fresh = await fetch(`${at}/__motioneer/projects/${encodeURIComponent(id)}`).then((r) => r.json()).catch(() => null)
+    if (fresh?.tracks) await fetch(`${at}/__motioneer/projects/${encodeURIComponent(id)}`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...fresh, film: { ...fresh.film, origin: { tool: 'refresh', sourceProjectId: source.id, at: Date.now() } } }) }).catch(() => {})
+  }
+  return { ...result, structured: { ...result.structured, refreshed: source.id }, summary: `Filmed ${source.name} again from its recipe, as the product looks today. ${result.summary}` }
 }
 
 /**

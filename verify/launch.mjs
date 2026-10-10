@@ -36,6 +36,12 @@ try{
   await withInstallLock(cache,async()=>{await mkdir(cache+'/node_modules/playwright',{recursive:true});await writeFile(cache+'/node_modules/playwright/index.mjs','throw Error("partially unpacked")');assert.equal(await loadChromium(),null);assert.equal((await renderer().status()).state,'installing');await writeFile(cache+'/browser','fixture');await writeFile(cache+'/node_modules/playwright/index.mjs','export const chromium={executablePath:()=>'+JSON.stringify(cache+'/browser')+'}')});
   assert.ok(await loadChromium());
  `],{encoding:'utf8',env:{...process.env,MOTIONEER_RENDER_CACHE:cache}});assert.equal(regression.status,0,regression.stderr)
+ // the house style as a check on a project's own stylesheets, advisory unless --strict
+ await mkdir(path.join(dir,'styles'),{recursive:true});await writeFile(path.join(dir,'styles','fade.css'),'.card{transition:width 900ms ease-in-out}@keyframes in{from{opacity:0}to{opacity:1}}.card{animation:in 900ms linear}')
+ await writeFile(path.join(dir,'styles','built.css'),'@media (prefers-reduced-motion: no-preference){.list > li{animation:rise 320ms cubic-bezier(.16,1,.3,1) both}.list > li:nth-child(2){animation-delay:60ms}@keyframes rise{from{translate:0 12px}to{translate:0 0}}}')
+ const linted=run(['lint','styles','--json']);assert.equal(linted.status,0);const lintReport=JSON.parse(linted.stdout);assert.equal(lintReport.checked,2);assert.equal(lintReport.flagged,1)
+ assert.match(lintReport.files.find(f=>f.file.endsWith('fade.css')).notes.join(' | '),/prefers-reduced-motion/);assert.equal(lintReport.files.find(f=>f.file.endsWith('built.css')).notes.length,0)
+ assert.equal(run(['lint','styles','--strict']).status,1,'strict lint fails a run with notes, for CI')
  // the Claude Code plugin starts the package at its own version, so every place naming the version agrees
  const root=fileURLToPath(new URL('..',import.meta.url))
  const version=JSON.parse(await readFile(path.join(root,'package.json'),'utf8')).version,manifest=JSON.parse(await readFile(path.join(root,'plugin/.claude-plugin/plugin.json'),'utf8')),servers=JSON.parse(await readFile(path.join(root,'plugin/.mcp.json'),'utf8')).mcpServers,market=JSON.parse(await readFile(path.join(root,'.claude-plugin/marketplace.json'),'utf8'))
