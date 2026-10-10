@@ -67,7 +67,7 @@ export const TOOLS = [
   },
   {
     name: 'change', title: 'Change a film',
-    description: 'Change a film or reel that was already made, by its projectId, and return a new take: a new projectId, the file, numbered shots and a storyboard. The original stays as it was. Use it for every reaction to a film. cut changes pace, length, shot order, dropped shots, titles, colours or frame rate of a capture film. motion rewrites how elements move while keeping timing and audio: name shots or elements for a capture film, or trackIds for a reel, and lock what was approved. music replaces only the score with a musical identity or direction, or with a finished audio file. Give cut, motion or music; cut and motion can go together. It takes 30 seconds to three minutes. To film elements that were never filmed, call film again with pick.',
+    description: 'Change a film or reel that was already made, by its projectId, and return a new take: a new projectId, the file, numbered shots and a storyboard. The original stays as it was. Use it for every reaction to a film. cut changes pace, length, shot order, dropped shots, titles, colours or frame rate of a capture film. motion rewrites how elements move while keeping timing and audio: name shots or elements for a capture film, or trackIds for a reel, and lock what was approved. music replaces only the score with a musical identity or direction, or with a finished audio file. timing rescales how fast parts move, how far apart they start, or their easing, with no model call. Give one of cut, motion, timing or music; cut and motion can go together. It takes 30 seconds to three minutes. To film elements that were never filmed, call film again with pick.',
     annotations: { destructiveHint: false, openWorldHint: false },
     inputSchema: {
       type: 'object',
@@ -100,6 +100,15 @@ export const TOOLS = [
           },
           required: ['direction'],
         },
+        timing: {
+          type: 'object', description: 'A capture film\'s motion timing, rescaled exactly with no model: new versions, cut and audio kept.',
+          properties: {
+            duration: { type: 'number', minimum: 0.25, maximum: 4, description: 'Scale each part\'s movement: 0.7 is 30 percent snappier, 1.5 is slower.' },
+            stagger: { type: 'number', minimum: 0, maximum: 4, description: 'Scale the gaps between parts: 0.5 packs them tighter, 2 spreads them out.' },
+            ease: { type: 'string', enum: ['arrive', 'leave', 'mechanical'], description: 'arrive settles with a long tail, leave accelerates away, mechanical steps.' },
+            elements: { type: 'array', items: { type: 'string' }, description: 'Shot numbers or words from element names. Every visible element when left out.' },
+          },
+        },
         music: {
           type: 'object', description: 'Only the music. Visuals, timing and camera are kept.',
           properties: {
@@ -116,13 +125,15 @@ export const TOOLS = [
   },
   {
     name: 'look', title: 'Look at a page or a film',
-    description: 'See before filming or after rendering. With url it lists what on a page is worth filming, each element with its role, size, image and text, plus a contact sheet image with numbered tiles; follow with film, passing pick in the person\'s words. With projectId it renders that film and returns a storyboard image of its shots with stable track IDs and the measured verdict; critique true also has the configured model list concrete visible issues, which does not certify taste. It never changes a project. It takes a few seconds for a page and up to a minute for a film.',
+    description: 'See before filming or after rendering. With url it lists what on a page is worth filming, each element with its role, size, image and text, plus a contact sheet image with numbered tiles; follow with film, passing pick in the person\'s words. With projectId it returns a storyboard of that film\'s shots with stable track IDs and the measured verdict; at gives frames at chosen seconds, and shot gives one shot as a filmstrip of six frames, which is how to see an arrival move. critique true also has the configured model list concrete visible issues, which does not certify taste. It never changes a project, and reuses a render of the same revision.',
     annotations: { readOnlyHint: true, openWorldHint: true },
     inputSchema: {
       type: 'object',
       properties: {
         url: { type: 'string', description: 'The running site or dev server to look at.' },
         projectId: { type: 'string', description: 'A film or take to look at.' },
+        at: { type: 'array', maxItems: 12, items: { type: 'number' }, description: 'projectId: seconds to see frames at, such as [1.2, 1.35, 1.5].' },
+        shot: { type: 'number', description: 'projectId: a shot number from the reply, shown as six frames from its start to its end.' },
         critique: { type: 'boolean', description: 'projectId: also ask the model for concrete visible issues, by track.' },
         theme: { type: 'string', enum: ['light', 'dark'] },
         language: { type: 'string', description: 'Two-letter language, en by default.' },

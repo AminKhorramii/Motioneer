@@ -362,9 +362,10 @@ async function filmTool(args, progress) {
  * person who has the original open in the editor never finds it changed under them. An authored
  * reel's scenes are designed together, so its motion is refined by track and its cut is left alone.
  */
-async function changeTool({ projectId, dir, cut, motion: moving, music }, progress) {
+async function changeTool({ projectId, dir, cut, motion: moving, timing, music }, progress) {
   if (!projectId) throw cannot('change a film without its projectId.', 'pass the projectId a film, change or projects reply carried, or call projects to find it.')
-  if (!cut && !moving && !music) throw cannot('change nothing: give cut, motion or music.', 'say what should change.')
+  if (!cut && !moving && !music && !timing) throw cannot('change nothing: give cut, motion, timing or music.', 'say what should change.')
+  if (timing && (cut || moving || music)) throw cannot('rescale the timing in the same call as another change.', 'change the timing on its own, then the take it returns.')
   if (music && music.identity === 'none' && !cut && !moving) return changeTool({ projectId, dir, cut: { soundtrack: 'none' } }, progress)
   if (music && (cut || moving)) throw cannot('change the music in the same call as the cut or the motion.', 'change the cut or motion first, then the music of the take it returns.')
   const at = await studioFor('change')
@@ -372,6 +373,7 @@ async function changeTool({ projectId, dir, cut, motion: moving, music }, progre
   if (!project || project.error || !Array.isArray(project.tracks)) throw cannot(`change ${projectId}: there is no such film in this workspace.`, 'call projects to find the film, or film again.')
   if (music) return rescore({ projectId, dir, music: music.identity, direction: music.direction, bpm: music.bpm, audioFile: music.audioFile, replaceAudioTrackIds: music.replaceAudioTrackIds }, progress)
   const authored = !!project.direction || project.motions.some((m) => m.scope === 'data-kinetic')
+  if (timing) return retimeTool({ at, project, authored, dir, timing }, progress)
   if (authored) {
     if (cut) throw cannot('recut an authored reel: its scenes are designed together, so shots cannot be dropped or reordered.', 'change its motion with trackIds, or its music, or film again with a new direction.')
     const shots = projectShots(project)
@@ -386,6 +388,40 @@ async function changeTool({ projectId, dir, cut, motion: moving, music }, progre
   progress('Making a new take, so the original stays as it is.')
   const take = await forkProject(at, project, `${project.name} / Take`, { tool: 'change', request: JSON.stringify({ cut, motion: moving }).slice(0, 2000) })
   return revise({ projectId: take.id, dir, ...(cut || {}), motionDirection: moving?.direction || '', motionElements: elements, sourceProjectId: projectId }, progress)
+}
+
+/** Motion timing rescaled exactly, on a take of its own, with no model asked. */
+async function retimeTool({ at, project, authored, dir, timing }, progress) {
+  if (authored) throw cannot('rescale an authored reel\'s timing: its scenes are timed to its music.', 'change its motion with a direction and trackIds instead.')
+  const duration = Math.max(0.25, Math.min(4, Number(timing.duration ?? 1))), stagger = Math.max(0, Math.min(4, Number(timing.stagger ?? 1)))
+  const core = await import(pathToFileURL(path.join(ROOT, 'dist-core', 'core.js')).href)
+  const ease = { arrive: core.ASSEMBLED.easing.arrive, leave: core.ASSEMBLED.easing.leave, mechanical: 'steps(6, end)' }[timing.ease]
+  if (duration === 1 && stagger === 1 && !ease) throw cannot('rescale timing by nothing.', 'pass duration, stagger or ease.')
+  const { shotList, renderProject, proveRender, paceOf, boundariesOf } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'autofilm.mjs')).href)
+  const { forkProject, retimeTracks } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'refinement.mjs')).href)
+  const shots = shotList(project), visible = project.tracks.filter((t) => t.kind === 'component' && !t.hidden)
+  const named = (timing.elements || []).flatMap((v) => /^\d+$/.test(String(v)) && shots[Number(v) - 1] ? visible.filter((t) => Math.round(t.start) / 1000 === shots[Number(v) - 1].at).map((t) => t.id) : visible.filter((t) => project.subjects.find((s) => s.id === t.subjectId)?.name.toLowerCase().includes(String(v).toLowerCase())).map((t) => t.id))
+  const trackIds = timing.elements?.length ? [...new Set(named)] : visible.map((t) => t.id)
+  if (!trackIds.length) throw cannot('rescale the timing of elements this film does not have.', 'use shot numbers or words from the element names in the last reply.')
+  progress('Making a new take, so the original stays as it is.')
+  const take = await forkProject(at, project, `${project.name} / Retimed`, { tool: 'change', request: JSON.stringify({ timing }).slice(0, 2000) })
+  const changed = retimeTracks(take, { trackIds, duration, stagger, ease })
+  if (!changed.changes.length) throw cannot('rescale these motions: their timing is unchanged by that scale, or they are locked.', 'pick other elements, or a stronger scale.')
+  const saved = await fetch(`${at}/__motioneer/projects/${take.id}`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(changed.project) }).then((r) => r.json())
+  if (saved.error) throw Object.assign(cannot(`save the retimed take: ${saved.error}`, 'try again.'), { projectId: take.id })
+  const { prepareRenderer } = await import('../tools/environment.mjs'); await prepareRenderer(at, progress)
+  // every boundary, titles included, as the film's own proof measured them
+  const rendered = await renderProject(at, take.id, progress), cutTimes = boundariesOf(saved)
+  const proved = await proveRender(rendered.url, { pace: paceOf(saved), seconds: (saved.settings.to - saved.settings.from) / 1000, cuts: cutTimes })
+  const result = { projectId: take.id, at, file: proved.file, url: rendered.url, proof: proved.proof, shotList: shotList(saved), seconds: (saved.settings.to - saved.settings.from) / 1000 }
+  const file = await keepFile(result, dir, `${new URL(project.source || 'http://film').host}-retimed`), review = await reviewResult(result, file, progress)
+  const { proofLine } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'proof.mjs')).href)
+  const style = await styleOf(at, take.id, proved.proof), motions = new Set(changed.changes.map((c) => c.toMotionId)).size
+  const said = [duration !== 1 && `each part moves ${duration < 1 ? `${Math.round((1 - duration) * 100)} percent faster` : `${Math.round((duration - 1) * 100)} percent slower`}`, stagger !== 1 && `gaps between parts ${stagger < 1 ? 'tighter' : 'wider'} by ${Math.abs(Math.round((1 - stagger) * 100))} percent`, ease && `${timing.ease} easing`].filter(Boolean).join(', ')
+  return { images: review ? [review] : [], ids: { projectId: take.id, video: file, storyboard: result.storyboard },
+    structured: { projectId: take.id, sourceProjectId: project.id, editor: `${at}/__motioneer/editor/?project=${take.id}&view=film`, file, changes: changed.changes, shots: result.shotList, verdict: { ok: !!proved.proof?.ok, notes: proved.proof?.notes || [], arriveMs: proved.proof?.arriveMs }, assembled: style, artifacts: { video: file, storyboard: result.storyboard || null } },
+    summary: `Retimed ${motions} motion${motions === 1 ? '' : 's'} on a new take, with no model asked: ${said}. Saved to ${file}. ${proofLine(proved.proof)}${styleLine(style)}`,
+    next: [{ tool: 'look', args: { projectId: take.id, shot: Number(timing.elements?.[0]) || 1 }, why: 'see the retimed arrival frame by frame' }, ...filmNext(take.id, proved.proof, false).slice(0, 2)] }
 }
 
 /** A reel's scoped motion refinement, as a take of its own. */
@@ -415,10 +451,54 @@ async function reviewTool({ projectId, critique = false }, progress) {
     next: issues.slice(0, 3).map((i) => ({ tool: 'change', args: { projectId, motion: { direction: i.suggestion || i.detail, trackIds: [i.trackId] } }, why: i.detail })) }
 }
 
+/**
+ * The film as rendered at its current revision: a finished render of that revision when the studio
+ * already has one, since rendering the same edit again only costs a minute, otherwise a new one.
+ */
+async function renderedFor(at, project, progress) {
+  const jobs = await fetch(`${at}/__motioneer/projects/${project.id}/renders`).then((r) => r.ok ? r.json() : []).catch(() => [])
+  const done = jobs.find((j) => j.state === 'complete' && j.revision === project.revision)
+  const { renderProject } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'autofilm.mjs')).href)
+  const job = done ? done.id : (await renderProject(at, project.id, progress)).jobId
+  return path.join(await workspace(), '.studio', 'projects', project.id, 'renders', job, 'film.mp4')
+}
+
+/**
+ * Frames from chosen moments of a film, or one shot as a filmstrip. The storyboard shows each shot
+ * once, settled, which cannot say whether an arrival is snappy; six frames across a shot can.
+ */
+async function framesTool({ projectId, at: times, shot }, progress) {
+  const at = await studioFor('look at the film')
+  const { prepareRenderer } = await import('../tools/environment.mjs'); await prepareRenderer(at, progress)
+  const project = await fetch(`${at}/__motioneer/projects/${encodeURIComponent(projectId)}`).then((r) => r.ok ? r.json() : null).catch(() => null)
+  if (!project?.tracks) throw cannot(`look at ${projectId}: there is no such film in this workspace.`, 'call projects to find it.')
+  const { shotList } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'autofilm.mjs')).href)
+  const authored = !!project.direction || project.motions.some((m) => m.scope === 'data-kinetic')
+  const shots = authored ? projectShots(project) : shotList(project)
+  const seconds = (project.settings.to - project.settings.from) / 1000
+  let points
+  if (shot !== undefined) {
+    const s = shots[Number(shot) - 1]
+    if (!s) throw cannot(`show shot ${shot}: this film has ${shots.length} shots.`, `pass a shot number from 1 to ${shots.length}.`)
+    points = Array.from({ length: 6 }, (_, i) => ({ at: s.at + Math.max(0, s.seconds - 0.06) * i / 5, seconds: 0.08, shot: s.shot, elements: [`${(Math.max(0, s.seconds - 0.06) * i / 5).toFixed(2)}s into the shot`] }))
+  } else points = [...new Set((times || []).map(Number).filter(Number.isFinite))].slice(0, 12).map((t) => ({ at: Math.max(0, Math.min(seconds - 0.05, t)), seconds: 0.08, shot: '', elements: [`${t.toFixed(2)}s`] }))
+  if (!points.length) throw cannot('look at no moments: at needs at least one second within the film.', `pass seconds between 0 and ${seconds}.`)
+  progress('Finding the render of this revision.')
+  const file = await renderedFor(at, project, progress)
+  const { reviewFilm } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'review.mjs')).href)
+  const board = await reviewFilm(file, { shots: points, seconds, maxSamples: points.length, includeEndpoints: false })
+  const s = shot !== undefined ? shots[Number(shot) - 1] : null
+  return { images: [board], ids: { projectId, render: file, frames: board.path },
+    structured: { projectId, frames: board.samples.map(({ at, label }) => ({ at: Math.round(at * 100) / 100, label })), ...(s ? { shot: s } : {}), artifacts: { render: file, frames: board.path } },
+    summary: s ? `Shot ${s.shot} of ${projectId} as six frames from its start to its end (${s.seconds.toFixed(2)}s), read left to right and down; the arrival is in the first frames and the hold in the last. Nothing was changed.` : `${points.length} frame${points.length === 1 ? '' : 's'} of ${projectId} at the seconds asked for. Nothing was changed.`,
+    next: authored ? [] : [{ tool: 'change', args: { projectId, timing: { duration: 0.75, elements: [s ? String(s.shot) : '<shot number>'] } }, why: 'make it snappier without asking the model' }] }
+}
+
 /** Looking at a page or at a film, which is the same question asked before and after. */
-async function lookTool({ url, projectId, critique, theme, language }, progress) {
+async function lookTool({ url, projectId, critique, theme, language, at, shot }, progress) {
   if (url && projectId) throw cannot('look at a page and a film in one call.', 'pass url or projectId.')
   if (url) return inspect({ url, language, theme })
+  if (projectId && (at?.length || shot !== undefined)) return framesTool({ projectId, at, shot }, progress)
   if (!projectId) throw cannot('look at nothing: look needs a url or a projectId.', 'pass the running site to see what is on it, or a film\'s projectId to see its frames.')
   return reviewTool({ projectId, critique: critique === true }, progress)
 }

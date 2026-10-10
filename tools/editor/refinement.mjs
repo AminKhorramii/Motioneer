@@ -1,7 +1,7 @@
 /** Scoped additive motion changes. A take copies assets and never rewrites the approved source. */
 import {visualClock,currentEvents} from './film-events.mjs'
 import {randomUUID} from 'node:crypto'
-import {safeStyle,janky,validateProject} from '../../dist-core/core.js'
+import {safeStyle,janky,validateProject,retimed,tempo,assembled} from '../../dist-core/core.js'
 export async function projectRequest(at,path,body,method){
  const response=await fetch(at+path,body===undefined?undefined:{method:method||'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(body)})
  if(!response.ok)throw Error(`Project request failed (${response.status}): ${await response.text()}`)
@@ -39,6 +39,28 @@ export function applyMotionPatches(source,patches,{trackIds,lockedTrackIds=[]}){
   p.motions.push(motion);t.motionId=motion.id;changes.push({trackId:t.id,fromMotionId:original.id,toMotionId:motion.id,reason:motion.note})
  }
  for(const id of lockedTrackIds)p.tracks.find(t=>t.id===id).locked=true
+ return {project:validateProject(p),changes}
+}
+/**
+ * New versions of the chosen tracks' motions with their timing rescaled, written with no model.
+ *
+ * "Snappier" is a number, not a request for a different motion: the same sheet with each part
+ * moving faster is exactly what was asked for, takes no model call, and cannot come back as
+ * something the gates refuse. Locked tracks keep what was approved.
+ */
+export function retimeTracks(source,{trackIds,duration=1,stagger=1,ease}){
+ const p=structuredClone(source),made=new Map(),changes=[]
+ for(const id of trackIds){
+  const t=p.tracks.find(x=>x.id===id)
+  if(!t||t.kind!=='component'||!t.motionId||t.locked)continue
+  if(!made.has(t.motionId)){
+   const original=p.motions.find(m=>m.id===t.motionId),css=retimed(original.css,{duration,stagger,ease})
+   if(css===original.css)continue
+   const motion={...original,id:randomUUID(),parentId:original.id,css,duration:tempo(css).span||original.duration,assembled:assembled(css,{purpose:original.brief?.purpose}),saved:true}
+   p.motions.push(motion);made.set(t.motionId,motion.id)
+  }
+  changes.push({trackId:t.id,fromMotionId:t.motionId,toMotionId:made.get(t.motionId)});t.motionId=made.get(t.motionId)
+ }
  return {project:validateProject(p),changes}
 }
 /** A take forked by the studio, which links the asset bytes, then given the changed edit. */

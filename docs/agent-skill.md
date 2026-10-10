@@ -76,6 +76,12 @@ or making the pricing cards glide in. The verdict checks structure, not taste, s
 polished only because the verdict passed. Repeat the summary's verified line, because it is the
 proof the film is what was asked for.
 
+The storyboard shows each shot once, settled, so it cannot tell you whether an arrival is snappy.
+To judge motion, call `look` with the projectId and `shot` for six frames across that shot, or
+`at` for the seconds you want. It reuses the existing render, so it answers in seconds. Read the
+reply's `assembled` notes too: they say where the film departs from the house style, such as
+repeated captures, shots that cut before they hold, or motions that move the whole element at once.
+
 Make at most two focused passes before handing over, then say what is still weak.
 
 ## Changing a film
@@ -86,6 +92,9 @@ lost:
   Capture films only, since an authored reel's scenes are designed together.
 - **`motion`:** how elements move, with timing, camera and audio kept. Name shots or elements for a
   capture film, or `trackIds` for a reel, and lock what was approved.
+- **`timing`:** "snappier", "slower" or "tighter" as numbers, with no model call: `duration: 0.7`
+  makes each part 30 percent faster, and `stagger: 0.5` packs the parts tighter. Prefer it over
+  `motion` when the motion is right and only its tempo is wrong. Then look at the shot again.
 - **`music`:** a musical identity or direction, or a finished `audioFile`.
 
 To add elements that were never filmed, call `film` again with `pick`. When the projectId is not in

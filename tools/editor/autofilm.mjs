@@ -100,7 +100,7 @@ export async function proveRender(url, { pace, seconds, cuts }) {
 export const fitBrief = (words, tail) => (String(words).slice(0, Math.max(0, 1400 - tail.length)).trim() + ' ' + tail).trim()
 
 /** Every boundary in a cut: each shot's start and the closing title's, for the proof to check in place. */
-const boundariesOf = (cut) => [...new Set(cut.tracks.filter((t) => !t.hidden && t.kind !== 'audio' && (t.kind !== 'title' || t.start > 0)).map((t) => Math.round(t.start)))].sort((a, b) => a - b)
+export const boundariesOf = (cut) => [...new Set(cut.tracks.filter((t) => !t.hidden && t.kind !== 'audio' && (t.kind !== 'title' || t.start > 0)).map((t) => Math.round(t.start)))].sort((a, b) => a - b)
 
 /** The shots of a cut as a list an agent can read: when, how long, which elements, which layout. */
 export function shotList(cut) {

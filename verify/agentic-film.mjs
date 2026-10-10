@@ -6,7 +6,7 @@ import {createProject,compositionDocument,newTrack,firstCut,dealVerbs,errandFor,
 import {normalizeReel,reelProject} from '../tools/editor/kinetic.mjs'
 import {productBrief,groundStory,captureCapabilities} from '../tools/editor/product-brief.mjs'
 import {normalizeHandoffs} from '../tools/editor/source-handoffs.mjs'
-import {applyMotionPatches,refinementScope,forkProject,connectedTracks} from '../tools/editor/refinement.mjs'
+import {applyMotionPatches,refinementScope,forkProject,connectedTracks,retimeTracks} from '../tools/editor/refinement.mjs'
 import {normalizeCritique,reviewAndRefine} from '../tools/editor/film-review.mjs'
 import {regressed} from '../tools/editor/proof.mjs'
 import {paceOf,assembledReport,fitBrief} from '../tools/editor/autofilm.mjs'
@@ -61,6 +61,11 @@ const tail=' The contract. A previous attempt was refused: nothing moved.';asser
 const twice={...createProject('Twice'),subjects:[{id:'a',name:'A',html:'<b>a</b>',css:'',w:300,h:100,warnings:[]}],motions:[{id:'m',subjectId:'a',css:'',scope:'data-m',note:'',treatment:'subtle',verb:'flap',assembled:{ok:false,notes:['uses ease-in-out, the curves every generated interface already wears']},brief:{purpose:'entrance',intensity:'subtle',duration:1000,direction:''},duration:900,saved:true}]}
 const cut=firstCut(twice,{pace:'fast',seconds:6,scenes:[{ids:['a']}]}),report=assembledReport(cut,{holds:[900,100,100,900]})
 assert.equal(report.ok,false);assert.match(report.notes.join(' | '),/appear in more than one shot/);assert.match(report.notes.join(' | '),/cut before holding still for 300ms/);assert.match(report.notes.join(' | '),/motions: uses ease-in-out/);assert.deepEqual(report.verbs,['flap'])
+// Timing is a number, not a request: rescaled exactly with no model, as a new version, leaving locked tracks alone.
+const timed={...twice,motions:[{...twice.motions[0],css:'[data-m] > li{animation:rise 400ms cubic-bezier(.16,1,.3,1) both}[data-m] > li:nth-child(2){animation-delay:80ms}'}]},timedCut=firstCut(timed,{pace:'fast',seconds:6,scenes:[{ids:['a']}]})
+const lockedId=timedCut.tracks.filter(t=>t.kind==='component')[1].id;timedCut.tracks.find(t=>t.id===lockedId).locked=true
+const quicker=retimeTracks(timedCut,{trackIds:timedCut.tracks.filter(t=>t.kind==='component').map(t=>t.id),duration:.5,stagger:.5})
+const fresh=quicker.project.motions.find(m=>m.parentId==='m');assert.ok(fresh,'a new version, the original kept');assert.match(fresh.css,/200ms/);assert.match(fresh.css,/40ms/);assert.equal(quicker.project.tracks.find(t=>t.id===lockedId).motionId,'m','a locked track keeps its approved motion');assert.ok(quicker.changes.length>=1&&quicker.changes.every(c=>c.toMotionId===fresh.id))
 // Every film is proved at its own pace: a reel says fast, a calm film says calm, and an old film is read off its shots.
 assert.equal(paceOf(made.project),'fast');assert.equal(paceOf({...createProject('Calm one'),film:{pace:'calm'}}),'calm')
 // A repair is judged against the take it repairs, so a fault the take already had cannot reject it, and a new one does.

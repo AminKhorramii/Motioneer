@@ -117,7 +117,8 @@ ok('a capture film takes a pace, a pick in the person\'s words, a count, a treat
 ok('an authored film takes twenty-two musical identities, a tempo, six art directions, the brand mode and documentation', props('film').music?.enum.length === 22 && props('film').bpm?.maximum === 180 && props('film').art?.enum.length === 6 && props('film').brandMode?.enum.join(',') === 'site,expressive' && props('film').referenceUrls?.maxItems === 3 && !!props('film').soundKit)
 ok('finishing options and locale selection are on film', props('film').soundtrack?.enum.includes('none') && !!props('film').language && props('film').theme?.enum.includes('dark') && props('film').fps?.enum.includes(60))
 ok('change recuts by shot number, rewrites motion by track with locks, and replaces only the music', !!props('change').cut?.properties?.drop && !!props('change').cut?.properties?.order && props('change').motion?.properties?.trackIds?.maxItems === 12 && !!props('change').motion?.properties?.lockedTrackIds && !!props('change').music?.properties?.audioFile && props('change').music?.properties?.identity?.enum.includes('none'))
-ok('look sees a page or a film, and can ask for a critique', !!props('look').url && !!props('look').projectId && props('look').critique?.type === 'boolean')
+ok('look sees a page or a film, frames at chosen seconds or a shot as a filmstrip, and can ask for a critique', !!props('look').url && !!props('look').projectId && props('look').at?.maxItems === 12 && props('look').shot?.type === 'number' && props('look').critique?.type === 'boolean')
+ok('change can rescale timing exactly, with no model', props('change').timing?.properties?.duration?.minimum === 0.25 && JSON.stringify(props('change').timing?.properties?.ease?.enum) === '["arrive","leave","mechanical"]')
 ok('projects lists earlier work or describes one film', !!props('projects').projectId && !!props('projects').limit)
 
 console.log('\n  the names it used to have')
@@ -198,6 +199,10 @@ const restarted = (() => { try { return JSON.parse(readFileSync(path.join(elsewh
 ok('change starts a studio when none is running and reaches the film, rather than saying to film again', changed?.isError && /no shots yet/.test(changed.content?.[0]?.text || '') && restarted?.nonce && restarted.nonce !== theirs?.nonce, changed?.content?.[0]?.text?.slice(0, 80))
 const after = (await otherCall('projects', {})).result?.structuredContent
 ok('and a capture film is changed on a take of its own, which records where it came from', after?.projects?.some((p) => p.origin?.sourceProjectId === seeded.id && p.origin?.tool === 'change'), JSON.stringify(after?.projects?.map((p) => p.origin)))
+const noShot = (await otherCall('look', { projectId: seeded.id, shot: 3 })).result
+ok('a filmstrip of a shot the film does not have says how many it has', noShot?.isError && /has 0 shots/.test(noShot.content?.[0]?.text || ''), noShot?.content?.[0]?.text?.slice(0, 80))
+const noTiming = (await otherCall('change', { projectId: seeded.id, timing: { duration: 0.7 } })).result
+ok('timing on a film with nothing in it is refused before any take is made', noTiming?.isError && /does not have/.test(noTiming.content?.[0]?.text || ''), noTiming?.content?.[0]?.text?.slice(0, 80))
 try { process.kill(restarted?.pid, 'SIGKILL') } catch { /* gone */ }
 try { other.kill('SIGKILL') } catch { /* gone */ }
 
