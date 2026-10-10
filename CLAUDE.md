@@ -17,7 +17,10 @@ carries structuredContent it gives the model that JSON and the images and drops 
   the structured copy, and puts the ids another call needs in the text.
 - The eight listed tools are film, change, look, motion, projects, studio, open and doctor. The
   older names (reel, revise, refine, rescore, review, inspect) still answer, but are not listed.
-- Long guidance lives in `docs/agent-skill.md`, which `setup --claude` installs as a skill.
+- Long guidance lives in `plugin/skills/motioneer/SKILL.md`. The Claude Code plugin in `plugin/`
+  carries it as a skill, and `setup --claude` installs the same file. The repo root's
+  `.claude-plugin/marketplace.json` publishes the plugin; check both with
+  `claude plugin validate --strict`.
 - A change to the card or a description is measured with `node verify/routing.mjs --runs 3`
   (needs the claude command, spends model calls). It asks a real model what it would call for 38
   requests. Keep the number up, and put it in the commit message.

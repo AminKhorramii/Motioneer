@@ -1,5 +1,6 @@
 ---
 name: motioneer
+user-invocable: false
 description: How to direct Motioneer well when someone wants motion for their own product, whether a launch or demo film of their site, CSS motion for a component, or a change to a film already made. Use it before writing a film direction, when reviewing a storyboard, and when choosing between capture and authored films.
 ---
 

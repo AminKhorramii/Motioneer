@@ -4,6 +4,24 @@ Motioneer runs locally on Node 20+. Its model provider is separate from the agen
 Code or Codex already signed in on PATH can generate motions, and studio Settings supports API providers. A client
 connecting over MCP does not itself supply model access to Motioneer.
 
+## Claude Code plugin
+
+The plugin is the shortest path. In Claude Code:
+
+```text
+/plugin marketplace add AminKhorramii/Motioneer
+/plugin install motioneer@motioneer
+```
+
+It starts the MCP server with `npx -y motioneer@<version> mcp` in the project you open, so projects
+and renders stay in that project's `.studio` and `motioneer` folders. It also installs the
+directing skill and the four slash commands (`/motioneer:film`, `/motioneer:look`,
+`/motioneer:motion` and `/motioneer:change`). Each command is pre-approved for the Motioneer tools
+it calls, so it does not prompt on every call.
+
+Use the plugin or the project setup below, not both. With both installed the agent sees two sets
+of Motioneer tools, and the commands only pre-approve the plugin's.
+
 ## Claude Code project
 
 ```sh

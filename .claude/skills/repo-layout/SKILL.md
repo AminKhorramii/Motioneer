@@ -36,7 +36,8 @@ tools/    the studio, the motioneer command, setup, film-lab, and editor/ for th
 verify/   the suites, read as a set, plus routing-proxy.mjs for the routing eval
 src/      the TypeScript side: design/ for taste, written.ts for the gates, editor/ for the editor
 shared/   what the studio and the page share: providers, the proxy guard, raster, mp4
-docs/     the guides, including agent-skill.md, which setup installs as a Claude Code skill
+docs/     the guides for people
+plugin/   the Claude Code plugin: the directing skill, the slash commands and the MCP server entry
 ```
 
 The npm script names are the public interface of the repository, so keep them stable when files

@@ -7,13 +7,34 @@
 [![Node](https://img.shields.io/node/v/motioneer?logo=nodedotjs&logoColor=fff&color=5FA04E)](package.json)
 [![License](https://img.shields.io/npm/l/motioneer?color=blue)](LICENSE)
 
-Motioneer gives your agent a motion studio: capture real website elements, direct branded motion,
-compose an original score, export an MP4, and return an editable film. Native detail reveals use the
-site’s DOM/SVG, typography and colors. Embedded screenshots remain flattened.
+Motioneer gives your agent a motion studio. It captures real website elements, directs branded motion
+in its Assembled house style, composes an original score, and returns two things: an MP4, and a
+live HTML film made of your real interface. The HTML film keeps its text sharp at any size, fits
+any frame, starts muted, and holds still for viewers who ask for less motion, so it can sit on your
+own landing page. Native detail reveals use the site’s DOM/SVG, typography and colors; embedded
+screenshots remain flattened.
 
 ![Motioneer film editor showing the Notion Pressure study, with its asset library, canvas, inspector and timeline](docs/images/film-editor.png)
 
 ## Start with your agent
+
+### As a Claude Code plugin
+
+In Claude Code, with Node 20 or newer:
+
+```text
+/plugin marketplace add AminKhorramii/Motioneer
+/plugin install motioneer@motioneer
+```
+
+The plugin brings four things:
+- the MCP server
+- a skill that teaches the agent to direct films in the house style
+- the slash commands `/motioneer:film`, `/motioneer:look`, `/motioneer:motion` and
+  `/motioneer:change`, each pre-approved for the Motioneer tools it calls
+- the renderer on demand: the first film installs it
+
+### With setup
 
 Use Node 20 or newer and Claude Code signed in on your machine. In your project directory:
 
@@ -21,10 +42,14 @@ Use Node 20 or newer and Claude Code signed in on your machine. In your project 
 npx -y motioneer setup --claude
 ```
 
-Setup downloads Chromium and FFmpeg once into a shared local cache, checks that the browser works,
-and adds Motioneer to the project’s `.mcp.json`. It preserves other MCP entries and refuses to
-replace a different existing Motioneer configuration. No API key is needed when using your signed-in
-Claude Code CLI.
+Setup does three things:
+- downloads Chromium and FFmpeg once into a shared local cache, and checks that the browser works
+- adds Motioneer to the project’s `.mcp.json`, keeping other MCP entries and refusing to replace a
+  different Motioneer configuration
+- installs the directing skill
+
+No API key is needed when using your signed-in Claude Code CLI. Use the plugin or setup, not both,
+so the agent sees one set of Motioneer tools.
 
 Restart Claude Code in this project and approve its Motioneer MCP server when prompted. Then ask:
 

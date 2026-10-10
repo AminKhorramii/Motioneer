@@ -5,7 +5,7 @@
     "type": "git",
     "url": "git+https://github.com/AminKhorramii/Motioneer.git"
   },
-  "version": "0.4.0",
+  "version": "0.5.0",
   "scripts": {
     "build": "tsc -b && vite build --ssr src/core.ts --outDir dist-core && vite build --config tools/editor/vite.config.mjs",
     "mcp": "node mcp/index.mjs",
@@ -62,7 +62,8 @@
     "README.md",
     "examples/",
     "dist-editor/",
-    "docs/"
+    "docs/",
+    "plugin/"
   ],
   "engines": {
     "node": ">=20"

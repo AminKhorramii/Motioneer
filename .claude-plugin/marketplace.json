@@ -1,0 +1,17 @@
+{
+  "name": "motioneer",
+  "owner": { "name": "Amin Khorrami" },
+  "metadata": {
+    "description": "Motioneer for Claude Code: films made of your real interface, CSS motion for components, and new takes of any film.",
+    "version": "0.5.0"
+  },
+  "plugins": [
+    {
+      "name": "motioneer",
+      "description": "Films made of your real interface, as an MP4 and a live HTML film, CSS motion for components, and new takes of any film, in the Assembled house style.",
+      "version": "0.5.0",
+      "author": { "name": "Amin Khorrami" },
+      "source": "./plugin"
+    }
+  ]
+}

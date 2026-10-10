@@ -43,7 +43,7 @@ Reaching for `document`, `window` or `localStorage` below this line breaks all t
 **`mcp/tools.mjs`** is everything an agent is shown, the card and the eight tools, and it has a
 budget: Claude Code shows only 2,048 characters of the card. What a tool needs to be chosen
 correctly belongs in its own description, and detail belongs in a reply's `next` or in
-`docs/agent-skill.md`, not in the card. `verify/routing.mjs` measures any change here.
+`plugin/skills/motioneer/SKILL.md`, not in the card. `verify/routing.mjs` measures any change here.
 
 **`tools/studio.mjs`** is the one room: the proxy, the routes and the model calls. Nothing imports
 from it. The agent side talks to it over HTTP, and to a studio only when that studio belongs to the

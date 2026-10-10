@@ -36,5 +36,10 @@ try{
   await withInstallLock(cache,async()=>{await mkdir(cache+'/node_modules/playwright',{recursive:true});await writeFile(cache+'/node_modules/playwright/index.mjs','throw Error("partially unpacked")');assert.equal(await loadChromium(),null);assert.equal((await renderer().status()).state,'installing');await writeFile(cache+'/browser','fixture');await writeFile(cache+'/node_modules/playwright/index.mjs','export const chromium={executablePath:()=>'+JSON.stringify(cache+'/browser')+'}')});
   assert.ok(await loadChromium());
  `],{encoding:'utf8',env:{...process.env,MOTIONEER_RENDER_CACHE:cache}});assert.equal(regression.status,0,regression.stderr)
- console.log('Launch: read-only diagnostics, missing setup, secret redaction, pinned MCP configuration, idempotent safe merging and automatic renderer preparation verified.')
+ // the Claude Code plugin starts the package at its own version, so every place naming the version agrees
+ const root=fileURLToPath(new URL('..',import.meta.url))
+ const version=JSON.parse(await readFile(path.join(root,'package.json'),'utf8')).version,manifest=JSON.parse(await readFile(path.join(root,'plugin/.claude-plugin/plugin.json'),'utf8')),servers=JSON.parse(await readFile(path.join(root,'plugin/.mcp.json'),'utf8')).mcpServers,market=JSON.parse(await readFile(path.join(root,'.claude-plugin/marketplace.json'),'utf8'))
+ assert.equal(manifest.version,version);assert.deepEqual(servers.motioneer.args,['-y','motioneer@'+version,'mcp']);assert.equal(market.plugins.find(p=>p.name==='motioneer').version,version);assert.equal(market.plugins.find(p=>p.name==='motioneer').source,'./plugin')
+ assert.ok(JSON.parse(await readFile(path.join(root,'package.json'),'utf8')).files.includes('plugin/'),'the package ships the plugin, whose skill setup installs')
+ console.log('Launch: read-only diagnostics, missing setup, secret redaction, pinned MCP configuration, idempotent safe merging, automatic renderer preparation and one plugin version verified.')
 }finally{await rm(dir,{recursive:true,force:true})}

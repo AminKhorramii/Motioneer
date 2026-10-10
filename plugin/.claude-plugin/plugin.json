@@ -1,0 +1,10 @@
+{
+  "name": "motioneer",
+  "version": "0.5.0",
+  "description": "Motion for your own product: films made of your real interface, as an MP4 and a live HTML film, CSS motion for components, and new takes of any film, in the Assembled house style.",
+  "author": { "name": "Amin Khorrami" },
+  "homepage": "https://motioneer.bsct.so",
+  "repository": "https://github.com/AminKhorramii/Motioneer",
+  "license": "MIT",
+  "keywords": ["motion", "animation", "video", "css", "product-film", "mcp"]
+}
