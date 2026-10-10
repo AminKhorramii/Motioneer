@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from './api'
-import type { Project, Asset } from './project'
+import type { Project, Asset, ProjectSummary } from './project'
 function rememberProject(id:string){localStorage.setItem('motioneer-project',id);const url=new URL(location.href);url.searchParams.set('project',id);window.history.replaceState(null,'',url)}
 export function useProject() {
   const [project, setProject] = useState<Project | null>(null), [status, setStatus] = useState('Opening projects'), [error,setError] = useState('')
-  const [history,setHistory] = useState({past:0,ahead:0}), [projects,setProjects] = useState<{id:string;name:string}[]>([])
+  const [history,setHistory] = useState({past:0,ahead:0}), [projects,setProjects] = useState<ProjectSummary[]>([])
   const current=useRef<Project|null>(null), past=useRef<Project[]>([]), ahead=useRef<Project[]>([]), revision=useRef(0), dirty=useRef(false), pending=useRef<Promise<void>|null>(null), blocked=useRef(false)
   const transaction=useRef<{before:Project;recorded:boolean;past:Project[];ahead:Project[]}|null>(null)
   const publish = useCallback((p:Project) => { current.current=p;setProject(p) },[])
-  const refresh = useCallback(async()=>{const list=await api<{id:string;name:string}[]>('projects');setProjects(list);return list},[])
+  const refresh = useCallback(async()=>{const list=await api<ProjectSummary[]>('projects');setProjects(list);return list},[])
   const flush = useCallback(async function flushNow(){
     if (pending.current) await pending.current
     if (blocked.current) throw new Error('Resolve the save conflict or save a copy before continuing.')

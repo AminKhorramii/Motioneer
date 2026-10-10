@@ -63,6 +63,16 @@ is left alone.
 None of it needs the page to still be open, which is the property that makes this work at all: a
 capture already carries the markup, the rules that matched it and a snapshot of how it looked.
 
+A page whose policy allows the request has each pick sent straight to the studio instead. The studio
+keeps it in its inbox and says so on its live feed, and the open editor reads the inbox when it hears,
+so a pick on a signed-in page lands the way a pick in the source frame does. Only a pick that arrives
+while the editor is open is taken, so reopening it never imports an old one.
+
+A signed-in page shows somebody's details, and a film should not. Redact details replaces addresses,
+long numbers, handles and avatars in a capture, keeping each text's length so the layout and the
+motion measured on it stay put. Names cannot be told from other words, so Every word replaces each
+word with filler of the same length. Both edit the capture and leave its motions alone.
+
 ### What a pick captures
 
 Two captures, for two readers. The model gets the markup and the rules that actually matched it, so a
@@ -407,6 +417,15 @@ Markers are dropped by double clicking a track and taken away by clicking them, 
 them. The strip says what the composition does with its time: how many cars, when the last lands, and
 where it goes quiet. That reports and does not judge, because whether a two second hole is a fault
 depends on what the thing is for.
+
+### Comparing takes
+
+An agent's change is always a new take, a project of its own that records the film it came from. The
+film editor lists the takes around the open film under Takes: the one it was made from, the takes
+made from it, and its siblings. Compare puts a take beside the cut, read only, and the one playhead
+drives both, so the difference is seen at the same instant rather than remembered. Open makes the
+take the film being edited; the film it came from is unchanged. The list is read again when the film
+workspace opens, so a take an agent made a moment ago is there.
 
 ### Where each component sits
 

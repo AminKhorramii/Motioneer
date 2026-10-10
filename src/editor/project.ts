@@ -12,6 +12,18 @@ export type FilmDirection = { version: 1; clock?: string; brief?: unknown; scene
 export type FilmMeta = { pace?: 'calm' | 'brisk' | 'fast'; scenes?: { ids: string[]; layout?: string; hold?: string }[]; origin?: { tool: string; sourceProjectId: string; request?: string; at: number } }
 export type Project = { version: 1; direction?: FilmDirection; film?: FilmMeta; id: string; revision: number; name: string; updatedAt: number; source: string; subjects: Subject[]; motions: Motion[]; tracks: Track[]; camera: Move[]; assets: Asset[]; arrangements: Arrangement[]; settings: { width: number; height: number; fps: number; duration: number; background: string; from: number; to: number }; brief: Brief }
 export const uid = () => crypto.randomUUID()
+/** A project as the studio lists it, which is all a takes list needs without opening every film. */
+export type ProjectSummary = { id: string; name: string; updatedAt?: number; origin?: FilmMeta['origin'] | null }
+/**
+ * The takes around a film: the one it was made from, the takes made from it, and its siblings,
+ * newest first. An agent's change is always a new take, so this is where a person finds it.
+ */
+export function takesOf(project: Project, list: ProjectSummary[]) {
+  const parent = project.film?.origin?.sourceProjectId
+  return list.filter((p) => p.id !== project.id && (p.id === parent || p.origin?.sourceProjectId === project.id || (!!parent && p.origin?.sourceProjectId === parent)))
+    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+    .map((p) => ({ id: p.id, name: p.name, note: p.id === parent ? 'The film this take was made from' : p.origin?.request || `Made by ${p.origin?.tool || 'a fork'}` }))
+}
 export const defaultBrief: Brief = { purpose: 'entrance', intensity: 'range', duration: 1000, direction: '' }
 export function createProject(name = 'Untitled film'): Project {
   return { version: 1, id: uid(), revision: 0, name, updatedAt: Date.now(), source: '', subjects: [], motions: [], tracks: [], camera: [], assets: [], arrangements: [], brief: { ...defaultBrief }, settings: { width: 1920, height: 1080, fps: 30, duration: 30000, background: '#101319', from: 0, to: 30000 } }
