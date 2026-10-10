@@ -3,7 +3,7 @@ import { createFilmMath } from './filmMath'
 // @ts-expect-error The legacy arithmetic is JavaScript.
 import { resolve } from '../../shared/arrange.mjs'
 export type Composition = { update: (p: Project) => void; seek: (ms: number, playing?: boolean) => Promise<void>; ready: () => Promise<void> }
-declare global { interface Window { __composition?: Composition; __assetSources?: Record<string,string> } }
+declare global { interface Window { __composition?: Composition; __assetSources?: Record<string,string>; __shared?: string[]; __live?: { still: boolean } } }
 /** Runs unchanged in the canvas, exported HTML, and the renderer's Chromium page. No closures. */
 export function compositionRuntime(initial: Project, assetRoot: string, math: ReturnType<typeof createFilmMath>) {
   let project = initial, now = 0
@@ -21,7 +21,9 @@ export function compositionRuntime(initial: Project, assetRoot: string, math: Re
     holder.replaceChildren()
     const frame = document.createElement('iframe'); frame.title = subject.name; frame.style.cssText = 'border:0;position:absolute;left:0;top:0;transform-origin:top left;pointer-events:none;'
     frame.width = String(subject.w)
-    const parsed = new DOMParser().parseFromString(subject.html, 'text/html')
+    // a live film stores each repeated font or image once, and a capture reads it back where it is used
+    const shared = (text: string) => window.__shared ? text.replace(/motioneer-shared:(\d+)/g, (_, i) => window.__shared![Number(i)] || '') : text
+    const parsed = new DOMParser().parseFromString(shared(subject.html), 'text/html')
     parsed.querySelectorAll('script,iframe,object,embed,base,meta,link').forEach(el => el.remove())
     parsed.querySelectorAll('*').forEach(el => { for (const attr of [...el.attributes]) if (/^on/i.test(attr.name) || /^(javascript|vbscript):/i.test(attr.value.trim())) el.removeAttribute(attr.name) })
     if (motion && /^data-[\w-]+$/.test(motion.scope)) parsed.body.firstElementChild?.setAttribute(motion.scope, '')
@@ -67,7 +69,7 @@ export function compositionRuntime(initial: Project, assetRoot: string, math: Re
      * own first keyframe is allowed to start from zero.
      */
     frame.height = String(Math.round(subject.h * 1.17))
-    const styles = (subject.css + '\n' + (motion?.css || '')).replace(/<\/style/gi, '<\\/style')
+    const styles = shared(subject.css + '\n' + (motion?.css || '')).replace(/<\/style/gi, '<\\/style')
     let done!: () => void
     const wait = new Promise<void>(resolve => { done = resolve }); pending.add(wait)
     const timeout = setTimeout(() => { done(); pending.delete(wait) }, 15000)
@@ -102,7 +104,7 @@ export function compositionRuntime(initial: Project, assetRoot: string, math: Re
   }
   async function seek(ms: number, playing = false) {
     now = ms
-    const offsets = starts(), cam = position(project.camera,ms)
+    const still = !!window.__live?.still, offsets = starts(), cam = still ? { x: 0, y: 0, scale: 1 } : position(project.camera,ms)
     camera.style.transform = `translate(${cam.x}%,${cam.y}%) scale(${cam.scale})`
     for (const t of project.tracks) {
       const node = nodes.get(t.id)!, local = ms-offsets.get(t.id)!, active = !t.hidden && local >= 0 && local < t.duration
@@ -114,7 +116,7 @@ export function compositionRuntime(initial: Project, assetRoot: string, math: Re
         if (playing && active && a.paused) void a.play().catch(() => {})
         continue
       }
-      const move = position(t.moves, ms); node.style.transform = `translate(${move.x}%,${move.y}%) scale(${move.scale})`
+      const move = still ? { x: 0, y: 0, scale: 1 } : position(t.moves, ms); node.style.transform = `translate(${move.x}%,${move.y}%) scale(${move.scale})`
       if (t.kind === 'title') { const f=clamp(local/400,0,1); node.style.opacity='1'; node.style.transform += ` translateY(${(1-ease(f,'ease-out'))*16}px)` }
       const d = node.querySelector('iframe')?.contentDocument
       if (d) for (const animation of animations.get(t.id) || d.getAnimations()) { animation.pause(); animation.currentTime = local-t.entrance }

@@ -156,9 +156,9 @@ async function film({ url, dir, language, theme, captureMode, seconds, fps, soun
   const mended = result.repairs?.length ? ` It mended itself once before the final render: ${result.repairs.join('; ')}.` : ''
   const fates = result.elements.filter((e) => e.status !== 'filmed')
   const leftOut = fates.length ? ` Left out: ${fates.map((e) => `${e.name} (${e.status})`).join('; ')}.` : ''
-  return { structured, images: review ? [review] : [], ids: { projectId: result.projectId, video: file, storyboard: result.storyboard },
+  return { structured, images: review ? [review] : [], ids: { projectId: result.projectId, video: file, html: result.live, storyboard: result.storyboard },
     summary: `Filmed ${result.distinct} of ${result.elements.length} selected element${result.elements.length === 1 ? '' : 's'} from ${url}${result.product ? `, "${result.product}",` : ''} into a ${Math.round(result.seconds)} second ${wantPace} film`
-      + `${result.opening ? ` titled "${result.opening}"` : ''}: ${result.shots} shots of ${result.distinct} distinct element${result.distinct === 1 ? '' : 's'} in ${result.layouts} layout${result.layouts === 1 ? '' : 's'}, saved to ${file} (${(buf.length / 1e6).toFixed(1)} MB). ${verified}${mended}${leftOut}${styleLine(style)}`,
+      + `${result.opening ? ` titled "${result.opening}"` : ''}: ${result.shots} shots of ${result.distinct} distinct element${result.distinct === 1 ? '' : 's'} in ${result.layouts} layout${result.layouts === 1 ? '' : 's'}, saved to ${file} (${(buf.length / 1e6).toFixed(1)} MB). ${verified}${mended}${leftOut}${styleLine(style)}${liveLine(result)}`,
     next: filmNext(result.projectId, result.proof, false) }
 }
 
@@ -172,12 +172,12 @@ async function reel({brand,domain,projectId,url,mode='auto',direction,seconds=18
   if(sourceSheet)await writeFile(sourceSheet,Buffer.from(result.sourceSheet.data,'base64'))
   const reviewed=result.review?.status==='unavailable'?'Visual review unavailable: '+result.review.error:'Sampled-frame review '+result.review?.status+': '+(result.review?.issues?.length||0)+' unresolved observations; artistic quality is not certified.'
   const {proofLine}=await import(pathToFileURL(path.join(ROOT,'tools','editor','proof.mjs')).href),style=await styleOf(at,result.projectId,result.proof)
-  return {images:review?[review]:[],ids:{projectId:result.projectId,video:file,storyboard:result.storyboard,sources:sourceSheet,trackIds:result.shotList.map(s=>s.trackId)},
+  return {images:review?[review]:[],ids:{projectId:result.projectId,video:file,html:result.live,storyboard:result.storyboard,sources:sourceSheet,trackIds:result.shotList.map(s=>s.trackId)},
     structured:{projectId:result.projectId,editor:`${at}/__motioneer/editor/?project=${encodeURIComponent(result.projectId)}&view=film`,studio:at,file,seconds,fps:60,style:result.mode==='native'?'native':result.mode==='hybrid'?'hybrid':'kinetic',sourceSelection:result.sourceSelection,soundtrack:result.soundtrack,music:{profile:result.music?.profile,label:result.music?.label},bpm:result.bpm,concept:result.plan.concept,
       shots:result.shotList.map(s=>({shot:s.shot,trackId:s.trackId,sceneId:s.sceneId,at:s.at,seconds:s.seconds,elements:s.elements,layout:s.layout,choreography:s.choreography,...(s.renderedMotion?{renderedMotion:s.renderedMotion}:{})})),
-      sourceProjectId:result.sourceProjectId,artifacts:{video:file,storyboard:result.storyboard||null,sources:sourceSheet},reviewError:result.reviewError||null,verdict:{ok:!!result.proof?.ok,notes:result.proof?.notes||[],cuts:result.proof?.cuts,arriveMs:result.proof?.arriveMs,blank:result.proof?.blank},quality:{warnings:result.quality?.warnings||[]},
+      sourceProjectId:result.sourceProjectId,artifacts:{video:file,html:result.live||null,storyboard:result.storyboard||null,sources:sourceSheet},reviewError:result.reviewError||null,verdict:{ok:!!result.proof?.ok,notes:result.proof?.notes||[],cuts:result.proof?.cuts,arriveMs:result.proof?.arriveMs,blank:result.proof?.blank},quality:{warnings:result.quality?.warnings||[]},
       review:result.review?{status:result.review.status,summary:result.review.summary,issues:result.review.issues||[],attempts:result.review.attempts||[],error:result.review.error}:null,assembled:style,eventStatus:result.eventStatus,transitions:(result.transitions||[]).length,captureSkipped:result.captureSkipped||[],limitation:result.limitation},
-    summary:`Created ${brand}: ${result.plan.concept}. ${result.shotList.length} scenes in ${seconds} seconds at 60 fps, with original ${result.music.label} music, saved to ${file}. ${proofLine(result.proof)} ${reviewed} ${result.limitation||''}`.trim(),
+    summary:`Created ${brand}: ${result.plan.concept}. ${result.shotList.length} scenes in ${seconds} seconds at 60 fps, with original ${result.music.label} music, saved to ${file}. ${proofLine(result.proof)} ${reviewed} ${result.limitation||''}${liveLine(result)}`.trim(),
     next:filmNext(result.projectId,result.proof,true,result.shotList)}
 }
 
@@ -190,9 +190,9 @@ async function rescore(args,progress=()=>{}){
   const response=await fetch(result.audioUrl)
   if(!response.ok)throw cannot('deliver the score: its audio file is unavailable.','export the saved take from the studio.')
   await writeFile(audio,Buffer.from(await response.arrayBuffer()))
-  return {images:review?[review]:[],ids:{projectId:result.projectId,video:file,audio,storyboard:result.storyboard},
-    structured:{projectId:result.projectId,editor:`${at}/__motioneer/editor/?project=${encodeURIComponent(result.projectId)}&view=film`,sourceProjectId:result.sourceProjectId,studio:at,file,seconds:result.seconds,fps:result.fps,soundtrack:result.soundtrack,music:{profile:result.music?.profile,label:result.music?.label},bpm:result.bpm,shots:result.shotList,verdict:{ok:!!result.proof?.ok,notes:result.proof?.notes||[]},artifacts:{video:file,audio,storyboard:result.storyboard||null}},
-    summary:`Made a new take with ${result.soundtrack==='imported'?'the supplied soundtrack':`an original ${result.music.label} score`}: ${result.music.description} The visuals and the original film are unchanged. Video ${file}, audio ${audio}.`,
+  return {images:review?[review]:[],ids:{projectId:result.projectId,video:file,html:result.live,audio,storyboard:result.storyboard},
+    structured:{projectId:result.projectId,editor:`${at}/__motioneer/editor/?project=${encodeURIComponent(result.projectId)}&view=film`,sourceProjectId:result.sourceProjectId,studio:at,file,seconds:result.seconds,fps:result.fps,soundtrack:result.soundtrack,music:{profile:result.music?.profile,label:result.music?.label},bpm:result.bpm,shots:result.shotList,verdict:{ok:!!result.proof?.ok,notes:result.proof?.notes||[]},artifacts:{video:file,html:result.live||null,audio,storyboard:result.storyboard||null}},
+    summary:`Made a new take with ${result.soundtrack==='imported'?'the supplied soundtrack':`an original ${result.music.label} score`}: ${result.music.description} The visuals and the original film are unchanged. Video ${file}, audio ${audio}.${liveLine(result)}`,
     next:[{tool:'change',args:{projectId:result.projectId,music:{identity:'<another identity>'}},why:'try a different musical identity on the same edit'},{tool:'open',args:{target:'editor',projectId:result.projectId},why:'only if they ask to open the editor'}]}
 }
 
@@ -203,6 +203,7 @@ async function styleOf(at, projectId, proof) {
   return project ? assembledReport(project, proof) : null
 }
 const styleLine = (style) => style && !style.ok ? ` House style notes: ${style.notes.join('; ')}.` : ''
+const liveLine = (result) => result.live ? ` The live HTML film, made of the real captures so its text stays sharp at any size, is at ${result.live}; embed it with an iframe.` : ''
 
 /**
  * The rendered file, moved from where the driver measured it to where the person works.
@@ -221,6 +222,11 @@ async function keepFile(result, dir, hint = 'film') {
   const file = path.join(outDir, `${slug}-${n}.mp4`)
   const buf = result.file ? await readFile(result.file).catch(() => null) : null
   await writeFile(file, buf || Buffer.from(await (await fetch(result.url)).arrayBuffer()))
+  // the live film beside it: the same cut made of the real captures, one file that plays anywhere
+  if (result.projectId && result.at) {
+    const page = await fetch(`${result.at}/__motioneer/projects/${encodeURIComponent(result.projectId)}/html`).then((r) => r.ok ? r.text() : null).catch(() => null)
+    if (page) { result.live = file.replace(/\.mp4$/, '.html'); await writeFile(result.live, page) }
+  }
   if (result.projectId) {
     const record = path.join(await workspace(), '.studio', 'projects', String(result.projectId), 'outputs.json')
     const was = JSON.parse(await readFile(record, 'utf8').catch(() => '[]'))
@@ -248,7 +254,7 @@ function shape(result, file, pace) {
     elements: result.elements || [],
     coverage: {selected:result.elements?.length || 0,filmed:result.distinct,complete:(result.elements || []).every(e=>e.status==='filmed')},
     planning: result.byModel === undefined ? 'existing cut' : result.byModel ? 'model' : 'prominence fallback',
-    artifacts: {video:file,storyboard:result.storyboard || null},
+    artifacts: {video:file,storyboard:result.storyboard || null,html:result.live || null},
     reviewError: result.reviewError || null,
     verdict: { ok: !!result.proof?.ok, notes: result.proof?.notes || [], cuts: result.proof?.cuts, arriveMs: result.proof?.arriveMs, blank: result.proof?.blank },
     repairs: result.repairs || result.changes || [],
@@ -270,8 +276,8 @@ async function revise({ projectId, dir, pace, seconds, opening, closing, drop, o
   const review=await reviewResult(result,file,progress)
   const { proofLine } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'proof.mjs')).href)
   const style = await styleOf(at, result.projectId, result.proof)
-  return { structured: { ...shape(result, file, result.pace), assembled: style, ...(sourceProjectId ? { sourceProjectId } : {}) }, images: review ? [review] : [], ids: { projectId: result.projectId, video: file, storyboard: result.storyboard },
-    summary: `${sourceProjectId ? 'Made a new take' : 'Revised the film'}: ${result.changes.join('; ') || 'cut again as it was'}. Now ${result.shots} shots of ${result.distinct} element${result.distinct === 1 ? '' : 's'} in ${Math.round(result.seconds)} seconds, ${result.pace}, saved to ${file}. ${proofLine(result.proof)}${styleLine(style)}`,
+  return { structured: { ...shape(result, file, result.pace), assembled: style, ...(sourceProjectId ? { sourceProjectId } : {}) }, images: review ? [review] : [], ids: { projectId: result.projectId, video: file, html: result.live, storyboard: result.storyboard },
+    summary: `${sourceProjectId ? 'Made a new take' : 'Revised the film'}: ${result.changes.join('; ') || 'cut again as it was'}. Now ${result.shots} shots of ${result.distinct} element${result.distinct === 1 ? '' : 's'} in ${Math.round(result.seconds)} seconds, ${result.pace}, saved to ${file}. ${proofLine(result.proof)}${styleLine(style)}${liveLine(result)}`,
     next: filmNext(result.projectId, result.proof, false) }
 }
 
@@ -418,9 +424,9 @@ async function retimeTool({ at, project, authored, dir, timing }, progress) {
   const { proofLine } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'proof.mjs')).href)
   const style = await styleOf(at, take.id, proved.proof), motions = new Set(changed.changes.map((c) => c.toMotionId)).size
   const said = [duration !== 1 && `each part moves ${duration < 1 ? `${Math.round((1 - duration) * 100)} percent faster` : `${Math.round((duration - 1) * 100)} percent slower`}`, stagger !== 1 && `gaps between parts ${stagger < 1 ? 'tighter' : 'wider'} by ${Math.abs(Math.round((1 - stagger) * 100))} percent`, ease && `${timing.ease} easing`].filter(Boolean).join(', ')
-  return { images: review ? [review] : [], ids: { projectId: take.id, video: file, storyboard: result.storyboard },
-    structured: { projectId: take.id, sourceProjectId: project.id, editor: `${at}/__motioneer/editor/?project=${take.id}&view=film`, file, changes: changed.changes, shots: result.shotList, verdict: { ok: !!proved.proof?.ok, notes: proved.proof?.notes || [], arriveMs: proved.proof?.arriveMs }, assembled: style, artifacts: { video: file, storyboard: result.storyboard || null } },
-    summary: `Retimed ${motions} motion${motions === 1 ? '' : 's'} on a new take, with no model asked: ${said}. Saved to ${file}. ${proofLine(proved.proof)}${styleLine(style)}`,
+  return { images: review ? [review] : [], ids: { projectId: take.id, video: file, html: result.live, storyboard: result.storyboard },
+    structured: { projectId: take.id, sourceProjectId: project.id, editor: `${at}/__motioneer/editor/?project=${take.id}&view=film`, file, changes: changed.changes, shots: result.shotList, verdict: { ok: !!proved.proof?.ok, notes: proved.proof?.notes || [], arriveMs: proved.proof?.arriveMs }, assembled: style, artifacts: { video: file, html: result.live || null, storyboard: result.storyboard || null } },
+    summary: `Retimed ${motions} motion${motions === 1 ? '' : 's'} on a new take, with no model asked: ${said}. Saved to ${file}. ${proofLine(proved.proof)}${styleLine(style)}${liveLine(result)}`,
     next: [{ tool: 'look', args: { projectId: take.id, shot: Number(timing.elements?.[0]) || 1 }, why: 'see the retimed arrival frame by frame' }, ...filmNext(take.id, proved.proof, false).slice(0, 2)] }
 }
 
@@ -428,11 +434,11 @@ async function retimeTool({ at, project, authored, dir, timing }, progress) {
 async function refineTool(args, progress) {
   const at = await studioFor('refine')
   const { prepareRenderer } = await import('../tools/environment.mjs'); await prepareRenderer(at, progress)
-  const result = await runFilmTool('refine', args, { at, onStep: progress }), file = await keepFile(result, args.dir, 'refined-take'), image = await reviewResult(result, file, progress)
+  const result = { ...(await runFilmTool('refine', args, { at, onStep: progress })), at }, file = await keepFile(result, args.dir, 'refined-take'), image = await reviewResult(result, file, progress)
   const { proofLine } = await import(pathToFileURL(path.join(ROOT, 'tools', 'editor', 'proof.mjs')).href)
-  return { images: image ? [image] : [], ids: { projectId: result.projectId, video: file, storyboard: result.storyboard },
-    structured: { projectId: result.projectId, sourceProjectId: result.sourceProjectId, editor: `${at}/__motioneer/editor/?project=${result.projectId}&view=film`, file, seconds: result.seconds, changes: result.changes, unchanged: result.unchanged, shots: result.shotList, verdict: { ok: !!result.proof?.ok, notes: result.proof?.notes || [] }, review: { status: result.review?.status, issues: result.review?.issues || [], attempts: result.review?.attempts || [] }, eventStatus: result.eventStatus, artifacts: { video: file, storyboard: result.storyboard || null } },
-    summary: `${result.unchanged ? 'No motion changed, so the source take stands' : `Made a new take refining ${result.changes.length} track${result.changes.length === 1 ? '' : 's'}`}, saved to ${file}. ${proofLine(result.proof)} Review ${result.review?.status}: ${result.review?.issues?.length ?? 0} unresolved observations.`,
+  return { images: image ? [image] : [], ids: { projectId: result.projectId, video: file, html: result.live, storyboard: result.storyboard },
+    structured: { projectId: result.projectId, sourceProjectId: result.sourceProjectId, editor: `${at}/__motioneer/editor/?project=${result.projectId}&view=film`, file, seconds: result.seconds, changes: result.changes, unchanged: result.unchanged, shots: result.shotList, verdict: { ok: !!result.proof?.ok, notes: result.proof?.notes || [] }, review: { status: result.review?.status, issues: result.review?.issues || [], attempts: result.review?.attempts || [] }, eventStatus: result.eventStatus, artifacts: { video: file, html: result.live || null, storyboard: result.storyboard || null } },
+    summary: `${result.unchanged ? 'No motion changed, so the source take stands' : `Made a new take refining ${result.changes.length} track${result.changes.length === 1 ? '' : 's'}`}, saved to ${file}. ${proofLine(result.proof)} Review ${result.review?.status}: ${result.review?.issues?.length ?? 0} unresolved observations.${liveLine(result)}`,
     next: filmNext(result.projectId, result.proof, true, result.shotList) }
 }
 

@@ -3,7 +3,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { projectStore } from './projects.mjs'
 import { renderer } from './render.mjs'
-import { compositionDocument } from '../../dist-core/core.js'
+import { liveFilm } from './live-film.mjs'
 const BUILD = fileURLToPath(new URL('../../dist-editor/', import.meta.url))
 /**
  * A project carries every captured element with its stylesheet and its fonts inlined, about a
@@ -53,14 +53,10 @@ export function editorRoutes(hooks) {
         return send(await render.list(id))
       }
       if(parts[3]==='html'){
-        const project=await store.read(id)
-        let html=compositionDocument(project)
-        for(const a of project.assets){const {data,mime}=await store.asset(id,a.id);const url=`/__motioneer/projects/${id}/assets/${a.id}`;html=html.split(url).join(`data:${mime};base64,${data.toString('base64')}`)}
-        // The runtime builds URLs from the root and id. A map keeps the exported document offline.
-        const sources={};for(const a of project.assets){const {data,mime}=await store.asset(id,a.id);sources[a.id]=`data:${mime};base64,${data.toString('base64')}`}
-        html=html.replace('assetRoot + t.assetId','(assetRoot + t.assetId)')
-        html=html.replace('</body>',`<script>window.__assetSources=${JSON.stringify(sources).replace(/</g,'\\u003c')};window.__composition.update(${JSON.stringify(project).replace(/</g,'\\u003c')});let t=0,last=performance.now(),playing=true;document.body.addEventListener('click',()=>playing=!playing);requestAnimationFrame(function tick(n){if(playing)t=(t+n-last)%${project.settings.duration};last=n;window.__composition.seek(t,playing);requestAnimationFrame(tick)});</script></body>`)
-        res.setHeader('content-disposition',`attachment; filename="motioneer.html"`);return send(html,200,'text/html')
+        // the live film: the real captures on the film's timeline, one file that plays anywhere
+        const project=await store.read(id),{html}=await liveFilm(project,(asset)=>store.asset(id,asset))
+        const name=String(project.name).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,60)||'motioneer'
+        res.setHeader('content-disposition',`attachment; filename="${name}.html"`);return send(html,200,'text/html')
       }
       return send({error:'Not found'},404)
     }catch(e){return send({error:e.message},e.status || (e.code==='ENOENT'?404:400))}

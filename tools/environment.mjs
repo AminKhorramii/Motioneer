@@ -91,7 +91,7 @@ export async function connectClaude(dir){
  * edited is kept as it is.
  */
 export async function installSkill(dir){
- const folder=path.join(await workspace(dir),'.claude','skills','motioneer'),file=path.join(folder,'SKILL.md'),text=await readFile(path.join(root,'docs','agent-skill.md'),'utf8')
+ const folder=path.join(await workspace(dir),'.claude','skills','motioneer'),file=path.join(folder,'SKILL.md'),text=await readFile(path.join(root,'plugin','skills','motioneer','SKILL.md'),'utf8')
  const current=await readFile(file,'utf8').catch(e=>{if(e.code==='ENOENT')return null;throw e})
  if(current===text)return{file,changed:false}
  if(current!==null)return{file,changed:false,kept:true}
